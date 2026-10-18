@@ -202,6 +202,22 @@ export const RunningWithNothingRecorded: Story = {
 	},
 };
 
+/**
+ * A partial review may have run to the end with a practice failed or withheld, and this view has no
+ * stop reason to say which, so its status claims neither. The results it recorded still list.
+ */
+export const PartialReview: Story = {
+	args: { state: readyWith({ review: { ...review, status: "PARTIAL" } }) },
+	play: async () => {
+		const panel = within(await settledReviewPanel());
+		await expect(panel.getByText("Partial")).toBeVisible();
+		await expect(panel.queryByText(/did not finish|stopped before/iu)).toBeNull();
+		await expect(
+			within(practiceTable()).getByRole("button", { name: focused.practiceName }),
+		).toBeVisible();
+	},
+};
+
 export const UntitledItem: Story = {
 	args: { state: readyWith({ review: { ...review, item: { ...review.item, title: null } } }) },
 	play: async () => {

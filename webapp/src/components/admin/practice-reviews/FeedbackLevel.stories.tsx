@@ -98,6 +98,42 @@ function withdrawnFromWork(
 	};
 }
 
+/**
+ * Feedback whose summary write on the work the provider never confirmed. `send` is where its post
+ * stands, and `withdrawn` adds an admin's withdrawal, which queues no removal while the write is
+ * unknown.
+ */
+function unknownWriteOnWork(
+	send: FeedbackSend["state"],
+	{ withdrawn = false }: { withdrawn?: boolean } = {},
+): ReviewFeedbackDetail {
+	const { id } = uncertainWriteFeedbackDetail;
+	return {
+		...uncertainWriteFeedbackDetail,
+		state: "UNCONFIRMED",
+		stopReason: "DELIVERY_UNCONFIRMED",
+		withdrawn,
+		copies: uncertainWriteFeedbackDetail.copies.map((copy) => ({
+			...copy,
+			readback: "UNKNOWN" as const,
+			stopReason: "DELIVERY_UNCONFIRMED" as const,
+			lastError: "Provider visibility is unknown.",
+		})),
+		sends: uncertainWriteFeedbackDetail.sends.map((post) => ({
+			...post,
+			state: send,
+			attemptCount: 8,
+			lastError: "Provider visibility is unknown.",
+		})),
+		decisions: withdrawn
+			? withdrawnFeedbackDetail.decisions.map((decision) => ({ ...decision, feedbackId: id }))
+			: [],
+	};
+}
+
+const UNKNOWN_ON_WORK_NOW =
+	"A comment was being written to the work, but the provider has not confirmed whether it appeared. It does not count as delivered until that is known. Until then, later reviews post no new feedback for this developer on this work.";
+
 const UNACKNOWLEDGED_REMOVAL = {
 	state: "POSTED",
 	readback: "TRANSIENT",
@@ -119,6 +155,8 @@ const meta = {
 		isChangingWithdrawal: false,
 		onRetryWithdrawal: fn(),
 		isRetryingWithdrawal: false,
+		onCheckDelivery: fn(),
+		isCheckingDelivery: false,
 	},
 	argTypes: { path: { control: false } },
 	render: (args) => (
@@ -589,9 +627,118 @@ export const DeliveryUnconfirmed: Story = {
 	args: { feedback: ready(unconfirmedFeedbackDetail) },
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
 		await expectHeaderChip(panelElement, "Delivery unconfirmed");
-		within(panelElement).getByText(/so it does not count as delivered/u);
+		panel.getByText(
+			"A conversation linked it, but its appearance was not recorded, so it does not count as delivered.",
+		);
 		await expect(history(panelElement).queryByText("Delivered")).toBeNull();
+		// A conversation has nothing on the work to read again.
+		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
+	},
+};
+
+/**
+ * The post stopped trying while the provider never confirmed whether the summary appeared. Reading
+ * the work again is offered, not another write.
+ */
+export const DeliveryUnknownOnWork: Story = {
+	args: { feedback: ready(unknownWriteOnWork("DONE")) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expectHeaderChip(panelElement, "Delivery unconfirmed");
+		panel.getByText(UNKNOWN_ON_WORK_NOW);
+		await expect(panel.queryByText(/conversation linked/iu)).toBeNull();
+		history(panelElement).getByText("Summary writing");
+		await expect(panel.getByRole("button", { name: "Check delivery" })).toBeEnabled();
+		await expect(panel.queryByRole("button", { name: "Retry withdrawal" })).toBeNull();
+		await expect(panel.getByRole("button", { name: "Withdraw feedback" })).toBeEnabled();
+	},
+};
+
+/** A check already asked for cannot be asked for twice. */
+export const CheckingDelivery: Story = {
+	args: { feedback: ready(unknownWriteOnWork("DONE")), isCheckingDelivery: true },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Check delivery" }));
+	},
+};
+
+/** While the post reads the work again, the sheet says so and offers no second check. */
+export const DeliveryCheckInProgress: Story = {
+	args: { feedback: ready(unknownWriteOnWork("PENDING")) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		panel.getByText(
+			"Heph is confirming whether a comment it began writing appeared on the work. Until the provider confirms it, it does not count as delivered.",
+		);
+		await expect(panel.queryByText(UNKNOWN_ON_WORK_NOW)).toBeNull();
+		history(panelElement).getByText("Waiting to be sent");
+		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
+	},
+};
+
+/** The check proved the summary absent: it is a failed copy, not an unknown one, and is not checked again. */
+export const DeliveryKnownAbsent: Story = {
+	args: {
+		feedback: ready({
+			...unknownWriteOnWork("DONE"),
+			state: "FAILED",
+			stopReason: null,
+			copies: uncertainWriteFeedbackDetail.copies.map((copy) => ({
+				...copy,
+				state: "FAILED" as const,
+				readback: "ABSENT" as const,
+				lastError: "Provider readback proved the copy is absent.",
+			})),
+		}),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expectHeaderChip(panelElement, "Failed to deliver");
+		const events = history(panelElement);
+		events.getByText("Summary failed");
+		events.getByText("Provider readback proved the copy is absent.");
+		await expect(panel.queryByText(/has not confirmed whether it appeared/u)).toBeNull();
+		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
+	},
+};
+
+/**
+ * Withdrawn while its write was unknown: nothing can be removed until the work is read again, so a
+ * check is offered in place of a removal that cannot run.
+ */
+export const WithdrawnUnknownWrite: Story = {
+	args: { feedback: ready(unknownWriteOnWork("DONE", { withdrawn: true })) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expectHeaderChip(panelElement, "Withdrawn");
+		panel.getByText(
+			"It is withdrawn, but one copy may still be on the work, because a write was never confirmed. Check delivery to find out. A comment found there is then retracted. The results behind it are unchanged.",
+		);
+		await expect(panel.queryByText(/Heph cannot remove/u)).toBeNull();
+		await expect(panel.getByRole("button", { name: "Check delivery" })).toBeEnabled();
+		await expect(panel.queryByRole("button", { name: "Retry withdrawal" })).toBeNull();
+		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
+	},
+};
+
+/** A withdrawn piece being checked is not reported as being removed. */
+export const WithdrawnDeliveryCheckInProgress: Story = {
+	args: { feedback: ready(unknownWriteOnWork("SENDING", { withdrawn: true })) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		panel.getByText(
+			"It is withdrawn. Heph is confirming whether a comment it began writing appeared on the work. A comment found there is then retracted. The results behind it are unchanged.",
+		);
+		await expect(panel.queryByText(/still removing/u)).toBeNull();
+		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
 	},
 };
 

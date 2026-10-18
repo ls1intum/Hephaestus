@@ -83,6 +83,8 @@ function TraceStack(props: Omit<TraceLevelProps, "path" | "onOpen">) {
 							isChangingWithdrawal={false}
 							onRetryWithdrawal={fn()}
 							isRetryingWithdrawal={false}
+							onCheckDelivery={fn()}
+							isCheckingDelivery={false}
 						/>
 					);
 				}

@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueProgress;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmCaptureConsent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
@@ -261,20 +262,15 @@ public class LinkedWorkItemContentSource {
                 if (label != null && label.getName() != null) labels.add(label.getName());
             }
         }
-        // GitHub supplies totals; GitLab supplies child relationships.
-        // subIssuesSource distinguishes provider totals from counts of stored children.
-        if (issue.getSubIssuesTotal() != null && issue.getSubIssuesCompleted() != null) {
-            node.put("subIssuesTotal", issue.getSubIssuesTotal());
-            node.put("subIssuesCompleted", issue.getSubIssuesCompleted());
-            node.put("subIssuesSource", "provider");
-        } else if (issue.getId() != null) {
-            IssueRepository.ChildRollup children =
-                    issueRepository.countChildrenByParentIssueId(issue.getId(), Issue.State.CLOSED);
-            if (children.getTotal() > 0) {
-                node.put("subIssuesTotal", children.getTotal());
-                node.put("subIssuesCompleted", children.getCompleted());
-                node.put("subIssuesSource", "children");
-            }
+        IssueRepository.ChildRollup children =
+                (issue.getSubIssuesTotal() == null || issue.getSubIssuesCompleted() == null) && issue.getId() != null
+                        ? issueRepository.countChildrenByParentIssueId(issue.getId(), Issue.State.CLOSED)
+                        : null;
+        var progress = IssueProgress.of(issue, children);
+        if (progress.source() != null) {
+            node.put("subIssuesTotal", progress.total());
+            node.put("subIssuesCompleted", progress.completed());
+            node.put("subIssuesSource", progress.source());
         }
         return node;
     }

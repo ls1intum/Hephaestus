@@ -30,6 +30,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -50,6 +51,7 @@ public class ResultAdmissionService {
     private final ReviewHistoryContentSource history;
     private final ObjectMapper mapper;
     private final TransactionTemplate transactions;
+    private final TransactionTemplate historySnapshot;
     private final ReviewCompositionBasisRepository bases;
     private final FeedbackCompositionService composition;
     private final ReviewWriteGuard writeGuard;
@@ -76,6 +78,11 @@ public class ResultAdmissionService {
         this.history = history;
         this.mapper = mapper;
         this.transactions = new TransactionTemplate(manager);
+        // Its own snapshot keeps the public page and its publication context on the same database state.
+        this.historySnapshot = new TransactionTemplate(manager);
+        this.historySnapshot.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.historySnapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        this.historySnapshot.setReadOnly(true);
         this.bases = bases;
         this.composition = composition;
         this.writeGuard = writeGuard;
@@ -223,7 +230,10 @@ public class ResultAdmissionService {
                     var job = ownedJob(identity);
                     if (!isAdmitted(job) || assignments.review(job).kind() != ReviewKind.ITEM)
                         throw new PublicHistoryRefusedException("History requires an admitted item review");
-                    return history.publicSameItemFeedback(job, assignments.load(job));
+                    var reviewed = assignments.load(job);
+                    // The owned attempt stays locked while a separate snapshot reads public history and its context.
+                    return Objects.requireNonNull(
+                            historySnapshot.execute(snapshot -> history.publicSameItemFeedback(job, reviewed)));
                 })),
                 read -> new JobEvidenceFiles.LateCopies(read.copies()));
         return retained.response();

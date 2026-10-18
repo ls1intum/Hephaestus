@@ -20,8 +20,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
@@ -40,9 +45,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -100,6 +107,7 @@ public class GitHubSubIssueSyncService {
     private final GitHubIssueProcessor issueProcessor;
     private final TransactionTemplate transactionTemplate;
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
+    private final ApplicationEventPublisher events;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubSubIssueSyncService(
@@ -113,7 +121,8 @@ public class GitHubSubIssueSyncService {
             SyncSchedulerProperties syncSchedulerProperties,
             GitHubIssueProcessor issueProcessor,
             PlatformTransactionManager transactionManager,
-            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper,
+            ApplicationEventPublisher events) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.identityProviderRepository = identityProviderRepository;
@@ -126,118 +135,75 @@ public class GitHubSubIssueSyncService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
         this.graphQlSyncHelper = graphQlSyncHelper;
+        this.events = events;
     }
 
     // WEBHOOK EVENT PROCESSING
 
-    /**
-     * Process a sub-issue webhook event.
-     * <p>
-     * Links or unlinks the parent-child relationship based on the event type.
-     * Also updates the parent's sub_issues_summary if provided.
-     */
+    /** Apply the native relationship and progress in the webhook transaction. */
     @Transactional
     public void processSubIssueEvent(
-            long subIssueId, long parentIssueId, boolean isLink, @Nullable SubIssuesSummaryDTO parentSummary) {
-        processSubIssueEventInternal(subIssueId, parentIssueId, isLink, parentSummary);
-    }
-
-    private void processSubIssueEventInternal(
-            long subIssueId, long parentIssueId, boolean isLink, @Nullable SubIssuesSummaryDTO parentSummary) {
-        log.debug(
-                "Received sub-issue event: subIssueId={}, parentIssueId={}, isLink={}",
-                subIssueId,
-                parentIssueId,
-                isLink);
-
-        Optional<Issue> subIssueOpt = issueRepository.findById(subIssueId);
-        if (subIssueOpt.isEmpty()) {
-            log.debug("Skipped sub-issue processing: reason=issueNotFound, issueId={}", subIssueId);
+            long subIssueId,
+            long parentIssueId,
+            boolean isLink,
+            @Nullable SubIssuesSummaryDTO parentSummary,
+            ProcessingContext context) {
+        var child = issueRepository.findById(subIssueId).orElse(null);
+        var parent = issueRepository.findById(parentIssueId).orElse(null);
+        if (child == null || parent == null) return;
+        var previous = child.getParentIssue();
+        if (!isLink && (previous == null || !previous.getId().equals(parentIssueId))) {
+            // A supplied provider summary is authoritative even when this mirror did not hold the relation.
+            // Without a relationship change or a summary, there is no new progress fact to store.
+            if (parentSummary != null && updateParentSummary(parent, parentSummary)) {
+                publishProgress(parent, EventContext.from(context));
+            }
             return;
         }
-
-        Issue subIssue = subIssueOpt.get();
-        if (isLink) {
-            linkSubIssueToParent(subIssue, parentIssueId, parentSummary);
-        } else {
-            unlinkSubIssueFromParent(subIssue, parentIssueId, parentSummary);
+        var eventContext = EventContext.from(context);
+        boolean relationshipChanged = isLink ? !Objects.equals(previous, parent) : true;
+        if (!relationshipChanged && parentSummary == null) return;
+        child.setParentIssue(isLink ? parent : null);
+        issueRepository.saveAndFlush(child);
+        if (isLink && previous != null && !previous.getId().equals(parentIssueId)) {
+            updateParentSummary(previous, null);
+            publishProgress(previous, eventContext);
         }
+        boolean summaryChanged = updateParentSummary(parent, parentSummary);
+        if (relationshipChanged || summaryChanged) publishProgress(parent, eventContext);
     }
 
-    /**
-     * Recounts the rollup of the parent of {@code issueId} from the children this repository stores,
-     * for an event that changes a child's state and carries no summary of the parent — the
-     * {@code issues} closed and reopened hooks. Nothing happens for an issue with no parent.
-     */
+    /** A child hook cannot certify that the stored child inventory is complete. */
     @Transactional
-    public void recountParentOf(long issueId) {
-        Issue parent =
+    public void invalidateParentCompletionOf(long issueId) {
+        var parent =
                 issueRepository.findById(issueId).map(Issue::getParentIssue).orElse(null);
-        if (parent == null || parent.getId() == null) {
-            return;
-        }
-        IssueRepository.ChildRollup children =
-                issueRepository.countChildrenByParentIssueId(parent.getId(), Issue.State.CLOSED);
-        int total = (int) children.getTotal();
-        int completed = (int) children.getCompleted();
-        updateParentSummary(
-                parent, new SubIssuesSummaryDTO(total, completed, total == 0 ? 0 : (100 * completed) / total));
+        if (parent == null) return;
+        parent.setSubIssuesCompleted(null);
+        parent.setSubIssuesPercentCompleted(null);
+        issueRepository.save(parent);
     }
 
-    /** Convenience overload for tests and cases where summary is not available. */
-    @Transactional
-    public void processSubIssueEvent(long subIssueId, long parentIssueId, boolean isLink) {
-        processSubIssueEventInternal(subIssueId, parentIssueId, isLink, null);
+    private boolean updateParentSummary(Issue parent, @Nullable SubIssuesSummaryDTO summary) {
+        Integer total = summary == null ? null : summary.total();
+        Integer completed = summary == null ? null : summary.completed();
+        boolean changed = !Objects.equals(parent.getSubIssuesTotal(), total)
+                || !Objects.equals(parent.getSubIssuesCompleted(), completed);
+        parent.setSubIssuesTotal(total);
+        parent.setSubIssuesCompleted(completed);
+        parent.setSubIssuesPercentCompleted(summary == null ? null : summary.percentCompleted());
+        issueRepository.save(parent);
+        return changed;
     }
 
-    private void linkSubIssueToParent(Issue subIssue, long parentIssueId, @Nullable SubIssuesSummaryDTO parentSummary) {
-        Optional<Issue> parentOpt = issueRepository.findById(parentIssueId);
-        if (parentOpt.isEmpty()) {
-            log.debug("Skipped sub-issue link: reason=parentNotFound, parentIssueId={}", parentIssueId);
-            return;
-        }
-
-        Issue parentIssue = parentOpt.get();
-        subIssue.setParentIssue(parentIssue);
-        issueRepository.save(subIssue);
-
-        updateParentSummary(parentIssue, parentSummary);
-
-        log.info(
-                "Linked sub-issue to parent: subIssueNumber={}, parentIssueNumber={}",
-                subIssue.getNumber(),
-                parentIssue.getNumber());
+    private void publishProgress(Issue parent, EventContext context) {
+        events.publishEvent(new ScmDomainEvent.IssueUpdated(
+                ScmEventPayload.IssueData.from(parent), Set.of(ScmItemEvents.ISSUE_PROGRESS_FIELD), context));
     }
 
-    private void unlinkSubIssueFromParent(
-            Issue subIssue, long parentIssueId, @Nullable SubIssuesSummaryDTO parentSummary) {
-        Issue currentParent = subIssue.getParentIssue();
-        if (currentParent != null) {
-            log.info(
-                    "Unlinked sub-issue from parent: subIssueNumber={}, parentIssueNumber={}",
-                    subIssue.getNumber(),
-                    currentParent.getNumber());
-        }
-
-        subIssue.setParentIssue(null);
-        issueRepository.save(subIssue);
-
-        if (parentSummary != null) {
-            issueRepository.findById(parentIssueId).ifPresent(parent -> updateParentSummary(parent, parentSummary));
-        }
-    }
-
-    private void updateParentSummary(Issue parentIssue, @Nullable SubIssuesSummaryDTO summary) {
-        if (summary == null) {
-            return;
-        }
-
-        parentIssue.setSubIssuesTotal(summary.total());
-        parentIssue.setSubIssuesCompleted(summary.completed());
-        parentIssue.setSubIssuesPercentCompleted(summary.percentCompleted());
-        issueRepository.save(parentIssue);
-
-        log.debug("Updated parent issue summary: issueNumber={}, summary={}", parentIssue.getNumber(), summary);
+    private EventContext syncContext(Issue parent, Long scopeId) {
+        return EventContext.forSync(
+                scopeId, RepositoryRef.from(parent.getRepository()), IdentityProviderType.GITHUB, Instant.now());
     }
 
     // GRAPHQL BULK SYNC
@@ -431,6 +397,13 @@ public class GitHubSubIssueSyncService {
                     break;
                 }
 
+                if (!graphQlResponse.getErrors().isEmpty()) {
+                    log.warn(
+                            "Skipped sub-issue page: reason=partialGraphQlResponse, repoName={}",
+                            sanitizeForLog(repository.getNameWithOwner()));
+                    break;
+                }
+
                 // Track rate limit from response
                 graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
@@ -525,7 +498,9 @@ public class GitHubSubIssueSyncService {
             if (graphQlIssue.getParent() != null) {
                 linkedCount += processParentRelationship(graphQlIssue, repository, scopeId);
             }
-
+        }
+        // A summary from this page is authoritative even if a later node changed a stored relationship.
+        for (var graphQlIssue : issueConnection.getNodes()) {
             if (graphQlIssue.getSubIssuesSummary() != null) {
                 processSubIssuesSummary(graphQlIssue, repository, scopeId);
             }
@@ -574,9 +549,15 @@ public class GitHubSubIssueSyncService {
             return 0;
         }
 
-        // Set the parent relationship
+        var previous = subIssue.getParentIssue();
         subIssue.setParentIssue(parent);
-        issueRepository.save(subIssue);
+        issueRepository.saveAndFlush(subIssue);
+        if (previous != null) {
+            updateParentSummary(previous, null);
+            publishProgress(previous, syncContext(previous, scopeId));
+        }
+        updateParentSummary(parent, null);
+        publishProgress(parent, syncContext(parent, scopeId));
 
         log.debug(
                 "Linked issue to parent: issueNumber={}, parentIssueNumber={}, repoName={}",
@@ -737,11 +718,11 @@ public class GitHubSubIssueSyncService {
             return;
         }
 
-        // Update the summary
-        issue.setSubIssuesTotal(summary.getTotal());
-        issue.setSubIssuesCompleted(summary.getCompleted());
-        issue.setSubIssuesPercentCompleted(summary.getPercentCompleted());
-        issueRepository.save(issue);
+        if (updateParentSummary(
+                issue,
+                new SubIssuesSummaryDTO(summary.getTotal(), summary.getCompleted(), summary.getPercentCompleted()))) {
+            publishProgress(issue, syncContext(issue, scopeId));
+        }
 
         log.debug(
                 "Updated issue sub-issues summary: issueNumber={}, completedCount={}, totalCount={}",

@@ -76,10 +76,26 @@ An issue edit can end current proof without erasing history.
 A tombstone holds new review work. Disconnect erases the connected source through its eraser.
 Restoration and a later eligible event can permit a fresh review.
 
+The issue evidence version includes its captured sub-issue progress and its source.
+Provider summaries are authoritative. Positive stored-child counts are a lower bound.
+An empty stored-child inventory does not prove that an issue has no children.
+Parent summary and hierarchy writes, and child close or reopen, record a parent issue occasion in the same transaction.
+
 A repair must capture the version it claims to review.
 It cannot reconstruct a missed merge from the current head alone.
 Duplicate event delivery does not extend a decision deadline or renew consent.
 Provider comments identified as Hephaestus's own writes do not start a feedback loop.
+
+A repeated SCM work version can reuse its existing occasion without starting another review.
+Its source observation still reconciles current issue and pull request results through durable event delivery.
+The comparison reads the canonical source now.
+It does not use the old occasion time as a freshness cutoff.
+A verified result for a superseded version remains in history and does not replace a matching current claim.
+An unavailable or hidden source does not establish a work change or item removal.
+
+Submitted reviews retain their own event-driven retirement and normal claim ordering.
+A later author push alone does not retire observations about an unchanged submitted review.
+Repository and file scans keep their frozen source contract.
 
 The [sync lifecycle](./sync-lifecycle.md) owns adapter lifecycle details.
 The [operations guide](/admin/practice-review-operations) owns queue timing and deployment controls.
@@ -186,6 +202,12 @@ The composer keeps evidence and its qualifications when it shortens feedback.
 Delivered prose uses natural evidence references without internal labels or coordinates.
 Support references and anchors retain the exact evidence links.
 
+The review on the work also gets the whole code that its public Not met citations name.
+Each cited text resolves to its one manifest entry, as admission resolved it.
+The source file that a citation names does not decide which text it is.
+A file is shown only when its pinned bytes match the digest of that file's captured text.
+A citation of lines in the captured change record shows the one changed file whose diff section holds those lines.
+
 Historical advice claims require confirmed shown words with authorized source custody.
 Unavailable history is a failed or refused read, not an empty history.
 Delivery facts can remain visible without copying unavailable words.
@@ -202,12 +224,13 @@ Then the runner asks for a new attempt of the same job.
 The server grants it only if the public review is accepted and no private piece of the job is prepared.
 A new attempt after a lost or stopped worker continues an admitted review in the same way.
 Each new attempt uses the original admission, its results and the retained original inputs.
-It reads routing, consent and erasure again and composes no public review.
-It composes private feedback only if the public review is accepted and no private piece is prepared.
+It reads routing, consent and erasure again.
+Like the first attempt, it composes the public review only if none is accepted.
+Then it composes private feedback only if no private piece is prepared.
 The retry limit and the original expiry of those inputs stay in effect.
 After one private piece is accepted, no attempt composes private feedback again.
 The other private pieces of that run are then not recovered.
-The new attempt does not see the accepted public review.
+A new attempt does not see a public review that an earlier attempt composed.
 Its private feedback can repeat a point of that review.
 
 The composer selects an inline citation by problem ID and citation index.
@@ -259,6 +282,28 @@ Confirmed historical copies are never posted again.
 Current source version, scope, consent, feedback mode, delivery pause and approval are checked at egress.
 A work-state refusal does not erase the result.
 Practice-page and conversation feedback retain their own visibility checks.
+
+A public piece keeps the publication context of the history read that it was composed from.
+The history read issues the context and the history page from one snapshot.
+A new copy write needs two facts about the same work and the same developer.
+First, the context of other reviews' feedback is still current.
+Second, no write of another review has an unknown outcome.
+The write fence takes the item lock first, then reads both facts in one statement.
+
+A stale context withholds the piece as Public history changed.
+An unknown outcome withholds the piece as Public delivery unresolved.
+The admitted results do not change.
+A piece prepared before contexts existed counts as composed from an empty history.
+Readback, retraction and correction do not need these checks.
+
+Preparation refuses a public piece with a stale context and stores nothing.
+While its composer still runs, a fresh session composes again from a new history read, at most twice.
+A refused approval records its check before it answers.
+A stale context also records the withholding.
+An unknown outcome keeps the proposal awaiting approval.
+
+An admin can recheck a write with unknown visibility.
+The recheck only reads the copy back and never creates a copy.
 
 The [feedback model](./practice-feedback-schema.md#feedback-and-delivery) owns durable receipts.
 The [operator guide](/admin/practice-review) owns approval, retry and diagnosis procedures.

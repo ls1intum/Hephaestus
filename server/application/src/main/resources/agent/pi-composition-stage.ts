@@ -27,7 +27,9 @@ import { errorText } from "./pi-error-text.ts";
 import {
 	prepareFeedback,
 	type FeedbackComposition,
+	type FeedbackPreparation,
 	type FeedbackPreparationReceipt,
+	type PublicationRefusal,
 } from "./pi-feedback-preparation.ts";
 import { trimmedText } from "./pi-result-normalize.ts";
 import {
@@ -168,7 +170,8 @@ export type CompositionFailureReason =
 	| "LOOP"
 	| "NO_DECISION"
 	| "SERVER_REFUSED"
-	| "PRIVATE_NOT_RECOVERED";
+	| "PRIVATE_NOT_RECOVERED"
+	| PublicationRefusal;
 
 interface CompositionFailure {
 	phase: CompositionPhase;
@@ -183,6 +186,8 @@ export interface ComposedFeedback extends ComposedFeedbackEnvelope {
 	preparedTargets: PreparedFeedbackTarget[];
 	feedback: FeedbackPiece[];
 	review: ComposedReview | null;
+	/** The context of the history read the stored review was composed from; set and cleared with `review`. */
+	publicationContext?: string | null;
 	preparation: FeedbackPreparationReceipt | null;
 }
 
@@ -827,7 +832,7 @@ export function buildFeedbackTool(
 	});
 }
 
-export async function prepareComposedFeedback(options: {
+export interface PreparationOptions {
 	feedback: ComposedFeedback;
 	phase?: CompositionPhase;
 	admitted: boolean;
@@ -838,19 +843,107 @@ export async function prepareComposedFeedback(options: {
 	timeoutMs: number;
 	persist: () => void;
 	recordFailure: (phase: CompositionPhase, reason: CompositionFailureReason) => void;
-}): Promise<void> {
-	const { feedback: composedFeedback } = options;
+}
+
+/**
+ * Prepares only the stored public review, while its composer can still answer a typed refusal. A typed refusal leaves
+ * the review for the caller to withdraw; any other refusal ends it as before; a lost answer leaves it stored, so the
+ * later preparation replays the same words.
+ */
+export async function preparePublicReview(
+	options: PreparationOptions,
+): Promise<FeedbackPreparation | null> {
 	if (!options.admitted || options.expired) {
+		return null;
+	}
+	const entry = preparationPackages(options.feedback, "PUBLIC_REVIEW").find(
+		(candidate) => candidate.publicComposition,
+	);
+	if (entry === undefined) {
+		return null;
+	}
+	const result = await prepareFeedback({
+		url: options.url,
+		token: options.token,
+		payload: {
+			...options.task,
+			basisResultIds: [...new Set(entry.composition.flatMap((piece) => piece.resultIds))],
+			composition: entry.composition,
+			publicComposition: true,
+			publicationContext: options.feedback.publicationContext ?? null,
+		},
+		timeoutMs: options.timeoutMs,
+	});
+	if (result.state === "PREPARED") {
+		options.feedback.preparation = result.receipt;
+		options.persist();
+	} else if (result.state === "REFUSED" && result.publication === undefined) {
+		options.feedback.review = null;
+		options.feedback.publicationContext = null;
+		options.recordFailure("PUBLIC_REVIEW", "SERVER_REFUSED");
+		options.persist();
+	}
+	console.error(`[pi-runner] public review preparation: ${result.state}`);
+	return result;
+}
+
+export async function prepareComposedFeedback(options: PreparationOptions): Promise<void> {
+	const { feedback: composedFeedback } = options;
+	// A receipt already holds the public review accepted while its session ran; only a lost answer needs this replay.
+	if (
+		!options.admitted ||
+		options.expired ||
+		(options.phase === "PUBLIC_REVIEW" && composedFeedback.preparation !== null)
+	) {
 		return;
 	}
+	const packages = preparationPackages(composedFeedback, options.phase);
+	const refused = new Set<number>();
+	for (const entry of packages) {
+		const result = await prepareFeedback({
+			url: options.url,
+			token: options.token,
+			payload: {
+				...options.task,
+				basisResultIds: [...new Set(entry.composition.flatMap((piece) => piece.resultIds))],
+				composition: entry.composition,
+				publicComposition: entry.publicComposition,
+				publicationContext: entry.publicComposition
+					? (composedFeedback.publicationContext ?? null)
+					: null,
+			},
+			timeoutMs: options.timeoutMs,
+		});
+		if (result.state === "REFUSED") {
+			if (entry.publicComposition) {
+				composedFeedback.review = null;
+				composedFeedback.publicationContext = null;
+				options.recordFailure("PUBLIC_REVIEW", result.publication ?? "SERVER_REFUSED");
+			} else if (entry.privateIndex !== undefined) {
+				refused.add(entry.privateIndex);
+				options.recordFailure("PRIVATE_FEEDBACK", "SERVER_REFUSED");
+			}
+		}
+		if (result.state === "PREPARED") {
+			composedFeedback.preparation = result.receipt;
+		}
+		console.error(`[pi-runner] feedback preparation: ${result.state}`);
+	}
+	composedFeedback.feedback = composedFeedback.feedback.filter((_, index) => !refused.has(index));
+	options.persist();
+}
 
+function preparationPackages(
+	composedFeedback: ComposedFeedback,
+	phase: CompositionPhase | undefined,
+): { composition: FeedbackComposition[]; publicComposition: boolean; privateIndex?: number }[] {
 	const packages: {
 		composition: FeedbackComposition[];
 		publicComposition: boolean;
 		privateIndex?: number;
 	}[] = [];
 	const { review } = composedFeedback;
-	if (review !== null && options.phase !== "PRIVATE_FEEDBACK") {
+	if (review !== null && phase !== "PRIVATE_FEEDBACK") {
 		const refs = [
 			...(review.summary?.basedOn ?? []),
 			...review.inline.flatMap((note) => note.basedOn),
@@ -897,7 +990,7 @@ export async function prepareComposedFeedback(options: {
 		});
 	}
 	for (const [privateIndex, piece] of composedFeedback.feedback.entries()) {
-		if (options.phase === "PUBLIC_REVIEW") {
+		if (phase === "PUBLIC_REVIEW") {
 			continue;
 		}
 		const quiet = piece.action === "WITHHOLD";
@@ -956,35 +1049,7 @@ export async function prepareComposedFeedback(options: {
 			],
 		});
 	}
-	const refused = new Set<number>();
-	for (const entry of packages) {
-		const result = await prepareFeedback({
-			url: options.url,
-			token: options.token,
-			payload: {
-				...options.task,
-				basisResultIds: [...new Set(entry.composition.flatMap((piece) => piece.resultIds))],
-				composition: entry.composition,
-				publicComposition: entry.publicComposition,
-			},
-			timeoutMs: options.timeoutMs,
-		});
-		if (result.state === "REFUSED") {
-			if (entry.publicComposition) {
-				composedFeedback.review = null;
-				options.recordFailure("PUBLIC_REVIEW", "SERVER_REFUSED");
-			} else if (entry.privateIndex !== undefined) {
-				refused.add(entry.privateIndex);
-				options.recordFailure("PRIVATE_FEEDBACK", "SERVER_REFUSED");
-			}
-		}
-		if (result.state === "PREPARED") {
-			composedFeedback.preparation = result.receipt;
-		}
-		console.error(`[pi-runner] feedback preparation: ${result.state}`);
-	}
-	composedFeedback.feedback = composedFeedback.feedback.filter((_, index) => !refused.has(index));
-	options.persist();
+	return packages;
 }
 
 interface ReportReviewDetails {
@@ -995,7 +1060,20 @@ interface ReportReviewDetails {
 export interface PublicReviewState {
 	final: boolean;
 	reviewContext: "LOST" | "RESTORING" | "HELD";
+	/** Set when preparation refused this session's review with a publication code; nothing was stored. */
+	refused?: PublicationRefusal;
 }
+
+/** A public review session ends, or ends because preparation refused its review with a publication code. */
+export type PublicReviewOutcome = "DONE" | { refused: PublicationRefusal };
+
+/**
+ * Fresh public sessions after the initial one, only when the history under the review changed; same attempt, same
+ * admitted results, same safety deadline. Each session builds its review tool and witness validator from one history
+ * read. The SDK could replace a session's tools, but a bounded restart keeps that one-read contract for this rare case.
+ * An unknown delivery outcome never starts a session: only a provider readback can resolve it.
+ */
+export const MAX_PUBLIC_RECOMPOSITIONS = 2;
 
 const REVIEW_FINAL = "The review on this work is final; this composition accepts nothing more.";
 
@@ -1004,6 +1082,10 @@ type ReviewToolRuntime = Pick<
 	"admitted" | "feedback" | "persist" | "onStored"
 > & {
 	refusal: (id: string, text: string) => Promise<AgentToolResult<ReportReviewDetails>>;
+	/** The context of the history read whose statements this session shows; stored with the review. */
+	publicationContext?: string | null;
+	/** Prepares the stored review while this session can still answer a typed refusal. */
+	preparePublic?: () => Promise<FeedbackPreparation | null>;
 };
 
 export function buildReviewTool(
@@ -1078,14 +1160,48 @@ export function createReviewRecorder(
 		}
 		// Final only once persisted: a failed write leaves the review unaccepted, so it is never delivered.
 		const previous = runtime.feedback.review;
+		const previousContext = runtime.feedback.publicationContext ?? null;
 		runtime.feedback.review = read.review;
+		runtime.feedback.publicationContext = runtime.publicationContext ?? null;
 		try {
 			runtime.persist();
 		} catch (error) {
 			runtime.feedback.review = previous;
+			runtime.feedback.publicationContext = previousContext;
 			throw error;
 		}
+		const prepared = await runtime.preparePublic?.();
+		if (prepared?.state === "REFUSED" && prepared.publication !== undefined) {
+			// The server prepared nothing. Changed history earns a fresh session; unknown delivery requires readback.
+			runtime.feedback.review = previous;
+			runtime.feedback.publicationContext = previousContext;
+			runtime.persist();
+			state.final = true;
+			state.refused = prepared.publication;
+			return {
+				content: [
+					{
+						type: "text",
+						text:
+							prepared.publication === "PUBLIC_HISTORY_CHANGED"
+								? "The review was not stored: feedback on this work changed while it was composed. Composition starts again from the current history."
+								: "The review was not stored: another delivery of feedback on this work has an unknown outcome. It is final.",
+					},
+				],
+				details: { stored: 0 },
+				terminate: true,
+			};
+		}
 		state.final = true;
+		if (prepared?.state === "REFUSED") {
+			return {
+				content: [
+					{ type: "text", text: "The server refused the review; nothing was stored. It is final." },
+				],
+				details: { stored: 0 },
+				terminate: true,
+			};
+		}
 		runtime.onStored(1);
 		const { summary, inline, withheld } = read.review;
 		const said = summary
@@ -1564,7 +1680,12 @@ interface CompositionRuntime<TTrace extends CompositionTrace> extends Pick<
 	opening: () => string;
 	hasOpening: () => boolean;
 	openedContext: () => void;
-	readPublicFeedbackHistory: () => Promise<{ readAt: string; history: { feedback: unknown[] } }>;
+	readPublicFeedbackHistory: () => Promise<{
+		readAt: string;
+		publicationContext: string | null;
+		history: { feedback: unknown[] };
+	}>;
+	preparePublic: (expired: boolean) => Promise<FeedbackPreparation | null>;
 	recordHistory: (history: {
 		readAt: string;
 		workCapturedAt: string | null;
@@ -1787,6 +1908,7 @@ export function createCompositionStage<TTrace extends CompositionTrace>(
 		hasOpening,
 		openedContext,
 		readPublicFeedbackHistory,
+		preparePublic,
 		recordHistory,
 		onStored,
 		paid,
@@ -1864,7 +1986,7 @@ ${finishCompositionText(notMet, request, composedFeedback)}`,
 		reviewable: readonly Record<string, unknown>[],
 		notReachedSlugs: readonly string[],
 		safety: CompositionDeadline,
-	): Promise<void> {
+	): Promise<PublicReviewOutcome> {
 		const lineNotes = request.onWorkCopyForms.includes("LINE_NOTE");
 		const reviewLoader = new DefaultResourceLoader({
 			cwd: CWD,
@@ -1888,7 +2010,7 @@ ${finishCompositionText(notMet, request, composedFeedback)}`,
 				"PUBLIC_REVIEW",
 				safety.expired() ? "SAFETY" : "RUNTIME_ERROR",
 			);
-			return;
+			return "DONE";
 		}
 		const framing = task;
 		const captured = buildPublicReviewHistory(CWD, paths.contextRoot, folderIndex, framing);
@@ -1936,6 +2058,8 @@ ${finishCompositionText(notMet, request, composedFeedback)}`,
 						persist: persistFeedback,
 						refusal,
 						onStored,
+						publicationContext: read.publicationContext,
+						preparePublic: async () => preparePublic(safety.expired()),
 					},
 				),
 			],
@@ -2107,6 +2231,7 @@ ${finishCompositionText(notMet, request, composedFeedback)}`,
 				unsubscribeContext();
 			}
 		}
+		return state.refused === undefined ? "DONE" : { refused: state.refused };
 	}
 
 	// Private composition starts after measurement in a fresh session with server-routed support.
@@ -2328,7 +2453,21 @@ export async function composeAdmittedFeedback(options: {
 			request.destinations.ON_WORK !== undefined &&
 			reviewable.length > 0
 		) {
-			await stage.composeReview(request, reviewable, notReached, safety);
+			// A typed refusal stored nothing. Only changed history opens a fresh session, which reads it again.
+			for (let recomposed = 0; ; recomposed += 1) {
+				const outcome = await stage.composeReview(request, reviewable, notReached, safety);
+				if (outcome === "DONE") {
+					break;
+				}
+				if (
+					outcome.refused !== "PUBLIC_HISTORY_CHANGED" ||
+					recomposed >= MAX_PUBLIC_RECOMPOSITIONS ||
+					safety.expired()
+				) {
+					recordCompositionFailure(feedback, "PUBLIC_REVIEW", outcome.refused);
+					break;
+				}
+			}
 		}
 		await prepare(safety, "PUBLIC_REVIEW");
 		try {

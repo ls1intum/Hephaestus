@@ -73,7 +73,9 @@ class IssueContentSourceTest extends BaseUnitTest {
                 issueRepository,
                 issueCommentRepository,
                 new IssueEvidenceVersion(
-                        issueCommentRepository, new IssueCommentProvenance(mock(DeliveredIssueCommentLookup.class))));
+                        issueCommentRepository,
+                        new IssueCommentProvenance(mock(DeliveredIssueCommentLookup.class)),
+                        issueRepository));
         lenient().when(issueCommentRepository.countByIssueId(ISSUE_ID)).thenReturn(0L);
         lenient().when(issueCommentRepository.findStoredByIssueId(ISSUE_ID)).thenReturn(List.of());
     }
@@ -154,7 +156,8 @@ class IssueContentSourceTest extends BaseUnitTest {
         for (StoredComment comment : delivered)
             notes.add(new DeliveredIssueCommentLookup.DeliveredComment(
                     "gid://gitlab/Note/" + comment.getNativeId(), null));
-        return new IssueEvidenceVersion(issueCommentRepository, new IssueCommentProvenance(deliveries(notes)));
+        return new IssueEvidenceVersion(
+                issueCommentRepository, new IssueCommentProvenance(deliveries(notes)), issueRepository);
     }
 
     @Test

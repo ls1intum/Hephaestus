@@ -24,7 +24,7 @@ on:
         type: boolean
         default: false
       allow-rollback:
-        description: Permit moving this environment backwards
+        description: Permit an older release or commit. This does not restore the database.
         type: boolean
         default: false
       freeze:

@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
@@ -21,10 +23,12 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +38,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
 
 @WorkspaceScopedController
 @ConditionalOnServerRole
@@ -90,14 +95,24 @@ public class FeedbackReviewController {
             WorkspaceContext workspace,
             @PathVariable UUID feedbackId,
             @Valid @RequestBody CreateFeedbackDecisionRequestDTO request) {
-        var decision = decisions.decide(
+        var outcome = decisions.decide(
                 workspace.id(),
                 feedbackId,
                 SecurityUtils.getCurrentAccountId().orElseThrow(),
                 new FeedbackDecisionInput(
                         request.action(), request.reasonCode(), request.note(), request.contentDigest()));
+        var refusal = outcome.refusal();
+        if (refusal != null) {
+            // The service committed the refused check, and any withholding, before this answer.
+            var refused = new ResponseStatusException(
+                    HttpStatus.CONFLICT, "The publication context does not permit approval.");
+            refused.getBody().setProperty("code", refusal.name());
+            refused.getBody().setProperty("state", outcome.state().name());
+            throw refused;
+        }
+        var decisionId = Objects.requireNonNull(outcome.decisionId());
         var saved = reader.decisionHistory(workspace.id(), feedbackId).stream()
-                .filter(row -> row.id().equals(decision.getId()))
+                .filter(row -> row.id().equals(decisionId))
                 .findFirst()
                 .orElseThrow();
         return ResponseEntity.status(201).body(saved);
@@ -109,6 +124,16 @@ public class FeedbackReviewController {
     @ApiResponse(responseCode = "202", description = "Feedback retry accepted")
     public ResponseEntity<ReviewFeedbackDetailDTO> retry(WorkspaceContext workspace, @PathVariable UUID feedbackId) {
         store.retry(
+                workspace.id(), feedbackId, SecurityUtils.getCurrentAccountId().orElseThrow());
+        return ResponseEntity.accepted().body(reader.detail(workspace.id(), feedbackId));
+    }
+
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "FEEDBACK_DELIVERY_RECHECK")
+    @PostMapping("/feedback/{feedbackId}/recheck")
+    @Operation(operationId = "recheckFeedbackDelivery")
+    @ApiResponse(responseCode = "202", description = "Feedback delivery recheck accepted")
+    public ResponseEntity<ReviewFeedbackDetailDTO> recheck(WorkspaceContext workspace, @PathVariable UUID feedbackId) {
+        store.recheck(
                 workspace.id(), feedbackId, SecurityUtils.getCurrentAccountId().orElseThrow());
         return ResponseEntity.accepted().body(reader.detail(workspace.id(), feedbackId));
     }

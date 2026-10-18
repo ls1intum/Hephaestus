@@ -84,9 +84,9 @@ describe("traceVerdict on a review", () => {
 		});
 	});
 
-	it("says a partial review left some of the work unreviewed", () => {
+	it("says a partial review closed as partial, not that it stopped or what it left out", () => {
 		expect(verdictOf("scan-many-jobs").sentence).toMatch(
-			/^This review closed after .+ with some of the work not reviewed and recorded \d+ results, but composed no feedback\.$/u,
+			/^This review closed as partial after .+ and recorded \d+ results, but composed no feedback\.$/u,
 		);
 	});
 

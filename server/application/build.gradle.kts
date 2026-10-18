@@ -193,24 +193,39 @@ tasks.named("dependencies") {
 jacoco { toolVersion = libs.versions.jacoco.get() }
 
 val profileTests = providers.gradleProperty("profileTests").map(String::toBoolean).orElse(false)
-val testSelection = providers.gradleProperty("testSelection").map(String::toBoolean).orElse(false)
+
+require(!providers.gradleProperty("testSelection").isPresent) {
+    "-PtestSelection is no longer supported. Use 'vp run test:server:selection' to discover tests without executing them."
+}
+
 val testJvmArgs = providers.gradleProperty("testJvmArgs").orElse("")
 val integrationShard = providers.environmentVariable("HEPHAESTUS_INTEGRATION_SHARD").orElse("")
 val packagedServer = providers.gradleProperty("packagedServer").map(String::toBoolean).orElse(false)
 // Stable catalogue case IDs for live checks and their credential-free staging proof.
 val criteriaCases = providers.gradleProperty("criteriaCases")
-val testInventories =
+val testTiers =
     mapOf(
-        "testInventory" to "",
+        "test" to "unit",
+        "architectureTest" to "architecture",
+        "integrationTest" to "integration",
+        "databaseTest" to "database",
+        "liveTest" to "live",
+    )
+val integrationInventories =
+    mapOf(
         "integrationProvidersInventory" to "providers-and-startup",
         "integrationApplicationInventory" to "application",
     )
+val testInventories =
+    mapOf("testInventory" to "") +
+        testTiers.values.filter { it != "live" }.associateBy { "${it}Inventory" } +
+        integrationInventories.mapValues { "integration" }
 
 tasks.withType<Test>().configureEach {
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
-    if (testSelection.get() || name in testInventories) {
+    if (name in testInventories) {
         dryRun.set(true)
         val selectionDirectory = layout.buildDirectory.dir("test-selection/$name")
         reports.junitXml.outputLocation.set(selectionDirectory.map { it.dir("xml") })
@@ -241,15 +256,19 @@ tasks.withType<Test>().configureEach {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
     doNotTrackState("Tests depend on containers, environment and mutable service state")
-    extensions.configure<JacocoTaskExtension> { isEnabled = name == "test" && !testSelection.get() }
+    extensions.configure<JacocoTaskExtension> { isEnabled = name == "test" }
+}
+
+fun Test.selectTestTier(tag: String) {
+    useJUnitPlatform {
+        if (tag.isNotEmpty()) includeTags(tag)
+        if (tag != "live") excludeTags("live")
+    }
 }
 
 tasks.test {
-    useJUnitPlatform {
-        includeTags("unit")
-        excludeTags("live")
-    }
-    if (!testSelection.get()) finalizedBy("jacocoTestReport")
+    selectTestTier(testTiers.getValue("test"))
+    finalizedBy("jacocoTestReport")
 }
 
 fun Test.selectIntegrationShard(shard: String) {
@@ -269,20 +288,11 @@ fun Test.selectIntegrationShard(shard: String) {
     }
 }
 
-for ((taskName, tag) in
-    mapOf(
-        "architectureTest" to "architecture",
-        "integrationTest" to "integration",
-        "databaseTest" to "database",
-        "liveTest" to "live",
-    )) {
+for ((taskName, tag) in testTiers.filterKeys { it != "test" }) {
     tasks.register<Test>(taskName) {
         description = "Runs the $tag test tier."
         group = "verification"
-        useJUnitPlatform {
-            includeTags(tag)
-            if (tag != "live") excludeTags("live")
-        }
+        selectTestTier(tag)
         shouldRunAfter(tasks.test)
         if (tag == "live") {
             listOf(
@@ -511,14 +521,11 @@ if (packagedServer.get()) {
 
 // Separate reports let one invocation prove tier coverage and disjoint shards without overwriting
 // results.
-for ((taskName, shard) in testInventories) {
+for ((taskName, tag) in testInventories) {
     tasks.register<Test>(taskName) {
         group = "verification"
-        description = "Discovers ${shard.ifEmpty { "all non-live" }} tests without executing them."
-        useJUnitPlatform {
-            excludeTags("live")
-            if (shard.isNotEmpty()) includeTags("integration")
-        }
-        selectIntegrationShard(shard)
+        description = "Discovers ${tag.ifEmpty { "all non-live" }} tests without executing them."
+        selectTestTier(tag)
+        selectIntegrationShard(integrationInventories[taskName].orEmpty())
     }
 }

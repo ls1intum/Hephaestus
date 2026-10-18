@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionTrace;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
@@ -63,7 +64,11 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
     private final FeedbackStore feedback = mock(FeedbackStore.class);
     private final ReviewAssignmentStore members = mock(ReviewAssignmentStore.class);
     private final FeedbackCompositionService composition = new FeedbackCompositionService(
-            feedback, members, mock(ResultHistoryQuery.class), mock(HistoryCopies.class));
+            feedback,
+            members,
+            mock(ResultHistoryQuery.class),
+            mock(HistoryCopies.class),
+            mock(FeedbackHistoryQuery.class));
     private final PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
     private final ReviewJob job = RuntimeReviewTestData.job();
     private ResultAdmissionService service;
@@ -140,7 +145,8 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                                 null,
                                 null),
                         null)),
-                true);
+                true,
+                null);
         var response = service.prepareFeedback(identity(), request);
         assertThat(response.feedbackIds()).containsExactly(feedbackId);
         assertThat(response.contentDigest()).isEqualTo("package-digest");
@@ -155,7 +161,8 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
         var stale = new ResultAdmissionService.AdmissionIdentity(job.getId(), 1, 1, "worker");
         assertThatThrownBy(() -> service.prepareFeedback(
                         stale,
-                        new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 1, List.of(), List.of(), false)))
+                        new PrepareFeedbackRequestDTO(
+                                job.getReviewId(), job.getId(), 1, List.of(), List.of(), false, null)))
                 .isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
         verifyNoInteractions(feedback, proof);
     }
@@ -188,7 +195,7 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                 .thenReturn(new PreparedPackage("empty-package", acceptedAt, List.of()));
         var response = service.prepareFeedback(
                 identity(),
-                new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 0, List.of(), List.of(), true));
+                new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 0, List.of(), List.of(), true, null));
         assertThat(response.feedbackIds()).isEmpty();
         assertThat(job.getPublicReviewDigest()).isEqualTo("empty-package");
         verify(members).publicReviewed(1, job.getReviewId(), job.getId(), 0, acceptedAt);
@@ -205,7 +212,7 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                 .thenReturn(new PreparedPackage("empty-package", acceptedAt, List.of()));
         service.prepareFeedback(
                 identity(),
-                new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 0, List.of(), List.of(), false));
+                new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 0, List.of(), List.of(), false, null));
         assertThat(job.getPublicReviewDigest()).isNull();
         verifyNoInteractions(members);
     }

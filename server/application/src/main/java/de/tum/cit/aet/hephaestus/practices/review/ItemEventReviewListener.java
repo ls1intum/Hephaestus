@@ -3,9 +3,11 @@ package de.tum.cit.aet.hephaestus.practices.review;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemSourceObserved;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.practices.result.ResultCurrentness;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -28,6 +30,7 @@ public class ItemEventReviewListener {
     private final ProductItemQuery items;
     private final WorkspaceRepository workspaces;
     private final ReviewService reviews;
+    private final ResultCurrentness currentness;
     private final ResultStore results;
 
     @ApplicationModuleListener
@@ -35,10 +38,13 @@ public class ItemEventReviewListener {
         if (workspaces.findByIdForUpdate(recorded.workspaceId()).isEmpty())
             throw new IllegalStateException("The event workspace no longer exists");
         var event = events.find(recorded.workspaceId(), recorded.eventId()).orElseThrow();
+        if (event.name().value().startsWith("scm.")) {
+            currentness.reconcile(recorded.workspaceId(), recorded.itemId());
+        }
         var state = event.state();
         if (state.isTerminal()) return;
         var item = items.find(recorded.workspaceId(), recorded.itemId());
-        if (state == ItemEventState.RECORDED && event.name().value().startsWith("scm.")) {
+        if (state == ItemEventState.RECORDED && event.name().value().startsWith("scm.pull_request_review.")) {
             results.endCurrent(
                     recorded.workspaceId(),
                     recorded.itemId(),
@@ -80,6 +86,13 @@ public class ItemEventReviewListener {
             boolean retry = refusal.reason().transientReason();
             decide(recorded, state, retry ? ItemEventState.WAITING : ItemEventState.WITHHELD, reason);
         }
+    }
+
+    @ApplicationModuleListener
+    public void on(ItemSourceObserved observed) {
+        if (workspaces.findByIdForUpdate(observed.workspaceId()).isEmpty())
+            throw new IllegalStateException("The event workspace no longer exists");
+        currentness.reconcile(observed.workspaceId(), observed.itemId());
     }
 
     private void decide(

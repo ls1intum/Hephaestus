@@ -92,6 +92,22 @@ public class ScmItemEventRecorder {
                     default -> null;
                 };
         if (name != null) record(issue.repository().id(), issue.id(), ScmItemEvents.ISSUE, null, name, event.context());
+        if (event instanceof ScmDomainEvent.IssueClosed
+                || event instanceof ScmDomainEvent.IssueReopened
+                || (event instanceof ScmDomainEvent.IssueUpdated updated
+                        && updated.changedFields().contains("state"))) {
+            var parent = issues.findByIdWithRepository(issue.id())
+                    .map(current -> current.getParentIssue())
+                    .orElse(null);
+            if (parent != null)
+                record(
+                        Objects.requireNonNull(parent.getRepository()).getId(),
+                        parent.getId(),
+                        ScmItemEvents.ISSUE,
+                        null,
+                        ScmItemEvents.ISSUE_UPDATED,
+                        event.context());
+        }
         if (event instanceof ScmDomainEvent.IssueUpdated updated
                 && !Collections.disjoint(updated.changedFields(), ScmItemEvents.LINKED_ISSUE_MATERIAL_FIELDS)) {
             var parents = queries.closingPullRequests(issue.id());

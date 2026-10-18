@@ -19,8 +19,7 @@ export function reviewLead(saw: ReviewSaw): string {
 	}
 	switch (saw.status) {
 		case "FAILED":
-		case "CANCELLED":
-		case "PARTIAL": {
+		case "CANCELLED": {
 			return "Stopped before it finished";
 		}
 		case "RUNNING": {
@@ -29,9 +28,14 @@ export function reviewLead(saw: ReviewSaw): string {
 		case "QUEUED": {
 			return "Waiting to start";
 		}
-		case "COMPLETE": {
-			return saw.results.couldNotDetermine > 0
-				? "Some practices could not be determined"
+		case "COMPLETE":
+		case "PARTIAL": {
+			if (saw.results.couldNotDetermine > 0) {
+				return "Some practices could not be determined";
+			}
+			// A partial review may have run to the end, so it names its scope, not a stop.
+			return saw.status === "PARTIAL"
+				? "Nothing to improve in what it reached"
 				: "Nothing to improve";
 		}
 	}

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
 	createFeedbackDecisionMutation,
 	getReviewFeedbackOptions,
+	recheckFeedbackDeliveryMutation,
 	retryFeedbackMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { ReviewFeedbackDetail } from "@/api/types.gen";
@@ -12,13 +13,22 @@ import { PRACTICE_REVIEW_READS } from "@/components/admin/practice-reviews/revie
 import { type PanelState, panelState } from "@/components/common/panel-state";
 import { isDeliveryInProgress } from "@/components/practice-vocabulary/delivery-state-defs";
 import type { FeedbackDecisionReason } from "@/components/practice-vocabulary/feedback-decision-defs";
-import { withdrawalCorrection } from "@/components/practice-vocabulary/feedback-send-defs";
+import {
+	deliveryCheck,
+	withdrawalCorrection,
+} from "@/components/practice-vocabulary/feedback-send-defs";
+import {
+	WITHHOLDING_REASON_DEFS,
+	type WithholdingReason,
+	withholdingReasonSentence,
+} from "@/components/practice-vocabulary/withholding-defs";
+import { isRecord } from "@/lib/is-record";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 
 import { awaitingApprovalOptions } from "./use-feedback-awaiting-approval";
 
-/** How often feedback still on its way out, or still being removed, is re-read until it settles. */
+/** How often feedback still being sent, checked, or removed is re-read until it settles. */
 const DELIVERY_POLL_MS = 2000;
 
 const READS_OF_FEEDBACK_DECISION: ReadonlySet<string> = new Set([
@@ -36,6 +46,24 @@ interface FeedbackController {
 	isChangingWithdrawal: boolean;
 	onRetryWithdrawal: () => void;
 	isRetryingWithdrawal: boolean;
+	onCheckDelivery: () => void;
+	isCheckingDelivery: boolean;
+}
+
+function isWithholdingReason(code: unknown): code is WithholdingReason {
+	return typeof code === "string" && Object.hasOwn(WITHHOLDING_REASON_DEFS, code);
+}
+
+/**
+ * Why the server refused an approval, in the sheet's own words, when the refusal names a withholding
+ * reason. Only a refusal by the publication context carries one, so a reason is never invented.
+ */
+function refusalSentence(error: unknown): string | undefined {
+	if (!isRecord(error)) {
+		return undefined;
+	}
+	const { code } = error;
+	return isWithholdingReason(code) ? withholdingReasonSentence(code) : undefined;
 }
 
 interface FeedbackControllerOptions {
@@ -59,7 +87,10 @@ export function useFeedbackController(
 	const feedbackQuery = useQuery({
 		...feedbackOptions,
 		refetchInterval: ({ state: { data } }) =>
-			data !== undefined && (isDeliveryInProgress(data) || withdrawalCorrection(data) === "pending")
+			data !== undefined &&
+			(isDeliveryInProgress(data) ||
+				deliveryCheck(data) === "checking" ||
+				withdrawalCorrection(data) === "pending")
 				? DELIVERY_POLL_MS
 				: false,
 	});
@@ -82,7 +113,7 @@ export function useFeedbackController(
 		},
 		onError: (error) => {
 			toast.error("We could not save your decision on this feedback", {
-				description: problemDetailOf(error),
+				description: refusalSentence(error) ?? problemDetailOf(error),
 			});
 		},
 	});
@@ -108,6 +139,20 @@ export function useFeedbackController(
 		},
 		onError: (error) => {
 			toast.error("We could not retry the withdrawal", { description: problemDetailOf(error) });
+		},
+	});
+
+	const recheck = useMutation({
+		...recheckFeedbackDeliveryMutation(),
+		onSettled: async () =>
+			invalidateWorkspaceReads(queryClient, workspaceSlug, READS_OF_FEEDBACK_DECISION),
+		onSuccess: () => {
+			toast.success("Checking whether the comment appeared", {
+				description: "This posts nothing.",
+			});
+		},
+		onError: (error) => {
+			toast.error("We could not check delivery", { description: problemDetailOf(error) });
 		},
 	});
 
@@ -140,6 +185,8 @@ export function useFeedbackController(
 			}),
 		isRetryingWithdrawal: retry.isPending,
 		onRetryWithdrawal: () => retry.mutate({ path }),
+		isCheckingDelivery: recheck.isPending,
+		onCheckDelivery: () => recheck.mutate({ path }),
 	};
 }
 

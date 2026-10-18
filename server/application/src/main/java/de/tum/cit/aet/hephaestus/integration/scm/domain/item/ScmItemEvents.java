@@ -26,9 +26,18 @@ public final class ScmItemEvents {
     public static final ItemEventName ISSUE_CLOSED = new ItemEventName("scm.issue.closed");
     public static final ItemEventName ISSUE_DELETED = new ItemEventName("scm.issue.deleted");
     public static final String ISSUE_DISCUSSION_FIELD = "discussion";
+    public static final String ISSUE_PROGRESS_FIELD = "subIssues";
     public static final String CLOSING_ISSUES_FIELD = "closingIssues";
     public static final Set<String> REVIEWABLE_ISSUE_FIELDS = Set.of(
-            "title", "body", "state", "stateReason", "issueType", "milestone", "relationships", ISSUE_DISCUSSION_FIELD);
+            "title",
+            "body",
+            "state",
+            "stateReason",
+            "issueType",
+            "milestone",
+            "relationships",
+            ISSUE_DISCUSSION_FIELD,
+            ISSUE_PROGRESS_FIELD);
     public static final Set<String> LINKED_ISSUE_MATERIAL_FIELDS =
             Set.of("title", "body", "state", "createdAt", "closedAt");
     public static final Set<String> LINKED_PULL_REQUEST_MATERIAL_FIELDS =

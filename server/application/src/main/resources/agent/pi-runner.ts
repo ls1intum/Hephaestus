@@ -23,8 +23,9 @@ import {
 	privateCompositionOwed,
 	persistComposedFeedback as persistComposition,
 	prepareComposedFeedback as prepareComposition,
+	preparePublicReview,
+	type PreparationOptions,
 	type ComposedFeedback,
-	type CompositionFailureReason,
 } from "./pi-composition-stage.ts";
 import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sources.ts";
 
@@ -107,7 +108,6 @@ import {
 import {
 	PRIVATE_DESTINATIONS,
 	REVIEW_CONTRACT_VERSION,
-	publicResults,
 	workIdentity,
 } from "./pi-runner-composition.ts";
 import { outputPath } from "./pi-runner-output.ts";
@@ -2069,6 +2069,7 @@ export async function runReviewJob(): Promise<void> {
 	let routedDestinations: ReadonlyMap<string, readonly PrivateDestination[]> | null = null;
 
 	const PUBLIC_FEEDBACK_HISTORY_PATH = `${CWD}/work/composition/public-feedback-history.json`;
+	const PUBLICATION_CONTEXT = /^v1:[1-9][0-9]*(?:,[1-9][0-9]*)*:[0-9a-f]{64}$/u;
 
 	// Echo the exact composition inputs so Java validates references against the same snapshot.
 	const composedFeedback: ComposedFeedback = {
@@ -2087,7 +2088,9 @@ export async function runReviewJob(): Promise<void> {
 		if (!privateCompositionOwed(composedFeedback)) {
 			return 0;
 		}
-		console.error("[pi-runner] OWED: the run stopped private feedback composition before it finished");
+		console.error(
+			"[pi-runner] OWED: the run stopped private feedback composition before it finished",
+		);
 		return COMPOSITION_OWED_EXIT;
 	}
 
@@ -2111,26 +2114,29 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	const persistComposedFeedback = () => persistComposition(composedFeedback, FEEDBACK_PATH);
+	const preparationOptions = (
+		expired: boolean,
+		phase?: "PUBLIC_REVIEW" | "PRIVATE_FEEDBACK",
+	): PreparationOptions => ({
+		feedback: composedFeedback,
+		phase,
+		admitted: admission !== null,
+		expired,
+		url: `${LLM_PROXY_URL}/prepare-feedback`,
+		token: LLM_PROXY_TOKEN,
+		task: taskEnvelope,
+		timeoutMs: Math.min(
+			ADMISSION_ATTEMPT_TIMEOUT_MS,
+			AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
+		),
+		persist: persistComposedFeedback,
+		recordFailure: (failedPhase, reason) =>
+			recordCompositionFailure(composedFeedback, failedPhase, reason),
+	});
 	const prepareComposedFeedback = async (
 		safety: ReturnType<typeof scheduleDeadline>,
 		phase?: "PUBLIC_REVIEW" | "PRIVATE_FEEDBACK",
-	) =>
-		prepareComposition({
-			feedback: composedFeedback,
-			phase,
-			admitted: admission !== null,
-			expired: safety.expired(),
-			url: `${LLM_PROXY_URL}/prepare-feedback`,
-			token: LLM_PROXY_TOKEN,
-			task: taskEnvelope,
-			timeoutMs: Math.min(
-				ADMISSION_ATTEMPT_TIMEOUT_MS,
-				AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
-			),
-			persist: persistComposedFeedback,
-			recordFailure: (failedPhase, reason) =>
-				recordCompositionFailure(composedFeedback, failedPhase, reason),
-		});
+	) => prepareComposition(preparationOptions(safety.expired(), phase));
 
 	const THIS_WORK = ((): string | undefined => {
 		const metadataPath = nodePath.join(INPUT_PATHS.contextRoot, "metadata.json");
@@ -2191,6 +2197,7 @@ export async function runReviewJob(): Promise<void> {
 	// Keep live delivery history beside the staged history that the review was prepared from.
 	async function readPublicFeedbackHistory(): Promise<{
 		readAt: string;
+		publicationContext: string | null;
 		history: { feedback: unknown[] };
 	}> {
 		const answer: unknown = await retrying(
@@ -2205,7 +2212,10 @@ export async function runReviewJob(): Promise<void> {
 		const history = isRecord(answer) && isRecord(answer.history) ? answer.history : null;
 		if (
 			!isRecord(answer) ||
-			answer.contractVersion !== 3 ||
+			answer.contractVersion !== 4 ||
+			(answer.publicationContext !== null &&
+				(typeof answer.publicationContext !== "string" ||
+					!PUBLICATION_CONTEXT.test(answer.publicationContext))) ||
 			typeof answer.readAt !== "string" ||
 			!Number.isFinite(Date.parse(answer.readAt)) ||
 			history === null ||
@@ -2244,7 +2254,13 @@ export async function runReviewJob(): Promise<void> {
 				...(entry.bodyUnavailable ? { wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE" } : {}),
 			};
 		});
-		const read = { readAt: answer.readAt, history: { ...history, feedback } };
+		// The context names this exact response; it travels with the statements built from it, never alone.
+		const read = {
+			readAt: answer.readAt,
+			publicationContext:
+				typeof answer.publicationContext === "string" ? answer.publicationContext : null,
+			history: { ...history, feedback },
+		};
 		writeFileSync(PUBLIC_FEEDBACK_HISTORY_PATH, JSON.stringify(read, null, 2));
 		return read;
 	}
@@ -2796,6 +2812,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						sessionState().openingInContext = true;
 					},
 					readPublicFeedbackHistory,
+					preparePublic: async (expired) =>
+						preparePublicReview(preparationOptions(expired, "PUBLIC_REVIEW")),
 					recordHistory: (history) => {
 						runnerDebug.publicHistory = history;
 						persistRunnerDebug();
@@ -3642,8 +3660,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		finalizeOutput();
 		process.exit(compositionExit());
 
-		// Recovery performs no new admission. It composes the review on the work until that review is accepted, and
-		// private feedback only after it is, while no private piece is prepared yet.
+		// Recovery performs no new admission. Like the measured attempt, it composes the review on the work unless that
+		// review is accepted, then private feedback unless a private piece is prepared, from the server's current reread.
 		async function continueAdmittedReview(): Promise<void> {
 			measuring = false;
 			measurementClosed = true;
@@ -3659,21 +3677,31 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				PRIVATE_DESTINATIONS.some(
 					(destination) => compositionRequest.destinations[destination] !== undefined,
 				);
-			const privateOwed =
-				privateRequested && admission.publicReviewed && !admission.privatePrepared;
+			const publicWork = admission.publicReviewed
+				? "no review on the work"
+				: "the review on the work";
+			const privateWork =
+				privateRequested && !admission.privatePrepared ? "private feedback" : "no private feedback";
 			console.error(
 				`[pi-runner] Continuing an admitted review: ${admission.results.length} result(s), ` +
-					`${unreachedSlugs.length} practice(s) not reached; ` +
-					`composing ${privateOwed ? "private feedback only" : "the review on the work only"}`,
+					`${unreachedSlugs.length} practice(s) not reached; composing ${publicWork} and ${privateWork}`,
 			);
-			if (privateOwed && compositionRequest !== null) {
+			if (privateRequested && admission.privatePrepared) {
+				// An accepted private piece closes private composition: no practice is routed to it again.
+				if (undecidedPrivatePractices(admission, composedFeedback, null).length > 0) {
+					recordCompositionFailure(composedFeedback, "PRIVATE_FEEDBACK", "PRIVATE_NOT_RECOVERED");
+				}
+				routedDestinations = new Map();
+			} else if (privateRequested) {
 				// Routing comes from the server's reread for this attempt, not from the earlier attempt.
 				routedDestinations = closeUnroutedPrivateDestinations(
 					compositionRequest,
 					admission,
 					composedFeedback,
 				);
-				persistComposedFeedback();
+			}
+			persistComposedFeedback();
+			if (compositionRequest !== null) {
 				await composeAdmittedFeedback({
 					request: compositionRequest,
 					admission,
@@ -3694,56 +3722,6 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						persistUsage();
 					},
 				});
-			} else if (
-				privateRequested &&
-				undecidedPrivatePractices(requiredAdmission(), composedFeedback, routedDestinations)
-					.length > 0
-			) {
-				recordCompositionFailure(composedFeedback, "PRIVATE_FEEDBACK", "PRIVATE_NOT_RECOVERED");
-			}
-			persistComposedFeedback();
-			const reviewable = publicResults(admission.results);
-			if (
-				!admission.publicReviewed &&
-				compositionRequest?.destinations.ON_WORK !== undefined &&
-				reviewable.length > 0
-			) {
-				const safetyMs = AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS);
-				if (safetyMs <= 0) {
-					recordCompositionFailure(composedFeedback, "PUBLIC_REVIEW", "SAFETY");
-				} else {
-					const safety = scheduleDeadline(safetyMs, () => {
-						stopTurn(
-							"safety",
-							"the run is near its safety ceiling — preserving the composed review so far",
-						);
-					});
-					const unfinished = (reason: CompositionFailureReason) => {
-						if (composedFeedback.review === null) {
-							recordCompositionFailure(composedFeedback, "PUBLIC_REVIEW", reason);
-						}
-					};
-					try {
-						await compositionStage().composeReview(
-							compositionRequest,
-							reviewable,
-							unreachedSlugs,
-							safety,
-						);
-						await prepareComposedFeedback(safety);
-					} catch (error) {
-						unfinished(safety.expired() ? "SAFETY" : "RUNTIME_ERROR");
-						throw error;
-					} finally {
-						if (safety.expired()) {
-							unfinished("SAFETY");
-						}
-						clearTimeout(safety.timer);
-						persistComposedFeedback();
-						accumulateUsage(null, extractUsageFromSession({}, streamUsage));
-						persistUsage();
-					}
-				}
 			}
 			console.error(
 				`[pi-runner] SUCCESS: composed from the ${admission.results.length} admitted result(s)`,

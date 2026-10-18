@@ -4,21 +4,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPublicationContext;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSend;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackVisibilityService;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckFacts;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
@@ -30,6 +34,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -54,6 +59,7 @@ class FeedbackDecisionServiceTest {
     final FeedbackGate gate = mock(FeedbackGate.class);
     final PersonDataWriteFence privacy = mock(PersonDataWriteFence.class);
     final FeedbackContentDigest digests = mock(FeedbackContentDigest.class);
+    final FeedbackPublicationContext publication = mock(FeedbackPublicationContext.class);
     final Instant now = Instant.EPOCH;
     final UUID id = UUID.randomUUID();
     final FeedbackDecisionService service = new FeedbackDecisionService(
@@ -67,7 +73,13 @@ class FeedbackDecisionServiceTest {
             gate,
             digests,
             privacy,
-            new FeedbackSendQueue(sends, Clock.fixed(now, ZoneOffset.UTC)));
+            new FeedbackSendQueue(
+                    sends,
+                    Clock.fixed(now, ZoneOffset.UTC),
+                    copies,
+                    mock(FeedbackVisibilityService.class),
+                    mock(ConfigAuditPort.class)),
+            publication);
     Feedback row;
 
     @BeforeEach
@@ -112,14 +124,51 @@ class FeedbackDecisionServiceTest {
 
     @Test
     void shouldAppendApprovalAndQueueTheSamePreparedPiece() {
-        var decision = service.decide(
+        var outcome = service.decide(
                 1, id, 3, new FeedbackDecisionInput(FeedbackDecisionAction.APPROVE, null, null, digest()));
+        var decision = saved();
+        assertThat(outcome.decisionId()).isEqualTo(decision.getId());
+        assertThat(outcome.state()).isEqualTo(FeedbackState.READY);
         assertThat(decision.getAction()).isEqualTo(FeedbackDecisionAction.APPROVE);
         assertThat(decision.getFeedbackId()).isEqualTo(id);
         var capture = ArgumentCaptor.forClass(FeedbackSend.class);
         verify(sends).saveAndFlush(capture.capture());
         assertThat(capture.getValue().getState()).isEqualTo(FeedbackSendState.PENDING);
         assertThat(capture.getValue().getAction()).isEqualTo(FeedbackSendAction.POST);
+    }
+
+    @Test
+    void shouldCommitAChangedPublicationContextAsAWithholdingInsteadOfAnApproval() {
+        when(publication.refusal(row)).thenReturn(Optional.of(FeedbackStopReason.PUBLIC_HISTORY_CHANGED));
+        var outcome = service.decide(
+                1, id, 3, new FeedbackDecisionInput(FeedbackDecisionAction.APPROVE, null, null, digest()));
+        assertThat(outcome.decisionId()).isNull();
+        assertThat(outcome.refusal()).isEqualTo(FeedbackStopReason.PUBLIC_HISTORY_CHANGED);
+        assertThat(outcome.state()).isEqualTo(FeedbackState.WITHHELD);
+        verify(feedback).updateChecks(eq(1L), eq(id), any());
+        verify(copies).withholdPlanned(1, id, FeedbackStopReason.PUBLIC_HISTORY_CHANGED.name());
+        verify(feedback).updateDelivery(1, id, FeedbackState.WITHHELD, FeedbackStopReason.PUBLIC_HISTORY_CHANGED, null);
+        verify(decisions, never()).save(any());
+        verify(sends, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void shouldKeepAwaitingApprovalWhileAnotherReviewsWriteIsUnresolved() {
+        when(publication.refusal(row)).thenReturn(Optional.of(FeedbackStopReason.PUBLIC_DELIVERY_UNRESOLVED));
+        var outcome = service.decide(
+                1, id, 3, new FeedbackDecisionInput(FeedbackDecisionAction.APPROVE, null, null, digest()));
+        assertThat(outcome.refusal()).isEqualTo(FeedbackStopReason.PUBLIC_DELIVERY_UNRESOLVED);
+        assertThat(outcome.state()).isEqualTo(FeedbackState.AWAITING_APPROVAL);
+        verify(feedback).updateChecks(eq(1L), eq(id), any());
+        verify(copies, never()).withholdPlanned(anyLong(), any(), any());
+        verify(feedback, never()).updateDelivery(anyLong(), any(), any(), any(), any());
+        verify(decisions, never()).save(any());
+    }
+
+    private FeedbackDecision saved() {
+        var captured = ArgumentCaptor.forClass(FeedbackDecision.class);
+        verify(decisions).save(captured.capture());
+        return captured.getValue();
     }
 
     @Test
@@ -147,13 +196,14 @@ class FeedbackDecisionServiceTest {
                         .id(UUID.randomUUID())
                         .state(FeedbackCopyState.POSTED)
                         .build()));
-        var decision = service.decide(
+        var outcome = service.decide(
                 1,
                 id,
                 3,
                 new FeedbackDecisionInput(
                         FeedbackDecisionAction.WITHDRAW, FeedbackDecisionReason.OTHER, "Remove this guidance.", null));
-        assertThat(decision.getAction()).isEqualTo(FeedbackDecisionAction.WITHDRAW);
+        assertThat(outcome.refusal()).isNull();
+        assertThat(saved().getAction()).isEqualTo(FeedbackDecisionAction.WITHDRAW);
         var capture = ArgumentCaptor.forClass(FeedbackSend.class);
         verify(sends).saveAndFlush(capture.capture());
         assertThat(capture.getValue().getAction()).isEqualTo(FeedbackSendAction.RETRACT);

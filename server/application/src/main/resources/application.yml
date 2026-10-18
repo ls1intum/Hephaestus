@@ -169,6 +169,14 @@ spring:
     lifecycle:
         timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
 
+    # Closing the scheduler waits for running scheduled jobs, so a stopped sync records its outcome
+    # and its job lock is released before the database closes (ServerSchedulingConfig).
+    task:
+        scheduling:
+            shutdown:
+                await-termination: true
+                await-termination-period: ${SHUTDOWN_TIMEOUT:20s}
+
 server:
     port: ${SERVER_PORT:8080}
     shutdown: graceful

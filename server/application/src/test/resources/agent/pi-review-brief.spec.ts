@@ -16,6 +16,7 @@ import {
 	buildPrimarySourceReference,
 	buildPublicReviewHistory,
 	buildSameWorkContext,
+	DEFAULT_BRIEF_LIMITS,
 } from "../../../main/resources/agent/pi-review-brief.ts";
 
 const paths = { contextRoot: "context", repositoryRoot: "repos/reviewed" };
@@ -99,11 +100,11 @@ function primaryCapture(t: { after: (cleanup: () => void) => void }) {
 
 const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
 
-/** A verified code citation as admission returns it. */
+/** A verified code citation as admission returns it: every field present, a tree citation with no side. */
 function cited(
 	sourceKind: string,
 	path: string,
-	commit: string,
+	commit: string | null,
 	text: string | Buffer,
 	extra: Record<string, unknown> = {},
 ) {
@@ -113,12 +114,77 @@ function cited(
 		sourcePath:
 			sourceKind === "scm.repository.tree" ? "repos/reviewed/.git/HEAD" : "context/change.json",
 		path,
+		side: null,
 		commit,
 		startLine: 1,
+		endLine: 1,
 		quote: "x",
-		verification: { status: "VERIFIED", scope: "EXACT_LOCATION", sourceFileSha256: sha(text) },
+		verification: { status: "VERIFIED", itemSha256: sha(text), quoteSha256: sha("x") },
+		anchorable: false,
 		...extra,
 	};
+}
+
+/** A captured text's identity: source, path, side and commit. */
+const textKey = (text: Record<string, unknown>) =>
+	[text.source ?? text.sourceKind, text.path, text.side, text.commit].map(String).join("\0");
+
+/** A field that holds a list, as unknown entries; anything else holds none. */
+const listOf = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+/** The manifest text each cited proof names, staged as the server stages it; the first proof of a text wins. */
+function withTexts(index: Record<string, unknown>, results: readonly Record<string, unknown>[]) {
+	const staged = Array.isArray(index.citableTexts) ? index.citableTexts.filter(isRecord) : [];
+	const texts = new Map<string, Record<string, unknown>>(
+		staged.map((text) => [textKey(text), text]),
+	);
+	for (const result of results) {
+		const example = isRecord(result.example) ? [result.example.citation] : [];
+		for (const citation of [
+			...listOf(result.citations),
+			...example,
+			...listOf(result.problems).flatMap((problem) =>
+				isRecord(problem) ? listOf(problem.citations) : [],
+			),
+		]) {
+			if (!isRecord(citation) || !isRecord(citation.verification)) {
+				continue;
+			}
+			const side = typeof citation.side === "string" ? citation.side : "NEW";
+			const commit = typeof citation.commit === "string" ? citation.commit : null;
+			const key = textKey({ ...citation, side, commit });
+			if (!texts.has(key) && typeof citation.verification.itemSha256 === "string") {
+				texts.set(key, {
+					source: citation.sourceKind,
+					path: citation.path,
+					side,
+					commit,
+					stagedPath: `context/citable/${side.toLowerCase()}/${String(citation.path)}`,
+					sha256: citation.verification.itemSha256,
+				});
+			}
+		}
+	}
+	return { ...index, citableTexts: [...texts.values()] };
+}
+
+/** The reference over a capture whose manifest holds the texts the citations' proofs name. */
+function primaryReference(
+	root: string,
+	index: Record<string, unknown>,
+	results: Record<string, unknown>[],
+	reader: Parameters<typeof buildPrimarySourceReference>[5],
+	limits?: Parameters<typeof buildPrimarySourceReference>[6],
+) {
+	return buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		withTexts(index, results),
+		results,
+		reader,
+		limits,
+	);
 }
 
 const decided = (citations: unknown[]) => ({
@@ -161,10 +227,8 @@ void test("cited primary code arrives whole, once per file and commit, with its 
 		[`${EARLIER}:App/Model.swift`]: { kind: "regular", bytes: Buffer.from(model) },
 		[`${BASE}:App/Legacy.swift`]: { kind: "regular", bytes: Buffer.from(legacy) },
 	});
-	const reference = buildPrimarySourceReference(
+	const reference = primaryReference(
 		root,
-		"context",
-		"repos/reviewed",
 		index,
 		[
 			decided([cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" })]),
@@ -232,10 +296,8 @@ void test("every citation of a public result is read: its own, its example's and
 		[`${EARLIER}:App/Model.swift`]: { kind: "regular", bytes: Buffer.from(model) },
 		[`${HEAD}:App/Handled.swift`]: { kind: "regular", bytes: Buffer.from(example) },
 	});
-	const reference = buildPrimarySourceReference(
+	const reference = primaryReference(
 		root,
-		"context",
-		"repos/reviewed",
 		index,
 		[
 			{
@@ -282,10 +344,8 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 		[`${HEAD}:Huge.swift`]: { kind: "tooLarge", size: 40_000 },
 		[`${HEAD}:Private.swift`]: { kind: "regular", bytes: Buffer.from(text) },
 	});
-	const reference = buildPrimarySourceReference(
+	const reference = primaryReference(
 		root,
-		"context",
-		"repos/reviewed",
 		index,
 		[
 			{
@@ -297,7 +357,8 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 				outcome: "COULD_NOT_DETERMINE",
 			},
 			decided([
-				cited("scm.repository.tree", "Private.swift", HEAD, text, {
+				// Another repository's bytes are not this capture's text, whatever file the citation names.
+				cited("scm.repository.tree", "Private.swift", HEAD, "let other = 1\n", {
 					sourcePath: "repos/other/.git/HEAD",
 				}),
 				{
@@ -315,6 +376,10 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 		read.reader,
 	);
 	assert.ok(!read.asked.includes(`${HEAD}:Private.swift`), read.asked.join("\n"));
+	assert.ok(
+		reference.includes("`Private.swift`: no captured text matches the proof admission recorded"),
+		reference,
+	);
 	assert.ok(!reference.includes("let x"), reference);
 	for (const reason of [
 		`\`Changed.swift\` at \`${HEAD}\`: its bytes differ from the ones admission verified`,
@@ -332,10 +397,8 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 		{ [`${HEAD}:Private.swift`]: { kind: "regular", bytes: Buffer.from(text) } },
 		EARLIER,
 	);
-	const unpinned = buildPrimarySourceReference(
+	const unpinned = primaryReference(
 		root,
-		"context",
-		"repos/reviewed",
 		index,
 		[decided([cited("scm.repository.tree", "Private.swift", HEAD, text)])],
 		moved.reader,
@@ -351,10 +414,8 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 	const untracked = blobs({
 		[`${HEAD}:App/Loader.swift`]: { kind: "regular", bytes: Buffer.from(LOADER) },
 	});
-	const treeless = buildPrimarySourceReference(
+	const treeless = primaryReference(
 		root,
-		"context",
-		"repos/reviewed",
 		withoutTree,
 		[decided([cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" })])],
 		untracked.reader,
@@ -378,11 +439,23 @@ void test("text is shown only as valid UTF-8 and a rejected citation does not hi
 		HEAD,
 		{ kind: "tooLarge" },
 	);
-	const reference = buildPrimarySourceReference(
+	// The capture staged the recovered file once; a proof of other bytes names no text of it.
+	const staged = {
+		...index,
+		citableTexts: [
+			{
+				source: "scm.repository.tree",
+				path: "Recovered.swift",
+				side: "NEW",
+				commit: HEAD,
+				stagedPath: "repos/reviewed/Recovered.swift",
+				sha256: sha(recovered),
+			},
+		],
+	};
+	const reference = primaryReference(
 		root,
-		"context",
-		"repos/reviewed",
-		index,
+		staged,
 		[
 			decided([
 				cited("scm.repository.tree", "Recovered.swift", HEAD, "something else\n"),
@@ -394,7 +467,10 @@ void test("text is shown only as valid UTF-8 and a rejected citation does not hi
 		],
 		read.reader,
 	);
-	assert.ok(reference.includes(`\`Recovered.swift\` at \`${HEAD}\`: its bytes differ`), reference);
+	assert.ok(
+		reference.includes("`Recovered.swift`: no captured text matches the proof admission recorded"),
+		reference,
+	);
 	assert.equal(reference.split("[L1] let recovered = true").length, 2, reference);
 	assert.ok(
 		reference.includes(`\`Invalid.swift\` at \`${HEAD}\`: not valid UTF-8 text`),
@@ -431,6 +507,180 @@ void test("a regular new file cannot expose an excluded counterpart through its 
 			diff,
 		);
 		const results = [decided([cited("scm.pull-request.diff", file, HEAD, code, { side: "NEW" })])];
+		const reference = primaryReference(root, index, results, read.reader);
+		assert.ok(reference.includes("[L1] let visible = true"), reference);
+		assert.ok(reference.includes(reason), reference);
+		assert.ok(!reference.includes("EXCLUDED-COUNTERPART-SENTINEL"), reference);
+		assert.ok(!reference.includes("diff --git"), reference);
+		const bounded = primaryReference(root, index, results, read.reader, {
+			filePerChars: 24_000,
+			diffChars: 64_000,
+			totalChars: 600,
+		});
+		assert.ok(bounded.length <= 600, bounded);
+		assert.ok(!bounded.includes("[L1] let visible = true"), bounded);
+		assert.ok(!bounded.includes("EXCLUDED-COUNTERPART-SENTINEL"), bounded);
+		assert.ok(bounded.includes("omitted") || bounded.includes("exceed"), bounded);
+	}
+});
+
+/** The change as the capture recorded it in `context/change.json#/diff`, staged as one canonical record text. */
+const RECORDED = PINNED_TEXT.replaceAll(/^\[L\d+\] /gmu, "");
+const CHANGE_RECORD = "context/change.json#/diff";
+const RECORD_PATH = `context/citable-records/scm.pull-request.diff/${sha(CHANGE_RECORD)}.txt`;
+const recordLine = (text: string) => RECORDED.split("\n").indexOf(text) + 1;
+
+/** The capture with its change record staged and the manifest texts the server records for it. */
+function recordCapture(t: { after: (cleanup: () => void) => void }, recorded = RECORDED) {
+	const { root, index } = primaryCapture(t);
+	mkdirSync(nodePath.join(root, nodePath.dirname(RECORD_PATH)), { recursive: true });
+	writeFileSync(nodePath.join(root, RECORD_PATH), recorded);
+	const text = (
+		path: string,
+		side: string,
+		commit: string | null,
+		bytes: string,
+		stagedPath: string,
+	) => ({
+		source: "scm.pull-request.diff",
+		path,
+		side,
+		commit,
+		stagedPath,
+		sha256: sha(bytes),
+	});
+	const changed = (path: string, side: string, commit: string, bytes: string) => {
+		const stagedPath = `context/citable/${side.toLowerCase()}/${path}`;
+		return [text(path, side, commit, bytes, stagedPath), text(path, side, null, bytes, stagedPath)];
+	};
+	const citableTexts = [
+		text(CHANGE_RECORD, "NEW", null, RECORDED, RECORD_PATH),
+		...changed("App/Loader.swift", "NEW", HEAD, LOADER),
+		...changed("App/Loader.swift", "OLD", BASE, "old loader\n"),
+		...changed("App/Legacy.swift", "OLD", BASE, "func legacy() {}\n"),
+	];
+	return { root, index: { ...index, citableTexts } };
+}
+
+/** A verified citation of lines of the change record, as admission returns it: NEW record side, no commit. */
+function recordCited(startLine: number, endLine = startLine, extra: Record<string, unknown> = {}) {
+	return {
+		index: 0,
+		sourceKind: "scm.pull-request.diff",
+		sourcePath: RECORD_PATH,
+		path: CHANGE_RECORD,
+		side: "NEW",
+		commit: null,
+		startLine,
+		endLine,
+		quote: RECORDED.split("\n")
+			.slice(startLine - 1, endLine)
+			.join("\n"),
+		verification: { status: "VERIFIED", itemSha256: sha(RECORDED), quoteSha256: sha("x") },
+		anchorable: false,
+		...extra,
+	};
+}
+
+const LOADER_FILES = {
+	[`${HEAD}:App/Loader.swift`]: { kind: "regular" as const, bytes: Buffer.from(LOADER) },
+	[`${BASE}:App/Legacy.swift`]: {
+		kind: "regular" as const,
+		bytes: Buffer.from("func legacy() {}\n"),
+	},
+};
+
+void test("cited lines of the recorded change show their file whole at the head, with its complete section", (t) => {
+	const { root, index } = recordCapture(t);
+	const added = recordLine(String.raw`+        print("decode failed: \(error)")`);
+	const read = blobs(LOADER_FILES);
+	const reference = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		[decided([recordCited(added)]), decided([recordCited(added)])],
+		read.reader,
+	);
+	assert.ok(reference.includes("[L2]     let id: Int"), reference);
+	assert.equal(reference.split("[L8]         return try JSONDecoder()").length, 2, reference);
+	assert.equal(reference.split(LOADER_SECTION).length, 2, reference);
+	assert.ok(reference.includes(`\`App/Loader.swift\` at \`${HEAD}\`, the NEW side`), reference);
+	assert.ok(!reference.includes("UNCITED-SENTINEL"), reference);
+	assert.ok(!reference.includes("STALE-SENTINEL"), reference);
+	assert.ok(!reference.includes("Legacy"), reference);
+	assert.deepEqual(read.asked, [`diff ${BASE}..${HEAD}`, `${HEAD}:App/Loader.swift`]);
+
+	// A removed file is shown from the base, where the capture holds its text.
+	const removed = blobs(LOADER_FILES);
+	const legacy = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		[decided([recordCited(recordLine("-func legacy() {}"))])],
+		removed.reader,
+	);
+	assert.ok(legacy.includes(`\`App/Legacy.swift\` at \`${BASE}\`, the OLD side`), legacy);
+	assert.equal(legacy.split(LEGACY_SECTION).length, 2, legacy);
+	assert.ok(!legacy.includes("let id: Int"), legacy);
+
+	// The capture's own completeness still qualifies what is shown.
+	const partial = {
+		...index,
+		sources: index.sources.map((source) =>
+			source.kind === "scm.pull-request.diff"
+				? {
+						...source,
+						state: {
+							...source.state,
+							completeness: "PARTIAL",
+							limitations: ["Renames are not followed."],
+						},
+					}
+				: source,
+		),
+	};
+	const qualified = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		partial,
+		[decided([recordCited(added)])],
+		blobs(LOADER_FILES).reader,
+	);
+	assert.ok(qualified.includes("PARTIAL: Renames are not followed."), qualified);
+	assert.ok(qualified.includes("[L2]     let id: Int"), qualified);
+});
+
+void test("recorded-change lines that do not prove one file of this capture show no code", (t) => {
+	const { root, index } = recordCapture(t);
+	const added = recordLine(String.raw`+        print("decode failed: \(error)")`);
+	const cases: [string, Record<string, unknown>[], string][] = [
+		[
+			"another digest",
+			[
+				decided([
+					recordCited(added, added, {
+						verification: { status: "VERIFIED", itemSha256: sha("other"), quoteSha256: sha("x") },
+					}),
+				]),
+			],
+			"lines of the captured change: no captured text matches the proof admission recorded",
+		],
+		[
+			"the OLD record side",
+			[decided([recordCited(added, added, { side: "OLD" })])],
+			"lines of the captured change: no captured text matches the proof admission recorded",
+		],
+		[
+			"lines across two files",
+			[decided([recordCited(added, recordLine("-func legacy() {}"))])],
+			"the cited lines do not lie within one file's section of the pinned change",
+		],
+	];
+	for (const [name, results, reason] of cases) {
+		const read = blobs(LOADER_FILES);
 		const reference = buildPrimarySourceReference(
 			root,
 			"context",
@@ -439,24 +689,273 @@ void test("a regular new file cannot expose an excluded counterpart through its 
 			results,
 			read.reader,
 		);
-		assert.ok(reference.includes("[L1] let visible = true"), reference);
-		assert.ok(reference.includes(reason), reference);
-		assert.ok(!reference.includes("EXCLUDED-COUNTERPART-SENTINEL"), reference);
-		assert.ok(!reference.includes("diff --git"), reference);
-		const bounded = buildPrimarySourceReference(
-			root,
-			"context",
-			"repos/reviewed",
-			index,
-			results,
-			read.reader,
-			{ filePerChars: 24_000, diffChars: 64_000, totalChars: 600 },
+		assert.ok(reference.includes(reason), `${name}\n${reference}`);
+		assert.ok(!reference.includes("let id: Int"), `${name}\n${reference}`);
+		assert.ok(
+			!read.asked.some((asked) => asked.includes(":App/")),
+			`${name}\n${read.asked.join("\n")}`,
 		);
-		assert.ok(bounded.length <= 600, bounded);
-		assert.ok(!bounded.includes("[L1] let visible = true"), bounded);
-		assert.ok(!bounded.includes("EXCLUDED-COUNTERPART-SENTINEL"), bounded);
-		assert.ok(bounded.includes("omitted") || bounded.includes("exceed"), bounded);
 	}
+
+	// Staged bytes that differ from the manifest are not the verified record.
+	const tampered = recordCapture(t, RECORDED.replace("decode failed", "decode FAILED"));
+	const read = blobs(LOADER_FILES);
+	const reference = buildPrimarySourceReference(
+		tampered.root,
+		"context",
+		"repos/reviewed",
+		tampered.index,
+		[decided([recordCited(added)])],
+		read.reader,
+	);
+	assert.ok(reference.includes("its bytes differ from the ones admission verified"), reference);
+	assert.ok(!reference.includes("let id: Int"), reference);
+	assert.ok(!read.asked.some((asked) => asked.includes(":App/")), read.asked.join("\n"));
+
+	// A file the capture holds no text of is named, never read from the checkout unverified.
+	const textless = {
+		...index,
+		citableTexts: index.citableTexts.filter((text) => text.path !== "App/Loader.swift"),
+	};
+	const unread = blobs(LOADER_FILES);
+	const named = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		textless,
+		[decided([recordCited(added)])],
+		unread.reader,
+	);
+	assert.ok(
+		named.includes(`\`App/Loader.swift\` at \`${HEAD}\`: the capture holds no text of this file`),
+		named,
+	);
+	assert.ok(!unread.asked.includes(`${HEAD}:App/Loader.swift`), unread.asked.join("\n"));
+});
+
+void test("an admitted changed-file citation is identified by its captured text, not the source file it names", (t) => {
+	const { root, index } = recordCapture(t);
+	// The capture also stages other record fields of the change; no commit pins them, so they are not code.
+	const baseRecord = "context/change.json#/base_sha";
+	const staged = {
+		...index,
+		citableTexts: [
+			...index.citableTexts,
+			{
+				source: "scm.pull-request.diff",
+				path: baseRecord,
+				side: "NEW",
+				commit: null,
+				stagedPath: `context/citable-records/scm.pull-request.diff/${sha(baseRecord)}.txt`,
+				sha256: sha(BASE),
+			},
+		],
+	};
+	// As admission returns a changed-file citation: a captured record as sourcePath, the changed file as path, no commit.
+	const changed = (
+		path: string,
+		side: "NEW" | "OLD",
+		bytes: string,
+		extra: Record<string, unknown> = {},
+	) => ({
+		...cited("scm.pull-request.diff", path, null, bytes, {
+			sourcePath: `context/citable-records/scm.pull-request.diff/${sha("context/metadata.json#/body")}.txt`,
+			side,
+			startLine: 9,
+			endLine: 9,
+		}),
+		...extra,
+	});
+	const files = {
+		...LOADER_FILES,
+		[`${BASE}:App/Loader.swift`]: { kind: "regular" as const, bytes: Buffer.from("old loader\n") },
+	};
+	const read = blobs(files);
+	const reference = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		staged,
+		[
+			decided([
+				changed("App/Loader.swift", "NEW", LOADER),
+				changed("App/Loader.swift", "OLD", "old loader\n"),
+			]),
+		],
+		read.reader,
+	);
+	assert.ok(reference.includes(`\`App/Loader.swift\` at \`${HEAD}\`, the NEW side`), reference);
+	assert.ok(reference.includes("[L2]     let id: Int"), reference);
+	assert.ok(reference.includes(`\`App/Loader.swift\` at \`${BASE}\`, the OLD side`), reference);
+	assert.ok(reference.includes("[L1] old loader"), reference);
+	assert.equal(reference.split(LOADER_SECTION).length, 2, reference);
+	assert.ok(!reference.includes("UNCITED-SENTINEL"), reference);
+	assert.deepEqual(read.asked, [
+		`${HEAD}:App/Loader.swift`,
+		`diff ${BASE}..${HEAD}`,
+		`${BASE}:App/Loader.swift`,
+	]);
+
+	// Recorded-change lines are found the same way, whatever staged path the citation names.
+	const lines = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		staged,
+		[
+			decided([
+				recordCited(recordLine(String.raw`+        print("decode failed: \(error)")`), undefined, {
+					sourcePath: "context/citable-records/scm.pull-request.diff/other.txt",
+				}),
+			]),
+		],
+		blobs(files).reader,
+	);
+	assert.ok(lines.includes("[L2]     let id: Int"), lines);
+
+	// A proof of other bytes names no captured text; a record field no commit pins is not code. Neither is read.
+	const other = blobs(files);
+	const unproven = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		staged,
+		[
+			decided([
+				changed("App/Loader.swift", "NEW", "let changed = 1\n"),
+				cited("scm.pull-request.diff", baseRecord, null, BASE, { side: "NEW" }),
+			]),
+		],
+		other.reader,
+	);
+	assert.ok(
+		unproven.includes("`App/Loader.swift`: no captured text matches the proof admission recorded"),
+		unproven,
+	);
+	assert.ok(!unproven.includes("let id: Int"), unproven);
+	assert.ok(!unproven.includes("\n### "), unproven);
+	assert.deepEqual(other.asked, []);
+});
+
+void test("recorded-change lines stay within bounds and eligibility", (t) => {
+	const { root, index } = recordCapture(t);
+	const added = recordLine(String.raw`+        print("decode failed: \(error)")`);
+	const recordResults = [decided([recordCited(added)])];
+
+	// Only a public NOT_MET result's citations are read.
+	for (const result of [
+		{ ...decided([recordCited(added)]), publicEligible: false },
+		{ ...decided([recordCited(added)]), outcome: "MET" },
+	]) {
+		const read = blobs(LOADER_FILES);
+		assert.equal(
+			buildPrimarySourceReference(root, "context", "repos/reviewed", index, [result], read.reader),
+			"",
+		);
+		assert.deepEqual(read.asked, []);
+	}
+
+	// A change over its bound is named whole; the record is not read past it.
+	const large = blobs(LOADER_FILES, HEAD, { kind: "tooLarge" });
+	const tooLarge = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		recordResults,
+		large.reader,
+	);
+	assert.ok(tooLarge.includes("the whole change exceeds the bound"), tooLarge);
+	assert.ok(!tooLarge.includes("let id: Int"), tooLarge);
+	const capped = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		recordResults,
+		blobs(LOADER_FILES).reader,
+		{
+			...DEFAULT_BRIEF_LIMITS,
+			diffChars: RECORDED.length - 1,
+		},
+	);
+	assert.ok(capped.includes("the whole change exceeds the bound"), capped);
+
+	// A file over its own bound is named, and the whole reference keeps its total bound.
+	const small = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		recordResults,
+		blobs(LOADER_FILES).reader,
+		{
+			...DEFAULT_BRIEF_LIMITS,
+			filePerChars: 100,
+		},
+	);
+	assert.ok(small.includes(`\`App/Loader.swift\` at \`${HEAD}\`: too large to show here`), small);
+	const bounded = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		recordResults,
+		blobs(LOADER_FILES).reader,
+		{
+			...DEFAULT_BRIEF_LIMITS,
+			totalChars: 700,
+		},
+	);
+	assert.ok(bounded.length <= 700, bounded);
+	assert.ok(!bounded.includes("let id: Int"), bounded);
+
+	// A checkout that is not the captured head vouches for nothing.
+	const moved = blobs(LOADER_FILES, EARLIER);
+	const unpinned = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		recordResults,
+		moved.reader,
+	);
+	assert.deepEqual(moved.asked, []);
+	assert.ok(unpinned.includes("the checkout is not the captured commit"), unpinned);
+});
+
+void test("a production tree citation with no side or commit is read at the commit the manifest records", (t) => {
+	const { root, index } = primaryCapture(t);
+	const model = "struct Item {}\n";
+	const stagedPath = "repos/reviewed/App/Model.swift";
+	const staged = {
+		...index,
+		citableTexts: [HEAD, null].map((commit) => ({
+			source: "scm.repository.tree",
+			path: "App/Model.swift",
+			side: "NEW",
+			commit,
+			stagedPath,
+			sha256: sha(model),
+		})),
+	};
+	const read = blobs({
+		[`${HEAD}:App/Model.swift`]: { kind: "regular", bytes: Buffer.from(model) },
+	});
+	const reference = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		staged,
+		[decided([cited("scm.repository.tree", "App/Model.swift", null, model)])],
+		read.reader,
+	);
+	assert.ok(
+		reference.includes(`\`App/Model.swift\` at \`${HEAD}\`, the repository commit`),
+		reference,
+	);
+	assert.ok(reference.includes("[L1] struct Item {}"), reference);
+	assert.deepEqual(read.asked, [`${HEAD}:App/Model.swift`]);
 });
 
 /** A pull request capture index whose core and linked-work sources are in the given states. */

@@ -178,20 +178,20 @@ public class Issue extends BaseGitServiceEntity {
      * This is a denormalized count for efficient querying without loading all
      * sub-issues.
      */
-    private Integer subIssuesTotal;
+    private @Nullable Integer subIssuesTotal;
 
     /**
      * Number of completed sub-issues (from GitHub's sub_issues_summary.completed).
      * A sub-issue is considered completed when its state is CLOSED.
      */
-    private Integer subIssuesCompleted;
+    private @Nullable Integer subIssuesCompleted;
 
     /**
      * Percentage of sub-issues completed (from GitHub's
      * sub_issues_summary.percent_completed).
      * Value between 0 and 100. Null if no sub-issues exist.
      */
-    private Integer subIssuesPercentCompleted;
+    private @Nullable Integer subIssuesPercentCompleted;
 
     /**
      * The issue type (category) for this issue.

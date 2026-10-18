@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyReadback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPublicationContext;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSend;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
@@ -64,7 +66,9 @@ class FeedbackSendTransactionsTest {
             visibility,
             Clock.fixed(now, ZoneOffset.UTC),
             privacy,
-            mock(FeedbackSendQueue.class));
+            mock(FeedbackSendQueue.class),
+            mock(ItemIndexService.class),
+            mock(FeedbackPublicationContext.class));
 
     @BeforeEach
     void setup() {
