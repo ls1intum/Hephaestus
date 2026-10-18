@@ -3560,6 +3560,8 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-completion-unresolved",
 		"compose-continuation",
 		"compose-continuation-reviewed",
+		"compose-continuation-stale",
+		"compose-continuation-unresolved",
 		"compose-fresh-history",
 		"compose-history-unavailable-words",
 		"compose-history-missing-currentness",
@@ -3592,6 +3594,8 @@ if (scenario !== undefined && scenario !== "") {
 		const stage =
 			new Map([
 				["compose-continuation-reviewed", "compose-continuation"],
+				["compose-continuation-stale", "compose-continuation"],
+				["compose-continuation-unresolved", "compose-continuation"],
 				["compose-completion-accepted", "compose"],
 				["compose-completion-refused", "compose"],
 				["compose-completion-lost-ack", "compose"],
@@ -4115,7 +4119,10 @@ if (scenario !== undefined && scenario !== "") {
 								PI_ORCHESTRATION_SCENARIO: stage,
 								PI_PUBLIC_COMPLETION_MODE: fixture.startsWith("compose-completion-")
 									? fixture.slice("compose-completion-".length)
-									: undefined,
+									: new Map([
+											["compose-continuation-stale", "stale"],
+											["compose-continuation-unresolved", "unresolved"],
+										]).get(fixture),
 								PI_PRACTICE_PAGE_SUPPORT_MODE: fixture.startsWith("compose-support-")
 									? fixture.slice("compose-support-".length)
 									: new Map([["compose-already-said-inline", "first-inline"]]).get(fixture),
@@ -6760,11 +6767,29 @@ for (const item of nullableCases) {
 								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
 								break;
 							}
-							// One session, the review composer's: no practice is assessed and nothing can be recorded.
+							// Only the review composer's sessions: no practice is assessed and nothing can be recorded.
+							// Changed history earns one fresh session over the new read; an unknown delivery earns none.
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("create:session")),
-								["create:session tools=report_review"],
+								fixture === "compose-continuation-stale"
+									? ["create:session tools=report_review", "create:session tools=report_review"]
+									: ["create:session tools=report_review"],
 							);
+							if (fixture === "compose-continuation-stale") {
+								// The refused words came from the first read and the fresh session's from the second; the
+								// continuation's closing preparation may only replay those, never the refused context.
+								const contexts = events.filter((event) => event.startsWith("public-context:"));
+								assert.deepEqual(contexts.slice(0, 2), [
+									`public-context:v1:7:${"c".repeat(64)}`,
+									`public-context:v1:7:${"d".repeat(64)}`,
+								]);
+								assert.ok(
+									contexts
+										.slice(1)
+										.every((context) => context === `public-context:v1:7:${"d".repeat(64)}`),
+									events.join("\n"),
+								);
+							}
 							assert.equal(
 								readFileSync(nodePath.join(cwd, "system-prompt.md"), "utf8"),
 								"Write clear, useful feedback.\n\nWrite the review on the work.",
@@ -6784,11 +6809,14 @@ for (const item of nullableCases) {
 								feedback.admissionDigest,
 								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							);
-							assert.ok(feedback.review !== null);
+							assert.equal(feedback.review === null, fixture === "compose-continuation-unresolved");
 							assert.deepEqual(feedback.feedback, []);
 							// A continuing public writer cannot reconstruct the earlier private context.
 							assert.deepEqual(feedback.compositionFailures, [
 								{ phase: "PRIVATE_FEEDBACK", reason: "PRIVATE_NOT_RECOVERED" },
+								...(fixture === "compose-continuation-unresolved"
+									? [{ phase: "PUBLIC_REVIEW", reason: "PUBLIC_DELIVERY_UNRESOLVED" }]
+									: []),
 							]);
 							break;
 						}

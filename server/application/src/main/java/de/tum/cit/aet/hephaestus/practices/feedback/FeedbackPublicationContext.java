@@ -80,8 +80,15 @@ public class FeedbackPublicationContext {
     private static @Nullable List<Long> developers(String context) {
         var matcher = TOKEN.matcher(context);
         if (!matcher.matches()) return null;
-        var developers =
-                Arrays.stream(matcher.group(1).split(",")).map(Long::valueOf).toList();
+        List<Long> developers;
+        try {
+            developers = Arrays.stream(matcher.group(1).split(","))
+                    .map(Long::valueOf)
+                    .toList();
+        } catch (NumberFormatException outOfRange) {
+            // An id beyond the account id range was never issued, so the composer did not read this history.
+            return null;
+        }
         return developers.equals(developers.stream().distinct().sorted().toList()) ? developers : null;
     }
 

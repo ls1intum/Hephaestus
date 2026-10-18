@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.LookupPresence;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecision;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionService;
+import de.tum.cit.aet.hephaestus.practices.feedback.decision.dto.CreateFeedbackDecisionRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
@@ -325,6 +326,57 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
         assertThat(row.getState()).isEqualTo(FeedbackState.AWAITING_APPROVAL);
         var approved = Objects.requireNonNull(row.getChecks().get(FeedbackCheckStage.APPROVED));
         assertThat(approved.checks().getFirst().reason()).isEqualTo(FeedbackStopReason.PUBLIC_DELIVERY_UNRESOLVED);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldAnswerConflictWithTheChangedHistoryCodeAndCommitTheWithholdingWhenAnApprovalIsStale() {
+        when(gate.requiresApproval(any())).thenReturn(true);
+        UUID firstReview = review();
+        UUID secondReview = review();
+        String firstRead = contextFor(firstReview);
+        String secondRead = contextFor(secondReview);
+        var first = publicPiece(firstReview, "Name the missing failure case.", firstRead);
+        var second = publicPiece(secondReview, "Cover the empty input as well.", secondRead);
+        assertThat(approve(first).refusal()).isNull();
+        newSender().send(workspace.getId(), first);
+        approveOverHttp(second)
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.code")
+                .isEqualTo("PUBLIC_HISTORY_CHANGED")
+                .jsonPath("$.state")
+                .isEqualTo("WITHHELD");
+        var row = feedback.findById(second).orElseThrow();
+        assertThat(row.getState()).isEqualTo(FeedbackState.WITHHELD);
+        assertThat(row.getStopReason()).isEqualTo(FeedbackStopReason.PUBLIC_HISTORY_CHANGED);
+        assertThat(decisions.findLatestApproval(workspace.getId(), second)).isEmpty();
+        assertThat(sends.findById(second)).isEmpty();
+        assertThat(provider.summaryCreates).isEqualTo(1);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldAnswerConflictWithTheUnresolvedCodeAndKeepAwaitingApprovalWhenAnotherWriteIsUnknown() {
+        when(gate.requiresApproval(any())).thenReturn(true);
+        UUID review = review();
+        var piece = publicPiece(review, "Name the missing failure case.", contextFor(review));
+        sibling(developerId, itemId, FeedbackCopyState.WRITE_STARTED);
+        approveOverHttp(piece)
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.code")
+                .isEqualTo("PUBLIC_DELIVERY_UNRESOLVED")
+                .jsonPath("$.state")
+                .isEqualTo("AWAITING_APPROVAL");
+        var row = feedback.findById(piece).orElseThrow();
+        assertThat(row.getState()).isEqualTo(FeedbackState.AWAITING_APPROVAL);
+        var approved = Objects.requireNonNull(row.getChecks().get(FeedbackCheckStage.APPROVED));
+        assertThat(approved.checks().getFirst().reason()).isEqualTo(FeedbackStopReason.PUBLIC_DELIVERY_UNRESOLVED);
+        assertThat(decisions.findLatestApproval(workspace.getId(), piece)).isEmpty();
+        assertThat(sends.findById(piece)).isEmpty();
     }
 
     @ParameterizedTest
@@ -761,6 +813,15 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
                 developerId,
                 new FeedbackDecisionInput(
                         FeedbackDecisionAction.APPROVE, null, null, digests.current(workspace.getId(), piece)));
+    }
+
+    private WebTestClient.ResponseSpec approveOverHttp(UUID piece) {
+        return client.post()
+                .uri(route() + "/" + piece + "/decisions")
+                .headers(TestAuthUtils.withCurrentUser())
+                .bodyValue(new CreateFeedbackDecisionRequestDTO(
+                        FeedbackDecisionAction.APPROVE, null, null, digests.current(workspace.getId(), piece)))
+                .exchange();
     }
 
     private void assertWithheld(UUID piece, FeedbackStopReason reason) {

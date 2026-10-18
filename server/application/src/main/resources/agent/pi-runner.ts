@@ -17,6 +17,7 @@ import {
 	loadCompositionRequest,
 	createCompositionStage,
 	composeAdmittedFeedback,
+	composePublicReview,
 	closeUnroutedPrivateDestinations,
 	undecidedPrivatePractices,
 	recordCompositionFailure,
@@ -3696,11 +3697,13 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						}
 					};
 					try {
-						await compositionStage().composeReview(
+						await composePublicReview(
+							compositionStage(),
 							compositionRequest,
 							reviewable,
 							unreachedSlugs,
 							safety,
+							composedFeedback,
 						);
 						await prepareComposedFeedback(safety);
 					} catch (error) {

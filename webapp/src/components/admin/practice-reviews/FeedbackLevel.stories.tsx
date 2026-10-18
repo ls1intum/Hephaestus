@@ -339,6 +339,8 @@ export const UncertainWrite: Story = {
 		await expectHeaderChip(panelElement, "Ready to send");
 		const events = history(panelElement);
 		events.getByText("Not confirmed");
+		events.getByText("Read the work for the unconfirmed comment · 1 attempt");
+		events.getByText("This check posts nothing.");
 		events.getByText("Summary writing");
 		events.getByText(/The connection closed before GitHub answered/u);
 		within(panelElement).getByText(
@@ -514,6 +516,8 @@ export const WithdrawalInProgress: Story = {
 		const panel = within(panelElement);
 		panel.getByText(/Heph is still removing the copies it posted on the work\./u);
 		history(panelElement).getByText("Not confirmed");
+		// A removal keeps its own words: it is not a readback.
+		history(panelElement).getByText("Retract the posted copies · 3 attempts");
 		await expect(panel.queryByRole("button", { name: "Retry withdrawal" })).toBeNull();
 		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
 	},
@@ -593,6 +597,39 @@ export const WithdrawFeedback: Story = {
 			"It describes issues from before this pull request.",
 		);
 		await waitFor(async () => expect(screen.queryByRole("textbox", { name: "Reason" })).toBeNull());
+	},
+};
+
+const UNKNOWN_WRITE_WITHDRAWAL =
+	"An unconfirmed comment may still be on the work. Heph can retract that comment only if a check finds it. Receipts and results are kept.";
+
+/** Withdrawing a comment whose write is unknown promises no removal it cannot make yet. */
+export const WithdrawUnconfirmedComment: Story = {
+	args: { feedback: ready(unknownWriteOnWork("DONE")) },
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: "Withdraw feedback" }));
+		await expectSettledVisible(await screen.findByRole("textbox", { name: "Reason" }));
+		screen.getByText(UNKNOWN_WRITE_WITHDRAWAL);
+		await expect(
+			screen.queryByText(/^Copies already posted on the work are retracted there, and/u),
+		).toBeNull();
+	},
+};
+
+/** Withdrawing feedback whose copies are all accounted for keeps the plain promise. */
+export const WithdrawDeliveredFromWork: Story = {
+	args: { feedback: ready({ ...approvedFeedbackDetail, destination: "ON_WORK" }) },
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: "Withdraw feedback" }));
+		await expectSettledVisible(await screen.findByRole("textbox", { name: "Reason" }));
+		screen.getByText(
+			"Copies already posted on the work are retracted there, and nothing more is posted. Their receipts stay on this sheet, and the results behind it are unchanged.",
+		);
+		await expect(screen.queryByText(UNKNOWN_WRITE_WITHDRAWAL)).toBeNull();
 	},
 };
 
@@ -676,7 +713,13 @@ export const DeliveryCheckInProgress: Story = {
 			"Heph is confirming whether a comment it began writing appeared on the work. Until the provider confirms it, it does not count as delivered.",
 		);
 		await expect(panel.queryByText(UNKNOWN_ON_WORK_NOW)).toBeNull();
-		history(panelElement).getByText("Waiting to be sent");
+		// The queued post only reads the work back; it is not a send waiting to post.
+		const events = history(panelElement);
+		events.getByText("Waiting to check");
+		events.getByText("Read the work for the unconfirmed comment · 8 attempts");
+		events.getByText("This check posts nothing.");
+		await expect(events.queryByText("Waiting to be sent")).toBeNull();
+		await expect(events.queryByText(/Post the copies/u)).toBeNull();
 		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
 	},
 };
@@ -738,6 +781,11 @@ export const WithdrawnDeliveryCheckInProgress: Story = {
 			"It is withdrawn. Heph is confirming whether a comment it began writing appeared on the work. A comment found there is then retracted. The results behind it are unchanged.",
 		);
 		await expect(panel.queryByText(/still removing/u)).toBeNull();
+		// Being sent, it may be the first write or a readback; the record does not say which.
+		const events = history(panelElement);
+		events.getByText("Writing or checking");
+		events.getByText("Write the comment, or read back the one already started · 8 attempts");
+		events.getByText("The record does not say which.");
 		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
 	},
 };
