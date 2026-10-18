@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
@@ -45,7 +44,7 @@ public class ScmWorkItemLister implements ItemLister {
     }
 
     private final ScmItemService sources;
-    private final ItemIndexService writer;
+    private final ScmWorkItemIndex work;
     private final ObjectMapper mapper;
     private final ScmItemQueryRepository queries;
 
@@ -78,20 +77,9 @@ public class ScmWorkItemLister implements ItemLister {
                     ? queries.listReviews(repositoryId)
                     : queries.listWork(
                             repositoryId, request.memberKind().equals(ScmItemEvents.ISSUE) ? "ISSUE" : "PULL_REQUEST");
-            for (var row : rows) {
-                long source = row.getSourceId();
-                Long parent = request.container().itemId();
-                if (request.memberKind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)) {
-                    long pull = Objects.requireNonNull(row.getParentSourceId());
-                    var parentItem = writer.upsert(new ItemRegistration(
-                            request.container().workspaceId(), ScmItemEvents.PULL_REQUEST, pull, parent, null));
-                    writer.restore(parentItem.workspaceId(), parentItem.itemId());
-                    parent = parentItem.itemId();
-                }
-                var registration = new ItemRegistration(
-                        request.container().workspaceId(), request.memberKind(), source, parent, null);
-                var item = writer.upsert(registration);
-                writer.restore(item.workspaceId(), item.itemId());
+            for (var item : work.register(request.container(), request.memberKind(), rows)) {
+                var registration =
+                        new ItemRegistration(item.workspaceId(), item.kind(), item.sourceId(), item.parentId(), null);
                 items.add(new ListedItem(registration, sources.pin(item, null).version()));
             }
             cursor = new Cursor(

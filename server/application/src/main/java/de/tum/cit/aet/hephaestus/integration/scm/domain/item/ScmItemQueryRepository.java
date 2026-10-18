@@ -119,6 +119,20 @@ public interface ScmItemQueryRepository extends Repository<Item, Long> {
         """, nativeQuery = true)
     List<WorkRow> listWork(@Param("repositoryId") long repositoryId, @Param("discriminator") String discriminator);
 
+    @Query(value = """
+        SELECT work.id AS source_id, NULL::bigint AS parent_source_id, work.repository_id
+        FROM issue work WHERE work.repository_id=:repositoryId AND work.deleted_at IS NULL
+          AND work.issue_type=:discriminator
+          AND NOT EXISTS (SELECT 1 FROM item i WHERE i.workspace_id=:workspaceId AND i.kind=:kind
+            AND i.source_id=work.id AND i.removed_at IS NULL)
+        ORDER BY work.created_at,work.id
+        """, nativeQuery = true)
+    List<WorkRow> unindexedWork(
+            @Param("workspaceId") long workspaceId,
+            @Param("repositoryId") long repositoryId,
+            @Param("kind") String kind,
+            @Param("discriminator") String discriminator);
+
     @WorkspaceAgnostic("Reads native SCM mirror facts after the container repository passes workspace authorization")
     @Query(value = """
         SELECT review.id AS source_id, review.pull_request_id AS parent_source_id, work.repository_id

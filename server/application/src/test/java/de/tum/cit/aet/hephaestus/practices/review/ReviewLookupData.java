@@ -40,6 +40,24 @@ public class ReviewLookupData {
 
     @Transactional
     public ItemRef work(Workspace workspace, IdentityProviderType type, boolean pullRequest) {
+        var mirrored = mirror(workspace, type, pullRequest);
+        var parent = index.upsert(new ItemRegistration(
+                workspace.getId(),
+                ScmItemEvents.REPOSITORY,
+                mirrored.repository().getId(),
+                null,
+                null));
+        return index.upsert(new ItemRegistration(
+                workspace.getId(),
+                pullRequest ? ScmItemEvents.PULL_REQUEST : ScmItemEvents.ISSUE,
+                mirrored.workId(),
+                parent.itemId(),
+                null));
+    }
+
+    /** Monitored, mirrored work that no event has indexed yet, as a sync leaves work another workspace mirrored. */
+    @Transactional
+    public Mirrored mirror(Workspace workspace, IdentityProviderType type, boolean pullRequest) {
         String server = type == IdentityProviderType.GITHUB ? "https://github.com" : "https://gitlab.example.test";
         var kind = IntegrationKind.valueOf(type.name());
         ConnectionConfig config = type == IdentityProviderType.GITHUB
@@ -64,9 +82,8 @@ public class ReviewLookupData {
         repository.setUpdatedAt(Instant.now());
         repository.setPushedAt(Instant.now());
         repository = repositories.saveAndFlush(repository);
-        monitors.saveAndFlush(WorkspaceTestFixtures.repositoryMonitor(workspace, repository.getNameWithOwner()));
-        var parent = index.upsert(
-                new ItemRegistration(workspace.getId(), ScmItemEvents.REPOSITORY, repository.getId(), null, null));
+        var monitor = monitors.saveAndFlush(
+                WorkspaceTestFixtures.repositoryMonitor(workspace, repository.getNameWithOwner()));
         Issue work;
         if (pullRequest) {
             var pull = new PullRequest();
@@ -88,13 +105,11 @@ public class ReviewLookupData {
         String route = type == IdentityProviderType.GITHUB
                 ? (pullRequest ? "/pull/" : "/issues/")
                 : (pullRequest ? "/-/merge_requests/" : "/-/issues/");
-        work.setHtmlUrl(repository.getHtmlUrl() + route + work.getNumber());
+        String url = repository.getHtmlUrl() + route + work.getNumber();
+        work.setHtmlUrl(url);
         work = issues.saveAndFlush(work);
-        return index.upsert(new ItemRegistration(
-                workspace.getId(),
-                pullRequest ? ScmItemEvents.PULL_REQUEST : ScmItemEvents.ISSUE,
-                work.getId(),
-                parent.itemId(),
-                null));
+        return new Mirrored(monitor.getId(), repository, work.getId(), url);
     }
+
+    public record Mirrored(long monitorId, Repository repository, long workId, String url) {}
 }
