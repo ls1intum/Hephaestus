@@ -821,8 +821,8 @@ public class ReviewJobExecutor {
             Instant workDeadline =
                     Instant.now().plusSeconds(snapshot.timeoutSeconds()).truncatedTo(ChronoUnit.SECONDS);
             Instant tokenExpiry = workDeadline.plus(SandboxLayout.RESULT_UPLOAD_GRACE);
-            String jobToken =
-                    workerJwtIssuer.issueForJobUntil(jobId, job.getWorkspaceId(), job.getAttempt(), tokenExpiry);
+            String jobToken = workerJwtIssuer.issueForJobUntil(
+                    jobId, job.getWorkspaceId(), job.getAttempt(), workDeadline, tokenExpiry);
             stage.set(PreparationFailure.Stage.SPEC);
             PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
                     snapshot.model().apiProtocol().wire(),

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.scan.ScanBudget;
 import de.tum.cit.aet.hephaestus.agent.scan.ScanModelUnavailableException;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -15,14 +16,17 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,7 +56,14 @@ public class ScanCallGuard {
         var review = reviews.find(workspace, job.getReviewId()).orElseThrow(ScanCallGuard::refused);
         if (review.kind() != ReviewKind.SCAN) return Optional.empty();
         var lock = locks.get(new Attempt(job.getId(), attempt.number()), key -> new ReentrantLock());
-        lock.lock();
+        // The attempt's previous call holds the lease; waiting for it counts against the same work deadline.
+        Duration remaining = ProxyStreamingUtils.remainingUntil(Objects.requireNonNull(route.workDeadline()));
+        try {
+            if (!lock.tryLock(remaining.toNanos(), TimeUnit.NANOSECONDS)) throw workTimeOver(null);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw workTimeOver(interrupted);
+        }
         try {
             job = jobs.findByIdAndWorkspaceId(job.getId(), workspace).orElseThrow(ScanCallGuard::refused);
             if (job.getStatus() != ReviewJobStatus.RUNNING
@@ -138,6 +149,10 @@ public class ScanCallGuard {
                     || value.has("fileData")) throw refused();
         }
         if ((value.isObject() || value.isArray())) for (var child : value) requireTextOnly(child);
+    }
+
+    private static ResponseStatusException workTimeOver(@Nullable Throwable cause) {
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, LlmProxyService.WORK_TIME_OVER, cause);
     }
 
     private static ResponseStatusException refused() {

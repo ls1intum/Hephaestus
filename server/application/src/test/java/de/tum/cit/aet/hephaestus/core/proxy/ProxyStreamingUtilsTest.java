@@ -2,7 +2,8 @@ package de.tum.cit.aet.hephaestus.core.proxy;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Answers.RETURNS_DEFAULTS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -15,10 +16,17 @@ import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,9 +43,12 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
-import reactor.test.StepVerifier;
 
 class ProxyStreamingUtilsTest extends BaseUnitTest {
+
+    private static final Duration LIMIT = Duration.ofSeconds(10);
+
+    private static final NettyDataBufferFactory POOLED = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
 
     @Nested
     class FilterHopByHopHeaders {
@@ -148,7 +159,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
     }
 
     @Nested
-    class ConsumeResponse {
+    class BufferedResponse {
 
         @Test
         void shouldBufferNonSseResponse() {
@@ -156,39 +167,14 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-            ClientResponse clientResponse =
-                    mockClientResponse(200, upstreamHeaders, MediaType.APPLICATION_JSON, expectedBody);
+            var result = forward(
+                    mockClientResponse(200, upstreamHeaders, MediaType.APPLICATION_JSON, Mono.just(expectedBody)),
+                    new MockHttpServletResponse(),
+                    null);
 
-            StepVerifier.create(
-                            ProxyStreamingUtils.consumeResponse(clientResponse, new MockHttpServletResponse(), null))
-                    .assertNext(result -> {
-                        assertThat(result.status()).isEqualTo(200);
-                        assertThat(result.body()).isEqualTo(expectedBody);
-                        assertThat(result.streamed()).isFalse();
-                    })
-                    .verifyComplete();
-        }
-
-        @Test
-        void shouldStreamSseResponse() {
-            HttpHeaders upstreamHeaders = new HttpHeaders();
-            upstreamHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
-
-            var factory = new DefaultDataBufferFactory();
-            DataBuffer buf = factory.wrap("data: hello\n\n".getBytes(UTF_8));
-            Flux<DataBuffer> sseFlux = Flux.just(buf);
-
-            ClientResponse clientResponse = mockClientResponseWithSseFlux(200, upstreamHeaders, sseFlux);
-
-            StepVerifier.create(
-                            ProxyStreamingUtils.consumeResponse(clientResponse, new MockHttpServletResponse(), null))
-                    .assertNext(result -> {
-                        assertThat(result.status()).isEqualTo(200);
-                        assertThat(result.body()).isNull();
-                        assertThat(result.streamed()).isTrue();
-                        assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.COMPLETED);
-                    })
-                    .verifyComplete();
+            assertThat(result.status()).isEqualTo(200);
+            assertThat(result.body()).isEqualTo(expectedBody);
+            assertThat(result.streamed()).isFalse();
         }
 
         @Test
@@ -196,16 +182,14 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-            ClientResponse clientResponse = mockClientResponseEmpty(204, upstreamHeaders);
+            var result = forward(
+                    mockClientResponse(204, upstreamHeaders, MediaType.APPLICATION_JSON, Mono.empty()),
+                    new MockHttpServletResponse(),
+                    null);
 
-            StepVerifier.create(
-                            ProxyStreamingUtils.consumeResponse(clientResponse, new MockHttpServletResponse(), null))
-                    .assertNext(result -> {
-                        assertThat(result.status()).isEqualTo(204);
-                        assertThat(result.body()).isEmpty();
-                        assertThat(result.streamed()).isFalse();
-                    })
-                    .verifyComplete();
+            assertThat(result.status()).isEqualTo(204);
+            assertThat(result.body()).isEmpty();
+            assertThat(result.streamed()).isFalse();
         }
 
         @Test
@@ -216,18 +200,15 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             upstreamHeaders.set(HttpHeaders.TRANSFER_ENCODING, "chunked");
             upstreamHeaders.set("X-Request-Id", "abc123");
 
-            ClientResponse clientResponse =
-                    mockClientResponse(200, upstreamHeaders, MediaType.APPLICATION_JSON, "{}".getBytes(UTF_8));
+            var result = forward(
+                    mockClientResponse(
+                            200, upstreamHeaders, MediaType.APPLICATION_JSON, Mono.just("{}".getBytes(UTF_8))),
+                    new MockHttpServletResponse(),
+                    null);
 
-            StepVerifier.create(
-                            ProxyStreamingUtils.consumeResponse(clientResponse, new MockHttpServletResponse(), null))
-                    .assertNext(result -> {
-                        assertThat(result.headers().get(HttpHeaders.CONNECTION)).isNull();
-                        assertThat(result.headers().get(HttpHeaders.TRANSFER_ENCODING))
-                                .isNull();
-                        assertThat(result.headers().getFirst("X-Request-Id")).isEqualTo("abc123");
-                    })
-                    .verifyComplete();
+            assertThat(result.headers().get(HttpHeaders.CONNECTION)).isNull();
+            assertThat(result.headers().get(HttpHeaders.TRANSFER_ENCODING)).isNull();
+            assertThat(result.headers().getFirst("X-Request-Id")).isEqualTo("abc123");
         }
 
         @Test
@@ -236,191 +217,90 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-            ClientResponse clientResponse =
-                    mockClientResponse(429, upstreamHeaders, MediaType.APPLICATION_JSON, errorBody);
+            var result = forward(
+                    mockClientResponse(429, upstreamHeaders, MediaType.APPLICATION_JSON, Mono.just(errorBody)),
+                    new MockHttpServletResponse(),
+                    null);
 
-            StepVerifier.create(
-                            ProxyStreamingUtils.consumeResponse(clientResponse, new MockHttpServletResponse(), null))
-                    .assertNext(result -> {
-                        assertThat(result.status()).isEqualTo(429);
-                        assertThat(result.body()).isEqualTo(errorBody);
-                    })
-                    .verifyComplete();
+            assertThat(result.status()).isEqualTo(429);
+            assertThat(result.body()).isEqualTo(errorBody);
+        }
+
+        @Test
+        void shouldTreatNullContentTypeAsNonSse() {
+            var result = forward(
+                    mockClientResponse(200, new HttpHeaders(), null, Mono.just("plain text".getBytes(UTF_8))),
+                    new MockHttpServletResponse(),
+                    null);
+
+            assertThat(result.streamed()).isFalse();
+            assertThat(result.body()).isEqualTo("plain text".getBytes(UTF_8));
+        }
+
+        @Test
+        @DisplayName("a buffered body still unread at the limit is thrown, and the response is never touched")
+        void shouldThrowABufferedBodyStillUnreadAtTheLimit() {
+            var cancelled = new AtomicBoolean();
+            HttpHeaders upstreamHeaders = new HttpHeaders();
+            upstreamHeaders.setContentType(MediaType.APPLICATION_JSON);
+            var upstream = mockClientResponse(
+                    200,
+                    upstreamHeaders,
+                    MediaType.APPLICATION_JSON,
+                    Mono.<byte[]>never().doOnCancel(() -> cancelled.set(true)));
+            var recorded = recording(new CountDownLatch(0));
+
+            assertThatThrownBy(() -> ProxyStreamingUtils.forward(
+                            ProxyStreamingUtils.parts(upstream, null),
+                            Duration.ofSeconds(1),
+                            recorded.response(),
+                            null))
+                    .hasCauseInstanceOf(TimeoutException.class);
+
+            assertThat(cancelled).isTrue();
+            assertThat(recorded.callers()).isEmpty();
+        }
+    }
+
+    @Nested
+    class StreamedResponse {
+
+        private final DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
+
+        @Test
+        void shouldStreamSseResponse() throws IOException {
+            var response = new MockHttpServletResponse();
+
+            var result = forward(sse(Flux.just(bufferFactory.wrap("data: hello\n\n".getBytes(UTF_8)))), response, null);
+
+            assertThat(result.status()).isEqualTo(200);
+            assertThat(result.body()).isNull();
+            assertThat(result.streamed()).isTrue();
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.COMPLETED);
+            assertThat(response.getContentAsString()).isEqualTo("data: hello\n\n");
+            assertThat(response.getContentType()).startsWith(MediaType.TEXT_EVENT_STREAM_VALUE);
         }
 
         @Test
         void shouldDetectSseWithCharset() {
             HttpHeaders upstreamHeaders = new HttpHeaders();
-            MediaType sseWithCharset = new MediaType("text", "event-stream", StandardCharsets.UTF_8);
-            upstreamHeaders.setContentType(sseWithCharset);
+            upstreamHeaders.setContentType(new MediaType("text", "event-stream", StandardCharsets.UTF_8));
 
-            var factory = new DefaultDataBufferFactory();
-            DataBuffer buf = factory.wrap("data: test\n\n".getBytes(UTF_8));
-            Flux<DataBuffer> sseFlux = Flux.just(buf);
+            var result = forward(
+                    mockClientResponseWithSseFlux(
+                            200, upstreamHeaders, Flux.just(bufferFactory.wrap("data: test\n\n".getBytes(UTF_8)))),
+                    new MockHttpServletResponse(),
+                    null);
 
-            ClientResponse clientResponse = mockClientResponseWithSseFlux(200, upstreamHeaders, sseFlux);
-
-            StepVerifier.create(
-                            ProxyStreamingUtils.consumeResponse(clientResponse, new MockHttpServletResponse(), null))
-                    .assertNext(result -> {
-                        assertThat(result.streamed()).isTrue();
-                        assertThat(result.body()).isNull();
-                    })
-                    .verifyComplete();
-        }
-
-        @Test
-        void shouldTreatNullContentTypeAsNonSse() {
-            HttpHeaders upstreamHeaders = new HttpHeaders();
-
-            ClientResponse clientResponse =
-                    mockClientResponse(200, upstreamHeaders, null, "plain text".getBytes(UTF_8));
-
-            StepVerifier.create(
-                            ProxyStreamingUtils.consumeResponse(clientResponse, new MockHttpServletResponse(), null))
-                    .assertNext(result -> {
-                        assertThat(result.streamed()).isFalse();
-                        assertThat(result.body()).isEqualTo("plain text".getBytes(UTF_8));
-                    })
-                    .verifyComplete();
-        }
-
-        @Test
-        void shouldCancelUpstreamAndReleasePooledBuffersWhenClientDisconnects() throws Exception {
-            var allocated = new ConcurrentLinkedQueue<NettyDataBuffer>();
-            var cancelled = new AtomicBoolean();
-            var factory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
-            Flux<DataBuffer> body = Flux.range(0, 1024)
-                    .<DataBuffer>map(index -> {
-                        var buffer = factory.allocateBuffer(32);
-                        buffer.write("data: event\n\n".getBytes(StandardCharsets.UTF_8));
-                        allocated.add(buffer);
-                        return buffer;
-                    })
-                    .concatWith(Flux.never())
-                    .doOnCancel(() -> cancelled.set(true));
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.TEXT_EVENT_STREAM);
-            ClientResponse upstream = mockClientResponseWithSseFlux(200, headers, body);
-            var response = mock(HttpServletResponse.class);
-            var output = mock(ServletOutputStream.class);
-            when(response.getOutputStream()).thenReturn(output);
-            doThrow(new IOException("Client disconnected")).when(output).write(any(byte[].class));
-
-            StepVerifier.create(ProxyStreamingUtils.consumeResponse(upstream, response, null))
-                    .assertNext(result -> {
-                        assertThat(result.streamed()).isTrue();
-                        assertThat(result.streamOutcome())
-                                .isEqualTo(ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED);
-                    })
-                    .verifyComplete();
-
-            await().untilAsserted(() -> {
-                assertThat(cancelled).isTrue();
-                assertThat(allocated).isNotEmpty();
-                assertThat(allocated)
-                        .allSatisfy(buffer ->
-                                assertThat(buffer.getNativeBuffer().refCnt()).isZero());
-            });
-        }
-
-        @Test
-        void shouldReportUpstreamFailureAfterDeliveringAChunkWithoutReplacingCommittedResponse() throws Exception {
-            var factory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
-            var buffer = factory.allocateBuffer(32);
-            buffer.write("data: delivered\n\n".getBytes(StandardCharsets.UTF_8));
-            var delivered = Sinks.<Void>empty();
-            Flux<DataBuffer> body = Flux.<DataBuffer>just(buffer)
-                    .concatWith(delivered.asMono().then(Mono.error(new IOException("private provider failure"))));
-            var headers = new HttpHeaders();
-            headers.setContentType(MediaType.TEXT_EVENT_STREAM);
-            var response = new MockHttpServletResponse();
-
-            StepVerifier.create(ProxyStreamingUtils.consumeResponse(
-                            mockClientResponseWithSseFlux(200, headers, body),
-                            response,
-                            bytes -> delivered.tryEmitEmpty()))
-                    .assertNext(result -> {
-                        assertThat(result.status()).isEqualTo(200);
-                        assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.STREAM_FAILED);
-                        assertThat(result.body()).isNull();
-                    })
-                    .verifyComplete();
-
-            assertThat(response.isCommitted()).isTrue();
-            assertThat(response.getContentAsString()).isEqualTo("data: delivered\n\n");
-            assertThat(buffer.getNativeBuffer().refCnt()).isZero();
-        }
-
-        private ClientResponse mockClientResponse(
-                int status, HttpHeaders headers, @Nullable MediaType contentType, byte[] body) {
-            ClientResponse resp = mock(ClientResponse.class);
-            ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
-            when(resp.headers()).thenReturn(respHeaders);
-            when(respHeaders.asHttpHeaders()).thenReturn(headers);
-            when(respHeaders.contentType()).thenReturn(Optional.ofNullable(contentType));
-            when(resp.statusCode()).thenReturn(HttpStatusCode.valueOf(status));
-            when(resp.bodyToMono(byte[].class)).thenReturn(body != null ? Mono.just(body) : Mono.empty());
-            return resp;
-        }
-
-        private ClientResponse mockClientResponseWithSseFlux(
-                int status, HttpHeaders headers, Flux<DataBuffer> sseFlux) {
-            MediaType ct = headers.getContentType() != null ? headers.getContentType() : MediaType.TEXT_EVENT_STREAM;
-            ClientResponse resp = mock(ClientResponse.class);
-            ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
-            when(resp.headers()).thenReturn(respHeaders);
-            when(respHeaders.asHttpHeaders()).thenReturn(headers);
-            when(respHeaders.contentType()).thenReturn(Optional.of(ct));
-            when(resp.statusCode()).thenReturn(HttpStatusCode.valueOf(status));
-            when(resp.bodyToFlux(DataBuffer.class)).thenReturn(sseFlux);
-            return resp;
-        }
-
-        private ClientResponse mockClientResponseEmpty(int status, HttpHeaders headers) {
-            ClientResponse resp = mock(ClientResponse.class);
-            ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
-            when(resp.headers()).thenReturn(respHeaders);
-            when(respHeaders.asHttpHeaders()).thenReturn(headers);
-            when(respHeaders.contentType()).thenReturn(Optional.of(MediaType.APPLICATION_JSON));
-            when(resp.statusCode()).thenReturn(HttpStatusCode.valueOf(status));
-            when(resp.bodyToMono(byte[].class)).thenReturn(Mono.empty());
-            return resp;
-        }
-    }
-
-    @Nested
-    class StreamSseToResponse {
-
-        private final DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
-
-        @Test
-        void shouldWriteSseDataToResponse() throws IOException {
-            byte[] event1 = "data: hello\n\n".getBytes(StandardCharsets.UTF_8);
-            byte[] event2 = "data: world\n\n".getBytes(StandardCharsets.UTF_8);
-
-            Flux<DataBuffer> dataFlux = Flux.just(bufferFactory.wrap(event1), bufferFactory.wrap(event2));
-
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
-
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, headers, response, 200);
-
-            assertThat(response.getStatus()).isEqualTo(200);
-            assertThat(response.getContentType()).startsWith(MediaType.TEXT_EVENT_STREAM_VALUE);
-
-            String content = response.getContentAsString();
-            assertThat(content).contains("data: hello");
-            assertThat(content).contains("data: world");
+            assertThat(result.streamed()).isTrue();
+            assertThat(result.body()).isNull();
         }
 
         @Test
         void shouldSetSseHeaders() {
-            Flux<DataBuffer> dataFlux = Flux.empty();
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
+            var response = new MockHttpServletResponse();
 
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, headers, response, 200);
+            forward(sse(Flux.empty()), response, null);
 
             assertThat(response.getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-cache, no-store, must-revalidate");
             assertThat(response.getHeader(HttpHeaders.PRAGMA)).isEqualTo("no-cache");
@@ -431,86 +311,122 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
 
         @Test
         void shouldForwardUpstreamStatus() {
-            Flux<DataBuffer> dataFlux = Flux.empty();
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
+            HttpHeaders upstreamHeaders = new HttpHeaders();
+            upstreamHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
+            var response = new MockHttpServletResponse();
 
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, headers, response, 429);
+            forward(mockClientResponseWithSseFlux(429, upstreamHeaders, Flux.empty()), response, null);
 
             assertThat(response.getStatus()).isEqualTo(429);
         }
 
         @Test
         void shouldCopyUpstreamHeadersExcludingManaged() {
-            Flux<DataBuffer> dataFlux = Flux.empty();
-            MockHttpServletResponse response = new MockHttpServletResponse();
-
             HttpHeaders upstreamHeaders = new HttpHeaders();
             upstreamHeaders.set("X-Request-Id", "req-123");
             upstreamHeaders.set("X-Anthropic-RateLimit", "10");
             upstreamHeaders.set(HttpHeaders.CONTENT_TYPE, "text/event-stream");
             upstreamHeaders.set(HttpHeaders.CONTENT_LENGTH, "999");
-            upstreamHeaders.set(HttpHeaders.TRANSFER_ENCODING, "chunked");
             upstreamHeaders.set(HttpHeaders.CACHE_CONTROL, "private");
+            var response = new MockHttpServletResponse();
 
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, upstreamHeaders, response, 200);
+            forward(mockClientResponseWithSseFlux(200, upstreamHeaders, Flux.empty()), response, null);
 
             assertThat(response.getHeader("X-Request-Id")).isEqualTo("req-123");
             assertThat(response.getHeader("X-Anthropic-RateLimit")).isEqualTo("10");
+            assertThat(response.getHeader(HttpHeaders.CONTENT_LENGTH)).isNull();
             assertThat(response.getContentType()).startsWith(MediaType.TEXT_EVENT_STREAM_VALUE);
             assertThat(response.getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-cache, no-store, must-revalidate");
         }
 
         @Test
-        void shouldHandleEmptyFlux() {
-            Flux<DataBuffer> dataFlux = Flux.empty();
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
+        void shouldHandleEmptyStream() {
+            var response = new MockHttpServletResponse();
 
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, headers, response, 200);
+            var result = forward(sse(Flux.empty()), response, null);
 
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.COMPLETED);
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(response.getContentType()).startsWith(MediaType.TEXT_EVENT_STREAM_VALUE);
         }
 
         @Test
-        void shouldHandleErrorFlux() {
-            Flux<DataBuffer> dataFlux = Flux.error(new RuntimeException("upstream died"));
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
+        @DisplayName(
+                "a body that fails at once still keeps its head: the stream has started and its outcome says it failed")
+        void shouldHandleAFailedStream() {
+            var response = new MockHttpServletResponse();
 
-            assertThat(ProxyStreamingUtils.streamSseToResponse(dataFlux, headers, response, 200))
-                    .isEqualTo(ProxyStreamingUtils.StreamOutcome.STREAM_FAILED);
+            var result = forward(sse(Flux.error(new RuntimeException("upstream died"))), response, null);
 
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.STREAM_FAILED);
             assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(response.isCommitted()).isTrue();
         }
 
         @Test
         void shouldWriteEventsInOrder() throws IOException {
-            Flux<DataBuffer> dataFlux = Flux.range(1, 5)
-                    .map(i -> bufferFactory.wrap(("data: event-" + i + "\n\n").getBytes(StandardCharsets.UTF_8)));
+            var response = new MockHttpServletResponse();
 
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            HttpHeaders headers = new HttpHeaders();
+            forward(
+                    sse(Flux.range(1, 5).map(i -> bufferFactory.wrap(("data: event-" + i + "\n\n").getBytes(UTF_8)))),
+                    response,
+                    null);
 
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, headers, response, 200);
+            assertThat(response.getContentAsString())
+                    .isEqualTo("data: event-1\n\ndata: event-2\n\ndata: event-3\n\ndata: event-4\n\ndata: event-5\n\n");
+        }
 
-            String content = response.getContentAsString();
-            int idx1 = content.indexOf("event-1");
-            int idx2 = content.indexOf("event-2");
-            int idx3 = content.indexOf("event-3");
-            int idx4 = content.indexOf("event-4");
-            int idx5 = content.indexOf("event-5");
+        @Test
+        void shouldReportUpstreamFailureAfterDeliveringAChunkWithoutReplacingCommittedResponse() throws Exception {
+            var buffer = pooled("data: delivered\n\n");
+            var delivered = Sinks.<Void>empty();
+            Flux<DataBuffer> body = Flux.<DataBuffer>just(buffer)
+                    .concatWith(delivered.asMono().then(Mono.error(new IOException("private provider failure"))));
+            var response = new MockHttpServletResponse();
 
-            assertThat(idx1).isLessThan(idx2);
-            assertThat(idx2).isLessThan(idx3);
-            assertThat(idx3).isLessThan(idx4);
-            assertThat(idx4).isLessThan(idx5);
+            var result = forward(sse(body), response, bytes -> delivered.tryEmitEmpty());
+
+            assertThat(result.status()).isEqualTo(200);
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.STREAM_FAILED);
+            assertThat(result.body()).isNull();
+            assertThat(response.isCommitted()).isTrue();
+            assertThat(response.getContentAsString()).isEqualTo("data: delivered\n\n");
+            assertThat(buffer.getNativeBuffer().refCnt()).isZero();
+        }
+
+        @Test
+        @DisplayName(
+                "a client that disconnects cancels the upstream before the call returns, and every buffer is released")
+        void shouldCancelUpstreamAndReleasePooledBuffersWhenClientDisconnects() throws Exception {
+            var allocated = new ConcurrentLinkedQueue<NettyDataBuffer>();
+            var cancelled = new AtomicBoolean();
+            Flux<DataBuffer> body = Flux.range(0, 1024)
+                    .<DataBuffer>map(index -> {
+                        var buffer = pooled("data: event\n\n");
+                        allocated.add(buffer);
+                        return buffer;
+                    })
+                    .concatWith(Flux.never())
+                    .doOnCancel(() -> cancelled.set(true));
+            var response = mock(HttpServletResponse.class);
+            var output = mock(ServletOutputStream.class);
+            when(response.getOutputStream()).thenReturn(output);
+            doThrow(new IOException("Client disconnected")).when(output).write(any(byte[].class));
+
+            var result = forward(sse(body), response, null);
+
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED);
+            assertThat(cancelled).isTrue();
+            // Read one part at a time: the body is never read far ahead of the client.
+            assertThat(allocated).hasSizeBetween(1, 2);
+            assertThat(allocated)
+                    .allSatisfy(buffer ->
+                            assertThat(buffer.getNativeBuffer().refCnt()).isZero());
         }
     }
 
     @Nested
-    class StreamSseToResponseWithTap {
+    class Tap {
 
         private final DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
 
@@ -521,18 +437,15 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         @Test
         @DisplayName("the tap sees exactly the bytes the client received")
         void tapObservesEveryChunkTheClientGets() throws IOException {
-            Flux<DataBuffer> dataFlux = Flux.just(
-                    bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
-                    bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8)));
-            MockHttpServletResponse response = new MockHttpServletResponse();
+            var response = new MockHttpServletResponse();
             StringBuilder tapped = new StringBuilder();
 
-            ProxyStreamingUtils.streamSseToResponse(
-                    dataFlux,
-                    new HttpHeaders(),
+            forward(
+                    sse(Flux.just(
+                            bufferFactory.wrap("data: one\n\n".getBytes(UTF_8)),
+                            bufferFactory.wrap("data: two\n\n".getBytes(UTF_8)))),
                     response,
-                    200,
-                    bytes -> tapped.append(new String(bytes, StandardCharsets.UTF_8)));
+                    bytes -> tapped.append(new String(bytes, UTF_8)));
 
             assertThat(tapped.toString()).isEqualTo(response.getContentAsString());
             assertThat(tapped.toString()).isEqualTo("data: one\n\ndata: two\n\n");
@@ -541,43 +454,50 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         @Test
         @DisplayName("a tap that throws does not interrupt the stream to the client")
         void aThrowingTapCannotBreakTheStream() throws IOException {
-            Flux<DataBuffer> dataFlux = Flux.just(
-                    bufferFactory.wrap("data: one\n\n".getBytes(StandardCharsets.UTF_8)),
-                    bufferFactory.wrap("data: two\n\n".getBytes(StandardCharsets.UTF_8)));
-            MockHttpServletResponse response = new MockHttpServletResponse();
+            var response = new MockHttpServletResponse();
 
-            ProxyStreamingUtils.streamSseToResponse(dataFlux, new HttpHeaders(), response, 200, bytes -> {
-                throw new IllegalStateException("bookkeeping blew up");
-            });
+            var result = forward(
+                    sse(Flux.just(
+                            bufferFactory.wrap("data: one\n\n".getBytes(UTF_8)),
+                            bufferFactory.wrap("data: two\n\n".getBytes(UTF_8)))),
+                    response,
+                    bytes -> {
+                        throw new IllegalStateException("bookkeeping blew up");
+                    });
 
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.COMPLETED);
             assertThat(response.getContentAsString()).isEqualTo("data: one\n\ndata: two\n\n");
         }
 
+        /**
+         * The failure arrives while the usage frame still waits to be read; it must not overtake the frame, or the
+         * usage the upstream did send would go unbilled.
+         */
         @Test
-        @DisplayName("the tap keeps what it saw when the stream errors mid-flight")
-        void tapKeepsWhatItSawBeforeAMidStreamError() {
-            Flux<DataBuffer> dataFlux = Flux.<DataBuffer>just(
-                            bufferFactory.wrap("data: delivered\n\n".getBytes(StandardCharsets.UTF_8)))
-                    .concatWith(Flux.error(new RuntimeException("upstream died")));
-            MockHttpServletResponse response = new MockHttpServletResponse();
+        @DisplayName("a usage frame received just before the upstream fails is still tapped and written")
+        void tapKeepsWhatItSawBeforeAMidStreamError() throws IOException {
+            var content = pooled("data: {\"delta\":\"hi\"}\n\n");
+            var usage = pooled("data: {\"usage\":{\"prompt_tokens\":3}}\n\n");
+            Flux<DataBuffer> body =
+                    Flux.<DataBuffer>just(content, usage).concatWith(Flux.error(new IOException("connection reset")));
+            var response = new MockHttpServletResponse();
             StringBuilder tapped = new StringBuilder();
 
-            ProxyStreamingUtils.streamSseToResponse(
-                    dataFlux,
-                    new HttpHeaders(),
-                    response,
-                    200,
-                    bytes -> tapped.append(new String(bytes, StandardCharsets.UTF_8)));
+            var result = forward(sse(body), response, bytes -> tapped.append(new String(bytes, UTF_8)));
 
-            assertThat(tapped.toString()).isEqualTo("data: delivered\n\n");
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.STREAM_FAILED);
+            assertThat(tapped.toString())
+                    .isEqualTo("data: {\"delta\":\"hi\"}\n\ndata: {\"usage\":{\"prompt_tokens\":3}}\n\n");
+            assertThat(response.getContentAsString()).isEqualTo(tapped.toString());
+            assertThat(content.getNativeBuffer().refCnt()).isZero();
+            assertThat(usage.getNativeBuffer().refCnt()).isZero();
         }
 
         @Test
         @DisplayName("a received usage frame is tapped even when the write to the client then fails")
         void tapKeepsAReceivedUsageFrameWhoseFlushFails() throws IOException {
-            var factory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
-            var content = pooled(factory, "data: {\"delta\":\"hi\"}\n\n");
-            var usage = pooled(factory, "data: {\"usage\":{\"prompt_tokens\":3}}\n\n");
+            var content = pooled("data: {\"delta\":\"hi\"}\n\n");
+            var usage = pooled("data: {\"usage\":{\"prompt_tokens\":3}}\n\n");
             var subscriptions = new AtomicInteger();
             Flux<DataBuffer> body =
                     Flux.<DataBuffer>just(content, usage).doOnSubscribe(s -> subscriptions.incrementAndGet());
@@ -590,10 +510,9 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
                     .flush();
             StringBuilder tapped = new StringBuilder();
 
-            var outcome = ProxyStreamingUtils.streamSseToResponse(
-                    body, new HttpHeaders(), response, 200, bytes -> tapped.append(new String(bytes, UTF_8)));
+            var result = forward(sse(body), response, bytes -> tapped.append(new String(bytes, UTF_8)));
 
-            assertThat(outcome).isEqualTo(ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED);
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED);
             assertThat(tapped.toString())
                     .isEqualTo("data: {\"delta\":\"hi\"}\n\ndata: {\"usage\":{\"prompt_tokens\":3}}\n\n");
             assertThat(subscriptions).hasValue(1);
@@ -604,8 +523,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         @Test
         @DisplayName("a client that disconnects before the usage frame leaves the tap without it")
         void tapHasNoUsageWhenTheClientDisconnectsFirst() throws Exception {
-            var factory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
-            var content = pooled(factory, "data: {\"delta\":\"hi\"}\n\n");
+            var content = pooled("data: {\"delta\":\"hi\"}\n\n");
             var cancelled = new AtomicBoolean();
             var subscriptions = new AtomicInteger();
             Flux<DataBuffer> body = Flux.<DataBuffer>just(content)
@@ -618,22 +536,291 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             doThrow(new IOException("Client disconnected")).when(output).write(any(byte[].class));
             StringBuilder tapped = new StringBuilder();
 
-            var outcome = ProxyStreamingUtils.streamSseToResponse(
-                    body, new HttpHeaders(), response, 200, bytes -> tapped.append(new String(bytes, UTF_8)));
+            var result = forward(sse(body), response, bytes -> tapped.append(new String(bytes, UTF_8)));
 
-            assertThat(outcome).isEqualTo(ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED);
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED);
             assertThat(tapped.toString()).isEqualTo("data: {\"delta\":\"hi\"}\n\n");
             assertThat(subscriptions).hasValue(1);
-            await().untilAsserted(() -> {
-                assertThat(cancelled).isTrue();
-                assertThat(content.getNativeBuffer().refCnt()).isZero();
-            });
+            assertThat(cancelled).isTrue();
+            assertThat(content.getNativeBuffer().refCnt()).isZero();
+        }
+    }
+
+    @Nested
+    class Limits {
+
+        @Test
+        @DisplayName("a limit that passes before the head is thrown, cancels the upstream, and touches no response")
+        void shouldThrowALimitThatPassesBeforeTheHead() {
+            var cancelled = new AtomicBoolean();
+            var recorded = recording(new CountDownLatch(0));
+
+            assertThatThrownBy(() -> ProxyStreamingUtils.forward(
+                            Flux.<ProxyStreamingUtils.Part>never().doOnCancel(() -> cancelled.set(true)),
+                            Duration.ofSeconds(1),
+                            recorded.response(),
+                            null))
+                    .hasCauseInstanceOf(TimeoutException.class);
+
+            assertThat(cancelled).isTrue();
+            assertThat(recorded.callers()).isEmpty();
         }
 
-        private NettyDataBuffer pooled(NettyDataBufferFactory factory, String frame) {
-            var buffer = factory.allocateBuffer(64);
-            buffer.write(frame.getBytes(UTF_8));
-            return buffer;
+        @Test
+        @DisplayName("an upstream failure before the head is thrown, leaving the response to the caller")
+        void shouldThrowAFailureBeforeTheHead() {
+            var recorded = recording(new CountDownLatch(0));
+
+            assertThatThrownBy(() -> ProxyStreamingUtils.forward(
+                            Flux.error(new IOException("connection refused")), LIMIT, recorded.response(), null))
+                    .hasCauseInstanceOf(IOException.class);
+
+            assertThat(recorded.callers()).isEmpty();
         }
+
+        @Test
+        @DisplayName("an exchange that ends without a head is thrown, leaving the response to the caller")
+        void shouldThrowAnExchangeWithoutAHead() {
+            var recorded = recording(new CountDownLatch(0));
+
+            assertThatThrownBy(() -> ProxyStreamingUtils.forward(Flux.empty(), LIMIT, recorded.response(), null))
+                    .isInstanceOf(IllegalStateException.class);
+
+            assertThat(recorded.callers()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("the limit ends a stalled stream as timed out, cancelling the upstream before the call returns")
+        void shouldTimeOutAStalledUpstreamAfterItsCommittedChunk() throws IOException {
+            var delivered = pooled("data: delivered\n\n");
+            var cancelled = new AtomicBoolean();
+            Flux<DataBuffer> body =
+                    Flux.<DataBuffer>just(delivered).concatWith(Flux.never()).doOnCancel(() -> cancelled.set(true));
+            var response = new MockHttpServletResponse();
+
+            var result = ProxyStreamingUtils.forward(
+                    ProxyStreamingUtils.parts(sse(body), null), Duration.ofSeconds(1), response, null);
+
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.TIMED_OUT);
+            // The committed 200 and its bytes stay as they are; the outcome, not the status, says the stream failed.
+            assertThat(response.isCommitted()).isTrue();
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(response.getContentAsString()).isEqualTo("data: delivered\n\n");
+            assertThat(cancelled).isTrue();
+            assertThat(delivered.getNativeBuffer().refCnt()).isZero();
+        }
+
+        /** The mentor's stream limit: counted from the head, and shorter than its whole-exchange limit. */
+        @Test
+        @DisplayName("a body limit ends a stalled stream as timed out within a longer exchange limit")
+        void shouldEndAStalledBodyAtItsOwnLimit() {
+            var cancelled = new AtomicBoolean();
+            Flux<DataBuffer> body = Flux.<DataBuffer>never().doOnCancel(() -> cancelled.set(true));
+
+            var result = ProxyStreamingUtils.forward(
+                    ProxyStreamingUtils.parts(sse(body), Duration.ofSeconds(1)),
+                    Duration.ofSeconds(30),
+                    new MockHttpServletResponse(),
+                    null);
+
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.TIMED_OUT);
+            assertThat(cancelled).isTrue();
+        }
+
+        /**
+         * The write is held past the limit and opened only by another thread once the upstream is cancelled, so
+         * the cancel cannot have waited for the write. The calling thread makes every response call, all of them
+         * before it returns.
+         */
+        @Test
+        @DisplayName(
+                "the limit cancels the upstream while a write is held, and only the calling thread touches the response")
+        void shouldCancelTheUpstreamWhileAWriteIsHeld() throws Exception {
+            var allocated = new ConcurrentLinkedQueue<NettyDataBuffer>();
+            var cancelled = new CountDownLatch(1);
+            Flux<DataBuffer> body = Flux.range(0, 64)
+                    .<DataBuffer>map(index -> {
+                        var buffer = pooled("data: event\n\n");
+                        allocated.add(buffer);
+                        return buffer;
+                    })
+                    .concatWith(Flux.never())
+                    .doOnCancel(cancelled::countDown);
+            var release = new CountDownLatch(1);
+            var recorded = recording(release);
+            var cancelledWhileHeld = new AtomicBoolean();
+            var releaser = new Thread(() -> {
+                try {
+                    cancelledWhileHeld.set(recorded.writing().await(10, TimeUnit.SECONDS)
+                            && cancelled.await(10, TimeUnit.SECONDS)
+                            && recorded.writes().get() == 1);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    release.countDown();
+                }
+            });
+            releaser.start();
+            var tapped = new AtomicInteger();
+
+            var result = ProxyStreamingUtils.forward(
+                    ProxyStreamingUtils.parts(sse(body), null),
+                    Duration.ofSeconds(1),
+                    recorded.response(),
+                    bytes -> tapped.incrementAndGet());
+            int callsAtReturn = recorded.callers().size();
+            releaser.join(10_000);
+
+            assertThat(cancelledWhileHeld).isTrue();
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.TIMED_OUT);
+            assertThat(recorded.callers()).isNotEmpty().containsOnly(Thread.currentThread());
+            assertThat(recorded.callers()).hasSize(callsAtReturn);
+            // Past the limit only the one part already received is written: it is tapped like any other.
+            assertThat(recorded.writes()).hasValue(2);
+            assertThat(tapped).hasValue(2);
+            assertThat(allocated).hasSize(2);
+            assertThat(allocated)
+                    .allSatisfy(buffer ->
+                            assertThat(buffer.getNativeBuffer().refCnt()).isZero());
+        }
+
+        @Test
+        @DisplayName("a stream whose upstream emits on another thread is still written only by the calling thread")
+        void shouldWriteOnlyOnTheCallingThread() {
+            var first = pooled("data: one\n\n");
+            var second = pooled("data: two\n\n");
+            var emitters = new ConcurrentLinkedQueue<Thread>();
+            Flux<DataBuffer> body = Flux.<DataBuffer>just(first, second)
+                    .delayElements(Duration.ofMillis(10))
+                    .doOnNext(buffer -> emitters.add(Thread.currentThread()));
+            var recorded = recording(new CountDownLatch(0));
+
+            var result = forward(sse(body), recorded.response(), null);
+
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.COMPLETED);
+            assertThat(emitters).hasSize(2).doesNotContain(Thread.currentThread());
+            assertThat(recorded.writes()).hasValue(2);
+            assertThat(recorded.callers()).containsOnly(Thread.currentThread());
+            assertThat(first.getNativeBuffer().refCnt()).isZero();
+            assertThat(second.getNativeBuffer().refCnt()).isZero();
+        }
+
+        @Test
+        @DisplayName("a stream that ends before its limit is completed")
+        void shouldCompleteAStreamThatEndsBeforeItsDeadline() throws IOException {
+            var content = pooled("data: done\n\n");
+            var response = new MockHttpServletResponse();
+
+            var result = forward(sse(Flux.just(content)), response, null);
+
+            assertThat(result.streamOutcome()).isEqualTo(ProxyStreamingUtils.StreamOutcome.COMPLETED);
+            assertThat(response.getContentAsString()).isEqualTo("data: done\n\n");
+            assertThat(content.getNativeBuffer().refCnt()).isZero();
+        }
+
+        @Test
+        @DisplayName("only a typed timeout cause is a timeout: a failure whose words name one is not")
+        void shouldReportAFailureWithoutATypedTimeoutCauseAsFailed() {
+            var worded = Flux.<DataBuffer>error(
+                    new IllegalStateException("Timeout on blocking read for 600000000000 NANOSECONDS"));
+
+            assertThat(forward(sse(worded), new MockHttpServletResponse(), null).streamOutcome())
+                    .isEqualTo(ProxyStreamingUtils.StreamOutcome.STREAM_FAILED);
+        }
+
+        @Test
+        @DisplayName("an upstream typed timeout is also a typed timeout: the outcome does not name the hop")
+        void shouldReportATypedUpstreamTimeoutAsTimedOut() {
+            var upstream = Flux.<DataBuffer>error(new TimeoutException("upstream"));
+
+            assertThat(forward(sse(upstream), new MockHttpServletResponse(), null)
+                            .streamOutcome())
+                    .isEqualTo(ProxyStreamingUtils.StreamOutcome.TIMED_OUT);
+        }
+
+        @Test
+        @DisplayName("a nested timeout without a direct typed cause remains a stream failure")
+        void shouldNotClassifyANestedTimeoutAsADirectTimeout() {
+            var nested = Flux.<DataBuffer>error(
+                    new RuntimeException(new IllegalStateException(new TimeoutException("nested"))));
+
+            assertThat(forward(sse(nested), new MockHttpServletResponse(), null).streamOutcome())
+                    .isEqualTo(ProxyStreamingUtils.StreamOutcome.STREAM_FAILED);
+        }
+
+        @Test
+        @DisplayName("a far deadline keeps all of its time; a passed one leaves none")
+        void shouldGiveAFarDeadlineAllOfItsTimeAndAPassedOneNone() {
+            assertThat(ProxyStreamingUtils.remainingUntil(Instant.now().plus(Duration.ofHours(3))))
+                    .isGreaterThan(ProxyStreamingUtils.DEFAULT_SSE_TIMEOUT);
+            assertThat(ProxyStreamingUtils.remainingUntil(Instant.now().minusSeconds(5)))
+                    .isZero();
+        }
+    }
+
+    private static ProxyStreamingUtils.UpstreamResult forward(
+            ClientResponse upstream, HttpServletResponse response, @Nullable Consumer<byte[]> tap) {
+        return ProxyStreamingUtils.forward(ProxyStreamingUtils.parts(upstream, null), LIMIT, response, tap);
+    }
+
+    /** Every call on a response or its output stream, by thread; each write waits until {@code release} opens. */
+    private record Recording(
+            HttpServletResponse response, Queue<Thread> callers, CountDownLatch writing, AtomicInteger writes) {}
+
+    private static Recording recording(CountDownLatch release) {
+        var callers = new ConcurrentLinkedQueue<Thread>();
+        var writing = new CountDownLatch(1);
+        var writes = new AtomicInteger();
+        ServletOutputStream output = mock(ServletOutputStream.class, call -> {
+            callers.add(Thread.currentThread());
+            if (call.getMethod().getName().equals("write")) {
+                writes.incrementAndGet();
+                writing.countDown();
+                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+            }
+            return RETURNS_DEFAULTS.answer(call);
+        });
+        HttpServletResponse response = mock(HttpServletResponse.class, call -> {
+            callers.add(Thread.currentThread());
+            return call.getMethod().getName().equals("getOutputStream") ? output : RETURNS_DEFAULTS.answer(call);
+        });
+        return new Recording(response, callers, writing, writes);
+    }
+
+    private static NettyDataBuffer pooled(String frame) {
+        var buffer = POOLED.allocateBuffer(64);
+        buffer.write(frame.getBytes(UTF_8));
+        return buffer;
+    }
+
+    private static ClientResponse sse(Flux<DataBuffer> body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_EVENT_STREAM);
+        return mockClientResponseWithSseFlux(200, headers, body);
+    }
+
+    private static ClientResponse mockClientResponse(
+            int status, HttpHeaders headers, @Nullable MediaType contentType, Mono<byte[]> body) {
+        ClientResponse resp = mock(ClientResponse.class);
+        ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
+        when(resp.headers()).thenReturn(respHeaders);
+        when(respHeaders.asHttpHeaders()).thenReturn(headers);
+        when(respHeaders.contentType()).thenReturn(Optional.ofNullable(contentType));
+        when(resp.statusCode()).thenReturn(HttpStatusCode.valueOf(status));
+        when(resp.bodyToMono(byte[].class)).thenReturn(body);
+        return resp;
+    }
+
+    private static ClientResponse mockClientResponseWithSseFlux(
+            int status, HttpHeaders headers, Flux<DataBuffer> sseFlux) {
+        MediaType ct = headers.getContentType() != null ? headers.getContentType() : MediaType.TEXT_EVENT_STREAM;
+        ClientResponse resp = mock(ClientResponse.class);
+        ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
+        when(resp.headers()).thenReturn(respHeaders);
+        when(respHeaders.asHttpHeaders()).thenReturn(headers);
+        when(respHeaders.contentType()).thenReturn(Optional.of(ct));
+        when(resp.statusCode()).thenReturn(HttpStatusCode.valueOf(status));
+        when(resp.bodyToFlux(DataBuffer.class)).thenReturn(sseFlux);
+        return resp;
     }
 }

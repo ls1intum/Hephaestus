@@ -43,7 +43,7 @@ class ResultAdmissionControllerTest extends BaseUnitTest {
         var id = UUID.randomUUID();
         var request = new AdmissionRequestDTO(3, UUID.randomUUID(), id, 0, List.of(), List.of());
         var now = Instant.now();
-        var jwt = new JobJwt(id, 1L, 0, Set.of("llm_proxy"), "test", now, now.plusSeconds(60));
+        var jwt = new JobJwt(id, 1L, 0, Set.of("llm_proxy"), "test", now, now.plusSeconds(60), now.plusSeconds(30));
         var identity = new ProxyIdentity(jwt, "worker", null);
         var authentication = new JobTokenAuthentication(identity, jwt.scopes());
         when(admission.admit(new ResultAdmissionService.AdmissionIdentity(id, 1L, 0, "worker"), request))
@@ -60,7 +60,7 @@ class ResultAdmissionControllerTest extends BaseUnitTest {
         var id = UUID.randomUUID();
         var request = new PrepareFeedbackRequestDTO(UUID.randomUUID(), id, 0, List.of(), List.of(), true, null);
         var now = Instant.now();
-        var jwt = new JobJwt(id, 1L, 0, Set.of("llm_proxy"), "test", now, now.plusSeconds(60));
+        var jwt = new JobJwt(id, 1L, 0, Set.of("llm_proxy"), "test", now, now.plusSeconds(60), now.plusSeconds(30));
         var authentication = new JobTokenAuthentication(new ProxyIdentity(jwt, "worker", null), jwt.scopes());
         when(admission.prepareFeedback(new ResultAdmissionService.AdmissionIdentity(id, 1L, 0, "worker"), request))
                 .thenThrow(new PublicationContextRefusedException(FeedbackStopReason.PUBLIC_HISTORY_CHANGED));

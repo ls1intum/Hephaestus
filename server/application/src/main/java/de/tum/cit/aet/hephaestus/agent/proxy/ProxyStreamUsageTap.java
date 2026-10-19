@@ -19,8 +19,8 @@ import tools.jackson.databind.ObjectMapper;
  * what it burned. The figure is cumulative for the whole response, so the tap replaces rather than
  * sums, and never estimates from the deltas.
  *
- * <p>Not thread-safe: one instance serves one stream, whose frames arrive in order on a single worker,
- * and {@link #observed()} is read only after the streaming call has returned.
+ * <p>Not thread-safe: one instance serves one call, whose request thread both feeds it each chunk and reads
+ * {@link #observed()} once the stream has returned.
  */
 final class ProxyStreamUsageTap implements Consumer<byte[]> {
 

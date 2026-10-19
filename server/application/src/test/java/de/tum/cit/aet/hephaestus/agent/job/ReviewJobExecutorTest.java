@@ -24,7 +24,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
+import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
+import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -67,6 +69,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.MDC;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -86,6 +89,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
     private final SandboxManager sandbox = mock(SandboxManager.class);
     private final LlmBudgetService budgets = mock(LlmBudgetService.class);
     private final PracticePiAdapter practiceAgent = mock(PracticePiAdapter.class);
+    private final WorkerJwtIssuer jwtIssuer = mock(WorkerJwtIssuer.class);
     private Optional<WorkerCapacityState> capacity = Optional.empty();
     private Optional<WorkerProperties> worker = Optional.empty();
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
@@ -122,7 +126,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                 jobs,
                 handler,
                 practiceAgent,
-                mock(WorkerJwtIssuer.class),
+                jwtIssuer,
                 sandbox,
                 pool,
                 transactions,
@@ -268,9 +272,14 @@ class ReviewJobExecutorTest extends BaseUnitTest {
     }
 
     private ReviewJob owedJob() {
-        var job = RuntimeReviewTestData.job();
+        var job = configuredJob();
         job.setAdmissionAttempt(0);
         job.setAdmissionDigest("admitted");
+        return job;
+    }
+
+    private ReviewJob configuredJob() {
+        var job = RuntimeReviewTestData.job();
         job.setConfigSnapshot(new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
                         new FrozenModel(
@@ -291,6 +300,73 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         null)
                 .toJson(new JsonMapper()));
         return job;
+    }
+
+    @Test
+    void shouldGiveTheCredentialAndSandboxTheSameDeadlineWhenPreparingAnAttempt() {
+        var job = configuredJob();
+        job.setAttempt(2);
+        var snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), new JsonMapper());
+        when(jobs.findByIdQueuedForUpdateSkipLocked(any(), any())).thenReturn(Optional.of(job));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        when(policy.permitsReview(job)).thenReturn(true);
+        var binding = mock(WorkspaceAgentBinding.class);
+        when(binding.getDataHandlingTier()).thenReturn(DataHandlingTier.UNDECLARED);
+        when(binding.getMaxConcurrentJobs()).thenReturn(1);
+        when(policy.binding(job)).thenReturn(Optional.of(binding));
+        when(budgets.decide(job.getWorkspaceId())).thenReturn(LlmBudgetDecision.ALLOWED);
+        when(assignments.load(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(null, null)));
+        when(handler.prepareInputs(job)).thenReturn(new PreparedJobInputs(Map.of(), List.of(), List.of(), null, null));
+        when(jwtIssuer.issueForJobUntil(eq(job.getId()), eq(job.getWorkspaceId()), eq(2), any(), any()))
+                .thenReturn("issued-job-token");
+        when(practiceAgent.buildSandboxSpec(any()))
+                .thenReturn(new PracticeSandboxSpec(
+                        "practice-runtime",
+                        List.of(),
+                        Map.of(),
+                        Map.of(),
+                        SandboxLayout.OUTPUT_PATH,
+                        null,
+                        null,
+                        null));
+        when(jobs.updateCapture(any(), anyLong(), any(), anyInt(), any())).thenReturn(1);
+        when(jobs.markExecutionStarted(eq(job.getId()), eq(null), any())).thenReturn(1);
+        var result = new SandboxResult(0, Map.of(), "", false, Duration.ZERO);
+        when(sandbox.execute(any())).thenReturn(result);
+        when(practiceAgent.parseResult(result)).thenReturn(new AgentResult(true, Map.of(), null));
+        var pool = mock(AsyncTaskExecutor.class);
+        doAnswer(invocation -> {
+                    Runnable work = invocation.getArgument(0);
+                    work.run();
+                    return null;
+                })
+                .when(pool)
+                .execute(any(Runnable.class));
+
+        assertThat(executor(pool).processJob(job.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.STARTED);
+
+        var issuedDeadline = ArgumentCaptor.forClass(Instant.class);
+        var issuedExpiry = ArgumentCaptor.forClass(Instant.class);
+        verify(jwtIssuer)
+                .issueForJobUntil(
+                        eq(job.getId()),
+                        eq(job.getWorkspaceId()),
+                        eq(2),
+                        issuedDeadline.capture(),
+                        issuedExpiry.capture());
+        var request = ArgumentCaptor.forClass(PracticeAgentRequest.class);
+        verify(practiceAgent).buildSandboxSpec(request.capture());
+        var execution = ArgumentCaptor.forClass(SandboxSpec.class);
+        verify(sandbox).execute(execution.capture());
+        var spec = execution.getValue();
+        var sandboxDeadline = Instant.ofEpochMilli(
+                Long.parseLong(Objects.requireNonNull(spec.environment().get("SANDBOX_WORK_DEADLINE_MS"))));
+        assertThat(issuedDeadline.getValue()).isEqualTo(sandboxDeadline);
+        assertThat(issuedExpiry.getValue()).isEqualTo(sandboxDeadline.plus(SandboxLayout.RESULT_UPLOAD_GRACE));
+        assertThat(request.getValue().jobToken()).isEqualTo("issued-job-token");
+        assertThat(spec.jobId()).isEqualTo(job.getId());
+        assertThat(spec.attempt()).isEqualTo(2);
+        assertThat(spec.resourceLimits().maxRuntime()).isEqualTo(Duration.ofSeconds(snapshot.timeoutSeconds()));
     }
 
     private static byte[] scriptReport() {

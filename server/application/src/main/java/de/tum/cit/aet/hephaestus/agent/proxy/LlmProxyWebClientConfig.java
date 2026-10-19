@@ -54,15 +54,15 @@ class LlmProxyWebClientConfig {
             LlmProperties llmProperties,
             WebClient.Builder webClientBuilder) {
         boolean allowLoopback = llmProperties.egress().allowLoopback();
+        // Two independent limits bound a response. responseTimeout is an idle limit: Reactor Netty fails the response
+        // when no bytes arrive for 5 minutes, however long the response has run. The total is the caller's: the
+        // proxy ends each exchange at the attempt's work deadline, or, for a mentor turn, at its own fixed limits.
         HttpClient httpClient = HttpClient.create(llmProxyConnectionProvider)
                 .runOn(llmProxyLoopResources)
                 .responseTimeout(Duration.ofMinutes(5))
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)
                 .resolver(WebClientConnectors.resolverGroup(allowLoopback))
-                .doOnConnected(conn ->
-                        // No ReadTimeoutHandler — LLM SSE streams go silent during model thinking, so stream
-                        // duration is bounded by ProxyStreamingUtils' own SSE timeout instead.
-                        conn.addHandlerLast(new WriteTimeoutHandler(60)));
+                .doOnConnected(conn -> conn.addHandlerLast(new WriteTimeoutHandler(60)));
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
                 .codecs(cfg -> cfg.defaultCodecs().maxInMemorySize(1024 * 1024))
