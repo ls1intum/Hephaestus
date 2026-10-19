@@ -222,6 +222,29 @@ function capturedSourceFields(
 	};
 }
 
+/**
+ * Whether a citation that names no source cites the change: its OLD or NEW side names a file that the captured change
+ * holds on that side. The quote is then checked against the change like any change citation, so a side never makes
+ * text admissible by itself. A file the change does not hold on that side stays repository text.
+ */
+function citesChangedText(
+	fields: Record<string, unknown>,
+	path: string,
+	sources: CitationSources,
+): boolean {
+	const side = trimmedText(fields.side).toUpperCase();
+	return (
+		(side === "OLD" || side === "NEW") &&
+		sources.capturedTexts?.some(
+			(text) =>
+				text.source === DIFF_SOURCE &&
+				text.path === path &&
+				text.side === side &&
+				(fields.commit == null || text.commit === fields.commit),
+		) === true
+	);
+}
+
 /** Resolve names from read tools to manifest identities before the shared contract is parsed. */
 function sourceFields(
 	fields: Record<string, unknown>,
@@ -252,6 +275,9 @@ function sourceFields(
 		return { ...resolved, path, sourcePath: path, sourceKind: staged };
 	}
 	const declared = sources.sourceFiles.get(sourcePath);
+	if (!sourceKind && !sourcePath && citesChangedText(resolved, path, sources)) {
+		sourceKind = DIFF_SOURCE;
+	}
 	if (
 		path === DIFF_VIEW ||
 		sourcePath === DIFF_VIEW ||
