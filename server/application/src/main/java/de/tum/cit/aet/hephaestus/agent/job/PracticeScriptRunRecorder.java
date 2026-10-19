@@ -43,7 +43,9 @@ class PracticeScriptRunRecorder {
 
     /**
      * Runs inside the attempt's terminal transaction, after the attempt kept its ownership fence, so each attempt
-     * writes its runs once and a requeued attempt writes none. The counter moves only when the rows commit.
+     * writes its runs once. A requeued attempt writes none, except an admitted attempt requeued only to continue its
+     * composition: it returned its report, and its requeue transaction records it. The counter moves only when the rows
+     * commit.
      *
      * @param report the collected report; {@code null} when the runner wrote none, which records nothing
      * @param slots the models that this attempt froze for its practice scripts, by kind. Each claim replaces the

@@ -17,16 +17,15 @@ import {
 	loadCompositionRequest,
 	createCompositionStage,
 	composeAdmittedFeedback,
-	composePublicReview,
 	closeUnroutedPrivateDestinations,
 	undecidedPrivatePractices,
 	recordCompositionFailure,
+	privateCompositionOwed,
 	persistComposedFeedback as persistComposition,
 	prepareComposedFeedback as prepareComposition,
 	preparePublicReview,
 	type PreparationOptions,
 	type ComposedFeedback,
-	type CompositionFailureReason,
 } from "./pi-composition-stage.ts";
 import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sources.ts";
 
@@ -109,7 +108,6 @@ import {
 import {
 	PRIVATE_DESTINATIONS,
 	REVIEW_CONTRACT_VERSION,
-	publicResults,
 	workIdentity,
 } from "./pi-runner-composition.ts";
 import { outputPath } from "./pi-runner-output.ts";
@@ -1970,6 +1968,8 @@ export async function runReviewJob(): Promise<void> {
 	const SERVER_UNREACHABLE_EXIT = 75;
 	// The server interprets exit 76 as provider failure without a recorded result and retries the review.
 	const PROVIDER_UNREACHABLE_EXIT = 76;
+	// The server interprets exit 77 as owed private composition and may continue it as a new attempt.
+	const COMPOSITION_OWED_EXIT = 77;
 
 	function readTaskEnvelope(): TaskEnvelope {
 		let raw: string;
@@ -2082,6 +2082,17 @@ export async function runReviewJob(): Promise<void> {
 		review: null,
 		preparation: null,
 	};
+
+	// Only a private phase the run itself stopped is owed. The server decides whether another attempt composes it.
+	function compositionExit(): number {
+		if (!privateCompositionOwed(composedFeedback)) {
+			return 0;
+		}
+		console.error(
+			"[pi-runner] OWED: the run stopped private feedback composition before it finished",
+		);
+		return COMPOSITION_OWED_EXIT;
+	}
 
 	function persistAdmission(): void {
 		if (admission === null) {
@@ -3647,9 +3658,10 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		}
 		console.error(`[pi-runner] SUCCESS: result.json holds ${reviewState.size} result(s)`);
 		finalizeOutput();
-		process.exit(0);
+		process.exit(compositionExit());
 
-		// Recovery composes only public feedback from the admitted attempt; it performs no new admission.
+		// Recovery performs no new admission. Like the measured attempt, it composes the review on the work unless that
+		// review is accepted, then private feedback unless a private piece is prepared, from the server's current reread.
 		async function continueAdmittedReview(): Promise<void> {
 			measuring = false;
 			measurementClosed = true;
@@ -3660,71 +3672,62 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				allSlugs,
 				admission.results.map((item) => item.practiceSlug),
 			);
-			console.error(
-				`[pi-runner] Continuing an admitted review: ${admission.results.length} result(s), ` +
-					`${unreachedSlugs.length} practice(s) not reached; composing the review on the work only`,
-			);
-			if (
-				compositionRequest &&
+			const privateRequested =
+				compositionRequest !== null &&
 				PRIVATE_DESTINATIONS.some(
 					(destination) => compositionRequest.destinations[destination] !== undefined,
-				) &&
-				undecidedPrivatePractices(requiredAdmission(), composedFeedback, routedDestinations)
-					.length > 0
-			) {
-				recordCompositionFailure(composedFeedback, "PRIVATE_FEEDBACK", "PRIVATE_NOT_RECOVERED");
+				);
+			const publicWork = admission.publicReviewed
+				? "no review on the work"
+				: "the review on the work";
+			const privateWork =
+				privateRequested && !admission.privatePrepared ? "private feedback" : "no private feedback";
+			console.error(
+				`[pi-runner] Continuing an admitted review: ${admission.results.length} result(s), ` +
+					`${unreachedSlugs.length} practice(s) not reached; composing ${publicWork} and ${privateWork}`,
+			);
+			if (privateRequested && admission.privatePrepared) {
+				// An accepted private piece closes private composition: no practice is routed to it again.
+				if (undecidedPrivatePractices(admission, composedFeedback, null).length > 0) {
+					recordCompositionFailure(composedFeedback, "PRIVATE_FEEDBACK", "PRIVATE_NOT_RECOVERED");
+				}
+				routedDestinations = new Map();
+			} else if (privateRequested) {
+				// Routing comes from the server's reread for this attempt, not from the earlier attempt.
+				routedDestinations = closeUnroutedPrivateDestinations(
+					compositionRequest,
+					admission,
+					composedFeedback,
+				);
 			}
 			persistComposedFeedback();
-			const reviewable = publicResults(admission.results);
-			if (
-				!admission.publicReviewed &&
-				compositionRequest?.destinations.ON_WORK !== undefined &&
-				reviewable.length > 0
-			) {
-				const safetyMs = AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS);
-				if (safetyMs <= 0) {
-					recordCompositionFailure(composedFeedback, "PUBLIC_REVIEW", "SAFETY");
-				} else {
-					const safety = scheduleDeadline(safetyMs, () => {
+			if (compositionRequest !== null) {
+				await composeAdmittedFeedback({
+					request: compositionRequest,
+					admission,
+					feedback: composedFeedback,
+					routes: routedDestinations,
+					stage: compositionStage(),
+					notReached: unreachedSlugs,
+					remainingMs: AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
+					onDeadline: () =>
 						stopTurn(
 							"safety",
-							"the run is near its safety ceiling — preserving the composed review so far",
-						);
-					});
-					const unfinished = (reason: CompositionFailureReason) => {
-						if (composedFeedback.review === null) {
-							recordCompositionFailure(composedFeedback, "PUBLIC_REVIEW", reason);
-						}
-					};
-					try {
-						await composePublicReview(
-							compositionStage(),
-							compositionRequest,
-							reviewable,
-							unreachedSlugs,
-							safety,
-							composedFeedback,
-						);
-						await prepareComposedFeedback(safety);
-					} catch (error) {
-						unfinished(safety.expired() ? "SAFETY" : "RUNTIME_ERROR");
-						throw error;
-					} finally {
-						if (safety.expired()) {
-							unfinished("SAFETY");
-						}
-						clearTimeout(safety.timer);
-						persistComposedFeedback();
+							"the run is near its safety ceiling — preserving the composed feedback so far",
+						),
+					prepare: prepareComposedFeedback,
+					persist: persistComposedFeedback,
+					after: () => {
 						accumulateUsage(null, extractUsageFromSession({}, streamUsage));
 						persistUsage();
-					}
-				}
+					},
+				});
 			}
 			console.error(
 				`[pi-runner] SUCCESS: composed from the ${admission.results.length} admitted result(s)`,
 			);
 			finalizeOutput();
-			process.exit(0);
+			process.exit(compositionExit());
 		}
 	}
 

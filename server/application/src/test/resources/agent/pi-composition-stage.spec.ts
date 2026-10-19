@@ -10,6 +10,7 @@ import {
 	buildFeedbackTool,
 	closeUnroutedPrivateDestinations,
 	persistComposedFeedback,
+	privateCompositionOwed,
 	type ComposedFeedback,
 	type PublicReviewState,
 } from "../../../main/resources/agent/pi-composition-stage.ts";
@@ -754,4 +755,54 @@ void test("only changed public history composes again in fresh sessions, within 
 		);
 		assert.deepEqual(phases, ["PUBLIC_REVIEW", "PRIVATE_FEEDBACK"]);
 	}
+});
+
+const composedWithFailures = (
+	failures: ComposedFeedback["compositionFailures"],
+): ComposedFeedback => ({
+	compositionFailures: failures,
+	contractVersion: 3,
+	admissionDigest: "a".repeat(64),
+	results: [],
+	preparedTargets: [],
+	feedback: [],
+	review: null,
+	preparation: null,
+});
+
+void test("only private composition the run stopped after an accepted public review is owed", () => {
+	for (const reason of ["SAFETY", "STALL"] as const) {
+		assert.equal(
+			privateCompositionOwed(composedWithFailures([{ phase: "PRIVATE_FEEDBACK", reason }])),
+			true,
+			reason,
+		);
+		// An unsettled review on the work is never composed again because private feedback is owed.
+		assert.equal(
+			privateCompositionOwed(
+				composedWithFailures([
+					{ phase: "PUBLIC_REVIEW", reason: "SAFETY" },
+					{ phase: "PRIVATE_FEEDBACK", reason },
+				]),
+			),
+			false,
+			reason,
+		);
+	}
+	for (const reason of [
+		"MODEL_ERROR",
+		"RUNTIME_ERROR",
+		"BUDGET",
+		"LOOP",
+		"NO_DECISION",
+		"SERVER_REFUSED",
+		"PRIVATE_NOT_RECOVERED",
+	] as const) {
+		assert.equal(
+			privateCompositionOwed(composedWithFailures([{ phase: "PRIVATE_FEEDBACK", reason }])),
+			false,
+			reason,
+		);
+	}
+	assert.equal(privateCompositionOwed(composedWithFailures([])), false);
 });

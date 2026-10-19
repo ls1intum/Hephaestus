@@ -675,6 +675,8 @@ const nativeSdk =
 		: undefined;
 let reviewExtensions: ExtensionFactory[] = [];
 const unavailableContext = process.env.PI_UNAVAILABLE_CONTEXT === "true";
+/** The private composer's response ends, but its compaction stays busy until the run's own deadline. */
+const privateHold = process.env.PI_PRIVATE_HOLD === "true";
 const counterevidence = process.env.PI_COUNTEREVIDENCE === "true";
 const reviewCompacted = process.env.PI_REVIEW_COMPACTED === "true";
 const reviewerOnly = process.env.PI_REVIEWER_ONLY === "true";
@@ -1062,6 +1064,10 @@ if (scenario !== undefined && scenario !== "") {
 		if (scenario === "compose-settle-deadline") {
 			now = 1_000_000 + Number(process.env.AGENT_BUDGET_MS) - 200;
 		}
+		if (scenario === "compose-private-safety") {
+			// Room for the review on the work, which this mock answers at once, before the private composition.
+			now = 1_000_000 + Number(process.env.AGENT_BUDGET_MS) - 2000;
+		}
 		const rows = admitted();
 		const supportMode = process.env.PI_PRACTICE_PAGE_SUPPORT_MODE;
 
@@ -1161,6 +1167,7 @@ if (scenario !== undefined && scenario !== "") {
 			contractVersion: 3,
 			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
+			privatePrepared: false,
 			admitted: rows.map(admissionDto),
 			withheld: [],
 			practicePageSupport: support ?? null,
@@ -2583,7 +2590,11 @@ if (scenario !== undefined && scenario !== "") {
 									});
 									return;
 								}
-								if (scenario === "compose-settle-deadline") {
+								if (
+									scenario === "compose-settle-deadline" ||
+									scenario === "compose-private-safety" ||
+									privateHold
+								) {
 									// The response ended, but its auto-compaction remains busy until the deadline.
 									compacting = true;
 									return;
@@ -3507,6 +3518,7 @@ if (scenario !== undefined && scenario !== "") {
 		"stall",
 		"settle-safety",
 		"compose-settle-deadline",
+		"compose-private-safety",
 		"provider-error",
 		"provider-reply-unanswered-stall",
 		"provider-reply-refused-error",
@@ -3560,6 +3572,9 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-completion-unresolved",
 		"compose-continuation",
 		"compose-continuation-reviewed",
+		"compose-continuation-private",
+		"compose-continuation-private-prepared",
+		"compose-continuation-private-safety",
 		"compose-continuation-stale",
 		"compose-continuation-unresolved",
 		"compose-fresh-history",
@@ -3594,6 +3609,9 @@ if (scenario !== undefined && scenario !== "") {
 		const stage =
 			new Map([
 				["compose-continuation-reviewed", "compose-continuation"],
+				["compose-continuation-private", "compose-continuation"],
+				["compose-continuation-private-prepared", "compose-continuation"],
+				["compose-continuation-private-safety", "compose-continuation"],
 				["compose-continuation-stale", "compose-continuation"],
 				["compose-continuation-unresolved", "compose-continuation"],
 				["compose-completion-accepted", "compose"],
@@ -3688,6 +3706,8 @@ if (scenario !== undefined && scenario !== "") {
 				"settle-safety": "does not start a measuring turn once settling reaches the safety line",
 				"compose-settle-deadline":
 					"does not ask the composer once more after the run reaches its safety ceiling",
+				"compose-private-safety":
+					"owes private feedback the run stopped at its safety ceiling after the public review was prepared",
 				"provider-reply-unanswered-stall":
 					"retries only when no model or tool answer preceded a stall",
 				"provider-reply-refused-error":
@@ -3736,8 +3756,16 @@ if (scenario !== undefined && scenario !== "") {
 					"keeps distinct native work identities separate from provider URL text",
 				"compose-continuation-reviewed":
 					"an accepted public review is never recomposed by its continuation",
+				"compose-continuation-private":
+					"continues private feedback after an accepted public review when no private piece is prepared",
 				"compose-continuation":
-					"continues an admitted review by composing only the review on the work, measuring and admitting nothing",
+					"continues an admitted review by composing the review on the work and then its private feedback, measuring and admitting nothing",
+				"compose-continuation-private-prepared":
+					"continues an admitted review whose private piece is prepared by composing only the review on the work",
+				"compose-continuation-unresolved":
+					"continues an admitted review whose public delivery stays unresolved without composing it again",
+				"compose-continuation-private-safety":
+					"owes the private feedback a continuation's own ceiling stopped after the review it composed was prepared",
 				"compose-overflow":
 					"compacts the session before a composition prompt that would not fit beside what it holds",
 				"compose-silent":
@@ -3925,16 +3953,55 @@ if (scenario !== undefined && scenario !== "") {
 					}
 					if (stage === "compose-continuation") {
 						// What an earlier attempt's admission answered, staged by the server beside the request.
+						const continued = admissionDto(admittedResult);
 						writeFileSync(
 							nodePath.join(cwd, "evidence/composition-continuation.json"),
 							JSON.stringify({
 								contractVersion: 3,
 								admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-								publicReviewed: fixture === "compose-continuation-reviewed",
-								admitted: [admissionDto(admittedResult)],
+								publicReviewed: [
+									"compose-continuation-reviewed",
+									"compose-continuation-private",
+								].includes(fixture),
+								privatePrepared: [
+									"compose-continuation-reviewed",
+									"compose-continuation-private-prepared",
+								].includes(fixture),
+								admitted: [continued],
 								withheld: [],
-								practicePageSupport: null,
-								conversationEligibility: null,
+								// The server's reread for this attempt: the page is routed, the conversation is not.
+								practicePageSupport:
+									fixture === "compose-continuation-reviewed"
+										? null
+										: {
+												state: "COMPLETE",
+												readAt: "2026-10-07T10:00:00Z",
+												practices: [
+													{
+														practiceSlug: admittedResult.practiceSlug,
+														decision: "ADMIT",
+														stopReason: null,
+														occurrences: [
+															supportOccurrence("scm.pull_request", 3),
+															supportOccurrence("scm.issue", 3),
+														],
+													},
+												],
+											},
+								conversationEligibility:
+									fixture === "compose-continuation-reviewed"
+										? null
+										: {
+												state: "COMPLETE",
+												readAt: "2026-10-07T10:00:00Z",
+												results: [
+													{
+														resultId: admittedResult.resultId,
+														decision: "GATE_REFUSED",
+														stopReason: "NO_AI",
+													},
+												],
+											},
 							}),
 						);
 					}
@@ -4105,7 +4172,10 @@ if (scenario !== undefined && scenario !== "") {
 							pullRequestNumber: 3,
 						}),
 					);
-					const budgetMs = stage === "stall" || stage.endsWith("-stall") ? "3600000" : "60000";
+					// A continuation measures nothing: its whole budget is composition, and this one ends inside it.
+					const budgetMs =
+						new Map([["compose-continuation-private-safety", "3000"]]).get(fixture) ??
+						(stage === "stall" || stage.endsWith("-stall") ? "3600000" : "60000");
 					const child = spawnSync(
 						process.execPath,
 						[
@@ -4127,6 +4197,7 @@ if (scenario !== undefined && scenario !== "") {
 									? fixture.slice("compose-support-".length)
 									: new Map([["compose-already-said-inline", "first-inline"]]).get(fixture),
 								PI_UNAVAILABLE_CONTEXT: String(fixture === "compose-context-unavailable"),
+								PI_PRIVATE_HOLD: String(fixture === "compose-continuation-private-safety"),
 								PI_PUBLIC_HISTORY_MODE: new Map([
 									["compose-fresh-history", "fresh"],
 									["compose-history-unavailable-words", "unavailable-words"],
@@ -4832,6 +4903,19 @@ if (scenario !== undefined && scenario !== "") {
 								"second-practice": "not-reached (deadline)",
 								"test-practice": "failed (deadline)",
 							});
+							break;
+						}
+						case "compose-private-safety": {
+							// The public review is prepared; the run's own ceiling stopped private composition.
+							assert.equal(child.status, 77, child.stderr);
+							assert.ok(events.includes("prepare-public:true"), events.join("\n"));
+							const owed: unknown = JSON.parse(
+								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+							);
+							assert.ok(isRecord(owed));
+							assert.deepEqual(owed.compositionFailures, [
+								{ phase: "PRIVATE_FEEDBACK", reason: "SAFETY" },
+							]);
 							break;
 						}
 						case "compose-settle-deadline": {
@@ -6757,7 +6841,41 @@ for (const item of nullableCases) {
 							break;
 						}
 						case "compose-continuation": {
-							assert.equal(child.status, 0, child.stderr);
+							assert.equal(
+								child.status,
+								fixture === "compose-continuation-private-safety" ? 77 : 0,
+								child.stderr,
+							);
+							if (fixture === "compose-continuation-private-safety") {
+								// The review composed and accepted in this attempt stays; the run's ceiling stopped the
+								// private composer, so the private feedback is owed to another attempt.
+								const created = events.filter((event) => event.startsWith("create:session"));
+								assert.equal(created.length, 2, events.join("\n"));
+								assert.equal(created[0], "create:session tools=report_review");
+								assert.ok((created[1] ?? "").includes("report_feedback"), events.join("\n"));
+								assert.deepEqual(
+									events.filter((event) => event.startsWith("prepare-public:")),
+									["prepare-public:true"],
+								);
+								assert.ok(
+									events.indexOf(created[1] ?? "") > events.indexOf("prepare-public:true"),
+									events.join("\n"),
+								);
+								assert.match(child.stderr, /preparation: PREPARED/u);
+								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
+								assert.ok(!existsSync(nodePath.join(cwd, "out/practice-scripts.json")));
+								assert.ok(!events.includes("derive-change"));
+								const owed: unknown = JSON.parse(
+									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+								);
+								assert.ok(isRecord(owed));
+								assert.ok(owed.review !== null);
+								assert.ok(isRecord(owed.preparation), JSON.stringify(owed.preparation));
+								assert.deepEqual(owed.compositionFailures, [
+									{ phase: "PRIVATE_FEEDBACK", reason: "SAFETY" },
+								]);
+								break;
+							}
 							if (fixture === "compose-continuation-reviewed") {
 								assert.deepEqual(
 									events.filter((event) => event.startsWith("create:session")),
@@ -6767,33 +6885,135 @@ for (const item of nullableCases) {
 								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
 								break;
 							}
-							// Only the review composer's sessions: no practice is assessed and nothing can be recorded.
-							// Changed history earns one fresh session over the new read; an unknown delivery earns none.
-							assert.deepEqual(
-								events.filter((event) => event.startsWith("create:session")),
-								fixture === "compose-continuation-stale"
-									? ["create:session tools=report_review", "create:session tools=report_review"]
-									: ["create:session tools=report_review"],
-							);
-							if (fixture === "compose-continuation-stale") {
-								// The refused words came from the first read and the fresh session's from the second; the
-								// continuation's closing preparation may only replay those, never the refused context.
-								const contexts = events.filter((event) => event.startsWith("public-context:"));
-								assert.deepEqual(contexts.slice(0, 2), [
-									`public-context:v1:7:${"c".repeat(64)}`,
-									`public-context:v1:7:${"d".repeat(64)}`,
-								]);
+							if (fixture === "compose-continuation-private") {
+								// Private feedback only: no review composer, no public preparation, no new admission.
+								const created = events.filter((event) => event.startsWith("create:session"));
 								assert.ok(
-									contexts
-										.slice(1)
-										.every((context) => context === `public-context:v1:7:${"d".repeat(64)}`),
+									!created.some((event) => event.includes("report_review")),
 									events.join("\n"),
 								);
+								assert.equal(
+									created.filter((event) => event.includes("report_feedback")).length,
+									1,
+									events.join("\n"),
+								);
+								assert.ok(
+									events.some((event) => event.startsWith("private-turn")),
+									events.join("\n"),
+								);
+								assert.ok(
+									events.includes("prepare-public:false"),
+									`${events.join("\n")}\n${child.stderr}`,
+								);
+								assert.ok(!events.includes("prepare-public:true"), events.join("\n"));
+								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
+								const continued: unknown = JSON.parse(
+									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+								);
+								assert.ok(isRecord(continued));
+								assert.equal(continued.review, null);
+								assert.ok(Array.isArray(continued.feedback));
+								assert.ok(
+									continued.feedback.some(
+										(piece: unknown) => isRecord(piece) && piece.destination === "PRACTICE_PAGE",
+									),
+								);
+								assert.ok(Array.isArray(continued.compositionFailures));
+								assert.ok(
+									!continued.compositionFailures.some(
+										(failure: unknown) =>
+											isRecord(failure) &&
+											(failure.phase === "PUBLIC_REVIEW" ||
+												failure.reason === "PRIVATE_NOT_RECOVERED"),
+									),
+									JSON.stringify(continued.compositionFailures),
+								);
+								break;
 							}
-							assert.equal(
-								readFileSync(nodePath.join(cwd, "system-prompt.md"), "utf8"),
-								"Write clear, useful feedback.\n\nWrite the review on the work.",
-							);
+							if (fixture === "compose-continuation-unresolved") {
+								// An unknown public delivery is recorded once and never composed again; it owes nothing.
+								// Private composition still runs, as in the measured attempt.
+								const sessions = events.filter((event) => event.startsWith("create:session"));
+								assert.equal(
+									sessions.filter((event) => event.includes("report_review")).length,
+									1,
+									events.join("\n"),
+								);
+								assert.equal(
+									sessions.filter((event) => event.includes("report_feedback")).length,
+									1,
+									events.join("\n"),
+								);
+								assert.equal(
+									events.filter((event) => event === "prepare-public:true").length,
+									1,
+									events.join("\n"),
+								);
+								assert.ok(events.includes("prepare-public:false"), events.join("\n"));
+								const unresolved: unknown = JSON.parse(
+									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+								);
+								assert.ok(isRecord(unresolved));
+								assert.equal(unresolved.review, null);
+								assert.deepEqual(unresolved.compositionFailures, [
+									{ phase: "PUBLIC_REVIEW", reason: "PUBLIC_DELIVERY_UNRESOLVED" },
+								]);
+								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
+								break;
+							}
+							const created = events.filter((event) => event.startsWith("create:session"));
+							if (fixture === "compose-continuation-private-prepared") {
+								// One session, the review composer's: an accepted private piece closes private composition.
+								assert.deepEqual(created, ["create:session tools=report_review"]);
+								assert.equal(
+									readFileSync(nodePath.join(cwd, "system-prompt.md"), "utf8"),
+									"Write clear, useful feedback.\n\nWrite the review on the work.",
+								);
+							} else if (fixture === "compose-continuation-stale") {
+								// Changed history earns one fresh review session over the new read, then the private
+								// composer sees the accepted review. No submission reuses the refused context.
+								assert.deepEqual(created.slice(0, 2), [
+									"create:session tools=report_review",
+									"create:session tools=report_review",
+								]);
+								assert.equal(created.length, 3, events.join("\n"));
+								assert.ok((created[2] ?? "").includes("report_feedback"), events.join("\n"));
+								assert.deepEqual(
+									events.filter((event) => event.startsWith("public-context:")),
+									[
+										`public-context:v1:7:${"c".repeat(64)}`,
+										`public-context:v1:7:${"d".repeat(64)}`,
+									],
+								);
+								assert.equal(events.filter((event) => event === "prepare-public:true").length, 2);
+								assert.ok(
+									events.lastIndexOf("prepare-public:true") <
+										events.indexOf("prepare-public:false"),
+									events.join("\n"),
+								);
+								assert.ok(
+									events.some(
+										(event) => event.startsWith("private-turn") && event.endsWith("review=true"),
+									),
+								);
+							} else {
+								// The review composer, then the private composer that sees the review just composed.
+								assert.equal(created.length, 2, events.join("\n"));
+								assert.equal(created[0], "create:session tools=report_review");
+								assert.ok((created[1] ?? "").includes("report_feedback"), events.join("\n"));
+								assert.ok(
+									events.some(
+										(event) => event.startsWith("private-turn") && event.endsWith("review=true"),
+									),
+								);
+								const publicPrepared = events.indexOf("prepare-public:true");
+								assert.ok(publicPrepared !== -1, events.join("\n"));
+								assert.ok(
+									publicPrepared < events.indexOf("prepare-public:false"),
+									events.join("\n"),
+								);
+								assert.equal(events.filter((event) => event === "prepare-public:true").length, 1);
+							}
 							const result: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/result.json"), "utf8"),
 							);
@@ -6809,15 +7029,23 @@ for (const item of nullableCases) {
 								feedback.admissionDigest,
 								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							);
-							assert.equal(feedback.review === null, fixture === "compose-continuation-unresolved");
-							assert.deepEqual(feedback.feedback, []);
-							// A continuing public writer cannot reconstruct the earlier private context.
-							assert.deepEqual(feedback.compositionFailures, [
-								{ phase: "PRIVATE_FEEDBACK", reason: "PRIVATE_NOT_RECOVERED" },
-								...(fixture === "compose-continuation-unresolved"
-									? [{ phase: "PUBLIC_REVIEW", reason: "PUBLIC_DELIVERY_UNRESOLVED" }]
-									: []),
-							]);
+							assert.ok(feedback.review !== null);
+							if (fixture === "compose-continuation-private-prepared") {
+								assert.deepEqual(feedback.feedback, []);
+								assert.deepEqual(feedback.compositionFailures, [
+									{ phase: "PRIVATE_FEEDBACK", reason: "PRIVATE_NOT_RECOVERED" },
+								]);
+								break;
+							}
+							// The private feedback the earlier attempt never composed, from the server's current reread.
+							assert.ok(Array.isArray(feedback.feedback));
+							assert.ok(
+								feedback.feedback.some(
+									(piece: unknown) => isRecord(piece) && piece.destination === "PRACTICE_PAGE",
+								),
+								JSON.stringify(feedback.feedback),
+							);
+							assert.deepEqual(feedback.compositionFailures, []);
 							break;
 						}
 						default: {

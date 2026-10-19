@@ -219,6 +219,22 @@ The host prepares the final public package before a private session starts.
 A private setup failure or deadline does not erase that prepared review.
 The destinations remain independently eligible.
 
+The run can stop private composition at its safety ceiling or after a stall.
+Then the runner asks for a new attempt of the same job.
+The server grants it only if the public review is accepted and no private piece of the job is prepared.
+A new attempt after a lost or stopped worker continues an admitted review in the same way.
+
+Each new attempt uses the original admission, its results and the retained original inputs.
+It reads routing, consent and erasure again.
+Like the first attempt, it composes the public review only if none is accepted.
+Then it composes private feedback only if no private piece is prepared.
+The retry limit and the original expiry of those inputs stay in effect.
+
+After one private piece is accepted, no attempt composes private feedback again.
+The other private pieces of that run are then not recovered.
+A new attempt does not see a public review that an earlier attempt composed.
+Its private feedback can repeat a point of that review.
+
 The composer selects an inline citation by problem ID and citation index.
 Preparation resolves that exact admitted citation.
 A valid citation is not automatically commentable.

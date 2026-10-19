@@ -16,7 +16,8 @@ public record AdmissionResponseDTO(
         List<Withheld> withheld,
         @Nullable PracticePageSupportDTO practicePageSupport,
         @Nullable ConversationEligibilityDTO conversationEligibility,
-        boolean publicReviewed) {
+        boolean publicReviewed,
+        boolean privatePrepared) {
     public AdmissionResponseDTO {
         admitted = List.copyOf(admitted);
         withheld = List.copyOf(withheld);

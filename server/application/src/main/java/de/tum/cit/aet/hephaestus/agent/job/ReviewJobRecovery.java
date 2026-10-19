@@ -2,12 +2,14 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -38,18 +40,21 @@ public class ReviewJobRecovery {
     private final ObjectMapper mapper;
     private final LlmUsageRecorder usage;
     private final Optional<ReviewCompositionContinuation> continuation;
+    private final Optional<PracticeScriptRunRecorder> scriptRuns;
 
     public ReviewJobRecovery(
             ReviewJobRepository jobs,
             AgentProperties properties,
             ObjectMapper mapper,
             LlmUsageRecorder usage,
-            Optional<ReviewCompositionContinuation> continuation) {
+            Optional<ReviewCompositionContinuation> continuation,
+            Optional<PracticeScriptRunRecorder> scriptRuns) {
         this.jobs = jobs;
         this.properties = properties;
         this.mapper = mapper;
         this.usage = usage;
         this.continuation = continuation;
+        this.scriptRuns = scriptRuns;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -76,7 +81,7 @@ public class ReviewJobRecovery {
                                     attempt, properties.maxRetries(), now, availableAt));
         }
         if (changed > 0) {
-            bill(owned, counts);
+            bill(owned, TerminalUsage.fromProxy(counts));
             return Outcome.REQUEUED;
         }
         if (!admitted && attempt < properties.maxRetries()) return Outcome.NONE;
@@ -101,7 +106,7 @@ public class ReviewJobRecovery {
                     workerId);
         }
         if (changed == 0) return Outcome.NONE;
-        bill(owned, counts);
+        bill(owned, TerminalUsage.fromProxy(counts));
         return !admitted && cancellation != null ? Outcome.CANCELLED : Outcome.FAILED;
     }
 
@@ -116,7 +121,54 @@ public class ReviewJobRecovery {
                 workerId,
                 properties.maxRetries(),
                 Instant.now().plus(ReviewJobBackoff.compute(job.getAttempt() + 1)));
-        if (changed > 0 && bill) bill(job, counts);
+        if (changed > 0 && bill) bill(job, TerminalUsage.fromProxy(counts));
+        return changed > 0;
+    }
+
+    /**
+     * Continues an admitted attempt whose private feedback composition the run stopped. The locked row decides: an
+     * accepted public review, so no attempt composes public feedback again, and no prepared private piece, so none is
+     * composed twice. The attempt returned, so it is billed once from its own report, selected as at a terminal write,
+     * and keeps the practice script runs it reported.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean continueComposition(
+            ReviewJob job,
+            String workerId,
+            AgentResult.@Nullable LlmUsage runnerUsage,
+            byte @Nullable [] scriptReport) {
+        if (continuation.isEmpty()) return false;
+        continuation.get().holdRecoveryCustody();
+        ReviewJob locked = jobs.lockById(job.getId()).orElse(null);
+        if (!owns(locked, workerId, job.getAttempt())) return false;
+        ReviewJob owned = Objects.requireNonNull(locked);
+        if (!ResultAdmissionService.isAdmitted(owned)
+                || owned.getPublicReviewDigest() == null
+                || ResultAdmissionService.privatePrepared(owned)) return false;
+        TerminalUsage spent = TerminalUsage.resolve(
+                runnerUsage,
+                counts(owned),
+                jobs.sumPracticeScriptUsageByKind(owned.getWorkspaceId(), owned.getId(), owned.getAttempt()));
+        Instant now = Instant.now();
+        int changed = continuation
+                .get()
+                .requeue(
+                        owned,
+                        workerId,
+                        new ReviewJobRepository.CompositionRequeue(
+                                owned.getAttempt(),
+                                properties.maxRetries(),
+                                now,
+                                now.plus(ReviewJobBackoff.compute(owned.getAttempt() + 1))));
+        if (changed > 0) {
+            bill(owned, spent);
+            // The row locked as attempt N keys and admits the runs; the requeue detached it unchanged. The attempt that
+            // continues it measures nothing, so no later report replaces them.
+            scriptRuns.ifPresent(runs -> {
+                ConfigSnapshot snapshot = frozen(owned);
+                runs.record(owned, scriptReport, snapshot == null ? Map.of() : snapshot.practiceScriptModels(), now);
+            });
+        }
         return changed > 0;
     }
 
@@ -133,17 +185,21 @@ public class ReviewJobRecovery {
                 : null;
     }
 
-    private void bill(ReviewJob job, @Nullable ReviewJobLlmUsage counts) {
+    private void bill(ReviewJob job, TerminalUsage spent) {
         if (job.getExecutionStartedAt() == null) return;
-        ConfigSnapshot snapshot = null;
-        try {
-            snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), mapper);
-        } catch (RuntimeException failure) {
-            log.warn("Cannot read frozen model for recovered job {}", job.getId(), failure);
-        }
+        ConfigSnapshot snapshot = frozen(job);
         LlmPriceSnapshot price = snapshot != null && snapshot.model().priceSnapshot() != null
                 ? snapshot.model().priceSnapshot()
                 : LlmPriceSnapshot.unpricedInstance();
-        TerminalUsage.fromProxy(counts).appendTo(usage, jobs, job.getWorkspaceId(), job, snapshot, price);
+        spent.appendTo(usage, jobs, job.getWorkspaceId(), job, snapshot, price);
+    }
+
+    private @Nullable ConfigSnapshot frozen(ReviewJob job) {
+        try {
+            return ConfigSnapshot.fromJson(job.getConfigSnapshot(), mapper);
+        } catch (RuntimeException failure) {
+            log.warn("Cannot read frozen model for recovered job {}", job.getId(), failure);
+            return null;
+        }
     }
 }

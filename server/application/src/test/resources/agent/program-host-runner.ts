@@ -369,6 +369,7 @@ if (scenario !== undefined && scenario !== "") {
 			contractVersion: 3,
 			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
+			privatePrepared: false,
 			admitted: [],
 			withheld: [],
 			practicePageSupport: null,

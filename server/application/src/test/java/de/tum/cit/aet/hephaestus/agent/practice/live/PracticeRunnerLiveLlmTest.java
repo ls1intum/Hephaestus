@@ -436,6 +436,7 @@ class PracticeRunnerLiveLlmTest {
                     List.of(),
                     null,
                     null,
+                    false,
                     false));
         }
 

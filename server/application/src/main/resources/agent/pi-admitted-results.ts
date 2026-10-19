@@ -95,6 +95,7 @@ export const admissionResponseSchema = z.looseObject({
 	admitted: z.array(admittedResultSchema),
 	withheld: z.array(z.object({ practiceSlug: z.string(), reason: z.string() })),
 	publicReviewed: z.boolean(),
+	privatePrepared: z.boolean(),
 	practicePageSupport: z.unknown().nullable(),
 	conversationEligibility: z.unknown().nullable(),
 });
@@ -109,6 +110,7 @@ export function parseAdmission(value: unknown) {
 		results: response.admitted,
 		digest: response.admissionDigest,
 		publicReviewed: response.publicReviewed,
+		privatePrepared: response.privatePrepared,
 		practicePageSupport: readPracticePageSupport(response.practicePageSupport, response.admitted),
 		conversationEligibility: readConversationEligibility(
 			response.conversationEligibility,

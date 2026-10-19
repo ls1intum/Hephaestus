@@ -722,7 +722,8 @@ public class ReviewJobExecutor {
             @Nullable RefusalReason reasonCode,
             @Nullable Map<String, Object> details) {}
 
-    private @Nullable ReviewJobStatus executePrepared(UUID jobId, ReviewJob job, SandboxSpec sandboxSpec) {
+    @Nullable
+    ReviewJobStatus executePrepared(UUID jobId, ReviewJob job, SandboxSpec sandboxSpec) {
         SandboxResult result = sandboxManager.execute(sandboxSpec);
         AgentResult agentResult = practiceAgent.parseResult(result);
 
@@ -737,6 +738,14 @@ public class ReviewJobExecutor {
                     "Requeuing job {} ({}): nothing it measured can be delivered from here (attempt {})",
                     jobId,
                     unreachable,
+                    job.getAttempt() + 1);
+            return null;
+        }
+        // An admitted run that stopped composing private feedback continues it as a new attempt when its fences hold.
+        if (result.exitCode() == SandboxLayout.EXIT_COMPOSITION_OWED && continueComposition(job, agentResult, result)) {
+            log.warn(
+                    "Requeuing job {}: private feedback composition stopped before it finished (attempt {})",
+                    jobId,
                     job.getAttempt() + 1);
             return null;
         }
@@ -1106,6 +1115,15 @@ public class ReviewJobExecutor {
         return true;
     }
 
+    private boolean continueComposition(ReviewJob job, AgentResult agentResult, SandboxResult result) {
+        if (workerId == null) return false;
+        return Boolean.TRUE.equals(transactionTemplate.execute(status -> recovery.continueComposition(
+                job,
+                workerId,
+                agentResult.usage(),
+                result.outputFiles().get(SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE))));
+    }
+
     private void recordPracticeReviewRefusal(String reason) {
         ReviewRefusalRecorder.record(meterRegistry, "execution", reason);
     }
@@ -1123,8 +1141,7 @@ public class ReviewJobExecutor {
     }
 
     // A failed runner's draft can reach delivery only through results the server already admitted.
-    private ReviewJobStatus determineTerminalStatus(
-            SandboxResult sandboxResult, AgentResult agentResult, ReviewJob job) {
+    ReviewJobStatus determineTerminalStatus(SandboxResult sandboxResult, AgentResult agentResult, ReviewJob job) {
         if (sandboxResult.timedOut()) {
             return ReviewJobStatus.TIMED_OUT;
         }

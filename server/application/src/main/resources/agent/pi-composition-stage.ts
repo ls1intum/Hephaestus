@@ -1605,6 +1605,20 @@ export function recordCompositionFailure(
 	}
 }
 
+const OWED_PRIVATE_REASONS: ReadonlySet<CompositionFailureReason> = new Set(["SAFETY", "STALL"]);
+
+// The run, not the work, stopped private composition after the review on the work was settled.
+export function privateCompositionOwed(composedFeedback: ComposedFeedback): boolean {
+	const reasonOf = (phase: CompositionPhase) =>
+		composedFeedback.compositionFailures.find((failure) => failure.phase === phase)?.reason;
+	const reason = reasonOf("PRIVATE_FEEDBACK");
+	return (
+		reason !== undefined &&
+		OWED_PRIVATE_REASONS.has(reason) &&
+		reasonOf("PUBLIC_REVIEW") === undefined
+	);
+}
+
 export function finishCompositionText(
 	notMet: readonly string[],
 	request: CompositionRequest,
@@ -2385,7 +2399,7 @@ function isDestination(value: unknown): value is Destination {
  * Composes the review on the work. A typed refusal stored nothing: only changed history opens a fresh session, which
  * reads it again, within MAX_PUBLIC_RECOMPOSITIONS. Any other refusal is recorded as the review's failure.
  */
-export async function composePublicReview(
+async function composePublicReview(
 	stage: Pick<ReturnType<typeof createCompositionStage>, "composeReview">,
 	request: CompositionRequest,
 	reviewable: readonly Record<string, unknown>[],

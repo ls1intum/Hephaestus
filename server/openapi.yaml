@@ -12009,6 +12009,8 @@ components:
           anyOf:
           - $ref: "#/components/schemas/PracticePageSupport"
           - type: "null"
+        privatePrepared:
+          type: boolean
         publicReviewed:
           type: boolean
         reviewId:
@@ -12026,6 +12028,7 @@ components:
       - conversationEligibility
       - jobId
       - practicePageSupport
+      - privatePrepared
       - publicReviewed
       - reviewId
       - withheld
