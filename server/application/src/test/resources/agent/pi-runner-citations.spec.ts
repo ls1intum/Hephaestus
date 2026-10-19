@@ -23,6 +23,7 @@ async function run(
 	absolute = false,
 	extraTexts: { commit: string; content: string }[] = [],
 	prepared = false,
+	changed = false,
 ) {
 	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-citation-"));
 	stagePractices(cwd, [
@@ -98,6 +99,19 @@ export default definePracticeScript({
 				stagedPath: "evidence/auth.txt",
 				sha256: createHash("sha256").update(text).digest("hex"),
 			},
+			// The changed file's NEW text, as a change capture registers it.
+			...(changed
+				? [
+						{
+							source: "scm.pull-request.diff",
+							path: "src/Auth.java",
+							side: "NEW",
+							commit: null,
+							stagedPath: "evidence/auth.txt",
+							sha256: createHash("sha256").update(text).digest("hex"),
+						},
+					]
+				: []),
 			...extraTexts.map(({ commit, content }) => {
 				write(`evidence/auth-${commit}.txt`, content);
 				return {
@@ -315,6 +329,60 @@ void test("an absolute generated-input citation receives the same captured-sourc
 	assert.match(result.stderr, /generated practice preparation, not captured evidence/u);
 	assert.match(result.stderr, /read\(\{"path":"evidence\/manifest\.json"\}\)/u);
 	assert.doesNotMatch(result.stderr, /no such file at commit/u);
+	assert.deepEqual(result.results, []);
+});
+
+// The live shape: optional identities omitted, the changed file, its side, lines and quote supplied.
+const CHANGED_LINE = {
+	path: "src/Auth.java",
+	side: "NEW",
+	startLine: 10,
+	endLine: 10,
+	quote: "insecure();",
+};
+
+void test("a changed line cited with its side but no source is stored as a citation of the change", async () => {
+	const result = await run(CHANGED_LINE, false, [], false, true);
+	assert.equal(result.status, 0, result.stderr);
+	assert.doesNotMatch(result.stderr, /side is forbidden/u);
+	assert.partialDeepStrictEqual(result.results, [
+		{
+			candidate: {
+				problems: [
+					{
+						citations: [
+							{
+								sourceKind: "scm.pull-request.diff",
+								sourcePath: "evidence/change.json",
+								path: "src/Auth.java",
+								side: "NEW",
+								startLine: 10,
+								endLine: 10,
+							},
+						],
+					},
+				],
+			},
+		},
+	]);
+});
+
+void test("a side alone never makes a citation one of the change", async () => {
+	const uncaptured = await run(CHANGED_LINE);
+	assert.match(uncaptured.stderr, /side is forbidden by the source catalog/u);
+	assert.deepEqual(uncaptured.results, []);
+	const repository = await run({ ...CHANGED_LINE, sourceKind: TREE }, false, [], false, true);
+	assert.match(repository.stderr, /side is forbidden by the source catalog/u);
+	assert.deepEqual(repository.results, []);
+});
+
+void test("a quote that is not the changed line is refused with a line of the change to cite", async () => {
+	const result = await run({ ...CHANGED_LINE, quote: "checked(token);" }, false, [], false, true);
+	assert.match(result.stderr, /citation does not match src\/Auth\.java:10-10 \(NEW\)/u);
+	assert.match(
+		result.stderr,
+		/Corrected citation example: .*"sourceKind":"scm\.pull-request\.diff"/u,
+	);
 	assert.deepEqual(result.results, []);
 });
 

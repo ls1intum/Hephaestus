@@ -634,6 +634,76 @@ void test("a diff citation names the change record, never another file of its ki
 	}
 });
 
+void test("a side on a file the change holds names the change when the citation names no source", () => {
+	const { code, smoke: _smoke, ...sources } = sourceIdentityCapture("test-first");
+	const cite = (fields: Record<string, unknown>) =>
+		normalizeCitation({ startLine: 20, endLine: 20, quote: "x", ...fields }, "", { sources });
+	// The live shape: optional identities omitted, the changed file, its side, lines and quote supplied.
+	const live = cite({ path: code, side: "NEW" });
+	assert.deepEqual(
+		[live.sourceKind, live.sourcePath, live.path, live.side],
+		["scm.pull-request.diff", "context/change.json", code, "NEW"],
+	);
+	const old = cite({ path: "README.md", side: "OLD" });
+	assert.deepEqual([old.sourceKind, old.side], ["scm.pull-request.diff", "OLD"]);
+	const pinned = cite({ path: code, side: "NEW", commit: "a".repeat(40) });
+	assert.equal(pinned.sourceKind, "scm.pull-request.diff");
+});
+
+void test("a side names the change only for a file the change holds on that side, and never over a named source", () => {
+	const { code, smoke: _smoke, ...sources } = sourceIdentityCapture("test-first");
+	const cite = (fields: Record<string, unknown>) =>
+		normalizeCitation({ startLine: 20, endLine: 20, quote: "x", ...fields }, "", { sources });
+	for (const [name, fields] of [
+		["named repository source", { sourceKind: "scm.repository.tree", path: code, side: "NEW" }],
+		["named checkout witness", { sourcePath: "repos/reviewed/.git/HEAD", path: code, side: "NEW" }],
+		["checkout path", { path: `repos/reviewed/${code}`, side: "NEW" }],
+		["side the change does not hold", { path: code, side: "OLD" }],
+		["file the change does not touch", { path: "docs/unchanged.md", side: "NEW" }],
+		["another commit", { path: code, side: "NEW", commit: "f".repeat(40) }],
+		["no side", { path: code }],
+	] as const) {
+		const citation = cite(fields);
+		assert.deepEqual(
+			[citation.sourceKind, citation.sourcePath],
+			["scm.repository.tree", "repos/reviewed/.git/HEAD"],
+			name,
+		);
+	}
+	const record = cite({
+		sourcePath: "context/description.md",
+		path: "context/description.md",
+		side: "NEW",
+	});
+	assert.equal(record.sourceKind, "scm.pull-request.core");
+	const scan = normalizeCitation(
+		{ path: "src/healthy.ts", side: "NEW", startLine: 1, quote: "x" },
+		"",
+		{
+			sources: {
+				sourceFiles: new Map([["context/item.json", "scm.repository.tree"]]),
+				capturedTexts: [
+					sourceIdentityText(
+						"scm.repository.tree",
+						"src/healthy.ts",
+						"NEW",
+						"a".repeat(40),
+						"repos/reviewed/src/healthy.ts",
+					),
+				],
+				sandboxRoot: "/sandbox",
+				repositoryRoot: "repos/reviewed",
+				headRevision: "a".repeat(40),
+				treeSourceFile: "context/item.json",
+			},
+		},
+	);
+	assert.deepEqual(
+		[scan.sourceKind, scan.sourcePath],
+		["scm.repository.tree", "context/item.json"],
+	);
+});
+
 void test("a literal # in a captured file name is part of the name, not a record fragment", () => {
 	for (const order of ["test-first", "record-last"] as const) {
 		const { code: _code, smoke: _smoke, ...capture } = sourceIdentityCapture(order);
