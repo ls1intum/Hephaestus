@@ -1151,14 +1151,16 @@ public class ReviewJobExecutor {
             // A clean exit without a valid result is the runner's failure, not a completed review.
             return agentResult != null && agentResult.success() ? ReviewJobStatus.COMPLETED : ReviewJobStatus.FAILED;
         }
-        // Distinguish envelope drift (exit 42) from generic failure — the runner emits this when
-        // the task.json schemaVersion doesn't match this image. Operators need to see
-        // this distinctly from agent crashes; the secondary metric also alerts on image drift.
+        // The runner exits 42 before any model call when it cannot use the staged task envelope. Operators need to see
+        // this apart from agent crashes; the runner's own log line names which check failed.
         if (sandboxResult.exitCode() == SandboxLayout.EXIT_ENVELOPE_MISMATCH) {
             log.error(
-                    "Pi runner rejected task envelope (exit {}) — server/image schemaVersion drift. "
-                            + "Rebuild the agent-pi image or roll back the server.",
-                    SandboxLayout.EXIT_ENVELOPE_MISMATCH);
+                    "Pi runner could not use the staged task envelope (exit {}): jobId={}, attempt={}. It is missing or"
+                            + " unreadable, has another schemaVersion than the image, or has an invalid field; the"
+                            + " runner log names which.",
+                    SandboxLayout.EXIT_ENVELOPE_MISMATCH,
+                    job.getId(),
+                    job.getAttempt());
             meterRegistry.counter(AgentMetrics.AGENT_PI_ENVELOPE_MISMATCH).increment();
             return ReviewJobStatus.FAILED;
         }

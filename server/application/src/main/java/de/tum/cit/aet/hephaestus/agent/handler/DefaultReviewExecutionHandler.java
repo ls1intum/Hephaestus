@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
@@ -26,12 +25,16 @@ import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
 import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.UnofferedItemCapabilities;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEvidence;
@@ -65,6 +68,8 @@ import tools.jackson.databind.node.ObjectNode;
 public class DefaultReviewExecutionHandler {
     /** A pinned practice whose reads the current source catalog cannot capture for the reviewed item. */
     static final String SOURCE_CONTRACT_UNSUPPORTED = "source_contract_unsupported";
+    /** A pinned item practice that declares a review event or About role that its item kind does not offer. */
+    static final String ITEM_CAPABILITY_UNSUPPORTED = "item_capability_unsupported";
 
     private final ReviewJobAssignments assignments;
     private final List<ItemSource> sources;
@@ -90,22 +95,19 @@ public class DefaultReviewExecutionHandler {
         if (matching.size() != 1) throw new IllegalStateException("The item needs exactly one capture source");
         var source = matching.getFirst();
         // The capture boundary rejects the whole batch for one read it cannot capture, so such a practice is
-        // withheld here and the others are captured.
-        var unsupported = new LinkedHashMap<ReviewAssignmentSnapshot, UnsupportedReads>();
+        // withheld here and the others are captured. A practice that its item kind cannot support is withheld
+        // the same way.
+        var refused = new LinkedHashMap<ReviewAssignmentSnapshot, ReviewCaptureDecision>();
         for (var assignment : assigned) {
-            var refusal = unsupportedReads(assignment, item.kind().value(), review.kind());
-            if (refusal != null) unsupported.put(assignment, refusal);
+            var refusal = refusal(assignment, item, review.kind());
+            if (refusal != null) refused.put(assignment, refusal);
         }
-        var pinned = assigned.stream().filter(a -> !unsupported.containsKey(a)).toList();
+        var pinned = assigned.stream().filter(a -> !refused.containsKey(a)).toList();
         if (pinned.isEmpty()) {
             capture.capture(
-                    job.getWorkspaceId(),
-                    review.id(),
-                    job.getId(),
-                    job.getAttempt(),
-                    unsupportedDecisions(unsupported));
+                    job.getWorkspaceId(), review.id(), job.getId(), job.getAttempt(), List.copyOf(refused.values()));
             throw new InsufficientEvidenceException(
-                    "No assigned practice reads sources that this source contract can capture",
+                    "No assigned practice has a pinned definition that this item supports",
                     new PreparedJobInputs(Map.of(), List.of(), List.of(), null, null));
         }
         var required = pinned.stream()
@@ -186,7 +188,7 @@ public class DefaultReviewExecutionHandler {
                         now,
                         decisions,
                         checks);
-                var captureDecisions = new ArrayList<>(unsupportedDecisions(unsupported));
+                var captureDecisions = new ArrayList<>(refused.values());
                 for (var decision : decisions) {
                     var assignment = pinned.stream()
                             .filter(a -> a.practiceSlug().equals(decision.practiceSlug()))
@@ -236,14 +238,8 @@ public class DefaultReviewExecutionHandler {
                 }
                 staged.put(
                         SandboxLayout.TASK_ENVELOPE_FILENAME,
-                        mapper.writeValueAsBytes(TaskEnvelope.of(
-                                review.id(),
-                                job.getId(),
-                                job.getAttempt(),
-                                job.getWorkspaceId(),
-                                new Task("Review each assigned practice against the captured item. Use the"
-                                        + " governed tools and return one result for each assigned"
-                                        + " practice."))));
+                        mapper.writeValueAsBytes(TaskEnvelope.practiceReview(
+                                review.id(), job.getId(), job.getAttempt(), job.getWorkspaceId())));
                 FeedbackCompositionInputs.stage(
                         staged,
                         review.kind(),
@@ -273,6 +269,41 @@ public class DefaultReviewExecutionHandler {
     }
 
     /**
+     * Returns the withheld decision for a practice that cannot be captured for the item, or null when it can.
+     *
+     * <p>An item practice must declare only review events and an About role that the item's descriptor offers.
+     * Authoring checks the same descriptor facts, but a stored version is not revalidated, and a requested review
+     * bypasses event selection. The check does not require any declared event to have occurred. A scan reviews
+     * files or repositories rather than the practice's own item kind, so neither field applies to it.
+     */
+    private @Nullable ReviewCaptureDecision refusal(
+            ReviewAssignmentSnapshot assignment, ItemRef item, ReviewKind scope) {
+        if (scope == ReviewKind.ITEM) {
+            var descriptor = items.descriptorFor(item.kind())
+                    .orElseThrow(() -> new IllegalStateException("The captured item kind has no descriptor"));
+            var unoffered = UnofferedItemCapabilities.of(
+                    descriptor, assignment.practice().definition());
+            if (unoffered != null)
+                return withheld(
+                        assignment,
+                        ITEM_CAPABILITY_UNSUPPORTED,
+                        new UnofferedCapabilities(
+                                assignment.practiceSlug(),
+                                clock.instant(),
+                                item.kind().value(),
+                                unoffered.events(),
+                                unoffered.about()));
+        }
+        var reads = unsupportedReads(assignment, item.kind().value(), scope);
+        return reads == null ? null : withheld(assignment, SOURCE_CONTRACT_UNSUPPORTED, reads);
+    }
+
+    private ReviewCaptureDecision withheld(ReviewAssignmentSnapshot assignment, String reason, Record facts) {
+        return new ReviewCaptureDecision(
+                assignment.practice().practiceId(), ReviewPracticeStatus.WITHHELD, reason, mapper.valueToTree(facts));
+    }
+
+    /**
      * Returns why the current catalog cannot capture this practice's pinned reads for the item, or null when it can.
      * An optional read counts: dropping it would review the practice with less than its pinned definition.
      */
@@ -298,16 +329,6 @@ public class DefaultReviewExecutionHandler {
                 sources);
     }
 
-    private List<ReviewCaptureDecision> unsupportedDecisions(Map<ReviewAssignmentSnapshot, UnsupportedReads> refused) {
-        return refused.entrySet().stream()
-                .map(entry -> new ReviewCaptureDecision(
-                        entry.getKey().practice().practiceId(),
-                        ReviewPracticeStatus.WITHHELD,
-                        SOURCE_CONTRACT_UNSUPPORTED,
-                        mapper.valueToTree(entry.getValue())))
-                .toList();
-    }
-
     /** The recorded capture facts of a practice withheld before capture. */
     private record UnsupportedReads(
             String practiceSlug,
@@ -316,6 +337,14 @@ public class DefaultReviewExecutionHandler {
             String currentSourceContract,
             String itemKind,
             List<PracticeReadSource> unsupportedSources) {}
+
+    /** The recorded facts of an item practice withheld before capture for what its item kind does not offer. */
+    private record UnofferedCapabilities(
+            String practiceSlug,
+            Instant decidedAt,
+            String itemKind,
+            List<ItemEventName> unofferedEvents,
+            @Nullable AboutRole unofferedAbout) {}
 
     private JsonNode captureFacts(AutomatedReviewReadinessDecision decision, @Nullable AppliesWhenCheck check) {
         ObjectNode facts = mapper.valueToTree(decision);

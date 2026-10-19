@@ -38,19 +38,26 @@ import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturedApplicability;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.FileItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestReviewItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.RepositoryItemDescriptor;
 import de.tum.cit.aet.hephaestus.practices.AppliesWhen;
 import de.tum.cit.aet.hephaestus.practices.AppliesWhenClause;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.ReviewOn;
 import de.tum.cit.aet.hephaestus.practices.ScanDefinition;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
@@ -71,7 +78,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -91,13 +97,13 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
     private final PracticeCatalogInjector catalog = mock(PracticeCatalogInjector.class);
     private final ReviewHistoryContentSource history = mock(ReviewHistoryContentSource.class);
     private final ReviewAssignmentStore members = mock(ReviewAssignmentStore.class);
-    private final ItemDescriptor descriptor = mock(ItemDescriptor.class);
-    private final ItemDescriptorRegistry items = new ItemDescriptorRegistry(List.of()) {
-        @Override
-        public Optional<ItemDescriptor> descriptorFor(ItemKind kind) {
-            return Optional.of(descriptor);
-        }
-    };
+    // The registered descriptors: the execution check reads the same offered events and roles as authoring.
+    private final ItemDescriptorRegistry items = new ItemDescriptorRegistry(List.of(
+            new DocumentItemDescriptor(),
+            new PullRequestItemDescriptor(),
+            new PullRequestReviewItemDescriptor(),
+            new FileItemDescriptor(),
+            new RepositoryItemDescriptor()));
     private final JsonMapper mapper = new JsonMapper();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final ClasspathSourceCatalogRegistry sourceCatalog = new ClasspathSourceCatalogRegistry(mapper, clock);
@@ -809,5 +815,172 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
                 .satisfies(decision -> assertThat(decision.reason())
                         .isEqualTo(DefaultReviewExecutionHandler.SOURCE_CONTRACT_UNSUPPORTED));
         verify(source, never()).pin(any(), any());
+    }
+
+    private static final ItemRef PULL_REQUEST_REVIEW =
+            new ItemRef(1, 2, new ItemKind("scm.pull_request_review"), 21L, 20L, null);
+
+    /** A practice on the item that reads its core record and declares these review events and About role. */
+    private static ReviewAssignmentSnapshot declaring(
+            ItemRef item, long practiceId, String slug, List<String> events, @Nullable AboutRole about) {
+        var original = practice(
+                RuntimeReviewTestData.assignment(5L, null),
+                item,
+                practiceId,
+                slug,
+                new PracticeReads("2.0.0", List.of(read("scm.pull-request.core", ReadNeed.REQUIRED))));
+        var p = original.practice();
+        var definition = DefinitionTestFixtures.withAbout(
+                DefinitionTestFixtures.withReviewOn(
+                        p.definition(),
+                        new ReviewOn(events.stream().map(ItemEventName::new).toList(), Map.of())),
+                about);
+        return new ReviewAssignmentSnapshot(
+                original.id(),
+                item,
+                original.version(),
+                original.developerId(),
+                slug,
+                new PinnedPractice(p.practiceId(), p.practiceVersionId(), definition, p.reviewDigest(), p.method()));
+    }
+
+    /** A stored pull request practice about the author that only a submitted review could select automatically. */
+    private static ReviewAssignmentSnapshot legacyReviewThoroughness() {
+        return declaring(
+                PULL_REQUEST,
+                71L,
+                "review-thoroughness",
+                List.of("scm.pull_request_review.submitted"),
+                AboutRole.AUTHOR);
+    }
+
+    @Test
+    void shouldWithholdAPullRequestPracticeBoundToAReviewEventAndRequestedReviewTheValidOnes() {
+        var job = RuntimeReviewTestData.job();
+        // Requested reviews bypass event selection: neither valid practice needs its event to have occurred.
+        var opened = declaring(PULL_REQUEST, 81L, "describe-the-change", List.of("scm.pull_request.opened"), null);
+        var author = declaring(PULL_REQUEST, 82L, "link-the-issue", List.of(), AboutRole.AUTHOR);
+        var legacy = legacyReviewThoroughness();
+        when(assignments.load(job)).thenReturn(List.of(opened, legacy, author));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, opened));
+
+        try (var prepared = strictHandler(job, PULL_REQUEST).prepareInputs(job)) {
+            assertThat(Objects.requireNonNull(prepared.automatedReviewReadinessReport())
+                            .decisions())
+                    .extracting(decision -> decision.practiceSlug())
+                    .containsExactlyInAnyOrder(opened.practiceSlug(), author.practiceSlug());
+        }
+        var decisions = recordedDecisions(job);
+        assertThat(decisions)
+                .filteredOn(decision -> decision.practiceId() != 71L)
+                .extracting(decision -> decision.status())
+                .containsExactly(ReviewPracticeStatus.READY, ReviewPracticeStatus.READY);
+        assertThat(decisions)
+                .filteredOn(decision -> decision.practiceId() == 71L)
+                .singleElement()
+                .satisfies(decision -> {
+                    assertThat(decision.status()).isEqualTo(ReviewPracticeStatus.WITHHELD);
+                    assertThat(decision.reason()).isEqualTo(DefaultReviewExecutionHandler.ITEM_CAPABILITY_UNSUPPORTED);
+                    assertThat(decision.facts().path("itemKind").asString()).isEqualTo("scm.pull_request");
+                    assertThat(decision.facts().path("unofferedEvents"))
+                            .isEqualTo(mapper.readTree("[\"scm.pull_request_review.submitted\"]"));
+                    // The pull request offers an author: only the event is unsupported.
+                    assertThat(decision.facts().hasNonNull("unofferedAbout")).isFalse();
+                });
+        // The withheld practice is not staged for the model.
+        verify(catalog).inject(any(), eq(List.of(opened, author)), eq(ReviewKind.ITEM), eq(Map.of()));
+    }
+
+    @Test
+    void shouldReviewAStoredPracticeBoundToAnOfferedEventThatAuthoringNoLongerBinds() {
+        var job = RuntimeReviewTestData.job();
+        // The pull request descriptor offers this event but authoring cannot bind it; the stored version stays
+        // reviewable on request, and the event need not have occurred.
+        var linked = declaring(
+                PULL_REQUEST,
+                101L,
+                "close-linked-issues",
+                List.of("scm.pull_request.linked_issue_updated"),
+                AboutRole.AUTHOR);
+        when(assignments.load(job)).thenReturn(List.of(linked));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, linked));
+
+        try (var prepared = strictHandler(job, PULL_REQUEST).prepareInputs(job)) {
+            assertThat(Objects.requireNonNull(prepared.automatedReviewReadinessReport())
+                            .decisions())
+                    .singleElement()
+                    .satisfies(decision -> assertThat(decision.ready()).isTrue());
+        }
+        assertThat(recordedDecisions(job)).singleElement().satisfies(decision -> {
+            assertThat(decision.status()).isEqualTo(ReviewPracticeStatus.READY);
+            assertThat(decision.reason()).isNull();
+        });
+        verify(catalog).inject(any(), eq(List.of(linked)), eq(ReviewKind.ITEM), eq(Map.of()));
+    }
+
+    @Test
+    void shouldReviewAReviewPracticeAboutTheReviewerAndWithholdOneAboutTheAuthor() {
+        var job = RuntimeReviewTestData.job();
+        var reviewer = declaring(
+                PULL_REQUEST_REVIEW,
+                91L,
+                "review-thoroughness",
+                List.of("scm.pull_request_review.submitted"),
+                AboutRole.REVIEWER);
+        var author = declaring(
+                PULL_REQUEST_REVIEW,
+                92L,
+                "author-review",
+                List.of("scm.pull_request_review.submitted"),
+                AboutRole.AUTHOR);
+        when(assignments.load(job)).thenReturn(List.of(reviewer, author));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, reviewer));
+
+        try (var prepared = strictHandler(job, PULL_REQUEST_REVIEW).prepareInputs(job)) {
+            assertThat(Objects.requireNonNull(prepared.automatedReviewReadinessReport())
+                            .decisions())
+                    .singleElement()
+                    .satisfies(decision -> assertThat(decision.practiceSlug()).isEqualTo(reviewer.practiceSlug()));
+        }
+        assertThat(recordedDecisions(job))
+                .satisfiesExactlyInAnyOrder(
+                        decision -> {
+                            assertThat(decision.practiceId()).isEqualTo(91L);
+                            assertThat(decision.status()).isEqualTo(ReviewPracticeStatus.READY);
+                        },
+                        decision -> {
+                            assertThat(decision.practiceId()).isEqualTo(92L);
+                            assertThat(decision.status()).isEqualTo(ReviewPracticeStatus.WITHHELD);
+                            assertThat(decision.reason())
+                                    .isEqualTo(DefaultReviewExecutionHandler.ITEM_CAPABILITY_UNSUPPORTED);
+                            assertThat(decision.facts().path("unofferedEvents").isEmpty())
+                                    .isTrue();
+                            assertThat(decision.facts().path("unofferedAbout").asString())
+                                    .isEqualTo("AUTHOR");
+                        });
+        verify(catalog).inject(any(), eq(List.of(reviewer)), eq(ReviewKind.ITEM), eq(Map.of()));
+    }
+
+    @Test
+    void shouldRefuseWithoutCapturingWhenEveryPracticeDeclaresWhatItsItemKindDoesNotOffer() {
+        var job = RuntimeReviewTestData.job();
+        var legacy = legacyReviewThoroughness();
+        when(assignments.load(job)).thenReturn(List.of(legacy));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, legacy));
+        var strict = strictHandler(job, PULL_REQUEST);
+
+        assertThatThrownBy(() -> strict.prepareInputs(job))
+                .isInstanceOfSatisfying(InsufficientEvidenceException.class, refusal -> {
+                    assertThat(refusal.preparedInputs().folderIndex()).isNull();
+                    assertThat(refusal.preparedInputs().automatedReviewReadinessReport())
+                            .isNull();
+                });
+        assertThat(recordedDecisions(job)).singleElement().satisfies(decision -> {
+            assertThat(decision.status()).isEqualTo(ReviewPracticeStatus.WITHHELD);
+            assertThat(decision.reason()).isEqualTo(DefaultReviewExecutionHandler.ITEM_CAPABILITY_UNSUPPORTED);
+        });
+        verify(source, never()).pin(any(), any());
+        verify(files, never()).beginPersonCapture(job);
+        verify(catalog, never()).inject(any(), any(), any(), any());
     }
 }

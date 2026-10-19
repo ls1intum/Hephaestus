@@ -20,6 +20,9 @@ public record TaskEnvelope(
         String practiceScripts) {
     public static final int SCHEMA_VERSION = 6;
 
+    private static final Task PRACTICE_REVIEW = new Task("Review each assigned practice against the captured item."
+            + " Use the governed tools and return one result for each assigned practice.");
+
     public TaskEnvelope {
         Objects.requireNonNull(reviewId, "reviewId");
         Objects.requireNonNull(jobId, "jobId");
@@ -57,6 +60,14 @@ public record TaskEnvelope(
                 paths.compositionRequest(),
                 paths.preparedFeedback(),
                 paths.practiceScripts());
+    }
+
+    /**
+     * The practice review task of one attempt. Each attempt stages its own, a continued one too: it reads its
+     * admission's retained inputs, but it runs, reports and is fenced as the attempt it is.
+     */
+    public static TaskEnvelope practiceReview(UUID reviewId, UUID jobId, int attempt, long workspaceId) {
+        return of(reviewId, jobId, attempt, workspaceId, PRACTICE_REVIEW);
     }
 
     public TaskPaths paths() {

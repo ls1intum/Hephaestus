@@ -19,15 +19,26 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
+import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -61,17 +72,20 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.tracing.Tracer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -935,6 +949,71 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(ResultAdmissionService.privatePrepared(continuing)).isEqualTo(privatePiece);
     }
 
+    @ParameterizedTest(name = "retained task envelope: {0}")
+    @ValueSource(strings = {"none", "the admitting attempt's", "malformed"})
+    @DisplayName("a continued attempt is staged with its own task envelope beside its admission's unchanged inputs")
+    void shouldStageTheContinuedAttemptWithItsOwnTaskEnvelope(String retainedEnvelope) throws Exception {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        admitWithResult(jobId);
+        pinScriptAssignments(jobId);
+        acceptPublicReview(jobId);
+        ReviewJob admitting = jobRepository.findById(jobId).orElseThrow();
+        Map<String, byte[]> captured = admittedInputs();
+        var retained = new TreeMap<>(captured);
+        // The admission never retains a task envelope; one in the retained set must not stand in for this attempt's.
+        switch (retainedEnvelope) {
+            case "the admitting attempt's" ->
+                retained.put(
+                        SandboxLayout.TASK_ENVELOPE_FILENAME,
+                        objectMapper.writeValueAsBytes(
+                                TaskEnvelope.practiceReview(admitting.getReviewId(), jobId, 0, workspace.getId())));
+            case "malformed" ->
+                retained.put(SandboxLayout.TASK_ENVELOPE_FILENAME, "{".getBytes(StandardCharsets.UTF_8));
+            default -> {}
+        }
+        Instant expiresAt = Instant.now().plus(Duration.ofHours(1)).truncatedTo(ChronoUnit.MICROS);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", expiresAt, retained);
+        assertThat(continueComposition(admitting, "live-owner")).isTrue();
+        // The next worker holds the queued attempt and stages it as the executor does.
+        jdbc.update(
+                "UPDATE review_job SET status = 'RUNNING', worker_id = 'next-worker', started_at = now() WHERE id = ?",
+                jobId);
+        ReviewJob claimed = jobRepository.findById(jobId).orElseThrow();
+
+        try (var prepared = continuation.prepareInputs(claimed)) {
+            var staged = prepared.filesOnDisk();
+            // The runner reads this file before anything else, and stops before any model call without it.
+            assertThat(staged).containsKey(SandboxLayout.TASK_ENVELOPE_FILENAME);
+            TaskEnvelope task = objectMapper.readValue(
+                    Files.readAllBytes(requireNonNull(staged.get(SandboxLayout.TASK_ENVELOPE_FILENAME))),
+                    TaskEnvelope.class);
+            assertThat(task.attempt()).isEqualTo(1);
+            assertThat(task.jobId()).isEqualTo(jobId);
+            assertThat(task.reviewId()).isEqualTo(claimed.getReviewId());
+            assertThat(task.workspaceId()).isEqualTo(Long.toString(workspace.getId()));
+            assertThat(task.prompt()).isNotBlank();
+            // The inputs the task names are the admission's, byte for byte.
+            assertThat(staged).containsKeys(task.manifest(), task.compositionRequest(), task.practiceIndex());
+            for (var file : captured.entrySet()) {
+                assertThat(Files.readAllBytes(requireNonNull(staged.get(file.getKey()))))
+                        .as(file.getKey())
+                        .isEqualTo(file.getValue());
+            }
+            assertThat(staged).containsKey(ReviewCompositionContinuation.CONTINUATION_PATH);
+        }
+
+        // Staging the attempt left the admission and what it retained as they were.
+        ReviewJob after = jobRepository.findById(jobId).orElseThrow();
+        assertThat(ResultAdmissionService.citationAttempt(after)).isZero();
+        assertThat(after.getAdmissionDigest()).isEqualTo("admitted-digest");
+        ReviewCompositionBasis basis = compositionBasisRepository
+                .findByWorkspaceIdAndJobId(workspace.getId(), jobId)
+                .orElseThrow();
+        assertThat(basis.getAdmissionAttempt()).isZero();
+        assertThat(basis.getExpiresAt()).isEqualTo(expiresAt);
+        assertThat(basis.getBasisDigest()).isEqualTo(ReviewCompositionBasis.digest(retained));
+    }
+
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"expired inputs", "erased receipt"})
     @DisplayName("an owed continuation refused at staging runs nothing, and its admitted review ends partial")
@@ -1265,6 +1344,16 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     private void keepOriginalInputs(
             UUID jobId, int attempt, String receiptState, String dependencies, Instant expiresAt) {
+        keepOriginalInputs(jobId, attempt, receiptState, dependencies, expiresAt, Map.of());
+    }
+
+    private void keepOriginalInputs(
+            UUID jobId,
+            int attempt,
+            String receiptState,
+            String dependencies,
+            Instant expiresAt,
+            Map<String, byte[]> files) {
         UUID copyId = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload) "
@@ -1289,11 +1378,47 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         basis.setAdmissionAttempt(attempt);
         basis.setAdmissionDigest("admitted-digest");
         basis.setBasisVersion(ReviewCompositionBasis.VERSION);
-        basis.setBasisDigest(ReviewCompositionBasis.digest(Map.of()));
+        basis.setBasisDigest(ReviewCompositionBasis.digest(files));
         basis.setCopyId(copyId);
         basis.setExpiresAt(expiresAt);
-        basis.setPayload(objectMapper.createObjectNode().set("files", objectMapper.createObjectNode()));
+        var retained = objectMapper.createObjectNode();
+        files.forEach((path, bytes) -> retained.put(path, Base64.getEncoder().encodeToString(bytes)));
+        basis.setPayload(objectMapper.createObjectNode().set("files", retained));
         transactionTemplate.executeWithoutResult(status -> compositionBasisRepository.save(basis));
+    }
+
+    // What an admission retains of its attempt's folder: the manifest and its index, a context record, the practice
+    // index and the composition request.
+    private Map<String, byte[]> admittedInputs() {
+        Instant now = Instant.now();
+        var source = new SourceKind("scm.pull-request.diff");
+        var manifest = new JobFolderIndex(
+                new SourceContractVersion("2.0.0"),
+                "a".repeat(64),
+                "scm.pull_request",
+                now,
+                List.of(new SourceCapture(
+                        source,
+                        new SourceCaptureState.Available(
+                                SourceContentState.EMPTY,
+                                SourceCompleteness.COMPLETE,
+                                new SourceCaptureFacts(now, null, null, "base:head")),
+                        EvidenceSnapshotFixtures.citation(source),
+                        List.of())),
+                List.of(),
+                List.of(),
+                List.of());
+        return Map.of(
+                SandboxLayout.MANIFEST_PATH,
+                objectMapper.writeValueAsBytes(manifest),
+                "INDEX.md",
+                "# Captured inputs\n".getBytes(StandardCharsets.UTF_8),
+                SandboxLayout.CONTEXT_PREFIX + "metadata.json",
+                "{\"title\":\"Fixture\"}".getBytes(StandardCharsets.UTF_8),
+                SandboxLayout.PRACTICES_PREFIX + "index.json",
+                "[]".getBytes(StandardCharsets.UTF_8),
+                SandboxLayout.FEEDBACK_COMPOSITION_PATH,
+                "{\"destinations\":[\"PRACTICE_PAGE\"]}".getBytes(StandardCharsets.UTF_8));
     }
 
     private void spentBeforeItWasLost(UUID jobId, int calls) {

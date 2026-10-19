@@ -156,6 +156,8 @@ const REVIEW_WITHHELD_REASON_SENTENCES: Readonly<Record<string, string>> = {
 		"This review referred to an earlier result that could not be identified exactly.",
 	source_contract_unsupported:
 		"Hephaestus cannot use this practice’s evidence settings for this work. Ask a workspace admin to check them.",
+	item_capability_unsupported:
+		"Hephaestus cannot use this practice’s Review on or About settings for this kind of work. Ask a workspace admin to check them.",
 };
 
 export function reviewReasonSentence(code: string | null): string | undefined {
