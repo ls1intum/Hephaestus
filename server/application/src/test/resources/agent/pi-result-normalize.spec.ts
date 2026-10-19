@@ -517,6 +517,192 @@ void test("an unstaged citation refuses its reference without disclosing every s
 	);
 });
 
+/** One captured text of the source identity capture; every text shares one placeholder digest. */
+function sourceIdentityText(
+	source: string,
+	path: string,
+	side: "OLD" | "NEW",
+	commit: string | null,
+	stagedPath: string,
+) {
+	return { source, path, side, commit, stagedPath, sha256: "c".repeat(64) };
+}
+
+/** A pull request capture as the server stages it: one change record and many diff texts of the same kind. */
+function sourceIdentityCapture(order: "test-first" | "record-last") {
+	const DIFF = "scm.pull-request.diff";
+	const CORE = "scm.pull-request.core";
+	const head = "a".repeat(40);
+	const base = "b".repeat(40);
+	const code = "src/main/java/com/example/userapi/config/RetryPolicy.java";
+	const smoke = "src/test/java/com/example/userapi/config/RetryPolicySmokeTest.java";
+	const diffFiles: [string, string][] = [
+		[`context/citable/new/${smoke}`, DIFF],
+		["context/citable/new/README.md", DIFF],
+		["context/citable/old/README.md", DIFF],
+		[`context/citable/new/${code}`, DIFF],
+		["context/citable-records/scm.pull-request.diff/1111.txt", DIFF],
+		["context/change.json", DIFF],
+	];
+	const sourceFiles = new Map<string, string>([
+		...(order === "test-first" ? diffFiles : diffFiles.toReversed()),
+		["context/metadata.json", CORE],
+		["context/description.md", CORE],
+		["context/citable-records/scm.pull-request.core/2222.txt", CORE],
+		["repos/reviewed/.git/HEAD", "scm.repository.tree"],
+	]);
+	const pinned = (path: string, side: "OLD" | "NEW") => {
+		const stagedPath = `context/citable/${side.toLowerCase()}/${path}`;
+		const commit = side === "NEW" ? head : base;
+		return [
+			sourceIdentityText(DIFF, path, side, commit, stagedPath),
+			sourceIdentityText(DIFF, path, side, null, stagedPath),
+		];
+	};
+	return {
+		sourceFiles,
+		capturedTexts: [
+			...pinned(smoke, "NEW"),
+			...pinned("README.md", "NEW"),
+			...pinned("README.md", "OLD"),
+			...pinned(code, "NEW"),
+			sourceIdentityText(DIFF, "context/change.json", "NEW", null, "context/change.json"),
+			sourceIdentityText(
+				DIFF,
+				"context/change.json#/diff",
+				"NEW",
+				null,
+				"context/citable-records/scm.pull-request.diff/1111.txt",
+			),
+			sourceIdentityText(CORE, "context/metadata.json", "NEW", null, "context/metadata.json"),
+			sourceIdentityText(CORE, "context/description.md", "NEW", null, "context/description.md"),
+			sourceIdentityText(
+				CORE,
+				"context/metadata.json#/body",
+				"NEW",
+				null,
+				"context/citable-records/scm.pull-request.core/2222.txt",
+			),
+		],
+		sandboxRoot: "/sandbox",
+		repositoryRoot: "repos/reviewed",
+		headRevision: head,
+		code,
+		smoke,
+	};
+}
+
+void test("a diff citation names the change record, never another file of its kind, in any capture order", () => {
+	for (const order of ["test-first", "record-last"] as const) {
+		const { code, smoke, ...sources } = sourceIdentityCapture(order);
+		const cite = (fields: Record<string, unknown>) =>
+			normalizeCitation({ startLine: 1, quote: "x", ...fields }, "", { sources });
+		const unrelated = `context/citable/new/${smoke}`;
+		for (const citation of [
+			cite({
+				sourceKind: "scm.pull-request.diff",
+				sourcePath: "context/change.json",
+				path: "README.md",
+				side: "NEW",
+			}),
+			cite({ sourcePath: unrelated, path: "context/citable/new/README.md" }),
+			cite({ sourcePath: "work/change/diff.patch", path: code, side: "NEW" }),
+			cite({ sourceKind: "scm.pull-request.diff", path: "work/change/diff.patch" }),
+			cite({
+				sourceKind: "scm.pull-request.diff",
+				sourcePath: unrelated,
+				path: smoke,
+				side: "NEW",
+			}),
+			cite({ sourcePath: unrelated, path: "context/change.json#/diff" }),
+		]) {
+			assert.equal(
+				citation.sourcePath,
+				"context/change.json",
+				`${order}: ${JSON.stringify(citation)}`,
+			);
+			assert.equal(citation.sourceKind, "scm.pull-request.diff");
+		}
+		const readme = cite({ sourcePath: unrelated, path: "context/citable/new/README.md" });
+		assert.equal(readme.path, "README.md");
+		assert.equal(readme.side, "NEW");
+		const old = cite({ sourcePath: unrelated, path: "context/citable/old/README.md" });
+		assert.deepEqual(
+			[old.path, old.side, old.sourcePath],
+			["README.md", "OLD", "context/change.json"],
+		);
+	}
+});
+
+void test("a literal # in a captured file name is part of the name, not a record fragment", () => {
+	for (const order of ["test-first", "record-last"] as const) {
+		const { code: _code, smoke: _smoke, ...capture } = sourceIdentityCapture(order);
+		const CORE = "scm.pull-request.core";
+		const text = (path: string, stagedPath: string) => ({
+			source: CORE,
+			path,
+			side: "NEW" as const,
+			commit: null,
+			stagedPath,
+			sha256: "e".repeat(64),
+		});
+		const sources = {
+			...capture,
+			sourceFiles: new Map([
+				...capture.sourceFiles,
+				["notes/a", CORE],
+				["context/notes/a#b.md", CORE],
+			]),
+			capturedTexts: [
+				...capture.capturedTexts,
+				text("notes/a", "notes/a"),
+				text("notes/a#b.md", "context/notes/a#b.md"),
+			],
+		};
+		const citation = normalizeCitation(
+			{
+				sourcePath: "context/description.md",
+				path: "context/notes/a#b.md",
+				startLine: 1,
+				quote: "x",
+			},
+			"",
+			{ sources },
+		);
+		assert.deepEqual(
+			[citation.sourcePath, citation.path],
+			["context/notes/a#b.md", "notes/a#b.md"],
+			order,
+		);
+	}
+});
+
+void test("a record citation keeps its own record, and repository text keeps the checkout witness", () => {
+	for (const order of ["test-first", "record-last"] as const) {
+		const { code, smoke: _smoke, ...sources } = sourceIdentityCapture(order);
+		const cite = (fields: Record<string, unknown>) =>
+			normalizeCitation({ startLine: 1, quote: "x", ...fields }, "", { sources });
+		const fragment = cite({
+			sourcePath: "context/description.md",
+			path: "context/citable-records/scm.pull-request.core/2222.txt",
+		});
+		assert.deepEqual(
+			[fragment.sourcePath, fragment.path],
+			["context/metadata.json", "context/metadata.json#/body"],
+		);
+		const record = cite({ sourcePath: "context/description.md", path: "context/description.md" });
+		assert.deepEqual(
+			[record.sourcePath, record.path],
+			["context/description.md", "context/description.md"],
+		);
+		const repository = cite({ sourcePath: "repos/reviewed/.git/HEAD", path: code });
+		assert.deepEqual(
+			[repository.sourceKind, repository.sourcePath, repository.path],
+			["scm.repository.tree", "repos/reviewed/.git/HEAD", code],
+		);
+	}
+});
+
 void test("a path under another checkout keeps its prefix, and no note says otherwise", () => {
 	const notes: string[] = [];
 	const citation = normalizeCitation(

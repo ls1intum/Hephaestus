@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,6 +41,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.CitationVerifier;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -46,6 +49,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -134,6 +138,221 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
              "startLine":999,"endLine":999,"quote":"Exact quote"}],
              "evidence":{},"coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
             """));
+    }
+
+    private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
+    private static final String README = "# Retry\nBoth inputs must be positive whole numbers.\n";
+    private static final String SMOKE = "final class RetryPolicySmokeTest {}\n";
+    private static final String CHANGE = "{\"diff\":\"+Both inputs must be positive whole numbers.\"}";
+    private static final String RANGE = "+Both inputs must be positive whole numbers.";
+    private static final String README_TEXT = "context/citable/new/README.md";
+    private static final String SMOKE_TEXT = "context/citable/new/src/test/RetryPolicySmokeTest.java";
+    private static final String CHANGE_RECORD = "context/change.json";
+    private static final String RANGE_TEXT = "context/citable-records/scm.pull-request.diff/1111.txt";
+
+    private static String digest(String text) {
+        return ProvenanceDigest.sha256Hex(text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private CandidateEvidenceVerifier diffVerifier() {
+        job.setWorkspaceId(1);
+        var policy = mock(SourceContract.class);
+        var catalog = mock(SourceCatalog.class);
+        when(catalogs.current()).thenReturn(catalog);
+        when(catalog.source(DIFF)).thenReturn(Optional.of(policy));
+        when(policy.appliesTo(KIND.value())).thenReturn(true);
+        when(policy.citation())
+                .thenReturn(new CitationCapabilities(CitationRequirement.OPTIONAL, CitationRequirement.OPTIONAL));
+        when(catalogs.isSourceUsePermitted(DIFF, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .thenReturn(true);
+        when(domain.kinds()).thenReturn(Set.of(KIND));
+        when(files.readText(job, README_TEXT, digest(README))).thenReturn(Optional.of(README));
+        when(files.readText(job, SMOKE_TEXT, digest(SMOKE))).thenReturn(Optional.of(SMOKE));
+        when(files.readText(job, RANGE_TEXT, digest(RANGE))).thenReturn(Optional.of(RANGE));
+        return new CandidateEvidenceVerifier(files, catalogs, List.of(domain));
+    }
+
+    /** A change capture as the server stages it: the change record and several diff texts of one kind. */
+    private CapturedEvidence changeCapture(boolean smokeFirst, String readmeDigest, CitableText... extra) {
+        return changeCapture(smokeFirst, readmeDigest, List.of(), extra);
+    }
+
+    private CapturedEvidence changeCapture(
+            boolean smokeFirst, String readmeDigest, List<CapturedSource> extraFiles, CitableText... extra) {
+        var now = Instant.now();
+        var state = new SourceCaptureState.Available(
+                SourceContentState.NON_EMPTY,
+                SourceCompleteness.COMPLETE,
+                new SourceCaptureFacts(now, null, null, "docs:one"),
+                List.of());
+        var smoke = new CapturedSource(SMOKE_TEXT, "text/plain", digest(SMOKE), SMOKE.length());
+        var readme = new CapturedSource(README_TEXT, "text/plain", readmeDigest, README.length());
+        var change = new CapturedSource(CHANGE_RECORD, "application/json", digest(CHANGE), CHANGE.length());
+        var range = new CapturedSource(RANGE_TEXT, "text/plain", digest(RANGE), RANGE.length());
+        var witness = new CapturedSource("context/diff-witness.json", "application/json", digest("{}"), 2);
+        var captured = new ArrayList<>(extraFiles);
+        captured.addAll(
+                smokeFirst
+                        ? List.of(smoke, readme, change, range, witness)
+                        : List.of(witness, range, change, readme, smoke));
+        var texts = new ArrayList<>(List.of(
+                new CitableText(
+                        DIFF.value(),
+                        "src/test/RetryPolicySmokeTest.java",
+                        CitationSide.NEW,
+                        null,
+                        SMOKE_TEXT,
+                        digest(SMOKE)),
+                new CitableText(DIFF.value(), "README.md", CitationSide.NEW, null, README_TEXT, readmeDigest),
+                new CitableText(DIFF.value(), CHANGE_RECORD, CitationSide.NEW, null, CHANGE_RECORD, digest(CHANGE)),
+                new CitableText(
+                        DIFF.value(), CHANGE_RECORD + "#/diff", CitationSide.NEW, null, RANGE_TEXT, digest(RANGE))));
+        texts.addAll(List.of(extra));
+        return CapturedEvidence.of(new JobFolderIndex(
+                new SourceContractVersion("2.0.0"),
+                "a".repeat(64),
+                KIND.value(),
+                now,
+                List.of(new SourceCapture(DIFF, state, EvidenceSnapshotFixtures.citation(DIFF), captured)),
+                List.of(),
+                captured.stream().map(file -> new FolderSource(DIFF, file)).toList(),
+                List.copyOf(texts)));
+    }
+
+    private Candidate diffCandidate(String sourcePath, String path, String side, String quote) {
+        return diffCandidate(sourcePath, path, side, quote, "");
+    }
+
+    private Candidate diffCandidate(String sourcePath, String path, String side, String quote, String commit) {
+        return CandidateParser.parse(MAPPER.readTree("""
+            {"outcome":"MET","summary":"The practice is met","explanation":"The captured change supports the criterion",
+             "citations":[{"sourceKind":"scm.pull-request.diff","sourcePath":"%s","path":"%s","side":"%s",%s
+             "startLine":2,"endLine":2,"quote":"%s"}],
+             "evidence":{},"coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
+            """.formatted(
+                        sourcePath, path, side, commit.isEmpty() ? "" : "\"commit\":\"" + commit + "\",", quote)));
+    }
+
+    private EvidenceCitation verifiedDiff(Candidate candidate, CapturedEvidence captured) {
+        return diffVerifier()
+                .verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate, captured)
+                .citations()
+                .getFirst();
+    }
+
+    private CandidateRefusal diffRefusal(Candidate candidate, CapturedEvidence captured) {
+        var verifier = diffVerifier();
+        try {
+            verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate, captured);
+        } catch (CandidateEvidenceVerifier.Unverified failure) {
+            return failure.refusal();
+        }
+        throw new AssertionError("The citation was verified");
+    }
+
+    @Test
+    void shouldStoreTheVerifiedTextWhenADiffCitationNamesAnotherTextOfItsKind() {
+        for (boolean smokeFirst : new boolean[] {true, false}) {
+            var stored = verifiedDiff(
+                    diffCandidate(SMOKE_TEXT, "README.md", "NEW", "Both inputs must be positive whole numbers."),
+                    changeCapture(smokeFirst, digest(README)));
+
+            assertThat(stored.sourcePath()).isEqualTo(README_TEXT);
+            assertThat(stored.path()).isEqualTo("README.md");
+            assertThat(Objects.requireNonNull(stored.verification()).itemSha256())
+                    .isEqualTo(digest(README));
+        }
+        verify(files, atLeastOnce()).readText(job, README_TEXT, digest(README));
+        verify(files, never()).readText(eq(job), eq(SMOKE_TEXT), any());
+    }
+
+    @Test
+    void shouldStoreTheVerifiedTextWhenADiffCitationNamesTheChangeRecord() {
+        var stored = verifiedDiff(
+                diffCandidate(CHANGE_RECORD, "README.md", "NEW", "Both inputs must be positive whole numbers."),
+                changeCapture(true, digest(README)));
+
+        assertThat(stored.sourcePath()).isEqualTo(README_TEXT);
+        assertThat(Objects.requireNonNull(stored.verification()).itemSha256()).isEqualTo(digest(README));
+    }
+
+    @Test
+    void shouldKeepTheChangeRecordForACitationOfItsOwnRangeAndAWitnessThatHoldsNoText() {
+        String rangeQuote = "+Both inputs must be positive whole numbers.";
+        assertThat(verifiedDiff(
+                                diffCandidate(SMOKE_TEXT, CHANGE_RECORD + "#/diff", "NEW", rangeQuote),
+                                changeCapture(true, digest(README)))
+                        .sourcePath())
+                .isEqualTo(CHANGE_RECORD);
+        assertThat(verifiedDiff(
+                                diffCandidate(CHANGE_RECORD, CHANGE_RECORD + "#/diff", "NEW", rangeQuote),
+                                changeCapture(false, digest(README)))
+                        .sourcePath())
+                .isEqualTo(CHANGE_RECORD);
+        assertThat(verifiedDiff(
+                                diffCandidate(
+                                        "context/diff-witness.json",
+                                        "README.md",
+                                        "NEW",
+                                        "Both inputs must be positive whole numbers."),
+                                changeCapture(true, digest(README)))
+                        .sourcePath())
+                .isEqualTo("context/diff-witness.json");
+    }
+
+    @Test
+    void shouldReadALiteralHashInAChangedFileNameAsPartOfTheNameNotARecordFragment() {
+        String part = "final class Part {}\n";
+        String partText = "context/citable/new/src/a#part.java";
+        String prefix = "a\n";
+        when(files.readText(job, partText, digest(part))).thenReturn(Optional.of(part));
+        var captured = changeCapture(
+                true,
+                digest(README),
+                List.of(
+                        new CapturedSource(partText, "text/plain", digest(part), part.length()),
+                        new CapturedSource("src/a", "text/plain", digest(prefix), prefix.length())),
+                new CitableText(DIFF.value(), "src/a#part.java", CitationSide.NEW, null, partText, digest(part)),
+                new CitableText(DIFF.value(), "src/a", CitationSide.NEW, null, "src/a", digest(prefix)));
+        for (String given : List.of(SMOKE_TEXT, "src/a", partText)) {
+            var stored = verifiedDiff(diffCandidate(given, "src/a#part.java", "NEW", "final class Part {}"), captured);
+
+            assertThat(stored.sourcePath()).isEqualTo(partText);
+            assertThat(Objects.requireNonNull(stored.verification()).itemSha256())
+                    .isEqualTo(digest(part));
+        }
+        verify(files, never()).readText(eq(job), eq("src/a"), any());
+    }
+
+    @Test
+    void shouldStillRefuseAWrongQuoteDigestSideCommitPathOrAmbiguousText() {
+        String quote = "Both inputs must be positive whole numbers.";
+        assertThat(diffRefusal(
+                        diffCandidate(SMOKE_TEXT, "README.md", "NEW", "final class RetryPolicySmokeTest {}"),
+                        changeCapture(true, digest(README))))
+                .isEqualTo(CandidateRefusal.QUOTE_UNVERIFIED);
+        assertThat(diffRefusal(
+                        diffCandidate(SMOKE_TEXT, "README.md", "NEW", quote), changeCapture(true, "d".repeat(64))))
+                .isEqualTo(CandidateRefusal.SOURCE_UNAVAILABLE);
+        assertThat(diffRefusal(
+                        diffCandidate(SMOKE_TEXT, "README.md", "OLD", quote), changeCapture(true, digest(README))))
+                .isEqualTo(CandidateRefusal.SOURCE_UNAVAILABLE);
+        assertThat(diffRefusal(
+                        diffCandidate(SMOKE_TEXT, "README.md", "NEW", quote, "e".repeat(40)),
+                        changeCapture(true, digest(README))))
+                .isEqualTo(CandidateRefusal.SOURCE_UNAVAILABLE);
+        assertThat(diffRefusal(
+                        diffCandidate("context/not-captured.json", "README.md", "NEW", quote),
+                        changeCapture(true, digest(README))))
+                .isEqualTo(CandidateRefusal.SOURCE_UNAVAILABLE);
+        assertThat(diffRefusal(
+                        diffCandidate(SMOKE_TEXT, "README.md", "NEW", quote),
+                        changeCapture(
+                                true,
+                                digest(README),
+                                new CitableText(
+                                        DIFF.value(), "README.md", CitationSide.NEW, null, SMOKE_TEXT, digest(SMOKE)))))
+                .isEqualTo(CandidateRefusal.SOURCE_UNAVAILABLE);
     }
 
     @Test

@@ -129,6 +129,56 @@ function insideCheckout(
 	return read;
 }
 
+/**
+ * The source file that a citation of one captured text names. A file of the same kind can hold another text, so the
+ * text's own record, or else its staged copy, is the witness. Repository text keeps the checkout witness. A text with
+ * neither file in the manifest keeps the given file of its kind, or else the first one.
+ */
+function witnessOf(
+	proof: CitableText,
+	given: string,
+	sources: CitationSources,
+): string | undefined {
+	const ownKind = (path: string) => sources.sourceFiles.get(path) === proof.source;
+	// An extracted record string is staged under context/citable-records/ as "<record>#/<pointer>", as SessionReads
+	// reads it; a file name may itself contain "#".
+	const fragment = proof.path.indexOf("#/");
+	const record =
+		fragment !== -1 && proof.stagedPath.startsWith("context/citable-records/")
+			? proof.path.slice(0, fragment)
+			: proof.path;
+	const own = proof.source === TREE_SOURCE ? undefined : [record, proof.stagedPath].find(ownKind);
+	return (
+		own ??
+		(ownKind(given)
+			? given
+			: [...sources.sourceFiles].find(
+					([path, kind]) =>
+						kind === proof.source &&
+						(proof.source !== TREE_SOURCE ||
+							CHECKOUT_WITNESS.test(path) ||
+							path === sources.treeSourceFile),
+				)?.[0])
+	);
+}
+
+/** The change record that diff citations name: the diff file the capture registered as its own whole text. */
+function changeRecordOf(sources: CitationSources): string | undefined {
+	const diffFiles = [...sources.sourceFiles].flatMap(([path, kind]) =>
+		kind === DIFF_SOURCE ? [path] : [],
+	);
+	const records = diffFiles.filter(
+		(path) =>
+			sources.capturedTexts?.some(
+				(text) => text.source === DIFF_SOURCE && text.path === path && text.stagedPath === path,
+			) === true,
+	);
+	if (records.length === 1) {
+		return records[0];
+	}
+	return diffFiles.length === 1 ? diffFiles[0] : undefined;
+}
+
 function capturedSourceFields(
 	fields: Record<string, unknown>,
 	sources: CitationSources,
@@ -161,16 +211,7 @@ function capturedSourceFields(
 	) {
 		throw new Error("the captured path names multiple text versions; specify the commit you read");
 	}
-	const sourcePath =
-		sources.sourceFiles.get(trimmedText(fields.sourcePath)) === proof.source
-			? fields.sourcePath
-			: [...sources.sourceFiles].find(
-					([path, kind]) =>
-						kind === proof.source &&
-						(proof.source !== TREE_SOURCE ||
-							CHECKOUT_WITNESS.test(path) ||
-							path === sources.treeSourceFile),
-				)?.[0];
+	const sourcePath = witnessOf(proof, trimmedText(fields.sourcePath), sources);
 	return {
 		...fields,
 		sourcePath,
@@ -211,14 +252,18 @@ function sourceFields(
 		return { ...resolved, path, sourcePath: path, sourceKind: staged };
 	}
 	const declared = sources.sourceFiles.get(sourcePath);
-	const diff = [...sources.sourceFiles].find(([, kind]) => kind === DIFF_SOURCE)?.[0];
 	if (
 		path === DIFF_VIEW ||
 		sourcePath === DIFF_VIEW ||
 		declared === DIFF_SOURCE ||
 		sourceKind === DIFF_SOURCE
 	) {
-		return { ...resolved, path, sourcePath: diff ?? sourcePath, sourceKind: DIFF_SOURCE };
+		return {
+			...resolved,
+			path,
+			sourcePath: changeRecordOf(sources) ?? sourcePath,
+			sourceKind: DIFF_SOURCE,
+		};
 	}
 	const witnesses = [...sources.sourceFiles.keys()].filter((file) => CHECKOUT_WITNESS.test(file));
 	const explicitRoot = witnesses.find((file) => {

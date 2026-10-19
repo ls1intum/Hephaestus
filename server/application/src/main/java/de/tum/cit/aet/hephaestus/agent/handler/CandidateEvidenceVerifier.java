@@ -158,7 +158,7 @@ class CandidateEvidenceVerifier {
             for (int offset = 0; offset < quote.length() - 1; offset++) if (quote.charAt(offset) == '\n') lastLine++;
             var annotated = new EvidenceCitation(
                     source,
-                    sourcePath,
+                    captured.witness(sourcePath, proof),
                     path,
                     citation.side(),
                     commit,

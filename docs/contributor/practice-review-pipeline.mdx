@@ -113,6 +113,14 @@ Before capture, the server compares each practice's pinned reads with the curren
 A practice that pins another source contract, or reads a source that the catalog does not have or does not apply to the item, records `source_contract_unsupported`.
 That practice is withheld, and its sources are not captured.
 The other practices are captured and run.
+
+An item review first compares each practice's pinned review events and About role with the reviewed item kind's descriptor.
+Authoring checks the same descriptor facts, but a stored version can predate them.
+A practice that declares an event or an About role that the item kind does not offer records `item_capability_unsupported`.
+It is withheld in the same way.
+The check does not require a declared event to have occurred, so a requested review still bypasses event selection.
+Scans review files and repositories, not the practice's item kind, so this check does not apply to them.
+
 If no practice can be captured, the review records a readiness refusal and the sandbox does not start.
 
 An optional read must name a supported source.
@@ -239,6 +247,8 @@ Each turn keeps its existing allowance.
 The passes of a phase do not share one budget.
 
 Each new attempt uses the original admission, its results and the retained original inputs.
+Its task envelope is its own and names the new attempt. The retained inputs never supply it.
+
 It reads routing, consent and erasure again.
 Like the first attempt, it composes the public review only if none is accepted.
 Then it composes private feedback only if no private piece is prepared.

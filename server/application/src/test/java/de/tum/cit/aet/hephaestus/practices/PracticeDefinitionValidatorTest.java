@@ -12,12 +12,15 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
 import de.tum.cit.aet.hephaestus.evidence.SourceContract;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventDefinition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewCapabilities;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestReviewItemDescriptor;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -93,6 +96,44 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 original.guidance());
         assertThatThrownBy(() -> validator.validate(new ItemKind("scm.pull_request"), unsupported))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldRefuseEventsAndRolesThatTheExactItemDescriptorDoesNotOffer() {
+        var registered = new PracticeDefinitionValidator(
+                sources,
+                new PracticeItemOptions(new ItemDescriptorRegistry(
+                        List.of(new PullRequestItemDescriptor(), new PullRequestReviewItemDescriptor()))));
+        lenient()
+                .when(catalog.sourcesFor("scm.pull_request_review"))
+                .thenReturn(Set.of(new SourceKind("scm.pull-request.core")));
+        var pullRequest = new ItemKind("scm.pull_request");
+        var review = new ItemKind("scm.pull_request_review");
+        var submitted = new ReviewOn(List.of(new ItemEventName("scm.pull_request_review.submitted")), Map.of());
+        var author = DefinitionTestFixtures.withReviewOn(DefinitionTestFixtures.definition(), submitted);
+
+        // The pull request descriptor does not merge its member kinds' events.
+        assertThatThrownBy(() -> registered.validate(pullRequest, author))
+                .hasMessage("Choose review events offered for this item kind.");
+        // An offered event that authoring cannot bind stays refused for a new definition.
+        assertThatThrownBy(() -> registered.validate(
+                        pullRequest,
+                        DefinitionTestFixtures.withReviewOn(
+                                DefinitionTestFixtures.definition(),
+                                new ReviewOn(
+                                        List.of(new ItemEventName("scm.pull_request.linked_issue_updated")),
+                                        Map.of()))))
+                .hasMessage("Choose review events offered for this item kind.");
+        assertThatThrownBy(() -> registered.validate(review, author))
+                .hasMessage("Choose an About role offered for this item kind.");
+        registered.validate(review, DefinitionTestFixtures.withAbout(author, AboutRole.REVIEWER));
+        assertThat(UnofferedItemCapabilities.of(new PullRequestItemDescriptor(), author))
+                .isEqualTo(new UnofferedItemCapabilities(
+                        List.of(new ItemEventName("scm.pull_request_review.submitted")), null));
+        assertThat(UnofferedItemCapabilities.of(
+                        new PullRequestItemDescriptor(),
+                        DefinitionTestFixtures.withAbout(DefinitionTestFixtures.definition(), null)))
+                .isNull();
     }
 
     @Test

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import java.time.Instant;
 import java.util.Base64;
@@ -91,6 +92,11 @@ public class ReviewCompositionContinuation {
         files.beginPersonCapture(job);
         try {
             staged.put(CONTINUATION_PATH, mapper.writeValueAsBytes(admission.capturedAdmissionResponse(job)));
+            // The retained inputs are the admitting attempt's; the task is this attempt's own.
+            staged.put(
+                    SandboxLayout.TASK_ENVELOPE_FILENAME,
+                    mapper.writeValueAsBytes(TaskEnvelope.practiceReview(
+                            job.getReviewId(), job.getId(), job.getAttempt(), job.getWorkspaceId())));
             return files.prepare(job, new PreparedEvidence(staged, Map.of(), List.of(), manifest, List.of()), null);
         } catch (RuntimeException failed) {
             files.abortPersonCapture(job);

@@ -26,6 +26,11 @@ describe("legacy withholding reasons", () => {
 			"Hephaestus cannot use this practice’s evidence settings for this work. Ask a workspace admin to check them.",
 		);
 	});
+	it("describes a practice whose Review on or About settings do not fit this kind of work", () => {
+		expect(withheldSentence("item_capability_unsupported")).toBe(
+			"Hephaestus cannot use this practice’s Review on or About settings for this kind of work. Ask a workspace admin to check them.",
+		);
+	});
 	it("keeps the generic fallback for an unknown reason", () => {
 		expect(knownReasonSentence("UNKNOWN_REASON")).toBeUndefined();
 		expect(withheldSentence("UNKNOWN_REASON")).toBe(

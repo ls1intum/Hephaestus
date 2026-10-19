@@ -87,6 +87,31 @@ final class CapturedEvidence {
         return matches.getFirst();
     }
 
+    /**
+     * The source file that a verified citation of {@code proof} names. {@link #requireFile} checks only the file's kind,
+     * and a file of that kind can hold another captured text. Such a file is replaced by the text's own record, or else by
+     * its staged copy, so the stored citation names the bytes its quote was verified in. A witness that holds no other
+     * text, such as the checkout HEAD, stays.
+     */
+    String witness(String sourcePath, CitableText proof) {
+        // ScmCitableTexts stages a string extracted from a record under context/citable-records/ and names it
+        // "<record>#/<pointer>"; any other path, a file name with "#" included, is its own record.
+        int fragment = proof.path().indexOf("#/");
+        String record = fragment >= 0 && proof.stagedPath().startsWith("context/citable-records/")
+                ? proof.path().substring(0, fragment)
+                : proof.path();
+        if (sourcePath.equals(record) || sourcePath.equals(proof.stagedPath())) return sourcePath;
+        boolean holdsAnotherText = manifest.citableTexts().stream()
+                .anyMatch(text -> text.source().equals(proof.source())
+                        && text.stagedPath().equals(sourcePath));
+        if (!holdsAnotherText) return sourcePath;
+        for (String own : new String[] {record, proof.stagedPath()}) {
+            var file = files.get(own);
+            if (file != null && file.kind().value().equals(proof.source())) return own;
+        }
+        return sourcePath;
+    }
+
     FileProof requireFile(SourceKind kind, String path) {
         var file = files.get(path);
         if (!available.contains(kind) || file == null || !file.kind().equals(kind)) {

@@ -27,13 +27,14 @@ public class PracticeDefinitionValidator {
         if (definition.reviewOn().events().size() > 100) {
             throw new IllegalArgumentException("Choose at most 100 review events.");
         }
-        for (var event : definition.reviewOn().events()) {
-            if (descriptor.events().stream()
-                    .noneMatch(option -> option.name().equals(event) && option.bindableForAuthoring())) {
-                throw new IllegalArgumentException("Choose review events offered for this item kind.");
-            }
+        var unoffered = UnofferedItemCapabilities.of(descriptor, definition);
+        if ((unoffered != null && !unoffered.events().isEmpty())
+                || descriptor.events().stream()
+                        .anyMatch(option -> !option.bindableForAuthoring()
+                                && definition.reviewOn().events().contains(option.name()))) {
+            throw new IllegalArgumentException("Choose review events offered for this item kind.");
         }
-        if (definition.about() != null && !descriptor.roles().contains(definition.about())) {
+        if (unoffered != null && unoffered.about() != null) {
             throw new IllegalArgumentException("Choose an About role offered for this item kind.");
         }
         definition.reviewOn().state().forEach((dimension, values) -> {
