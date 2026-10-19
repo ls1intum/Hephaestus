@@ -281,7 +281,10 @@ export const Disagreed: Story = {
 		await expect(
 			reviewResultDetail.feedback.map((entry) => `/?detail=feedback:${entry.id}`),
 		).toContain(
-			panel.getByRole("link", { name: "On the practice page, Delivered" }).getAttribute("href"),
+			// The result's practice-page feedback was delivered, then withdrawn: its receipt stays, flagged.
+			panel
+				.getByRole("link", { name: "On the practice page, Delivered, withdrawn" })
+				.getAttribute("href"),
 		);
 		panel.getByRole("button", { name: "Mark incorrect" });
 	},
@@ -520,10 +523,12 @@ export const HiddenProblemEvidence: Story = {
 const WITHHELD_ID = "f0000000-0000-4000-8000-000000000001";
 const CONVERSATION_ID = "f0000000-0000-4000-8000-000000000002";
 const WITHDRAWN_ID = "f0000000-0000-4000-8000-000000000003";
+const WITHDRAWN_READY_ID = "f0000000-0000-4000-8000-000000000004";
 
 /**
  * The feedback written from the result, each named by where it went and how far it got, and each
- * opening its own sheet in this one's place. A withdrawn piece says so.
+ * opening its own sheet in this one's place. A withdrawn piece says so: one withdrawn after delivery
+ * keeps its receipt and gains the flag, one withdrawn while ready is no longer offered as ready.
  */
 export const WithItsFeedback: Story = {
 	args: {
@@ -551,17 +556,25 @@ export const WithItsFeedback: Story = {
 					deliveredAt: daysBefore(1),
 					withdrawn: true,
 				},
+				{
+					id: WITHDRAWN_READY_ID,
+					destination: "CONVERSATION",
+					state: "READY",
+					deliveredAt: null,
+					withdrawn: true,
+				},
 			],
 		}),
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		const list = within(panel.getByRole("list", { name: "Feedback written from this result" }));
-		await expect(list.getAllByRole("listitem")).toHaveLength(3);
+		await expect(list.getAllByRole("listitem")).toHaveLength(4);
 		const conversation = deliveryOutcome({
 			destination: "CONVERSATION",
 			state: "DELIVERED",
 			stopReason: null,
+			withdrawn: false,
 		});
 		for (const [name, id] of [
 			[
@@ -570,13 +583,19 @@ export const WithItsFeedback: Story = {
 			],
 			[`${FEEDBACK_DESTINATION_DEFS.CONVERSATION.label}, ${conversation.label}`, CONVERSATION_ID],
 			[
-				`${FEEDBACK_DESTINATION_DEFS.PRACTICE_PAGE.label}, ${DELIVERY_STATE_DEFS.DELIVERED.label}`,
+				`${FEEDBACK_DESTINATION_DEFS.PRACTICE_PAGE.label}, ${DELIVERY_STATE_DEFS.DELIVERED.label}, withdrawn`,
 				WITHDRAWN_ID,
+			],
+			[
+				`${FEEDBACK_DESTINATION_DEFS.CONVERSATION.label}, Ready, then withdrawn`,
+				WITHDRAWN_READY_ID,
 			],
 		] as const) {
 			await expect(levelsOpenedBy(list.getByRole("link", { name }))).toEqual([`feedback:${id}`]);
 		}
+		// The withdrawn ready piece names its withdrawal in its outcome, so only the delivered one gets the flag.
 		await expect(list.getAllByText(FEEDBACK_DECISION_DEFS.WITHDRAW.label)).toHaveLength(1);
+		await expect(list.queryByText("Ready for conversation")).toBeNull();
 	},
 };
 

@@ -21,6 +21,7 @@ import { UNVERIFIED_HISTORY_NOTE } from "@/components/practice-vocabulary/claim-
 import {
 	DELIVERY_STATE_DEFS,
 	deliveryOutcome,
+	withdrawalMark,
 } from "@/components/practice-vocabulary/delivery-state-defs";
 import {
 	DEVELOPER_ANSWER_DEFS,
@@ -141,9 +142,10 @@ export function FeedbackLevel({
 	isCheckingDelivery,
 }: FeedbackLevelProps) {
 	const feedback = state.status === "ready" ? state.feedback : undefined;
+	const withdrawal = feedback && withdrawalMark(feedback);
 	let flag: ReactNode;
-	if (feedback?.withdrawn === true) {
-		flag = <StatusBadge def={FEEDBACK_DECISION_DEFS.WITHDRAW} />;
+	if (withdrawal !== undefined) {
+		flag = <StatusBadge def={withdrawal} />;
 	} else if (feedback !== undefined && feedback.disagreedAt !== null) {
 		flag = <StatusBadge def={DEVELOPER_ANSWER_DEFS.DISAGREED} />;
 	}

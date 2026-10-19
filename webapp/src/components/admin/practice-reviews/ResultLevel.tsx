@@ -18,8 +18,10 @@ import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLi
 import { Section } from "@/components/layout/Section";
 import { ProblemList } from "@/components/practice-problems/ProblemList";
 import { NON_CURRENT } from "@/components/practice-vocabulary/claim-currentness";
-import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-state-defs";
-import { FEEDBACK_DECISION_DEFS } from "@/components/practice-vocabulary/feedback-decision-defs";
+import {
+	deliveryOutcome,
+	withdrawalMark,
+} from "@/components/practice-vocabulary/delivery-state-defs";
 import { FEEDBACK_DESTINATION_DEFS } from "@/components/practice-vocabulary/feedback-destination-defs";
 import {
 	DISAGREEMENT_DEFS,
@@ -301,19 +303,25 @@ function ResultFeedback({ feedback }: { feedback: readonly ReviewBoundFeedback[]
 			{feedback.map((entry) => {
 				const destination = FEEDBACK_DESTINATION_DEFS[entry.destination].label;
 				// The bound record carries no stop reason, so a refined state reads as its base state.
-				const delivery = deliveryOutcome({ ...entry, stopReason: null });
+				const facts = { ...entry, stopReason: null };
+				const delivery = deliveryOutcome(facts);
+				const withdrawal = withdrawalMark(facts);
 				return (
 					<li key={entry.id} className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
 						<DetailStackLink
 							entry={feedbackLevel(entry.id)}
 							single
-							aria-label={`${destination}, ${delivery.label}`}
+							aria-label={
+								withdrawal === undefined
+									? `${destination}, ${delivery.label}`
+									: `${destination}, ${delivery.label}, ${withdrawal.label.toLowerCase()}`
+							}
 							className="font-medium underline-offset-4 hover:underline"
 						>
 							{destination}
 						</DetailStackLink>
 						<StatusBadge def={delivery} />
-						{entry.withdrawn && <StatusBadge def={FEEDBACK_DECISION_DEFS.WITHDRAW} />}
+						{withdrawal !== undefined && <StatusBadge def={withdrawal} />}
 					</li>
 				);
 			})}
