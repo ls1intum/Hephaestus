@@ -175,7 +175,9 @@ export function resultToolSchemas(availableSourceKindValues: readonly string[]) 
 				minLength: 1,
 				maxLength: CANDIDATE_LIMITS.problemExplanationChars,
 				description:
-					"What the cited evidence shows about this one problem and its consequence. Evidence, not advice, intent, confidence, or hidden chain-of-thought.",
+					"What the cited evidence establishes about this one criterion gap, including any consequence that decides its applicability, outcome or severity. " +
+					"Apply Grounding to the exact behavior and its language or API contract; leave an unresolved premise in evidence.openQuestions, and do not let it decide the problem. " +
+					"Evidence, not advice, intent, confidence, or hidden chain-of-thought.",
 			},
 			citations: {
 				type: "array",
@@ -234,7 +236,7 @@ export function resultToolSchemas(availableSourceKindValues: readonly string[]) 
 			nextStep: {
 				type: ["string", "null"],
 				description:
-					"Optional: the one change that would resolve this problem, when the criteria name it.",
+					"Optional, when the criteria name a change: the one change that resolves this supported criterion gap, relying on the same established mechanism as the explanation.",
 			},
 		},
 	} as const;

@@ -19,6 +19,7 @@ import {
 	GOLDEN_RECORD,
 	GOLDEN_DIRECTIONS,
 	GOLDEN_FACTS,
+	GOLDEN_INPUTS,
 	GOLDEN_UNRATED,
 	LEAD_LABELS,
 	PRACTICES_DIR,
@@ -31,6 +32,15 @@ import {
 import { mockChange, mockPiCodingAgent } from "./program-host-runner.ts";
 
 const GOLDEN = nodePath.join(import.meta.dirname, "golden-prompts");
+
+/** The whole assignment section of a practice turn, up to the next heading; empty when the turn has none. */
+function assignmentOf(prompt: string): string {
+	return (
+		/^## Assignment\n(?<text>[\s\S]*?)(?=^#{1,3} |(?![\s\S]))/mu
+			.exec(prompt)
+			?.groups?.text?.trim() ?? ""
+	);
+}
 const LIB = nodePath.resolve(
 	import.meta.dirname,
 	"../../../../../../docker/agents/practice-scripts/lib",
@@ -71,6 +81,27 @@ function runScenario(name: string): Map<string, string> {
 				"utf8",
 			),
 		);
+		const roles: Record<string, { kind: string; about: unknown }> = {
+			reviewer: {
+				kind: "scm.pull_request_review",
+				about: { role: "REVIEWER", developerId: "8675309" },
+			},
+			assignee: { kind: "scm.pull_request", about: { role: "ASSIGNEE", developerId: "8675309" } },
+			participant: { kind: "chat.thread", about: { role: "AUTHOR", developerId: "8675309" } },
+			unattributed: { kind: "scm.pull_request", about: null },
+		};
+		const role = roles[name];
+		if (role !== undefined) {
+			writeFileSync(
+				nodePath.join(cwd, PRACTICES_DIR, "test-practice.inputs.json"),
+				JSON.stringify({
+					...GOLDEN_INPUTS,
+					kind: role.kind,
+					about: role.about,
+					scope: { ...GOLDEN_INPUTS.scope, item: { ...GOLDEN_INPUTS.scope.item, kind: role.kind } },
+				}),
+			);
+		}
 		if (name === "scan") {
 			const inputs = scan("src/healthy.ts");
 			inputs.practice.slug = "test-practice";
@@ -528,6 +559,9 @@ if (scenario !== undefined && scenario !== "") {
 			captured.get("prompt-1.md") ?? "",
 			/Assigned scan file[\s\S]*Commit: a{40}[\s\S]*Source path: context\/item\.json[\s\S]*const healthy = true;/u,
 		);
+		const lens = assignmentOf(captured.get("prompt-1.md") ?? "");
+		assert.match(lens, /no person/u);
+		assert.doesNotMatch(lens, /AUTHOR|REVIEWER|ASSIGNEE|MERGER/u);
 	});
 
 	for (const name of SCENARIOS) {
@@ -552,6 +586,34 @@ if (scenario !== undefined && scenario !== "") {
 			);
 		});
 	}
+	void test("each practice turn states whose work its pinned assignment is about, also after compaction", () => {
+		const author = assignmentOf(captures.get("first-turn")?.get("prompt-1.md") ?? "");
+		assert.match(author, /\bAUTHOR\b/u);
+		assert.match(author, /scm\.pull_request/u);
+		assert.equal(assignmentOf(captures.get("compaction")?.get("prompt-2.md") ?? ""), author);
+		const reviewer = runScenario("reviewer").get("prompt-1.md") ?? "";
+		assert.match(assignmentOf(reviewer), /the REVIEWER of this scm\.pull_request_review item/u);
+		// An SCM capture names provider accounts; the internal developer id is never offered to match them.
+		assert.doesNotMatch(reviewer, /8675309/u);
+		const assignee = runScenario("assignee").get("prompt-1.md") ?? "";
+		assert.match(assignmentOf(assignee), /one ASSIGNEE of this scm\.pull_request item/u);
+		assert.match(assignmentOf(assignee), /does not say which captured account/u);
+		assert.doesNotMatch(assignee, /8675309/u);
+		const unattributed = assignmentOf(runScenario("unattributed").get("prompt-1.md") ?? "");
+		assert.match(unattributed, /no person/u);
+		assert.doesNotMatch(unattributed, /AUTHOR|REVIEWER|ASSIGNEE|MERGER/u);
+	});
+
+	void test("a conversation turn names its participant by the internal account id its own capture records", () => {
+		const participant = assignmentOf(runScenario("participant").get("prompt-1.md") ?? "");
+		// The same internal id as each captured turn's accountId: an internal match, not a provider identity.
+		assert.match(
+			participant,
+			/one participant of this chat\.thread item[\s\S]*`context\/conversation_thread\.json` whose `accountId` is 8675309/u,
+		);
+		assert.match(participant, /the other turns are context/u);
+		assert.doesNotMatch(participant, /the AUTHOR of this chat\.thread/u);
+	});
 	void test("truncated leads disclose the omitted context and locate the full input", () => {
 		const prompt = captures.get("leads-truncated")?.get("prompt-1.md") ?? "";
 		const omitted =

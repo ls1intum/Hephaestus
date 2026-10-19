@@ -1605,18 +1605,25 @@ export function recordCompositionFailure(
 	}
 }
 
-const OWED_PRIVATE_REASONS: ReadonlySet<CompositionFailureReason> = new Set(["SAFETY", "STALL"]);
+const OWED_REASONS: ReadonlySet<CompositionFailureReason> = new Set(["SAFETY", "STALL"]);
 
-// The run, not the work, stopped private composition after the review on the work was settled.
-export function privateCompositionOwed(composedFeedback: ComposedFeedback): boolean {
+/**
+ * Whether the runner requests recovery for composition that the run, not the work, stopped. Only the admitting
+ * attempt requests another public pass. A private stop requests recovery after a review was composed or accepted
+ * earlier; the server decides from its recorded preparation whether another attempt is owed.
+ */
+export function compositionOwed(
+	composedFeedback: ComposedFeedback,
+	attempt: { admitting: boolean; reviewOnWork: boolean },
+): boolean {
 	const reasonOf = (phase: CompositionPhase) =>
 		composedFeedback.compositionFailures.find((failure) => failure.phase === phase)?.reason;
-	const reason = reasonOf("PRIVATE_FEEDBACK");
-	return (
-		reason !== undefined &&
-		OWED_PRIVATE_REASONS.has(reason) &&
-		reasonOf("PUBLIC_REVIEW") === undefined
-	);
+	const publicReason = reasonOf("PUBLIC_REVIEW");
+	if (publicReason !== undefined) {
+		return attempt.admitting && OWED_REASONS.has(publicReason);
+	}
+	const privateReason = reasonOf("PRIVATE_FEEDBACK");
+	return attempt.reviewOnWork && privateReason !== undefined && OWED_REASONS.has(privateReason);
 }
 
 export function finishCompositionText(

@@ -1737,6 +1737,101 @@ void test("inline discussion preserves captured mirror links without turning aut
 	assert.equal(history.statements[1]?.witnessId, `comment:${file}:22`);
 	assert.match(JSON.stringify(history.sources), /captured mirror data/u);
 	assert.match(JSON.stringify(history.sources), /not proof of direct native parentage/u);
+	// With no stated omission, neither a key nor its qualification spends the history's bound.
+	assert.doesNotMatch(JSON.stringify(history), /inReplyToOmittedReason|capture rule/u);
+});
+
+void test("a reply keeps the captured reason its parent was left out, and nothing else becomes one", (t) => {
+	const file = "context/comments.json";
+	const root = workspace({
+		"context/metadata.json": discussionMetadata(),
+		[file]: JSON.stringify([
+			{
+				id: 102,
+				thread: 201,
+				in_reply_to: 101,
+				in_reply_to_omitted_reason: "DELIVERED_FEEDBACK",
+				native_id: 22,
+				author_id: 11,
+				body: "Confirmed with the boundary probe.",
+				created_at: BEFORE_CAPTURE,
+			},
+			{
+				id: 103,
+				in_reply_to: 99,
+				in_reply_to_omitted_reason: "FEEDBACK_MARKER",
+				native_id: 23,
+				author_id: 12,
+				body: "The cast still hides the parse failure.",
+				created_at: BEFORE_CAPTURE,
+			},
+			{
+				id: 104,
+				in_reply_to: 98,
+				in_reply_to_omitted_reason: "WRITTEN_BY_A_BOT",
+				native_id: 24,
+				author_id: 12,
+				body: "An unknown reason.",
+				created_at: BEFORE_CAPTURE,
+			},
+			{
+				id: 105,
+				in_reply_to_omitted_reason: "DELIVERED_FEEDBACK",
+				native_id: 25,
+				author_id: 12,
+				body: "No parent at all.",
+				created_at: BEFORE_CAPTURE,
+			},
+		]),
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const history = buildPublicReviewHistory(
+		root,
+		"context",
+		discussionIndex("scm.pull-request.comments", file),
+		FRAMING,
+	);
+	assert.deepEqual(
+		history.statements.map((statement) => ({
+			inReplyToId: statement.inReplyToId,
+			inReplyToOmittedReason:
+				"inReplyToOmittedReason" in statement ? statement.inReplyToOmittedReason : "absent",
+			origin: statement.origin,
+			eligibleForPriorAdvice: statement.eligibleForPriorAdvice,
+		})),
+		[
+			{
+				inReplyToId: "101",
+				inReplyToOmittedReason: "DELIVERED_FEEDBACK",
+				origin: "UNKNOWN",
+				eligibleForPriorAdvice: false,
+			},
+			{
+				inReplyToId: "99",
+				inReplyToOmittedReason: "FEEDBACK_MARKER",
+				origin: "UNKNOWN",
+				eligibleForPriorAdvice: true,
+			},
+			{
+				inReplyToId: "98",
+				inReplyToOmittedReason: "absent",
+				origin: "UNKNOWN",
+				eligibleForPriorAdvice: true,
+			},
+			{
+				inReplyToId: null,
+				inReplyToOmittedReason: "absent",
+				origin: "UNKNOWN",
+				eligibleForPriorAdvice: true,
+			},
+		],
+	);
+	const qualifications = history.sources.flatMap((source) => source.qualifications).join("\n");
+	assert.match(
+		qualifications,
+		/FEEDBACK_MARKER the Hephaestus marker in its words, which a person can quote, so it names no author/u,
+	);
+	assert.match(qualifications, /the reply keeps its own author and words/u);
 });
 
 void test("unmatched and unreadable inline links remain unknown, including a parent edited after capture", (t) => {

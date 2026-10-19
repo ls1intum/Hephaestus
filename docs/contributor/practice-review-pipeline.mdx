@@ -219,10 +219,24 @@ The host prepares the final public package before a private session starts.
 A private setup failure or deadline does not erase that prepared review.
 The destinations remain independently eligible.
 
-The run can stop private composition at its safety ceiling or after a stall.
-Then the runner asks for a new attempt of the same job.
-The server grants it only if the public review is accepted and no private piece of the job is prepared.
-A new attempt after a lost or stopped worker continues an admitted review in the same way.
+The run can stop composition at its safety ceiling or after a stall.
+Then the runner can ask for a new attempt of the same job in two cases:
+
+- Private feedback stopped after the public review was accepted, and no private piece of the job is prepared.
+- The public review itself stopped, and the stopped attempt is the one that admitted the results.
+
+In the second case the public review gets one more returned attempt.
+That attempt does not ask again when its own time runs out.
+The server checks the job before it grants the attempt.
+For the public attempt, it also checks the returned composition report against the original admission.
+A response the runner lost does not undo the public review the server accepted.
+
+Recovery after a lost or stopped worker is separate.
+It continues an admitted review in a new attempt in the same way, within the existing shared retry limit.
+
+Each composer request asks for no more output than its turn has left.
+Each turn keeps its existing allowance.
+The passes of a phase do not share one budget.
 
 Each new attempt uses the original admission, its results and the retained original inputs.
 It reads routing, consent and erasure again.

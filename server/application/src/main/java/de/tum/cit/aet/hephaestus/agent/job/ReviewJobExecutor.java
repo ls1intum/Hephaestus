@@ -741,10 +741,11 @@ public class ReviewJobExecutor {
                     job.getAttempt() + 1);
             return null;
         }
-        // An admitted run that stopped composing private feedback continues it as a new attempt when its fences hold.
+        // An admitted run that stopped composing its feedback continues it as a new attempt when the locked job owes it
+        // and its fences hold.
         if (result.exitCode() == SandboxLayout.EXIT_COMPOSITION_OWED && continueComposition(job, agentResult, result)) {
             log.warn(
-                    "Requeuing job {}: private feedback composition stopped before it finished (attempt {})",
+                    "Requeuing job {}: feedback composition stopped before it finished (attempt {})",
                     jobId,
                     job.getAttempt() + 1);
             return null;
@@ -1121,7 +1122,8 @@ public class ReviewJobExecutor {
                 job,
                 workerId,
                 agentResult.usage(),
-                result.outputFiles().get(SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE))));
+                result.outputFiles().get(SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE),
+                result.outputFiles().get(SandboxLayout.FEEDBACK_FILENAME))));
     }
 
     private void recordPracticeReviewRefusal(String reason) {

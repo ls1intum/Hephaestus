@@ -564,6 +564,13 @@ function linkedBlock(
 /** Who wrote words, as the provider classified the account; a person is never inferred from the absence of a mark. */
 export type StatementOrigin = "AUTOMATED" | "UNKNOWN";
 
+/** The capture rule that left a reply's linked record out: the ledger of delivered feedback, or the feedback marker in its words. */
+type OmittedParentReason = "DELIVERED_FEEDBACK" | "FEEDBACK_MARKER";
+
+/** What a composer must know before it reads an omission reason; stated once, and only when a statement carries one. */
+const OMITTED_PARENT_QUALIFICATION =
+	"inReplyToOmittedReason names the capture rule that left the linked in_reply_to record out: DELIVERED_FEEDBACK a recorded Hephaestus delivery, FEEDBACK_MARKER the Hephaestus marker in its words, which a person can quote, so it names no author; the reply keeps its own author and words";
+
 /** One thing written on the work before its capture, as captured: attributed data, not an assessment of the work now. */
 export interface CapturedPublicStatement {
 	/** Captured mirror links and positions, not native parentage, resolution or current-code anchors. */
@@ -571,6 +578,8 @@ export interface CapturedPublicStatement {
 	threadId?: string | null;
 	/** A missing or unmatched parent does not establish a root comment. */
 	inReplyToId?: string | null;
+	/** The capture rule that left the linked in_reply_to record out, for the two rules that state one; absent otherwise. */
+	inReplyToOmittedReason?: OmittedParentReason;
 	path?: string | null;
 	line?: number | null;
 	side?: "LEFT" | "RIGHT" | null;
@@ -709,6 +718,17 @@ function instantOf(value: unknown): string | null {
 	return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
 }
 
+/** A reason names the omission of one linked record; without a link, or with an unknown value, there is none. */
+function omittedParentOf(entry: Record<string, unknown>): {
+	inReplyToOmittedReason?: OmittedParentReason;
+} {
+	const reason = entry.in_reply_to_omitted_reason;
+	return idOf(entry.in_reply_to) !== null &&
+		(reason === "DELIVERED_FEEDBACK" || reason === "FEEDBACK_MARKER")
+		? { inReplyToOmittedReason: reason }
+		: {};
+}
+
 function readDiscussion(
 	root: string,
 	index: Record<string, unknown>,
@@ -771,6 +791,7 @@ function readDiscussion(
 						capturedId: idOf(entry.id),
 						threadId: idOf(entry.thread),
 						inReplyToId: idOf(entry.in_reply_to),
+						...omittedParentOf(entry),
 						path: textOf(entry.path),
 						line: lineOf(entry.line),
 						side: entry.side === "LEFT" || entry.side === "RIGHT" ? entry.side : null,
@@ -802,8 +823,11 @@ function readDiscussion(
 	}
 	const qualifications: string[] = [];
 	if (file.kind === "scm.pull-request.comments") {
+		const omissions = statements.some(
+			(statement) => statement.inReplyToOmittedReason !== undefined,
+		);
 		qualifications.push(
-			"comment, thread and reply handles are captured mirror data; parents and positions may be normalized or inherited, not proof of direct native parentage, resolution or current-code anchors; missing or unmatched parents are unknown",
+			`comment, thread and reply handles are captured mirror data; parents and positions may be normalized or inherited, not proof of direct native parentage, resolution or current-code anchors; missing or unmatched parents are unknown${omissions ? `; ${OMITTED_PARENT_QUALIFICATION}` : ""}`,
 		);
 	}
 	if (cutoff === null) {

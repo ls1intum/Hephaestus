@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange.ChangeType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -583,6 +584,120 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                 assertThat(captured.get(0).has("commit_id")).isFalse();
             } else {
                 assertThat(captured.get(0).path("commit_id").asString()).isEqualTo(expected);
+            }
+        }
+    }
+
+    @Nested
+    class ReplyParents {
+
+        private static PullRequestReviewComment comment(long id, long nativeId, String body, String login) {
+            PullRequestReviewComment comment = new PullRequestReviewComment();
+            ReflectionTestUtils.setField(comment, "id", id);
+            comment.setNativeId(nativeId);
+            comment.setPath("src/RetryPolicy.java");
+            comment.setLine(25);
+            comment.setBody(body);
+            comment.setAuthor(user(login));
+            comment.setCreatedAt(Instant.parse("2026-10-18T05:00:00Z").plusSeconds(id));
+            return comment;
+        }
+
+        private static PullRequestReviewComment reply(long id, long nativeId, PullRequestReviewComment parent) {
+            PullRequestReviewComment reply = comment(id, nativeId, "Confirmed with the boundary probe.", "author");
+            reply.setInReplyTo(parent);
+            return reply;
+        }
+
+        private JsonNode capturedComments() throws Exception {
+            return objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
+                    .files()
+                    .get("context/comments.json"));
+        }
+
+        @Test
+        void shouldNameDeliveredFeedbackAsTheReasonAReplysParentIsLeftOut() throws Exception {
+            PullRequestReviewComment delivered = comment(1L, 81L, "Throw instead of returning zero.", "hephaestus-app");
+            PullRequestReviewComment answer = reply(2L, 82L, delivered);
+            deliveredComments = new DeliveredPullRequestCommentLookup.CommentIds(Set.of(), Set.of(81L));
+            mirroredComments = List.of(answer, delivered);
+
+            JsonNode comments = capturedComments();
+
+            assertThat(comments).hasSize(1);
+            JsonNode kept = comments.get(0);
+            assertThat(kept.path("native_id").asLong()).isEqualTo(82L);
+            assertThat(kept.path("in_reply_to").asLong()).isEqualTo(1L);
+            assertThat(kept.path("in_reply_to_omitted_reason").asString()).isEqualTo("DELIVERED_FEEDBACK");
+            assertThat(kept.path("author").asString()).isEqualTo("author");
+            assertThat(kept.path("body").asString()).isEqualTo("Confirmed with the boundary probe.");
+            assertThat(comments.toString()).doesNotContain("Throw instead of returning zero.");
+        }
+
+        @Test
+        void shouldNameTheFeedbackMarkerAsTheReasonWhenTheQueryLeftTheParentOut() throws Exception {
+            PullRequestReviewComment marked =
+                    comment(1L, 81L, "Throw instead.\n" + WorkspaceScmProjection.HEPHAESTUS_MARKER + " -->", "someone");
+            PullRequestReviewComment answer = reply(2L, 82L, marked);
+            // The repository query leaves marked bodies out; only the reply comes back.
+            mirroredComments = List.of(answer);
+
+            JsonNode kept = capturedComments().get(0);
+
+            assertThat(kept.path("in_reply_to").asLong()).isEqualTo(1L);
+            assertThat(kept.path("in_reply_to_omitted_reason").asString()).isEqualTo("FEEDBACK_MARKER");
+            assertThat(kept.path("author").asString()).isEqualTo("author");
+        }
+
+        @Test
+        void shouldPreferTheDeliveredLedgerWhenTheParentIsBothDeliveredAndMarked() throws Exception {
+            PullRequestReviewComment both =
+                    comment(1L, 81L, "Note " + WorkspaceScmProjection.HEPHAESTUS_MARKER + " -->", "hephaestus-app");
+            PullRequestReviewComment answer = reply(2L, 82L, both);
+            User bot = user("ci-helper");
+            bot.setType(User.Type.BOT);
+            answer.setAuthor(bot);
+            deliveredComments = new DeliveredPullRequestCommentLookup.CommentIds(Set.of(), Set.of(81L));
+            mirroredComments = List.of(answer);
+
+            JsonNode kept = capturedComments().get(0);
+
+            assertThat(kept.path("in_reply_to_omitted_reason").asString()).isEqualTo("DELIVERED_FEEDBACK");
+            assertThat(kept.path("bot").asBoolean()).isTrue();
+        }
+
+        @Test
+        void shouldStateOnlyTheMarkerPolicyWhenAPersonQuotedTheMarkerInTheParent() throws Exception {
+            // The marker in a body says which policy left it out; it does not prove Hephaestus wrote it.
+            PullRequestReviewComment quoting = comment(
+                    1L,
+                    91L,
+                    "Our bot writes `" + WorkspaceScmProjection.HEPHAESTUS_MARKER + "` here; please drop the cast.",
+                    "reviewer");
+            PullRequestReviewComment answer = reply(2L, 92L, quoting);
+            mirroredComments = List.of(answer);
+
+            JsonNode kept = capturedComments().get(0);
+
+            assertThat(kept.path("in_reply_to_omitted_reason").asString()).isEqualTo("FEEDBACK_MARKER");
+            assertThat(kept.path("body").asString()).isEqualTo("Confirmed with the boundary probe.");
+        }
+
+        @Test
+        void shouldNameNoReasonWhenTheParentIsAKeptReviewOrThereIsNoParent() throws Exception {
+            PullRequestReviewComment review = comment(1L, 71L, "This catch hides the parse failure.", "reviewer");
+            PullRequestReviewComment answer = reply(2L, 72L, review);
+            PullRequestReviewComment standalone = comment(3L, 73L, "Why zero here?", "reviewer");
+            deliveredComments = new DeliveredPullRequestCommentLookup.CommentIds(Set.of(), Set.of(81L));
+            mirroredComments = List.of(standalone, answer, review);
+
+            JsonNode comments = capturedComments();
+
+            assertThat(comments).hasSize(3);
+            assertThat(comments.get(0).path("body").asString()).isEqualTo("This catch hides the parse failure.");
+            assertThat(comments.get(1).path("in_reply_to").asLong()).isEqualTo(1L);
+            for (JsonNode kept : comments) {
+                assertThat(kept.has("in_reply_to_omitted_reason")).isFalse();
             }
         }
     }

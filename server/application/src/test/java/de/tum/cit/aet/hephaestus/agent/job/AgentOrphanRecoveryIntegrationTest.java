@@ -84,6 +84,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -181,6 +182,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ReviewMethodVerifier methods;
 
+    private AgentProperties properties;
     private ReviewJobRecovery recovery;
     private Workspace workspace;
     private LlmModel instanceModel;
@@ -190,7 +192,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        AgentProperties properties = mock(AgentProperties.class);
+        properties = mock(AgentProperties.class);
         when(properties.maxRetries()).thenReturn(5);
         recovery = new ReviewJobRecovery(
                 jobRepository,
@@ -564,7 +566,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             strings = {
                 "practice page piece prepared",
                 "conversation piece prepared",
-                "public review not accepted",
                 "retry limit reached",
                 "expired inputs",
                 "erased receipt",
@@ -575,7 +576,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         int attempt = why.equals("retry limit reached") ? 5 : 0;
         UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), attempt);
         admitWithResult(jobId);
-        if (!why.equals("public review not accepted")) acceptPublicReview(jobId);
+        acceptPublicReview(jobId);
         Instant fresh = Instant.now().plus(Duration.ofHours(1));
         if (why.equals("expired inputs")) {
             keepOriginalInputs(
@@ -600,6 +601,235 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(kept.getWorkerId()).isEqualTo("live-owner");
         assertThat(kept.getAttempt()).isEqualTo(attempt);
         assertThat(usageCalls(jobId)).isEmpty();
+    }
+
+    @ParameterizedTest(name = "{0}, private piece prepared: {1}")
+    @CsvSource({"SAFETY,false", "STALL,false", "SAFETY,true", "STALL,true"})
+    @DisplayName(
+            "the admitting attempt hands a stopped, unaccepted review on the work to one more attempt, and only once")
+    void shouldContinueAnUnacceptedReviewOnTheWorkOnceFromTheAdmittingAttempt(String stop, boolean privatePiece) {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        Result observed = admitWithResult(jobId);
+        if (privatePiece) jdbc.update("UPDATE review_job SET conversation_prepared_at = now() WHERE id = ?", jobId);
+        Instant expiresAt = Instant.now().plus(Duration.ofHours(1)).truncatedTo(ChronoUnit.MICROS);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", expiresAt);
+        spentBeforeItWasLost(jobId, 3);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+        Instant preparedAt = owing.getConversationPreparedAt();
+
+        assertThat(continueComposition(owing, "live-owner", publicStop(stop))).isTrue();
+
+        ReviewJob continuing = jobRepository.findById(jobId).orElseThrow();
+        assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
+        assertThat(continuing.getAttempt()).isEqualTo(1);
+        assertThat(continuing.getOutput()).isNull();
+        // The same admission and results; still no accepted review on the work.
+        assertThat(ResultAdmissionService.citationAttempt(continuing)).isZero();
+        assertThat(continuing.getAdmissionDigest()).isEqualTo("admitted-digest");
+        assertThat(continuing.getPublicReviewDigest()).isNull();
+        // A prepared private piece stays exactly as it was: the next attempt composes no private feedback.
+        assertThat(continuing.getConversationPreparedAt()).isEqualTo(preparedAt);
+        assertThat(ResultAdmissionService.privatePrepared(continuing)).isEqualTo(privatePiece);
+        assertThat(practiceResultRepository.findById(observed.getId())).isPresent();
+        assertThat(compositionBasisRepository
+                        .findByWorkspaceIdAndJobId(workspace.getId(), jobId)
+                        .orElseThrow()
+                        .getExpiresAt())
+                .isEqualTo(expiresAt);
+        assertThat(usageCalls(jobId)).containsExactly(3);
+
+        // The attempt that continues it cannot hand the review on the work on again.
+        jdbc.update(
+                "UPDATE review_job SET status = 'RUNNING', worker_id = 'next-worker', started_at = now(),"
+                        + " execution_started_at = now() WHERE id = ?",
+                jobId);
+        ReviewJob claimed = jobRepository.findById(jobId).orElseThrow();
+        assertThat(continueComposition(claimed, "next-worker", publicStop(stop)))
+                .isFalse();
+        ReviewJob ended = jobRepository.findById(jobId).orElseThrow();
+        assertThat(ended.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(ended.getAttempt()).isEqualTo(1);
+        assertThat(usageCalls(jobId)).containsExactly(3);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"SAFETY", "STALL"})
+    @DisplayName("an admission on a later attempt is still the admitting attempt, and hands the review on once")
+    void shouldContinueAnUnacceptedReviewOnTheWorkFromAnAdmissionOnALaterAttempt(String stop) {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 2);
+        admitWithResult(jobId);
+        keepOriginalInputs(jobId, 2, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        spentBeforeItWasLost(jobId, 1);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+
+        assertThat(continueComposition(owing, "live-owner", publicStop(stop))).isTrue();
+
+        ReviewJob continuing = jobRepository.findById(jobId).orElseThrow();
+        assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
+        assertThat(continuing.getAttempt()).isEqualTo(3);
+        assertThat(ResultAdmissionService.citationAttempt(continuing)).isEqualTo(2);
+        assertThat(jdbc.queryForList(
+                        "SELECT total_calls FROM llm_usage_event WHERE source_id::text = ? AND source_attempt = 2",
+                        Integer.class,
+                        jobId.toString()))
+                .containsExactly(1);
+
+        jdbc.update(
+                "UPDATE review_job SET status = 'RUNNING', worker_id = 'next-worker', started_at = now(),"
+                        + " execution_started_at = now() WHERE id = ?",
+                jobId);
+        assertThat(continueComposition(jobRepository.findById(jobId).orElseThrow(), "next-worker", publicStop(stop)))
+                .isFalse();
+        assertThat(jobRepository.findById(jobId).orElseThrow().getAttempt()).isEqualTo(3);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "continuing attempt",
+                "no retries",
+                "retry limit reached",
+                "expired inputs",
+                "erased receipt",
+                "receipt not indexing its copies",
+                "another worker"
+            })
+    @DisplayName("an unaccepted review on the work stays with its attempt when a fence does not hold")
+    void shouldNotContinueAnUnacceptedReviewOnTheWorkWhenAFenceDoesNotHold(String why) {
+        int attempt =
+                switch (why) {
+                    case "continuing attempt" -> 1;
+                    case "retry limit reached" -> 5;
+                    default -> 0;
+                };
+        int admittedAt = why.equals("continuing attempt") ? 0 : attempt;
+        if (why.equals("no retries")) when(properties.maxRetries()).thenReturn(0);
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), attempt);
+        admitWithResult(jobId);
+        if (admittedAt != attempt)
+            jdbc.update("UPDATE review_job SET admission_attempt = ? WHERE id = ?", admittedAt, jobId);
+        Instant fresh = Instant.now().plus(Duration.ofHours(1));
+        switch (why) {
+            case "expired inputs" ->
+                keepOriginalInputs(
+                        jobId, admittedAt, "READY", "COMPLETE", Instant.now().minusSeconds(1));
+            case "erased receipt" -> keepOriginalInputs(jobId, admittedAt, "ERASE_REQUESTED", "COMPLETE", fresh);
+            case "receipt not indexing its copies" -> keepOriginalInputs(jobId, admittedAt, "READY", "UNKNOWN", fresh);
+            default -> keepOriginalInputs(jobId, admittedAt, "READY", "COMPLETE", fresh);
+        }
+        spentBeforeItWasLost(jobId, 2);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+
+        // The report says the run stopped the review on the work; the fence alone decides.
+        assertThat(continueComposition(
+                        owing, why.equals("another worker") ? "stranger" : "live-owner", publicStop("SAFETY")))
+                .isFalse();
+
+        ReviewJob kept = jobRepository.findById(jobId).orElseThrow();
+        assertThat(kept.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(kept.getWorkerId()).isEqualTo("live-owner");
+        assertThat(kept.getAttempt()).isEqualTo(attempt);
+        assertThat(usageCalls(jobId)).isEmpty();
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM review_job_script_run WHERE job_id = ?", Integer.class, jobId))
+                .isZero();
+    }
+
+    @ParameterizedTest(name = "public review accepted: {0}")
+    @ValueSource(booleans = {true, false})
+    @DisplayName(
+            "a private stop that never heard whether its public review was accepted continues only on the row's review")
+    void shouldDecideAPrivateStopWithAnUnknownPublicReviewOnTheReviewTheRowAccepted(boolean accepted) {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        admitWithResult(jobId);
+        pinScriptAssignments(jobId);
+        if (accepted) acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        spentBeforeItWasLost(jobId, 2);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+        // Both answers to the public preparation were lost: the report names only the private stop.
+        byte[] privateStop = feedbackReport("admitted-digest", failure("PRIVATE_FEEDBACK", "SAFETY"));
+
+        assertThat(continueComposition(owing, "live-owner", null, scriptReport(practice.getSlug()), privateStop))
+                .isEqualTo(accepted);
+
+        ReviewJob after = jobRepository.findById(jobId).orElseThrow();
+        Integer scriptRuns = jdbc.queryForObject(
+                "SELECT count(*) FROM review_job_script_run WHERE job_id = ?", Integer.class, jobId);
+        if (accepted) {
+            // The review the row accepted owes private feedback, as it did before.
+            assertThat(after.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
+            assertThat(after.getAttempt()).isEqualTo(1);
+            assertThat(after.getPublicReviewDigest()).isEqualTo("b".repeat(64));
+            assertThat(usageCalls(jobId)).containsExactly(2);
+            assertThat(scriptRuns).isEqualTo(1);
+        } else {
+            // Nothing the report says opens the review on the work again: the attempt ends as itself.
+            assertThat(after.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+            assertThat(after.getWorkerId()).isEqualTo("live-owner");
+            assertThat(after.getAttempt()).isZero();
+            assertThat(after.getOutput()).isNull();
+            assertThat(after.getPublicReviewDigest()).isNull();
+            assertThat(usageCalls(jobId)).isEmpty();
+            assertThat(scriptRuns).isZero();
+        }
+    }
+
+    @ParameterizedTest(name = "{0}, public review accepted: {1}")
+    @CsvSource({
+        "no report,false",
+        "no report,true",
+        "malformed report,false",
+        "malformed report,true",
+        "trailing tokens,false",
+        "trailing tokens,true",
+        "not an object,false",
+        "not an object,true",
+        "another admission,false",
+        "another admission,true",
+        "no failures,false",
+        "no failures,true",
+        "public budget,false",
+        "public budget,true",
+        "unknown public reason,false",
+        "unknown public reason,true",
+        "conflicting public reasons,false",
+        "conflicting public reasons,true"
+    })
+    @DisplayName("a report that does not say the run stopped the review on the work only refuses the unaccepted one")
+    void shouldContinueOnlyTheAcceptedReviewWhenTheReportDoesNotSayTheRunStoppedTheReviewOnTheWork(
+            String why, boolean accepted) {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        admitWithResult(jobId);
+        if (accepted) acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        spentBeforeItWasLost(jobId, 2);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+        String stopped = failure("PUBLIC_REVIEW", "SAFETY");
+        byte @Nullable [] report =
+                switch (why) {
+                    case "no report" -> null;
+                    case "malformed report" -> "{\"admissionDigest\":".getBytes(StandardCharsets.UTF_8);
+                    case "trailing tokens" ->
+                        (new String(publicStop("SAFETY"), StandardCharsets.UTF_8) + " {}")
+                                .getBytes(StandardCharsets.UTF_8);
+                    case "not an object" -> ("[" + stopped + "]").getBytes(StandardCharsets.UTF_8);
+                    case "another admission" -> feedbackReport("another-admission-digest", stopped);
+                    case "no failures" -> "{\"admissionDigest\":\"admitted-digest\"}".getBytes(StandardCharsets.UTF_8);
+                    case "public budget" -> publicStop("BUDGET");
+                    case "unknown public reason" -> publicStop("TIME");
+                    case "conflicting public reasons" ->
+                        feedbackReport("admitted-digest", stopped, failure("PUBLIC_REVIEW", "BUDGET"));
+                    default -> throw new IllegalArgumentException("Unknown report case: " + why);
+                };
+
+        assertThat(continueComposition(owing, "live-owner", null, null, report)).isEqualTo(accepted);
+
+        ReviewJob after = jobRepository.findById(jobId).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(accepted ? ReviewJobStatus.QUEUED : ReviewJobStatus.RUNNING);
+        assertThat(after.getAttempt()).isEqualTo(accepted ? 1 : 0);
+        if (accepted) assertThat(usageCalls(jobId)).containsExactly(2);
+        else assertThat(usageCalls(jobId)).isEmpty();
     }
 
     @Test
@@ -868,8 +1098,37 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             String workerId,
             AgentResult.@Nullable LlmUsage runnerUsage,
             byte @Nullable [] scriptReport) {
+        return continueComposition(job, workerId, runnerUsage, scriptReport, null);
+    }
+
+    private boolean continueComposition(ReviewJob job, String workerId, byte[] feedbackReport) {
+        return continueComposition(job, workerId, null, null, feedbackReport);
+    }
+
+    private boolean continueComposition(
+            ReviewJob job,
+            String workerId,
+            AgentResult.@Nullable LlmUsage runnerUsage,
+            byte @Nullable [] scriptReport,
+            byte @Nullable [] feedbackReport) {
         return Boolean.TRUE.equals(transactionTemplate.execute(
-                status -> recovery.continueComposition(job, workerId, runnerUsage, scriptReport)));
+                status -> recovery.continueComposition(job, workerId, runnerUsage, scriptReport, feedbackReport)));
+    }
+
+    // The runner's feedback report, as it writes it before asking for the attempt to continue.
+    private static byte[] feedbackReport(String admissionDigest, String... failures) {
+        return ("{\"compositionFailures\":[" + String.join(",", failures) + "],\"contractVersion\":3,"
+                        + "\"admissionDigest\":\"" + admissionDigest
+                        + "\",\"results\":[],\"feedback\":[],\"review\":null}")
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static String failure(String phase, String reason) {
+        return "{\"phase\":\"" + phase + "\",\"reason\":\"" + reason + "\"}";
+    }
+
+    private static byte[] publicStop(String reason) {
+        return feedbackReport("admitted-digest", failure("PUBLIC_REVIEW", reason));
     }
 
     // A second pinned practice that the capture refused: the runner was never given it.

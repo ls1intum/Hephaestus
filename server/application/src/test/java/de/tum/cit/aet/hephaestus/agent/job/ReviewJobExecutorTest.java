@@ -90,6 +90,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
     private Optional<WorkerProperties> worker = Optional.empty();
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final PracticeScriptRunRecorder practiceScriptRuns = mock(PracticeScriptRunRecorder.class);
+    private final LlmUsageRecorder usageRecorder = mock(LlmUsageRecorder.class);
     private ReviewJobRecovery recovery = new ReviewJobRecovery(
             jobs, properties(), new JsonMapper(), mock(LlmUsageRecorder.class), Optional.empty(), Optional.empty());
 
@@ -99,6 +100,8 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                     + "\"citations\":[],\"problems\":[{\"severity\":\"MAJOR\",\"summary\":\"s\","
                     + "\"explanation\":\"e\",\"citations\":[]}]}}]}";
     private static final String SCRIPT_REPORT = "{\"schemaVersion\":2,\"truncated\":false,\"practices\":[]}";
+    private static final String FEEDBACK_REPORT =
+            "{\"admissionDigest\":\"admitted\",\"compositionFailures\":[{\"phase\":\"PUBLIC_REVIEW\",\"reason\":\"STALL\"}]}";
     private static final AgentResult.LlmUsage RETURNED_USAGE =
             new AgentResult.LlmUsage("m", 1000, 700, 0, 0, 0, 0.0, 6);
 
@@ -126,7 +129,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                 new JsonMapper(),
                 meters,
                 telemetry,
-                mock(LlmUsageRecorder.class),
+                usageRecorder,
                 practiceScriptRuns,
                 null,
                 capacity,
@@ -205,19 +208,23 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         var job = owedJob();
         var kept = mock(ReviewCompositionContinuation.class);
         recovery = mock(ReviewJobRecovery.class);
-        when(recovery.continueComposition(eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport())))
+        when(recovery.continueComposition(
+                        eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport()), aryEq(feedbackReport())))
                 .thenReturn(true);
         var executor = owedExecutor(kept);
 
         assertThat(executor.executePrepared(job.getId(), job, mock(SandboxSpec.class)))
                 .isNull();
 
-        // The returned usage and practice script report go to the requeue; no terminal write ends the job, and its
-        // inputs stay.
-        verify(recovery).continueComposition(eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport()));
+        // The returned usage, practice script report and feedback report go to the requeue; no terminal write ends the
+        // job, and its inputs stay.
+        verify(recovery)
+                .continueComposition(
+                        eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport()), aryEq(feedbackReport()));
         verify(jobs, never()).lockById(any());
         verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any());
         verify(practiceScriptRuns, never()).record(any(), any(), any(), any());
+        verify(usageRecorder, never()).record(any(), any());
         verify(kept, never()).forget(any());
     }
 
@@ -226,7 +233,8 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         var job = owedJob();
         var kept = mock(ReviewCompositionContinuation.class);
         recovery = mock(ReviewJobRecovery.class);
-        when(recovery.continueComposition(eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport())))
+        when(recovery.continueComposition(
+                        eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport()), aryEq(feedbackReport())))
                 .thenReturn(false);
         when(jobs.lockById(job.getId())).thenReturn(Optional.of(job));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
@@ -239,7 +247,9 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                 .isEqualTo(ReviewJobStatus.COMPLETED);
 
         assertThat(job.getExitCode()).isEqualTo(SandboxLayout.EXIT_COMPOSITION_OWED);
-        // The ordinary terminal write records the attempt's practice script runs, once.
+        assertThat(job.getProcessingStatus()).isEqualTo(ProcessingStatus.PENDING);
+        // The ordinary terminal write bills the attempt and records its practice script runs, once each.
+        verify(usageRecorder).record(eq(job.getWorkspaceId()), any());
         verify(practiceScriptRuns).record(eq(job), aryEq(scriptReport()), any(), any());
         verify(kept).forget(job);
     }
@@ -287,6 +297,10 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         return SCRIPT_REPORT.getBytes(StandardCharsets.UTF_8);
     }
 
+    private static byte[] feedbackReport() {
+        return FEEDBACK_REPORT.getBytes(StandardCharsets.UTF_8);
+    }
+
     private static SandboxResult owedResult() {
         return new SandboxResult(
                 SandboxLayout.EXIT_COMPOSITION_OWED,
@@ -294,7 +308,9 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         "result.json",
                         OWED_RESULT.getBytes(StandardCharsets.UTF_8),
                         SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE,
-                        scriptReport()),
+                        scriptReport(),
+                        SandboxLayout.FEEDBACK_FILENAME,
+                        feedbackReport()),
                 "owed",
                 false,
                 Duration.ofSeconds(1));

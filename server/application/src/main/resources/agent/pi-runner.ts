@@ -20,7 +20,7 @@ import {
 	closeUnroutedPrivateDestinations,
 	undecidedPrivatePractices,
 	recordCompositionFailure,
-	privateCompositionOwed,
+	compositionOwed,
 	persistComposedFeedback as persistComposition,
 	prepareComposedFeedback as prepareComposition,
 	preparePublicReview,
@@ -648,6 +648,30 @@ function answeredByTool(
 	return event.toolName === "submit_result" && event.parentToolCallId === undefined
 		? scope.answeredRefusals.has(event.toolCallId)
 		: scope.answeredRefusals.delete(event.toolCallId);
+}
+
+// The pinned assignment says whose work a result is about; a record's place in the work does not.
+// Its developer id is an internal account id. Only a conversation capture records that same id, as each
+// turn's accountId, which validateConversationAttribution also matches; other captures name provider
+// accounts, so there the id is not shown and a role with several holders stays unidentified.
+function assignmentText(inputs: PracticeInputs | undefined): string {
+	if (inputs === undefined) {
+		return "";
+	}
+	let subject = `This result is about the ${inputs.kind} item; its assignment names no person.`;
+	if (inputs.scope.kind === "SCAN") {
+		subject = "This scan judges the assigned file at its pinned commit; it is about no person.";
+	} else if (inputs.kind === "chat.thread" && inputs.about !== null) {
+		subject = `This result is about one participant of this chat.thread item, as the ${inputs.about.role} of their own turns: the turns in \`${CONVERSATION_THREAD}\` whose \`accountId\` is ${inputs.about.developerId}. Assess that participant's turns; the other turns are context.`;
+	} else if (inputs.about?.role === "ASSIGNEE") {
+		subject = `This result is about one ASSIGNEE of this ${inputs.kind} item; the role alone does not say which captured account that is.`;
+	} else if (inputs.about !== null) {
+		subject = `This result is about the ${inputs.about.role} of this ${inputs.kind} item.`;
+	}
+	return `## Assignment
+${subject} Each captured record keeps the attribution it was captured with: its author, \`bot\` where the provider classified the account, or no author where none was captured. That attribution, not where a record appears, says who wrote it; the practice's criteria decide what it shows.
+
+`;
 }
 
 export async function runReviewJob(): Promise<void> {
@@ -2083,14 +2107,18 @@ export async function runReviewJob(): Promise<void> {
 		preparation: null,
 	};
 
-	// Only a private phase the run itself stopped is owed. The server decides whether another attempt composes it.
+	// A time stop can request recovery: the review on the work only from the admitting attempt, private feedback
+	// after a review was composed or accepted earlier. The server's recorded preparation decides whether it is owed.
 	function compositionExit(): number {
-		if (!privateCompositionOwed(composedFeedback)) {
+		if (
+			!compositionOwed(composedFeedback, {
+				admitting: !continuing,
+				reviewOnWork: admission?.publicReviewed === true || composedFeedback.review !== null,
+			})
+		) {
 			return 0;
 		}
-		console.error(
-			"[pi-runner] OWED: the run stopped private feedback composition before it finished",
-		);
+		console.error("[pi-runner] OWED: the run stopped feedback composition before it finished");
 		return COMPOSITION_OWED_EXIT;
 	}
 
@@ -2545,7 +2573,7 @@ ${example.map((result) => `\`\`\`json\n${JSON.stringify(result, null, 1)}\n\`\`\
 		const illustrations = sessionState().openingInContext ? "" : `\n\n${RESULT_EXAMPLE}`;
 		return `${openingIfNeeded(brief)}${heading}
 
-${criteriaOf([slug])}${illustrations}${preparedSectionOf(slug, prepared)}
+${assignmentText(assignedInputs.get(slug))}${criteriaOf([slug])}${illustrations}${preparedSectionOf(slug, prepared)}
 
 Submit one result for ${slug} with submit_result: the outcome its criterion above decides through its applicability, Judge and Defer, as the evidence supports it, DOES_NOT_APPLY and COULD_NOT_DETERMINE included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits only this practice's result. For several NOT_MET problems, optionally use upsert_problem with a stable key for each full problem body; remove_problem retracts a draft. Then submit_result selects the ordered problemKeys instead of inline problems. Nothing is admitted until the complete result passes server admission.`;
 	}
@@ -2902,7 +2930,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				thinkingLevel,
 			});
 			const scope = sessionState();
-			if (phase === "practice" && scope.currentTurn?.practiceSlug !== undefined) {
+			const composing = phase === "public-review" || phase === "private-feedback";
+			if (composing || scope.currentTurn?.practiceSlug !== undefined) {
 				const stream = fresh.agent.streamFunction;
 				fresh.agent.streamFunction = (
 					requestModel,
@@ -2915,9 +2944,18 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						trace.stoppedBy !== null ||
 						spent({ modelCalls: trace.calls, outputTokens: trace.outputTokens }, trace.budget)
 					) {
-						throw new UnratedError("budget", "the practice reservation is spent");
+						// A composer turn that spent its work ends for that reason: the work's outcome, not the run's.
+						if (composing && trace !== null && trace.stoppedBy === null) {
+							trace.stoppedBy = "budget";
+						}
+						throw new UnratedError(
+							"budget",
+							composing
+								? "the composition work budget is spent"
+								: "the practice reservation is spent",
+						);
 					}
-					// A final call can finish, but cannot write tokens reserved for a sibling practice.
+					// A final call can finish, but cannot write tokens beyond its turn or reserved for a sibling practice.
 					scope.callOutputLimit = Math.min(
 						options?.maxTokens ?? requestModel.maxTokens,
 						trace.budget.outputTokens - trace.outputTokens,
