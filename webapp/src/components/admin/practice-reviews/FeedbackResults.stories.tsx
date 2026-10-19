@@ -246,6 +246,87 @@ export const EveryLocation: Story = {
 	},
 };
 
+/**
+ * Withdrawn feedback that was still ready reads as withdrawn on every destination, in the row and in
+ * its accessible name. Feedback withdrawn after delivery keeps its receipt and gains the flag.
+ */
+export const WithdrawnFeedback: Story = {
+	args: {
+		state: {
+			status: "ready",
+			feedback: [
+				{
+					...firstFeedback,
+					id: "ready-conversation",
+					destination: "CONVERSATION",
+					location: "NEXT_CONVERSATION",
+					state: "READY",
+					stopReason: null,
+					withdrawn: false,
+				},
+				{
+					...firstFeedback,
+					id: "withdrawn-ready-conversation",
+					destination: "CONVERSATION",
+					location: "NEXT_CONVERSATION",
+					state: "READY",
+					stopReason: null,
+					withdrawn: true,
+				},
+				{
+					...firstFeedback,
+					id: "withdrawn-ready-practice-pages",
+					destination: "PRACTICE_PAGE",
+					location: "PRACTICE_PAGES",
+					state: "READY",
+					stopReason: null,
+					withdrawn: true,
+				},
+				{
+					...firstFeedback,
+					id: "withdrawn-ready-on-work",
+					destination: "ON_WORK",
+					location: "GITHUB",
+					item: githubItem,
+					state: "READY",
+					stopReason: null,
+					withdrawn: true,
+				},
+				{
+					...firstFeedback,
+					id: "withdrawn-delivered-conversation",
+					destination: "CONVERSATION",
+					location: "HEPH",
+					state: "DELIVERED",
+					stopReason: null,
+					withdrawn: true,
+				},
+			],
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getAllByText("Ready, then withdrawn")).toHaveLength(3);
+		await expect(canvas.getAllByText("Ready for conversation")).toHaveLength(1);
+		await expect(canvas.queryByText("Ready for their practice pages")).toBeNull();
+		await expect(canvas.queryByText("Ready to send")).toBeNull();
+		canvas.getByText("Delivered in conversation");
+		// Only the delivered piece needs the separate flag.
+		await expect(canvas.getAllByText("Withdrawn")).toHaveLength(1);
+		const names = canvas
+			.getAllByRole("link", { name: /^Open feedback /u })
+			.map((link) => link.getAttribute("aria-label") ?? "");
+		await expect(names.filter((name) => name.includes(", Ready, then withdrawn, "))).toHaveLength(
+			3,
+		);
+		await expect(names.filter((name) => name.includes(", Ready for conversation, "))).toHaveLength(
+			1,
+		);
+		await expect(
+			names.filter((name) => name.includes(", Delivered in conversation, withdrawn, ")),
+		).toHaveLength(1);
+	},
+};
+
 /** The head stands and the rows wait in their shape, so nothing jumps when they arrive. */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },

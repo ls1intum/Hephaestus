@@ -974,6 +974,36 @@ export const ReadyForConversation: Story = {
 	},
 };
 
+/**
+ * Withdrawn while it waited for a conversation: the stored state stays ready, but Heph does not
+ * raise it, so the sheet does not promise the next conversation and names the withdrawal once.
+ */
+export const WithdrawnBeforeConversation: Story = {
+	args: {
+		feedback: ready({
+			...feedbackDetail("11111111-4444-4444-4444-444444444444"),
+			withdrawn: true,
+			decisions: withdrawnFeedbackDetail.decisions.map((decision) => ({
+				...decision,
+				feedbackId: "11111111-4444-4444-4444-444444444444",
+			})),
+		}),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expectHeaderChip(panelElement, "Ready, then withdrawn");
+		await expect(panelElement.querySelector("[data-sheet-status]")).not.toHaveTextContent(
+			/Withdrawn|Ready for conversation/u,
+		);
+		panel.getByText(
+			"It is withdrawn, so Heph does not raise it in a conversation. The results behind it are unchanged.",
+		);
+		await expect(panel.queryByText(/which is what delivers it/u)).toBeNull();
+		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
+	},
+};
+
 export const ReadyForPracticePages: Story = {
 	args: {
 		feedback: ready({ ...practicePageCard, state: "READY", deliveredAt: null }),

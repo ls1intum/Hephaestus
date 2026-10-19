@@ -6,7 +6,10 @@ import { statusToneClass } from "@/components/common/status-def";
 import { useNow } from "@/components/common/use-now";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { ReviewItemCell } from "@/components/practice-trace/ReviewDayTable";
-import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-state-defs";
+import {
+	deliveryOutcome,
+	withdrawalMark,
+} from "@/components/practice-vocabulary/delivery-state-defs";
 import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { PracticeTableRow } from "@/components/practice-vocabulary/PracticeTable";
 import {
@@ -103,13 +106,18 @@ export function FeedbackRow({ feedback }: FeedbackRowProps) {
 	const name = feedbackRowName(feedback);
 	const when = formatDayTime(feedback.createdAt, today);
 	const delivery = deliveryOutcome(feedback);
+	const withdrawal = withdrawalMark(feedback);
+	const status =
+		withdrawal === undefined
+			? delivery.label
+			: `${delivery.label}, ${withdrawal.label.toLowerCase()}`;
 	const location = FEEDBACK_LOCATION_DEFS[feedback.location];
 	const LocationIcon = location.icon;
 	return (
 		<PracticeTableRow
 			link={{
 				text: "Open feedback",
-				name: `Feedback ${name}, ${delivery.label}, ${when}`,
+				name: `Feedback ${name}, ${status}, ${when}`,
 				render: <DetailStackLink entry={feedbackLevel(feedback.id)} single />,
 			}}
 			variant={tracked ? "highlighted" : undefined}
@@ -117,7 +125,7 @@ export function FeedbackRow({ feedback }: FeedbackRowProps) {
 				<RecordRowActions
 					record={{ kind: "feedback", id: feedback.id }}
 					reviewId={feedback.reviewId}
-					name={`feedback ${name}, ${delivery.label}, ${when}`}
+					name={`feedback ${name}, ${status}, ${when}`}
 				/>
 			}
 		>
@@ -142,6 +150,9 @@ export function FeedbackRow({ feedback }: FeedbackRowProps) {
 			<TableCell className="align-top whitespace-normal">
 				<span className="flex min-w-0 flex-col items-start gap-1">
 					<StatusLabel def={delivery} className="text-xs font-medium" />
+					{withdrawal !== undefined && (
+						<StatusLabel def={withdrawal} className="text-xs text-muted-foreground" />
+					)}
 					{feedback.state === "WITHHELD" && feedback.stopReason !== null && (
 						<span title={withholdingReasonSentence(feedback.stopReason)}>
 							<StatusLabel

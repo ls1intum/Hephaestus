@@ -17,9 +17,14 @@ import type { ReviewFeedback } from "@/api/types.gen";
 
 import type { StatusDef, StatusDefs } from "@/components/common/status-def";
 
+import { FEEDBACK_DECISION_DEFS } from "./feedback-decision-defs";
+
 export type DeliveryState = ReviewFeedback["state"];
 
-export type DeliveryFacts = Pick<ReviewFeedback, "destination" | "state" | "stopReason">;
+export type DeliveryFacts = Pick<
+	ReviewFeedback,
+	"destination" | "state" | "stopReason" | "withdrawn"
+>;
 
 export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 	AWAITING_APPROVAL: {
@@ -116,8 +121,20 @@ const ON_WORK_READY: StatusDef = {
 	description: "It is cleared to send. Provider delivery is in progress and may be retried safely.",
 };
 
+// A withdrawal keeps the stored state, so feedback withdrawn while ready still reads READY. No
+// destination delivers it while the withdrawal stands, so it must not read as waiting to be sent.
+const WITHDRAWN_READY: StatusDef = {
+	...FEEDBACK_DECISION_DEFS.WITHDRAW,
+	label: "Ready, then withdrawn",
+	description:
+		"It was withdrawn before delivery. It is not sent or shown while the withdrawal stands.",
+};
+
 export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	const { destination, state, stopReason } = feedback;
+	if (feedback.withdrawn && state === "READY") {
+		return WITHDRAWN_READY;
+	}
 	if (destination === "CONVERSATION") {
 		if (state === "READY") {
 			return CONVERSATION_OVERRIDES.READY;
@@ -138,6 +155,18 @@ export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	return DELIVERY_STATE_DEFS[state];
 }
 
+/**
+ * The withdrawal flag shown beside the delivery outcome. Feedback withdrawn after it was delivered,
+ * or after it stopped, keeps its recorded outcome and gains this flag. Feedback withdrawn while
+ * ready gets none, because its outcome already names the withdrawal.
+ */
+export function withdrawalMark(feedback: DeliveryFacts): StatusDef | undefined {
+	return feedback.withdrawn && deliveryOutcome(feedback) !== WITHDRAWN_READY
+		? FEEDBACK_DECISION_DEFS.WITHDRAW
+		: undefined;
+}
+
+// A withdrawn piece is not sent; a correction it still needs is polled by its own owner.
 export function isDeliveryInProgress(feedback: DeliveryFacts): boolean {
-	return feedback.state === "READY" && feedback.destination === "ON_WORK";
+	return feedback.state === "READY" && feedback.destination === "ON_WORK" && !feedback.withdrawn;
 }
