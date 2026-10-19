@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.94.6
+
+### Patch Changes
+
+- When a review runs out of time or stalls while it writes private practice feedback, or its worker stops before that feedback is written, Hephaestus now tries again in a new attempt from the review's original inputs instead of dropping that feedback. A new attempt composes the feedback on the work only if none was accepted, and private feedback only until any of it is prepared. Feedback that was already accepted is kept and is not prepared again.
+- Two reviews of the same work no longer both post their feedback to the same person when each was written before the other appeared. Feedback on the work is sent only while the feedback already there for that person is unchanged since it was written. If that feedback changes while the review is still writing, the review writes again from it. If it changes later, for example while the feedback awaits approval, the feedback is withheld with its reason, and you can request a new review of the work. While an earlier comment for that person on the same work may have appeared but was never confirmed, no new feedback for them is posted there, and feedback that awaits approval stays waiting. On the earlier feedback, a workspace admin can choose Check delivery to ask the provider again without posting anything. This also works for withdrawn feedback: a comment that the check finds is then retracted.
+- A queued or running review no longer shows "Nothing to process" under **Execution** while its attempt is still working. The badge now appears only when the attempt has ended. **Request another review** on a finished review becomes available again once no review of that work is queued or running, without reloading the page.
+- Restarting the application server during a scheduled sync now asks that sync to stop as shutdown begins, while open requests and live updates still drain. Before, an open live-update stream could delay the request until the request drain timed out, which left the sync less of the shutdown time to stop and record that it was cancelled.
+
 ## 0.94.5
 
 ### Patch Changes
