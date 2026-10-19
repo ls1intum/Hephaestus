@@ -10,6 +10,7 @@ import {
 import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import { createContext, type ReactNode, useContext, useState } from "react";
+import { sb } from "storybook/test";
 
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { Toaster } from "@/components/ui/sonner";
@@ -18,6 +19,11 @@ import { handlers } from "@/mocks/handlers";
 import { ThemeProvider } from "@/runtime/theme/ThemeContext";
 
 import "@/styles.css";
+
+// A component reads the time from `useNow`; in a story that is the story clock, so the fixtures and
+// the render read one instant even when a run crosses midnight (`src/stories/story-clock.ts`).
+// oxlint-disable-next-line import/no-relative-parent-imports -- sb.mock resolves its path with Node's resolver, which does not know the "@/" alias.
+sb.mock(import("../src/components/common/use-now.ts"));
 
 initialize(
 	{
