@@ -18,6 +18,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Locale;
 import org.jspecify.annotations.Nullable;
@@ -46,6 +47,9 @@ class LlmProxyService {
     private static final Logger log = LoggerFactory.getLogger(LlmProxyService.class);
     private static final Duration BLOCK_TIMEOUT = Duration.ofSeconds(310);
     private static final String PROXY_PATH_PREFIX = "/internal/llm";
+
+    /** The refusal of a model call after its review attempt's work deadline. */
+    static final String WORK_TIME_OVER = "This review's work time has ended; it makes no more model calls.";
 
     private final WebClient webClient;
     private final LlmModelResolver resolver;
@@ -230,8 +234,11 @@ class LlmProxyService {
             HttpHeaders incomingHeaders,
             byte[] body,
             Span span) {
+        if (workTimeOver(routing)) return workTimeOverRefusal();
+        // A scan call may wait for its attempt's previous call, at most until the work deadline.
         var lease = scanCalls.acquire(routing, body);
         try {
+            if (workTimeOver(routing)) return workTimeOverRefusal();
             return forwardWithinScanBudget(routing, protocol, practiceScript, response, incomingHeaders, body, span);
         } finally {
             lease.ifPresent(ScanCallGuard.Lease::close);
@@ -275,18 +282,18 @@ class LlmProxyService {
                 resolver.resolveProxyCredential(new LlmModelResolver.ConnectionRef(
                         routing.connectionScope(), routing.connectionId(), routing.modelId(), routing.workspaceId()));
         if (credential == null) {
-            incrementErrors(routing.apiProtocol());
+            accounting.recordError(routing.apiProtocol());
             return ResponseEntity.status(502).body("The configured model is not available");
         }
         if (!routing.apiProtocol().equals(credential.apiProtocol())) {
-            incrementErrors(routing.apiProtocol());
+            accounting.recordError(routing.apiProtocol());
             return ResponseEntity.status(502).body("The configured model protocol changed");
         }
 
         try {
             requestPolicy.validateTarget(credential.baseUrl());
         } catch (IllegalArgumentException e) {
-            incrementErrors(routing.apiProtocol());
+            accounting.recordError(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream target not permitted");
         }
 
@@ -298,16 +305,21 @@ class LlmProxyService {
         try {
             upstreamUri = buildUpstreamUri(credential.baseUrl(), protocol);
         } catch (IllegalArgumentException e) {
-            incrementErrors(routing.apiProtocol());
+            accounting.recordError(routing.apiProtocol());
             return ResponseEntity.status(502).body("Invalid upstream configuration");
         }
 
         span.tag("gen_ai.request.model", credential.upstreamModelId());
         HttpHeaders upstreamHeaders = buildUpstreamHeaders(incomingHeaders, credential);
         ProxyStreamUsageTap tap = new ProxyStreamUsageTap(objectMapper, responsesProtocol);
+        // Both requests below share the attempt's one deadline; the second one does not get a new window.
+        Instant deadline = routing.workDeadline();
+        boolean reviewStream = practiceScript == null && requestsStream(prepared.body());
         UpstreamResult upstream;
         try {
-            upstream = callUpstream(upstreamUri, upstreamHeaders, prepared.body(), span, response, tap);
+            if (workTimeOver(routing)) return workTimeOverRefusal();
+            upstream = callUpstream(
+                    upstreamUri, upstreamHeaders, prepared.body(), span, response, tap, deadline, reviewStream);
             if (rejectedOurUsageRequest(upstream, prepared)) {
                 // Asking for usage is OUR addition, so refusing it must cost the caller nothing.
                 log.info(
@@ -318,8 +330,16 @@ class LlmProxyService {
                 if (!requestPolicy.allows(routing))
                     return ResponseEntity.status(403)
                             .body("Your AI choice no longer permits this model in this workspace.");
+                if (workTimeOver(routing)) return workTimeOverRefusal();
                 upstream = callUpstream(
-                        upstreamUri, upstreamHeaders, prepared.withoutUsageRequestOrBody(), span, response, tap);
+                        upstreamUri,
+                        upstreamHeaders,
+                        prepared.withoutUsageRequestOrBody(),
+                        span,
+                        response,
+                        tap,
+                        deadline,
+                        reviewStream);
             }
         } catch (WebClientRequestException e) {
             if (practiceScript != null) accounting.recordUsage(attempt, practiceScript, null);
@@ -327,52 +347,28 @@ class LlmProxyService {
                     "LLM upstream unreachable for principal {}: reason={}",
                     routing.principalDescription(),
                     e.getClass().getSimpleName());
-            incrementErrors(routing.apiProtocol());
+            accounting.recordError(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream provider unreachable");
         } catch (Exception e) {
+            // Only a failure before a stream's head reaches here, so nothing has been written to the client.
             if (practiceScript != null) accounting.recordUsage(attempt, practiceScript, null);
             log.warn(
                     "LLM upstream request failed for principal {}: reason={}",
                     routing.principalDescription(),
                     e.getClass().getSimpleName());
-            incrementErrors(routing.apiProtocol());
+            accounting.recordError(routing.apiProtocol());
+            // The work deadline is answered as such; any other failure as before.
+            if (workTimeOver(routing)) return workTimeOverRefusal();
             return ResponseEntity.status(502).body("Upstream request failed");
         }
 
-        if (upstream == null) {
-            if (practiceScript != null) accounting.recordUsage(attempt, practiceScript, null);
-            incrementErrors(routing.apiProtocol());
-            return ResponseEntity.status(502).body("Upstream provider unavailable");
-        }
+        var outcome = upstream.streamOutcome();
+        if (outcome != null)
+            return settleStream(routing, attempt, practiceScript, span, upstream.status(), outcome, tap);
         boolean served = upstream.status() >= 200 && upstream.status() < 300;
         if (!served) {
-            // The sandbox only sees "error" from its model client; the trace carries the status on the
-            // span and this is its log-side counterpart, for an operator reading logs rather than
-            // traces. Status and principal only: the body can quote the request.
-            log.warn(
-                    "LLM upstream answered a call for principal {} with status={}",
-                    routing.principalDescription(),
-                    upstream.status());
-        }
-        var outcome = upstream.streamOutcome();
-        if (outcome != null) {
-            span.tag("hephaestus.stream.outcome", outcome.name());
-            if (outcome != ProxyStreamingUtils.StreamOutcome.COMPLETED) {
-                recordSpanError(span, outcome.name());
-                incrementErrors(routing.apiProtocol());
-            }
-            if (served) {
-                if (tap.hasMalformedUsage()) {
-                    accounting.recordMalformedUsage(attempt);
-                } else {
-                    accounting.recordUsage(attempt, practiceScript, tap.observed());
-                    tagUsage(span, tap.observed());
-                }
-            }
-            return null;
-        }
-        if (!served) {
-            incrementErrors(routing.apiProtocol());
+            logUnserved(routing, upstream.status());
+            accounting.recordError(routing.apiProtocol());
         }
         // Attributed now, not at the run's terminal write, so an execution that dies still bills.
         if (upstream.body() != null && served) {
@@ -383,15 +379,66 @@ class LlmProxyService {
                 .body(upstream.body());
     }
 
-    private @Nullable UpstreamResult callUpstream(
+    /**
+     * Settles a call whose stream wrote the response: one outcome, and the usage the stream reported up to its end.
+     * Its status and bytes are the answer, so no body of our own follows.
+     */
+    private @Nullable ResponseEntity<?> settleStream(
+            ProxyRouting routing,
+            ProxyRouting.BilledAttempt attempt,
+            @Nullable PracticeScriptCall practiceScript,
+            Span span,
+            int status,
+            ProxyStreamingUtils.StreamOutcome outcome,
+            ProxyStreamUsageTap tap) {
+        boolean served = status >= 200 && status < 300;
+        if (!served) logUnserved(routing, status);
+        span.tag("hephaestus.stream.outcome", outcome.name());
+        if (outcome != ProxyStreamingUtils.StreamOutcome.COMPLETED) {
+            recordSpanError(span, outcome.name());
+            accounting.recordError(routing.apiProtocol());
+            // Names the caller beside the outcome; the shared stream code knows neither.
+            if (outcome != ProxyStreamingUtils.StreamOutcome.CLIENT_DISCONNECTED)
+                log.warn("LLM stream for principal {} ended with outcome={}", routing.principalDescription(), outcome);
+        }
+        if (served) {
+            if (tap.hasMalformedUsage()) {
+                accounting.recordMalformedUsage(attempt);
+            } else {
+                accounting.recordUsage(attempt, practiceScript, tap.observed());
+                tagUsage(span, tap.observed());
+            }
+        }
+        return null;
+    }
+
+    private void logUnserved(ProxyRouting routing, int status) {
+        // The sandbox only sees "error" from its model client; the trace carries the status on the
+        // span and this is its log-side counterpart, for an operator reading logs rather than
+        // traces. Status and principal only: the body can quote the request.
+        log.warn(
+                "LLM upstream answered a call for principal {} with status={}", routing.principalDescription(), status);
+    }
+
+    /**
+     * One upstream exchange, run on this request thread, which alone writes the servlet response. Without a work
+     * deadline (a mentor turn) it keeps the proxy's own limits: the whole exchange, and a stream's body from its start.
+     * With one, the whole exchange — waiting for the head, the body, and a stream — ends by the deadline; a review's
+     * stream may use all of the attempt's remaining time, while every other call also keeps the proxy's own ceiling.
+     */
+    private UpstreamResult callUpstream(
             URI uri,
             HttpHeaders upstreamHeaders,
             byte[] outgoingBody,
             Span span,
             HttpServletResponse response,
-            ProxyStreamUsageTap tap) {
+            ProxyStreamUsageTap tap,
+            @Nullable Instant deadline,
+            boolean reviewStream) {
+        Duration limit = exchangeWait(deadline, reviewStream);
+        Duration bodyLimit = deadline == null ? ProxyStreamingUtils.DEFAULT_SSE_TIMEOUT : null;
         span.event("upstream.request");
-        return webClient
+        var exchange = webClient
                 .method(HttpMethod.POST)
                 .uri(uri)
                 .headers(headers -> {
@@ -399,8 +446,38 @@ class LlmProxyService {
                     headers.addAll(upstreamHeaders);
                 })
                 .bodyValue(outgoingBody)
-                .exchangeToMono(upstream -> ProxyStreamingUtils.consumeResponse(upstream, response, tap))
-                .block(BLOCK_TIMEOUT.plus(ProxyStreamingUtils.DEFAULT_SSE_TIMEOUT));
+                .exchangeToFlux(upstream -> ProxyStreamingUtils.parts(upstream, bodyLimit));
+        return ProxyStreamingUtils.forward(exchange, limit, response, tap);
+    }
+
+    /**
+     * How long one exchange may wait. A mentor turn keeps the proxy's own ceiling. A review's stream gets the
+     * attempt's remaining work time, however long; every other call of the attempt the shorter of the two.
+     */
+    static Duration exchangeWait(@Nullable Instant deadline, boolean reviewStream) {
+        Duration ceiling = BLOCK_TIMEOUT.plus(ProxyStreamingUtils.DEFAULT_SSE_TIMEOUT);
+        if (deadline == null) return ceiling;
+        Duration remaining = ProxyStreamingUtils.remainingUntil(deadline);
+        return reviewStream || remaining.compareTo(ceiling) < 0 ? remaining : ceiling;
+    }
+
+    private boolean requestsStream(byte[] body) {
+        try {
+            return objectMapper.readTree(body).path("stream").asBoolean(false);
+        } catch (RuntimeException unreadable) {
+            return false;
+        }
+    }
+
+    /** Whether the job attempt's work time is over. A mentor turn has no work deadline. */
+    private static boolean workTimeOver(ProxyRouting routing) {
+        Instant deadline = routing.workDeadline();
+        return deadline != null && !Instant.now().isBefore(deadline);
+    }
+
+    // Not 429 or 5xx, so neither the runner nor a model client asks again; the words avoid what retry classifiers read.
+    private static ResponseEntity<String> workTimeOverRefusal() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(WORK_TIME_OVER);
     }
 
     /** Narrow on purpose: a blanket retry on 4xx would double every bad request the runner makes. */
@@ -550,9 +627,5 @@ class LlmProxyService {
         // classification is exported; Micrometer's error API also sets the underlying OTLP status.
         span.error(new IllegalStateException(errorType));
         span.tag("error.type", errorType);
-    }
-
-    private void incrementErrors(String apiProtocol) {
-        accounting.recordError(apiProtocol);
     }
 }

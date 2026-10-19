@@ -49,6 +49,7 @@ import io.micrometer.tracing.Tracer;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -155,8 +156,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldAuthenticateRunningJobTokenAgainstPersistedRouting() throws Exception {
         ReviewJob job = runningJob(true);
-        AuthenticationResult result = authenticate(
-                jwtIssuer.issueForJob(job.getId(), workspace.getId(), job.getAttempt(), Duration.ofMinutes(5)));
+        AuthenticationResult result = authenticate(tokenFor(job));
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.authentication())
@@ -190,8 +190,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldRejectJobJwtBoundToAnotherWorkspace() throws Exception {
         ReviewJob job = runningJob(true);
 
-        AuthenticationResult result = authenticate(
-                jwtIssuer.issueForJob(job.getId(), workspace.getId() + 1, job.getAttempt(), Duration.ofMinutes(5)));
+        Instant work = Instant.now().plus(Duration.ofMinutes(5));
+        AuthenticationResult result = authenticate(jwtIssuer.issueForJobUntil(
+                job.getId(), workspace.getId() + 1, job.getAttempt(), work, work.plus(Duration.ofMinutes(10))));
 
         assertThat(result.status()).isEqualTo(401);
         assertThat(result.authentication()).isNull();
@@ -327,6 +328,30 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             ReviewJob reloaded = jobRepository.findById(job.getId()).orElseThrow();
             // The review's ledger row bills the chat model, so only chat calls reach the job's counters.
             assertThat(Objects.requireNonNullElse(reloaded.getLlmCalls(), 0)).isEqualTo(slot == ModelKind.CHAT ? 1 : 0);
+        }
+    }
+
+    @Test
+    void shouldKeepTheResultUploadButMakeNoModelCallOnceTheWorkTimeHasEnded() throws Exception {
+        try (MockWebServer upstream = new MockWebServer()) {
+            upstream.start();
+            ReviewJob job = practiceScriptJob(upstream.url("/v1").toString());
+            Instant work = Instant.now().plusSeconds(1);
+            String token = jwtIssuer.issueForJobUntil(
+                    job.getId(), workspace.getId(), job.getAttempt(), work, work.plus(Duration.ofMinutes(10)));
+            // Real time passes the signed work deadline; the token itself stays valid for the upload.
+            while (!Instant.now().isAfter(work)) Thread.sleep(50);
+
+            assertThat(authenticate("POST", "/internal/llm/runtime/" + job.getId() + "/result", token)
+                            .status())
+                    .isEqualTo(200);
+            ProxyResult refused = callPracticeScript(
+                    proxyService(200_000), token, "/internal/llm/practice-script/embedding/embeddings", PRACTICE, "{}");
+
+            assertThat(refused.status()).isEqualTo(403);
+            assertThat(refused.body()).isEqualTo(LlmProxyService.WORK_TIME_OVER);
+            assertThat(upstream.getRequestCount()).isZero();
+            assertThat(practiceScriptRows(job, 0)).isEmpty();
         }
     }
 
@@ -571,9 +596,14 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private ProxyResult callPracticeScript(
             LlmProxyService service, ReviewJob job, String path, String practice, String body) throws Exception {
+        return callPracticeScript(service, tokenFor(job), path, practice, body);
+    }
+
+    private ProxyResult callPracticeScript(
+            LlmProxyService service, String token, String path, String practice, String body) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
         request.setRemoteAddr("127.0.0.1");
-        request.addHeader("Authorization", "Bearer " + tokenFor(job));
+        request.addHeader("Authorization", "Bearer " + token);
         HttpHeaders headers = new HttpHeaders();
         headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, practice);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -777,7 +807,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             int status, @Nullable Authentication authentication) {}
 
     private String tokenFor(ReviewJob job) {
-        return jwtIssuer.issueForJob(job.getId(), workspace.getId(), job.getAttempt(), Duration.ofMinutes(5));
+        Instant work = Instant.now().plus(Duration.ofMinutes(5));
+        return jwtIssuer.issueForJobUntil(
+                job.getId(), workspace.getId(), job.getAttempt(), work, work.plus(Duration.ofMinutes(10)));
     }
 
     private ProxyRouting routingOf(AuthenticationResult result) {

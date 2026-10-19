@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -431,6 +432,56 @@ void test("openai-completions records a server error as its native status, witho
 		response.end(JSON.stringify({ error: { message: `upstream failed: ${SECRET}` } }));
 	});
 	assertFailure(message, { kind: "HTTP_ERROR", phase: "request", status: 500 });
+});
+
+void test("the native SDK does not retry the proxy's expired-work refusal", async () => {
+	const proxySource = readFileSync(
+		new URL(
+			"../../../main/java/de/tum/cit/aet/hephaestus/agent/proxy/LlmProxyService.java",
+			import.meta.url,
+		),
+		"utf8",
+	);
+	const literal = /static final String WORK_TIME_OVER\s*=\s*(?<literal>"(?:[^"\\]|\\.)*");/u.exec(
+		proxySource,
+	)?.groups?.literal;
+	assert.ok(
+		literal !== undefined && literal.length > 0,
+		"the proxy owns the expired-work response wording",
+	);
+	const workTimeOver: unknown = JSON.parse(literal);
+	assert.ok(typeof workTimeOver === "string");
+	let requests = 0;
+	const message = await completeWith(
+		"openai-completions",
+		(response) => {
+			requests += 1;
+			response.writeHead(403, { "content-type": "text/plain" });
+			response.end(workTimeOver);
+		},
+		{ maxRetries: 1 },
+	);
+	assertFailure(message, { kind: "HTTP_ERROR", phase: "request", status: 403 });
+	assert.equal(message.errorMessage?.includes(workTimeOver), true);
+	assert.equal(requests, 1);
+	const native = spawnSync(
+		process.execPath,
+		[
+			"--experimental-import-meta-resolve",
+			"--input-type=module",
+			"-e",
+			`import assert from "node:assert/strict";
+const sdk = import.meta.resolve("@earendil-works/pi-coding-agent");
+const { isRetryableAssistantError } = await import(import.meta.resolve("@earendil-works/pi-ai", sdk));
+const message = JSON.parse(process.argv[1]);
+assert.equal(isRetryableAssistantError(message), false);
+assert.equal(isRetryableAssistantError({ ...message, errorMessage: "504: Gateway timeout" }), true);
+`,
+			JSON.stringify(message),
+		],
+		{ encoding: "utf8", cwd: process.cwd() },
+	);
+	assert.equal(native.status, 0, native.stderr);
 });
 
 void test("openai-completions records a stream that ends without a finish reason", async () => {

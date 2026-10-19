@@ -191,7 +191,14 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     private static JobJwt jwt(UUID id, long workspace, int attempt) {
         var now = Instant.now();
         return new JobJwt(
-                id, workspace, attempt, Set.of("llm_proxy"), UUID.randomUUID().toString(), now, now.plusSeconds(60));
+                id,
+                workspace,
+                attempt,
+                Set.of("llm_proxy"),
+                UUID.randomUUID().toString(),
+                now,
+                now.plusSeconds(60),
+                now.plusSeconds(30));
     }
 
     private static MockHttpServletRequest request(String path, String authorization) {

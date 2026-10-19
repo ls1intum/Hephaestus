@@ -46,6 +46,7 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
     private final ProxyRoutingService routing =
             new ProxyRoutingService(jobs, mapper, new MentorProxyCredentialRegistry());
     private final ReviewJob job = new ReviewJob();
+    private final Instant workDeadline = Instant.now().plusSeconds(30);
     private ProxyIdentity identity;
 
     @BeforeEach
@@ -67,8 +68,21 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
         job.setConfigSnapshot(snapshot.toJson(mapper));
         var now = Instant.now();
         identity = new ProxyIdentity(
-                new JobJwt(job.getId(), 7L, 2, Set.of("llm_proxy"), "id", now, now.plusSeconds(60)), "worker", null);
+                new JobJwt(job.getId(), 7L, 2, Set.of("llm_proxy"), "id", now, now.plusSeconds(60), workDeadline),
+                "worker",
+                null);
         lenient().when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+    }
+
+    @Test
+    void shouldGiveEveryModelRouteOfTheAttemptItsOneSignedWorkDeadline() {
+        when(jobs.sumPracticeScriptUsageByKind(7L, job.getId(), 2)).thenReturn(List.of());
+
+        var review = routing.resolve(identity, request("/internal/llm/responses"));
+        var script = routing.resolve(identity, request("/internal/llm/practice-script/embedding/embeddings"));
+
+        assertThat(review.workDeadline()).isEqualTo(workDeadline);
+        assertThat(script.workDeadline()).isEqualTo(workDeadline);
     }
 
     @Test

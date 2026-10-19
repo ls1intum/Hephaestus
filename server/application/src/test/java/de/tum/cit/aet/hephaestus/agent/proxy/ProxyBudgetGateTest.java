@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,7 +72,8 @@ class ProxyBudgetGateTest extends BaseUnitTest {
                                 new BigDecimal(spentSoFarUsd),
                                 "worker-1"),
                 null,
-                null);
+                null,
+                spentSoFarUsd == null ? null : Instant.now().plusSeconds(60));
     }
 
     @Nested
@@ -207,6 +209,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
                     "job:legacy",
                     "openai-completions",
                     "https://frozen.example.com/v1",
+                    null,
                     null,
                     null,
                     null,

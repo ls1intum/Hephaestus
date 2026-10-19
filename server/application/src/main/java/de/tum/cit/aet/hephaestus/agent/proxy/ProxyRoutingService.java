@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -56,15 +57,17 @@ class ProxyRoutingService {
                 || !Objects.equals(job.getWorkerId(), identity.workerId()))
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Review attempt unavailable");
         var snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+        // The live checks above decide whether this attempt may call at all; the signed deadline decides until when.
+        Instant workDeadline = jwt.workDeadline();
         if (!request.getRequestURI().startsWith(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH))
-            return reviewRouting(job, snapshot);
+            return reviewRouting(job, snapshot, workDeadline);
         var slot = practiceScriptSlot(request.getRequestURI());
         if (slot == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        return practiceScriptRouting(job, snapshot, slot)
+        return practiceScriptRouting(job, snapshot, slot, workDeadline)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    private ProxyRouting reviewRouting(ReviewJob job, ConfigSnapshot snapshot) {
+    private ProxyRouting reviewRouting(ReviewJob job, ConfigSnapshot snapshot, Instant workDeadline) {
         return routing(
                 "job:" + job.getId(),
                 job,
@@ -73,11 +76,13 @@ class ProxyRoutingService {
                 spentSoFarUsd(job, snapshot),
                 0L,
                 0L,
-                null);
+                null,
+                workDeadline);
     }
 
     // Include all direct models' in-flight spend until their ledger rows exist; only the same funding source counts.
-    private Optional<ProxyRouting> practiceScriptRouting(ReviewJob job, ConfigSnapshot snapshot, ModelKind slot) {
+    private Optional<ProxyRouting> practiceScriptRouting(
+            ReviewJob job, ConfigSnapshot snapshot, ModelKind slot, Instant workDeadline) {
         FrozenModel model = slot == ModelKind.CHAT ? snapshot.model() : snapshot.practiceScriptSlot(slot);
         if (model == null) {
             return Optional.empty();
@@ -92,7 +97,8 @@ class ProxyRoutingService {
                 practiceScriptSpentUsd(job, snapshot, used, model.connectionScope()),
                 used.stream().mapToLong(PracticeScriptKindTotal::tokens).sum(),
                 used.stream().mapToLong(PracticeScriptKindTotal::searchUnits).sum(),
-                slot));
+                slot,
+                workDeadline));
     }
 
     private static ProxyRouting routing(
@@ -103,7 +109,8 @@ class ProxyRoutingService {
             BigDecimal spentUsd,
             long directModelTokens,
             long directModelSearchUnits,
-            @Nullable ModelKind slot) {
+            @Nullable ModelKind slot,
+            Instant workDeadline) {
         return new ProxyRouting(
                 principal,
                 model.apiProtocol().wire(),
@@ -121,7 +128,8 @@ class ProxyRoutingService {
                         directModelTokens,
                         directModelSearchUnits),
                 slot,
-                slot == null ? null : model.dataHandlingTier());
+                slot == null ? null : model.dataHandlingTier(),
+                workDeadline);
     }
 
     private static BigDecimal practiceScriptSpentUsd(

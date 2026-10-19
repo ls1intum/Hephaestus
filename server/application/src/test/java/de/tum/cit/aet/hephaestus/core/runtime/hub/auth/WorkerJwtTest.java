@@ -13,6 +13,7 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.nio.charset.StandardCharsets;
 import java.security.interfaces.RSAPrivateKey;
 import java.time.Duration;
 import java.time.Instant;
@@ -60,8 +61,9 @@ class WorkerJwtTest extends BaseUnitTest {
     @Test
     void issuedJobTokenVerifiesWithRequiredClaims() {
         UUID jobId = UUID.randomUUID();
+        Instant work = Instant.now().plusSeconds(300);
 
-        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJob(jobId, 42L, 0, Duration.ofMinutes(5)));
+        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(jobId, 42L, 0, work, work.plusSeconds(600)));
 
         assertThat(jwt.jobId()).isEqualTo(jobId);
         assertThat(jwt.workspaceId()).isEqualTo(42L);
@@ -71,27 +73,125 @@ class WorkerJwtTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldExpireJobTokenAtDeclaredUploadDeadline() {
-        Instant deadline = Instant.now().plusSeconds(600).truncatedTo(ChronoUnit.SECONDS);
-        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, deadline));
+    void shouldCarryTheWorkDeadlineAndTheLaterExpiryAsTwoSignedFacts() {
+        Instant work = Instant.now().plusSeconds(900).truncatedTo(ChronoUnit.SECONDS);
+        Instant expiry = work.plusSeconds(600);
 
-        assertThat(jwt.expiresAt()).isEqualTo(deadline);
-    }
+        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, work, expiry));
 
-    @Test
-    void shouldCarryOnlyTheProxyScopeWhenIssuedUntilADeadline() {
-        Instant deadline = Instant.now().plusSeconds(600);
-
-        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, deadline));
-
+        assertThat(jwt.workDeadline()).isEqualTo(work);
+        assertThat(jwt.expiresAt()).isEqualTo(expiry);
         assertThat(jwt.scopes()).containsExactly(WorkerJwtIssuer.LLM_PROXY_SCOPE);
     }
 
     @Test
+    void shouldNotIssueAJobTokenWhoseWorkOutlastsItOrHasAlreadyEnded() {
+        Instant expiry = Instant.now().plusSeconds(600);
+
+        assertThatThrownBy(() -> issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, expiry.plusSeconds(1), expiry))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> issuer.issueForJobUntil(
+                        UUID.randomUUID(), 42L, 0, Instant.now().minusSeconds(1), expiry))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldStillAuthenticateAJobWhoseWorkTimeEndedUntilItsTokenExpires() {
+        // The attempt still returns its result in the grace after its work; only model calls refuse it.
+        Instant issued = Instant.now().minusSeconds(120);
+        Instant work = Instant.now().minusSeconds(60);
+        String token = jobToken(
+                issued, work.plusSeconds(600), Map.<String, Object>of(WorkerJwtIssuer.WORK_DEADLINE_CLAIM, work));
+
+        JobJwt jwt = (JobJwt) verifier.verify(token);
+
+        assertThat(jwt.workDeadline()).isEqualTo(work.truncatedTo(ChronoUnit.SECONDS));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidWorkDeadlines")
+    void shouldRefuseAJobTokenWithoutAWellOrderedWorkDeadline(
+            String label, Instant issued, Map<String, Object> claims) {
+        String token = jobToken(issued, issued.plusSeconds(900), claims);
+
+        assertThatThrownBy(() -> verifier.verify(token))
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("work_deadline");
+    }
+
+    static Stream<Arguments> invalidWorkDeadlines() {
+        Instant issued = Instant.now().minusSeconds(60);
+        return Stream.of(
+                Arguments.of("missing", issued, Map.<String, Object>of()),
+                Arguments.of(
+                        "a string",
+                        issued,
+                        Map.<String, Object>of(
+                                WorkerJwtIssuer.WORK_DEADLINE_CLAIM, Long.toString(issued.getEpochSecond() + 300))),
+                Arguments.of(
+                        "before issue",
+                        issued,
+                        Map.<String, Object>of(WorkerJwtIssuer.WORK_DEADLINE_CLAIM, issued.minusSeconds(30))),
+                Arguments.of(
+                        "after expiry",
+                        issued,
+                        Map.<String, Object>of(WorkerJwtIssuer.WORK_DEADLINE_CLAIM, issued.plusSeconds(901))));
+    }
+
+    @Test
+    void shouldRefuseAJobTokenWhoseWorkDeadlineWasChangedAfterSigning() {
+        Instant work = Instant.now().plusSeconds(300);
+        String[] parts = issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, work, work.plusSeconds(600))
+                .split("\\.", -1);
+        String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+        String later = payload.replace(
+                "\"work_deadline\":" + work.getEpochSecond(), "\"work_deadline\":" + (work.getEpochSecond() + 3600));
+        assertThat(later).isNotEqualTo(payload);
+        String tampered = parts[0] + "."
+                + Base64.getUrlEncoder().withoutPadding().encodeToString(later.getBytes(StandardCharsets.UTF_8))
+                + "." + parts[2];
+
+        assertThatThrownBy(() -> verifier.verify(tampered))
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("verify failed");
+    }
+
+    @Test
     void expiredJobTokenRejected() {
-        WorkerSigningKey active = keyRing.active();
         Instant past = Instant.now().minusSeconds(120);
+        String token = jobToken(
+                past,
+                past.plusSeconds(30),
+                Map.<String, Object>of(WorkerJwtIssuer.WORK_DEADLINE_CLAIM, past.plusSeconds(10)));
+
+        assertThatThrownBy(() -> verifier.verify(token))
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("verify failed");
+    }
+
+    @Test
+    void workerSessionTokenCarryingAWorkDeadlineRejected() {
+        WorkerSigningKey active = keyRing.active();
         String token = JWT.create()
+                .withHeader(Map.of("kid", active.kid(), "typ", "worker-session+jwt"))
+                .withIssuer("hephaestus-test")
+                .withAudience("hephaestus-worker")
+                .withSubject("worker-1")
+                .withClaim(WorkerJwtIssuer.WORK_DEADLINE_CLAIM, Instant.now().plusSeconds(30))
+                .withJWTId(UUID.randomUUID().toString())
+                .withIssuedAt(Instant.now())
+                .withExpiresAt(Instant.now().plusSeconds(60))
+                .sign(Algorithm.RSA256(active.publicKey(), active.privateKey()));
+
+        assertThatThrownBy(() -> verifier.verify(token))
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("job claims");
+    }
+
+    // A job token signed with the active key, carrying exactly the given extra claims.
+    private String jobToken(Instant issued, Instant expires, Map<String, Object> claims) {
+        WorkerSigningKey active = keyRing.active();
+        var builder = JWT.create()
                 .withHeader(Map.of("kid", active.kid(), "typ", "job+jwt"))
                 .withIssuer("hephaestus-test")
                 .withAudience("hephaestus-worker")
@@ -100,11 +200,13 @@ class WorkerJwtTest extends BaseUnitTest {
                 .withClaim("attempt", 0)
                 .withClaim("scope", List.of("llm_proxy"))
                 .withJWTId(UUID.randomUUID().toString())
-                .withIssuedAt(past)
-                .withExpiresAt(past.plusSeconds(30))
-                .sign(Algorithm.RSA256(active.publicKey(), active.privateKey()));
-
-        assertThatThrownBy(() -> verifier.verify(token)).isInstanceOf(WorkerJwtInvalidException.class);
+                .withIssuedAt(issued)
+                .withExpiresAt(expires);
+        claims.forEach((name, value) -> {
+            if (value instanceof Instant instant) builder.withClaim(name, instant);
+            else builder.withClaim(name, value.toString());
+        });
+        return builder.sign(Algorithm.RSA256(active.publicKey(), active.privateKey()));
     }
 
     @Test

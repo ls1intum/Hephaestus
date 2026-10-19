@@ -112,7 +112,10 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
             if (workerId == null || workerId.isBlank()) {
                 throw new WorkerJwtInvalidException("missing sub claim", "claim");
             }
-            if (jobId != null || !scopeClaim(verified).isEmpty() || longClaim(verified, "workspace_id") != null) {
+            if (jobId != null
+                    || !scopeClaim(verified).isEmpty()
+                    || longClaim(verified, "workspace_id") != null
+                    || !verified.getClaim(WorkerJwtIssuer.WORK_DEADLINE_CLAIM).isMissing()) {
                 throw new WorkerJwtInvalidException("worker token contains job claims", "claim");
             }
             return new WorkerSessionJwt(workerId, jti, issuedAt, expiresAt);
@@ -128,7 +131,27 @@ public class JavaJwtWorkerJwtVerifier implements WorkerJwtVerifier {
         if (workspaceId == null || attempt == null || attempt < 0) {
             throw new WorkerJwtInvalidException("missing or invalid job binding claim", "claim");
         }
-        return new JobJwt(jobId, workspaceId, attempt, scopeClaim(verified), jti, issuedAt, expiresAt);
+        // Required: a job credential without its signed work deadline has no defined work time. The JWT leeway
+        // applies to the credential's own times, never to this claim.
+        Instant workDeadline = numericDateClaim(verified, WorkerJwtIssuer.WORK_DEADLINE_CLAIM);
+        if (workDeadline == null) {
+            throw new WorkerJwtInvalidException("missing or invalid work_deadline claim", "claim");
+        }
+        try {
+            return new JobJwt(
+                    jobId, workspaceId, attempt, scopeClaim(verified), jti, issuedAt, expiresAt, workDeadline);
+        } catch (IllegalArgumentException misordered) {
+            throw new WorkerJwtInvalidException("work_deadline out of order", "claim", misordered);
+        }
+    }
+
+    // A NumericDate is a JSON number of seconds (RFC 7519 §2); java-jwt answers null for any other value.
+    private static @Nullable Instant numericDateClaim(DecodedJWT jwt, String name) {
+        try {
+            return jwt.getClaim(name).asInstant();
+        } catch (RuntimeException e) {
+            throw new WorkerJwtInvalidException("invalid " + name + " claim", "claim", e);
+        }
     }
 
     private static @Nullable UUID uuidClaim(DecodedJWT jwt, String name) {

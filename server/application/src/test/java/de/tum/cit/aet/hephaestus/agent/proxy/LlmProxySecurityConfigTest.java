@@ -425,7 +425,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
                 Set.of(scope),
                 UUID.randomUUID().toString(),
                 now,
-                now.plusSeconds(60));
+                now.plusSeconds(60),
+                now.plusSeconds(30));
     }
 
     private static HttpSecurity httpSecurity(ApplicationContext context) {

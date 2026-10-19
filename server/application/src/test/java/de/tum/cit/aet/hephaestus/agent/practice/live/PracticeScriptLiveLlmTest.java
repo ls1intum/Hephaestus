@@ -386,11 +386,9 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         Map<ModelKind, FrozenModel> frozen = snapshot.practiceScriptModels();
         assertThat(frozen.keySet()).isEqualTo(called);
+        Instant workDeadline = Instant.now().plus(Duration.ofSeconds(LiveRunnerWorkspace.TIMEOUT_SECONDS + 300L));
         String jobToken = jwtIssuer.issueForJobUntil(
-                job.getId(),
-                context.id(),
-                job.getAttempt(),
-                Instant.now().plus(Duration.ofSeconds(LiveRunnerWorkspace.TIMEOUT_SECONDS + 300L)));
+                job.getId(), context.id(), job.getAttempt(), workDeadline, workDeadline.plus(Duration.ofMinutes(10)));
         PracticeSandboxSpec spec = practiceAdapter.buildSandboxSpec(new PracticeAgentRequest(
                 snapshot.model().apiProtocol().wire(),
                 snapshot.model().upstreamModelId(),

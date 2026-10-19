@@ -35,9 +35,14 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -55,6 +60,10 @@ class ScanCallGuardTest extends BaseUnitTest {
             new ScanCallGuard(jobs, reviews, budget, new SandboxGatewayProperties(8081, 10000, 120), mapper);
 
     private ProxyRouting route() {
+        return route(Instant.now().plusSeconds(60));
+    }
+
+    private ProxyRouting route(Instant workDeadline) {
         return new ProxyRouting(
                 "job",
                 "openai-completions",
@@ -65,7 +74,70 @@ class ScanCallGuardTest extends BaseUnitTest {
                 1L,
                 new ProxyRouting.BilledAttempt(UsageSourceType.REVIEW_JOB, job.getId(), 0, BigDecimal.ZERO, "worker"),
                 null,
-                null);
+                null,
+                workDeadline);
+    }
+
+    @Test
+    void shouldStopWaitingForTheAttemptsPreviousCallAtTheWorkDeadlineWithoutTakingItsLease() throws Exception {
+        byte[] body = "{\"max_tokens\":10}".getBytes(StandardCharsets.UTF_8);
+        var executor = Executors.newSingleThreadExecutor();
+        try (var held = guard.acquire(route(), body).orElseThrow()) {
+            assertThat(held).isNotNull();
+            // The lock is reentrant, so the waiting call runs on a thread of its own.
+            Future<?> waiting =
+                    executor.submit(() -> guard.acquire(route(Instant.now().plusSeconds(1)), body));
+
+            assertThatThrownBy(() -> waiting.get(10, TimeUnit.SECONDS))
+                    .hasCauseInstanceOf(ResponseStatusException.class)
+                    .cause()
+                    .satisfies(failure -> {
+                        var refusal = (ResponseStatusException) failure;
+                        assertThat(refusal.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                        assertThat(refusal.getReason()).isEqualTo(LlmProxyService.WORK_TIME_OVER);
+                    });
+        } finally {
+            executor.shutdownNow();
+        }
+        // The refused waiter took no lease and released none: after its holder released it, the next call of the
+        // attempt gets the lease at once.
+        var next = Executors.newSingleThreadExecutor();
+        try {
+            assertThat(next.submit(() -> {
+                                try (var lease = guard.acquire(route(), body).orElseThrow()) {
+                                    return lease != null;
+                                }
+                            })
+                            .get(10, TimeUnit.SECONDS))
+                    .isTrue();
+        } finally {
+            next.shutdownNow();
+        }
+    }
+
+    @Test
+    void shouldRefuseAWaitingCallThatIsInterruptedAndKeepItsInterrupt() throws Exception {
+        byte[] body = "{\"max_tokens\":10}".getBytes(StandardCharsets.UTF_8);
+        var executor = Executors.newSingleThreadExecutor();
+        try (var held = guard.acquire(route(), body).orElseThrow()) {
+            assertThat(held).isNotNull();
+            var interrupted = new CompletableFuture<Boolean>();
+            Future<?> waiting = executor.submit(() -> {
+                Thread.currentThread().interrupt();
+                try {
+                    guard.acquire(route(), body);
+                    interrupted.complete(false);
+                } catch (ResponseStatusException refusal) {
+                    interrupted.complete(refusal.getStatusCode() == HttpStatus.FORBIDDEN
+                            && Thread.currentThread().isInterrupted()
+                            && refusal.getCause() instanceof InterruptedException);
+                }
+            });
+            waiting.get(10, TimeUnit.SECONDS);
+            assertThat(interrupted.get()).isTrue();
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @BeforeEach

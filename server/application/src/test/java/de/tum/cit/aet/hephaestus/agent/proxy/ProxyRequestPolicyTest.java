@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +62,8 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
                 1L,
                 new ProxyRouting.BilledAttempt(source, id, 0, BigDecimal.ZERO, "worker-1"),
                 null,
-                null);
+                null,
+                source == UsageSourceType.MENTOR_TURN ? null : Instant.now().plusSeconds(60));
     }
 
     @Test
@@ -111,6 +113,7 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
                 7L,
                 8L,
                 1L,
+                null,
                 null,
                 null,
                 null);
