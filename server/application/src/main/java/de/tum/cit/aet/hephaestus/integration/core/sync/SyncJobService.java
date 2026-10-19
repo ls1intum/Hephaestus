@@ -21,11 +21,11 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.scheduling.concurrent.ExecutorConfigurationSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -434,7 +434,7 @@ public class SyncJobService implements SmartLifecycle {
      * </ul>
      *
      * <p>This returns without draining {@link #activeHandles}. The executor that runs a body owns its
-     * drain: {@code syncJobExecutor} for manual jobs, at the next-lower lifecycle phase, and the task
+     * drain: {@code syncJobExecutor} for manual jobs, at a lower lifecycle phase, and the task
      * scheduler's termination wait for scheduled jobs and the workspace syncs they wait for
      * ({@code ServerSchedulingConfig}).
      */
@@ -471,9 +471,14 @@ public class SyncJobService implements SmartLifecycle {
         return running.get();
     }
 
+    /**
+     * Stops just before the web server's graceful drain. An open live-update stream keeps that drain
+     * waiting until its phase timeout, so stopping after it would leave an in-flight sync unasked for
+     * that whole time. The executors and the task scheduler, which drain the bodies, still stop later.
+     */
     @Override
     public int getPhase() {
-        return ExecutorConfigurationSupport.DEFAULT_PHASE + 1;
+        return WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE + 1;
     }
 
     private record MarkRunningResult(boolean started, boolean cancelRequested) {}

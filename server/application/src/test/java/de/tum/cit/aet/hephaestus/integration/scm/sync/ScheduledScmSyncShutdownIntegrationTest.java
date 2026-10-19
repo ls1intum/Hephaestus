@@ -86,6 +86,10 @@ import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.util.TestPropertyValues;
+import org.springframework.boot.web.server.GracefulShutdownCallback;
+import org.springframework.boot.web.server.GracefulShutdownResult;
+import org.springframework.boot.web.server.WebServer;
+import org.springframework.boot.web.server.context.WebServerGracefulShutdownLifecycle;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -103,7 +107,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Closing that context is the shutdown. The context's DataSource records what the database showed
  * at the moment it was closed. A second {@link JdbcTemplateLockProvider} plays another replica, and
  * the sync-job rows are real. Only provider calls are controlled: the first provider call of a
- * workspace sync waits at a gate.
+ * workspace sync waits at a gate. Where a test needs the web drain, Boot's own graceful-shutdown
+ * lifecycle runs over a web server whose drain stays open until the test releases it, as an open
+ * live-update stream keeps Tomcat's drain open.
  */
 class ScheduledScmSyncShutdownIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -143,6 +149,7 @@ class ScheduledScmSyncShutdownIntegrationTest extends AbstractWorkspaceIntegrati
     private String lockName = "";
     private long connectionId;
     private @Nullable AnnotationConfigApplicationContext server;
+    private @Nullable WebServer webServer;
 
     @BeforeEach
     void setUp() {
@@ -194,6 +201,36 @@ class ScheduledScmSyncShutdownIntegrationTest extends AbstractWorkspaceIntegrati
                 .as("every task scheduler closes before the database beans")
                 .isNotEmpty()
                 .allSatisfy(dependencies -> assertThat(dependencies).contains("entityManagerFactory", "dataSource"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(Provider.class)
+    void shouldRequestCancellationBeforeTheWebDrainWhenShutdownStopsAScheduledSync(Provider provider) throws Exception {
+        HeldDrainWebServer web = new HeldDrainWebServer();
+        webServer = web;
+        startServer(provider, List.of(connectedSession(provider)), workspaceSyncs, Duration.ofSeconds(30));
+        awaitWorkspaceSyncAtGate();
+
+        Thread shutdown = Thread.ofPlatform().start(() -> requireServer().close());
+        try {
+            assertThat(web.drainBegan.await(30, TimeUnit.SECONDS)).isTrue();
+            assertThat(web.cancelRequestedWhenDrainBegan)
+                    .as("the in-flight sync was asked to cancel before the web drain began")
+                    .isTrue();
+            gate.countDown();
+            // The drain is still held here, so the sync records its outcome while requests drain.
+            await().atMost(Duration.ofSeconds(30)).until(() -> latestJob().getStatus() == SyncJobStatus.CANCELLED);
+        } finally {
+            web.releaseDrain.countDown();
+            gate.countDown();
+        }
+
+        assertThat(shutdown.join(Duration.ofSeconds(30))).isTrue();
+        AtDatabaseClose seen = atDatabaseClose.get(30, TimeUnit.SECONDS);
+        assertThat(seen.jobStatus()).isEqualTo(SyncJobStatus.CANCELLED);
+        assertThat(seen.lockReleased())
+                .as("the scheduled sync released its lock before the database closed")
+                .isTrue();
     }
 
     @ParameterizedTest
@@ -286,6 +323,13 @@ class ScheduledScmSyncShutdownIntegrationTest extends AbstractWorkspaceIntegrati
                 ServerSchedulingConfig.class,
                 TaskSchedulingAutoConfiguration.class);
         context.registerBean("syncJobService", SyncJobService.class, () -> jobs);
+        WebServer web = webServer;
+        if (web != null) {
+            context.registerBean(
+                    "webServerGracefulShutdown",
+                    WebServerGracefulShutdownLifecycle.class,
+                    () -> new WebServerGracefulShutdownLifecycle(web));
+        }
         if (provider == Provider.GITHUB) {
             lockName = lockName(GitHubDataSyncScheduler.class);
             context.registerBean(GitHubDataSyncScheduler.class, () -> gitHubScheduler(sessions, executor));
@@ -439,6 +483,35 @@ class ScheduledScmSyncShutdownIntegrationTest extends AbstractWorkspaceIntegrati
                 mock(GitLabProjectSyncService.class),
                 mock(ActivityLedgerRepair.class),
                 mock(GitLabProjectAdmission.class));
+    }
+
+    /** Records whether cancellation was already requested when the drain began, then holds the drain. */
+    private final class HeldDrainWebServer implements WebServer {
+        private final CountDownLatch drainBegan = new CountDownLatch(1);
+        private final CountDownLatch releaseDrain = new CountDownLatch(1);
+        private volatile boolean cancelRequestedWhenDrainBegan;
+
+        @Override
+        public void start() {}
+
+        @Override
+        public void stop() {}
+
+        @Override
+        public int getPort() {
+            return -1;
+        }
+
+        /** Returns at once and completes later, as Tomcat's graceful shutdown does. */
+        @Override
+        public void shutDownGracefully(GracefulShutdownCallback callback) {
+            cancelRequestedWhenDrainBegan = latestJob().isCancelRequested();
+            drainBegan.countDown();
+            Thread.ofPlatform().start(() -> {
+                awaitLatch(releaseDrain);
+                callback.shutdownComplete(GracefulShutdownResult.IDLE);
+            });
+        }
     }
 
     private AnnotationConfigApplicationContext requireServer() {
