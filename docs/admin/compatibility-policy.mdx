@@ -74,6 +74,8 @@ It does not replay archived migrations.
 
 Fresh databases initialize automatically.
 
+<a id="upgrade-paths-to-10"></a>
+
 ### Database baseline prerequisites
 
 | Installed release | Required path to the target release                                                                                          |
@@ -81,6 +83,10 @@ Fresh databases initialize automatically.
 | ≤ v0.77.3         | Install v0.77.4 and start it once → [baseline synchronization runbook](./liquibase-baseline-runbook.md) → target release |
 | v0.77.4           | [Baseline synchronization runbook](./liquibase-baseline-runbook.md) → target release                                     |
 | ≥ v0.78.0         | The baseline is already synchronized. Follow the target release migration procedure                                                 |
+
+The v0.81.0 migration guide entry names v1.0.0 as the target release.
+Use the release that you upgrade to as the target release.
+Synchronize with the signed image of that release, as the [baseline synchronization runbook](./liquibase-baseline-runbook.md) describes.
 
 The database history, not the image tag alone, determines whether it has reached the cut-point.
 Startup and the runbook's synchronization command refuse nonempty migration history without the
