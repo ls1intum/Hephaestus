@@ -625,3 +625,113 @@ void test("required outcome warrants and NOT_MET problems are never optionalized
 		"MET",
 	);
 });
+
+function refusalOf(submit: () => unknown): string {
+	try {
+		submit();
+	} catch (error) {
+		assert.ok(error instanceof Error);
+		return error.message;
+	}
+	assert.fail("The call was accepted");
+}
+
+/** The JSON example that follows a correction label in a refusal. */
+function exampleAfter(message: string, label: string): object {
+	const start = message.indexOf(label);
+	assert.notEqual(start, -1, message);
+	const text = message.slice(start + label.length);
+	for (let end = text.indexOf("}."); end >= 0; end = text.indexOf("}.", end + 1)) {
+		let example: unknown;
+		try {
+			example = JSON.parse(text.slice(0, end + 1));
+		} catch {
+			// The example continues past this delimiter.
+			example = undefined;
+		}
+		if (typeof example === "object" && example !== null && !Array.isArray(example)) {
+			return example;
+		}
+	}
+	assert.fail(message);
+}
+
+/** The facts of the refused review, sent in the declared shape. */
+const submitted = {
+	outcome: "NOT_MET",
+	summary: result.summary,
+	explanation: result.explanation,
+	citations: [treeCitation],
+	problems: [problem],
+	evidence: {},
+};
+
+void test("a singular argument wrapper is refused, and its correction holds only declared fields for the original facts", () => {
+	// The live refusals: the singular wrapper alone, then beside the declared fields, then alone again.
+	const wrapped = { argument: JSON.stringify(submitted) };
+	const refusal = refusalOf(() => prepareSubmittedResult(wrapped));
+	assert.match(
+		refusal,
+		/^outcome: expected .* It leaves out argument: .* Replace outcome, summary, explanation, citations, evidence with the facts of your original call;.*no outcome was inferred\.$/u,
+	);
+	const template = exampleAfter(refusal, "Corrected call example: ");
+	assert.deepEqual(template, {
+		outcome: "<MET | NOT_MET | DOES_NOT_APPLY | COULD_NOT_DETERMINE>",
+		summary: "<copy your summary>",
+		explanation: "<copy your explanation>",
+		citations: [],
+		evidence: {},
+	});
+	assert.equal(Object.hasOwn(template, "argument"), false);
+	// An outcome alone does not complete the template; the original facts still have to be supplied.
+	assert.throws(() => prepareSubmittedResult({ ...template, outcome: "NOT_MET" }));
+	const resubmitted = prepareSubmittedResult({ ...template, ...submitted });
+	assert.deepEqual(resubmitted, prepareSubmittedResult(submitted));
+	assert.equal(resubmitted.outcome, "NOT_MET");
+
+	// The wrapper is still not read, whatever fields come beside it.
+	const withOutcome = refusalOf(() => prepareSubmittedResult({ ...wrapped, outcome: "NOT_MET" }));
+	assert.doesNotMatch(
+		JSON.stringify(exampleAfter(withOutcome, "Corrected call example: ")),
+		/"argument"/u,
+	);
+	assert.match(withOutcome, /It leaves out argument:/u);
+});
+
+void test("declared fields beside an argument key are refused, and the arguments-wrapped correction is accepted", () => {
+	for (const sent of [
+		{ ...submitted, argument: JSON.stringify(submitted) },
+		{ arguments: { ...submitted, argument: JSON.stringify(submitted) } },
+	]) {
+		const refusal = refusalOf(() => prepareSubmittedResult(sent));
+		assert.match(refusal, /^arguments: Unrecognized key: "argument"\. /u);
+		const corrected = exampleAfter(refusal, "Corrected field example: ");
+		assert.deepEqual(Object.keys(corrected), ["arguments"]);
+		assert.deepEqual(prepareSubmittedResult(corrected), prepareSubmittedResult(submitted));
+	}
+	assert.deepEqual(
+		prepareSubmittedResult({ arguments: submitted }),
+		prepareSubmittedResult(submitted),
+	);
+});
+
+void test("malformed inputs inside or beside a wrapper are still refused", () => {
+	for (const sent of [
+		{ argument: '{"outcome":"NOT_MET"' },
+		{ arguments: { ...submitted, problems: '[{"summary":"Unchecked call"' } },
+		{ arguments: { ...submitted, citations: [{ ...treeCitation, endLine: "end" }] } },
+		{ arguments: { ...submitted, evidence: { search: "the diff" } } },
+	]) {
+		assert.throws(() => prepareSubmittedResult(sent), JSON.stringify(sent));
+	}
+	const envelope = refusalOf(() => prepareSubmittedResult({ arguments: '{"outcome":"MET"' }));
+	assert.deepEqual(exampleAfter(envelope, "Corrected call example: "), {
+		arguments: {
+			outcome: "<MET | NOT_MET | DOES_NOT_APPLY | COULD_NOT_DETERMINE>",
+			summary: "<copy your summary>",
+			explanation: "<copy your explanation>",
+			citations: [],
+			evidence: {},
+		},
+	});
+});

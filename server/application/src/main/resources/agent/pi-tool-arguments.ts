@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 
+import { resultToolSchemas } from "./pi-result-schema.ts";
 import { unwrapToolArguments } from "./pi-tool-validation.ts";
 
 import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
@@ -143,6 +144,57 @@ function absentQuestions(value: unknown): boolean {
 	return value == null || (Array.isArray(value) && value.length === 0);
 }
 
+// The declared top-level fields and their requirements do not depend on the available source kinds.
+const RESULT_SCHEMA: unknown = resultToolSchemas([]).result;
+const RESULT_FIELDS: Record<string, unknown> =
+	isRecord(RESULT_SCHEMA) && isRecord(RESULT_SCHEMA.properties) ? RESULT_SCHEMA.properties : {};
+const REQUIRED_RESULT_FIELDS: readonly string[] =
+	isRecord(RESULT_SCHEMA) && Array.isArray(RESULT_SCHEMA.required)
+		? RESULT_SCHEMA.required.filter((key: unknown): key is string => typeof key === "string")
+		: [];
+
+function placeholder(key: string): unknown {
+	const field = RESULT_FIELDS[key];
+	const schema = isRecord(field) ? field : {};
+	if (Array.isArray(schema.enum)) {
+		return `<${schema.enum.join(" | ")}>`;
+	}
+	if (schema.type === "array") {
+		return [];
+	}
+	return schema.type === "object" ? {} : `<copy your ${key}>`;
+}
+
+/**
+ * A complete call in the declared result shape. Declared fields keep their sent values exactly. An undeclared
+ * top-level field is left out unread, so a wrapper that the tool does not accept is never decoded. A missing
+ * required field is a placeholder that only the original facts can replace.
+ */
+function resultCall(call: Record<string, unknown>) {
+	const undeclared = Object.keys(call).filter((key) => !Object.hasOwn(RESULT_FIELDS, key));
+	const missing = REQUIRED_RESULT_FIELDS.filter((key) => call[key] === undefined);
+	const example = {
+		...Object.fromEntries(
+			Object.entries(call).filter(([key]) => Object.hasOwn(RESULT_FIELDS, key)),
+		),
+		...Object.fromEntries(missing.map((key): [string, unknown] => [key, placeholder(key)])),
+	};
+	const notes = [
+		undeclared.length === 0
+			? ""
+			: ` It leaves out ${undeclared.join(", ")}: submit_result does not read an undeclared top-level field, so send its facts in the declared fields.`,
+		missing.length === 0
+			? ""
+			: ` Replace ${missing.join(", ")} with the facts of your original call; a placeholder or empty value is not content.`,
+	].join("");
+	return { example, notes };
+}
+
+function correctedCall(call: Record<string, unknown>): string {
+	const { example, notes } = resultCall(call);
+	return `Corrected call example: ${JSON.stringify(example)}.${notes}`;
+}
+
 /** Prepare one Problem body using the same transport rules as inline problems. */
 export function prepareProblemArguments(raw: unknown): unknown {
 	const problem = object(raw);
@@ -190,7 +242,7 @@ export function prepareResultArguments(args: unknown): Record<string, unknown> {
 			typeof entry[1] === "string"
 		) {
 			throw new Error(
-				`${entry[0]}: expected a complete result object or its JSON encoding. The string is not a complete JSON object. Corrected call example: ${JSON.stringify({ [entry[0]]: { outcome: "<MET | NOT_MET | DOES_NOT_APPLY | COULD_NOT_DETERMINE>", summary: "<copy your summary>", explanation: "<copy your explanation>", citations: [], evidence: {} } })}. Copy your original claims and citations. Choose the outcome and its evidence shape; no content or outcome was inferred.`,
+				`${entry[0]}: expected a complete result object or its JSON encoding. The string is not a complete JSON object. Corrected call example: ${JSON.stringify({ [entry[0]]: resultCall({}).example })}. Copy your original claims and citations. Choose the outcome and its evidence shape; no content or outcome was inferred.`,
 			);
 		}
 	}
@@ -330,7 +382,7 @@ function prepareEvidence(result: Record<string, unknown>): Record<string, unknow
 									const question = object(raw);
 									if (typeof question === "string") {
 										throw new Error(
-											`evidence.openQuestions: each question requires openQuestion and wouldSettleIt. Corrected call example: ${JSON.stringify({ ...result, evidence: { ...evidence, openQuestions: questions.map((item: unknown) => (typeof item === "string" ? { openQuestion: item, wouldSettleIt: "<existing evidence that would settle this question>" } : item)) } })}. Name the evidence; no answer was inferred.`,
+											`evidence.openQuestions: each question requires openQuestion and wouldSettleIt. ${correctedCall({ ...result, evidence: { ...evidence, openQuestions: questions.map((item: unknown) => (typeof item === "string" ? { openQuestion: item, wouldSettleIt: "<existing evidence that would settle this question>" } : item)) } })} Name the evidence; no answer was inferred.`,
 										);
 									}
 									return isRecord(question) && !Array.isArray(question) && question.citation != null
@@ -417,7 +469,7 @@ export function validateResultEvidence(
 		}
 		default: {
 			throw new Error(
-				`outcome: expected MET, NOT_MET, DOES_NOT_APPLY, or COULD_NOT_DETERMINE. Supply the outcome supported by the evidence. Corrected call example: ${JSON.stringify({ ...result, outcome: "<MET | NOT_MET | DOES_NOT_APPLY | COULD_NOT_DETERMINE>" })}. The example requires your decision; no outcome was inferred.`,
+				`outcome: expected MET, NOT_MET, DOES_NOT_APPLY, or COULD_NOT_DETERMINE. Supply the outcome supported by the evidence. ${correctedCall({ ...result, outcome: undefined })} The example requires your decision; no outcome was inferred.`,
 			);
 		}
 	}
@@ -435,7 +487,7 @@ export function validateResultEvidence(
 		const requirement =
 			required === undefined ? "Omit unused fields or use null." : `Required: ${required}.`;
 		throw new Error(
-			`${field}: expected an evidence object for ${outcome} with only ${allowed.join(", ")}. ${requirement} Corrected field example: ${JSON.stringify({ evidence: corrected })}. Corrected call example: ${JSON.stringify({ ...result, evidence: corrected })}. Example shows shape only; keep only claims supported by captured evidence. Send the complete call again.`,
+			`${field}: expected an evidence object for ${outcome} with only ${allowed.join(", ")}. ${requirement} Corrected field example: ${JSON.stringify({ evidence: corrected })}. ${correctedCall({ ...result, evidence: corrected })} Example shows shape only; keep only claims supported by captured evidence. Send the complete call again.`,
 		);
 	}
 }
