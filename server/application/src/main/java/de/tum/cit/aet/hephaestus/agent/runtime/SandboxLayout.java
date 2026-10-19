@@ -183,10 +183,12 @@ public final class SandboxLayout {
     public static final int EXIT_PROVIDER_UNREACHABLE = 76;
 
     /**
-     * Exit code emitted by the Pi runner when the review is admitted and its public review is accepted, but the run
-     * itself stopped private feedback composition: it reached its safety ceiling or stalled. Another attempt can
-     * compose it from the original inputs, if the server prepared no private piece yet. Otherwise the attempt ends
-     * like any admitted run.
+     * Exit code emitted by the Pi runner when the review is admitted, but the run itself stopped feedback composition:
+     * it reached its safety ceiling or stalled. Another attempt can compose it from the original inputs. The runner asks
+     * for it for private feedback only once a review on the work exists, and for the review on the work only from the
+     * attempt that admitted the results. The server allows private feedback after an accepted review on the work while
+     * no private piece is prepared, and otherwise only the attempt that admitted the results. Otherwise the attempt
+     * ends like any admitted run.
      */
     public static final int EXIT_COMPOSITION_OWED = 77;
 

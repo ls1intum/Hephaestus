@@ -10,7 +10,7 @@ import {
 	buildFeedbackTool,
 	closeUnroutedPrivateDestinations,
 	persistComposedFeedback,
-	privateCompositionOwed,
+	compositionOwed,
 	type ComposedFeedback,
 	type PublicReviewState,
 } from "../../../main/resources/agent/pi-composition-stage.ts";
@@ -770,24 +770,36 @@ const composedWithFailures = (
 	preparation: null,
 });
 
-void test("only private composition the run stopped after an accepted public review is owed", () => {
+void test("only composition the run stopped is owed: the review on the work from the admitting attempt, private feedback once a review exists", () => {
 	for (const reason of ["SAFETY", "STALL"] as const) {
-		assert.equal(
-			privateCompositionOwed(composedWithFailures([{ phase: "PRIVATE_FEEDBACK", reason }])),
-			true,
-			reason,
-		);
-		// An unsettled review on the work is never composed again because private feedback is owed.
-		assert.equal(
-			privateCompositionOwed(
-				composedWithFailures([
-					{ phase: "PUBLIC_REVIEW", reason: "SAFETY" },
-					{ phase: "PRIVATE_FEEDBACK", reason },
-				]),
-			),
-			false,
-			reason,
-		);
+		for (const admitting of [true, false]) {
+			for (const reviewOnWork of [true, false]) {
+				// Private feedback is owed from any attempt, but only once a review on the work exists.
+				assert.equal(
+					compositionOwed(composedWithFailures([{ phase: "PRIVATE_FEEDBACK", reason }]), {
+						admitting,
+						reviewOnWork,
+					}),
+					reviewOnWork,
+					reason,
+				);
+				// The review on the work the run stopped: one more attempt from the admitting attempt, never from its
+				// continuation, whatever happened to private feedback.
+				for (const failures of [
+					[{ phase: "PUBLIC_REVIEW", reason }],
+					[
+						{ phase: "PUBLIC_REVIEW", reason },
+						{ phase: "PRIVATE_FEEDBACK", reason: "SAFETY" },
+					],
+				] as const) {
+					assert.equal(
+						compositionOwed(composedWithFailures([...failures]), { admitting, reviewOnWork }),
+						admitting,
+						reason,
+					);
+				}
+			}
+		}
 	}
 	for (const reason of [
 		"MODEL_ERROR",
@@ -797,12 +809,30 @@ void test("only private composition the run stopped after an accepted public rev
 		"NO_DECISION",
 		"SERVER_REFUSED",
 		"PRIVATE_NOT_RECOVERED",
+		"PUBLIC_DELIVERY_UNRESOLVED",
+		"PUBLIC_HISTORY_CHANGED",
 	] as const) {
+		const owed = { admitting: true, reviewOnWork: true };
 		assert.equal(
-			privateCompositionOwed(composedWithFailures([{ phase: "PRIVATE_FEEDBACK", reason }])),
+			compositionOwed(composedWithFailures([{ phase: "PRIVATE_FEEDBACK", reason }]), owed),
+			false,
+			reason,
+		);
+		// A typed or work-bound outcome of the review on the work is final, even if private feedback ran out of time.
+		assert.equal(
+			compositionOwed(
+				composedWithFailures([
+					{ phase: "PUBLIC_REVIEW", reason },
+					{ phase: "PRIVATE_FEEDBACK", reason: "SAFETY" },
+				]),
+				owed,
+			),
 			false,
 			reason,
 		);
 	}
-	assert.equal(privateCompositionOwed(composedWithFailures([])), false);
+	assert.equal(
+		compositionOwed(composedWithFailures([]), { admitting: true, reviewOnWork: true }),
+		false,
+	);
 });

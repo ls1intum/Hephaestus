@@ -166,7 +166,7 @@ public class PullRequestContentSource {
         }
         if (selectedKinds.contains(COMMENTS)) {
             CommentCapture comments = loadComments(capture.workspaceId(), pullRequestId);
-            storeComments(files, comments.comments());
+            storeComments(files, comments);
             completeness.put(COMMENTS, comments.complete() ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL);
             contentStates.put(
                     COMMENTS, comments.comments().isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
@@ -297,8 +297,8 @@ public class PullRequestContentSource {
         return record;
     }
 
-    private void storeComments(Map<String, byte[]> files, List<PullRequestReviewComment> comments) {
-        JsonNode serialized = buildReviewComments(comments);
+    private void storeComments(Map<String, byte[]> files, CommentCapture comments) {
+        JsonNode serialized = buildReviewComments(comments.comments(), comments.delivered());
         try {
             files.put(
                     OUTPUT_PREFIX + "comments.json",
@@ -416,10 +416,10 @@ public class PullRequestContentSource {
         boolean complete = true;
         comments.sort(Comparator.comparing(
                 PullRequestReviewComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
-        return new CommentCapture(comments, complete);
+        return new CommentCapture(comments, postedComments, complete);
     }
 
-    private JsonNode buildReviewComments(List<PullRequestReviewComment> comments) {
+    private JsonNode buildReviewComments(List<PullRequestReviewComment> comments, Set<Long> delivered) {
         var commentsArray = objectMapper.createArrayNode();
         for (var comment : comments) {
             var commentNode = objectMapper.createObjectNode();
@@ -431,8 +431,11 @@ public class PullRequestContentSource {
             if (comment.getThread() != null && comment.getThread().getId() != null) {
                 commentNode.put("thread", comment.getThread().getId());
             }
-            if (comment.getInReplyTo() != null && comment.getInReplyTo().getId() != null) {
-                commentNode.put("in_reply_to", comment.getInReplyTo().getId());
+            PullRequestReviewComment parent = comment.getInReplyTo();
+            if (parent != null && parent.getId() != null) {
+                commentNode.put("in_reply_to", parent.getId());
+                String omitted = omittedParentReason(parent, delivered);
+                if (omitted != null) commentNode.put("in_reply_to_omitted_reason", omitted);
             }
             commentNode.put("path", comment.getPath());
             // line is a primitive int; a file-level comment has no anchor and reports 0. Omit the
@@ -473,5 +476,17 @@ public class PullRequestContentSource {
         return commentsArray;
     }
 
-    private record CommentCapture(List<PullRequestReviewComment> comments, boolean complete) {}
+    /**
+     * Why the capture left a reply's parent out, by the rule that left it out: the delivered-feedback ledger
+     * first, then the feedback marker that the repository query filters on. A person can quote the marker, so
+     * that reason names the rule, not who wrote the parent. A parent that no rule left out has no reason.
+     */
+    private static @Nullable String omittedParentReason(PullRequestReviewComment parent, Set<Long> delivered) {
+        if (parent.getNativeId() != null && delivered.contains(parent.getNativeId())) return "DELIVERED_FEEDBACK";
+        String body = parent.getBody();
+        if (body != null && body.contains(WorkspaceScmProjection.HEPHAESTUS_MARKER)) return "FEEDBACK_MARKER";
+        return null;
+    }
+
+    private record CommentCapture(List<PullRequestReviewComment> comments, Set<Long> delivered, boolean complete) {}
 }

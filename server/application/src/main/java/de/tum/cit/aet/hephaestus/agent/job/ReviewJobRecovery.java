@@ -20,6 +20,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** Recovers lost attempts without repeating admitted results or losing their measured spend. */
@@ -35,6 +38,7 @@ public class ReviewJobRecovery {
     }
 
     private static final Logger log = LoggerFactory.getLogger(ReviewJobRecovery.class);
+    private static final Set<String> STOPPED_BY_THE_RUN = Set.of("SAFETY", "STALL");
     private final ReviewJobRepository jobs;
     private final AgentProperties properties;
     private final ObjectMapper mapper;
@@ -126,25 +130,33 @@ public class ReviewJobRecovery {
     }
 
     /**
-     * Continues an admitted attempt whose private feedback composition the run stopped. The locked row decides: an
-     * accepted public review, so no attempt composes public feedback again, and no prepared private piece, so none is
-     * composed twice. The attempt returned, so it is billed once from its own report, selected as at a terminal write,
-     * and keeps the practice script runs it reported.
+     * Continues an admitted attempt whose feedback composition the run stopped. The locked row decides. After an
+     * accepted review on the work, only private feedback is owed, and only while no private piece is prepared, so none
+     * is composed twice; the attempt's own report does not matter, as a response the runner lost does not undo the
+     * review the row accepted. Without one, only the attempt that admitted the results may continue, and only when
+     * its feedback report says the run stopped the review on the work itself. An attempt that continued it had the
+     * whole run for composition and ends with its outcome. A prepared private piece stays as it is, and the next attempt
+     * composes no private feedback. Recovery after a lost worker is separate and keeps its own shared retry limit. The
+     * attempt returned, so it is billed once from its own report, selected as at a terminal write, and keeps the
+     * practice script runs it reported.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean continueComposition(
             ReviewJob job,
             String workerId,
             AgentResult.@Nullable LlmUsage runnerUsage,
-            byte @Nullable [] scriptReport) {
+            byte @Nullable [] scriptReport,
+            byte @Nullable [] feedbackReport) {
         if (continuation.isEmpty()) return false;
         continuation.get().holdRecoveryCustody();
         ReviewJob locked = jobs.lockById(job.getId()).orElse(null);
         if (!owns(locked, workerId, job.getAttempt())) return false;
         ReviewJob owned = Objects.requireNonNull(locked);
-        if (!ResultAdmissionService.isAdmitted(owned)
-                || owned.getPublicReviewDigest() == null
-                || ResultAdmissionService.privatePrepared(owned)) return false;
+        if (!ResultAdmissionService.isAdmitted(owned)) return false;
+        boolean owed = owned.getPublicReviewDigest() != null
+                ? !ResultAdmissionService.privatePrepared(owned)
+                : !ResultAdmissionService.isContinuation(owned) && reviewOnTheWorkStopped(owned, feedbackReport);
+        if (!owed) return false;
         TerminalUsage spent = TerminalUsage.resolve(
                 runnerUsage,
                 counts(owned),
@@ -170,6 +182,43 @@ public class ReviewJobRecovery {
             });
         }
         return changed > 0;
+    }
+
+    /**
+     * Whether the attempt's feedback report, one JSON object as the runner writes it, is for the admission the row
+     * holds and names exactly one failure of the review on the work, a stop the run made. Anything else asks for
+     * nothing.
+     */
+    private boolean reviewOnTheWorkStopped(ReviewJob owned, byte @Nullable [] feedbackReport) {
+        if (feedbackReport == null) return false;
+        JsonNode report;
+        try {
+            report = mapper.readerFor(JsonNode.class)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(feedbackReport);
+        } catch (JacksonException unreadable) {
+            return false;
+        }
+        if (report == null || !report.isObject()) return false;
+        JsonNode digest = report.get("admissionDigest");
+        JsonNode failures = report.get("compositionFailures");
+        if (digest == null
+                || !digest.isString()
+                || !digest.asString().equals(owned.getAdmissionDigest())
+                || failures == null
+                || !failures.isArray()) return false;
+        int publicFailures = 0;
+        boolean stopped = false;
+        for (JsonNode failure : failures) {
+            JsonNode phase = failure.get("phase");
+            JsonNode reason = failure.get("reason");
+            if (phase == null || !phase.isString() || reason == null || !reason.isString()) return false;
+            if (phase.asString().equals("PUBLIC_REVIEW")) {
+                publicFailures++;
+                stopped = STOPPED_BY_THE_RUN.contains(reason.asString());
+            }
+        }
+        return publicFailures == 1 && stopped;
     }
 
     private static boolean owns(@Nullable ReviewJob job, String workerId, int attempt) {

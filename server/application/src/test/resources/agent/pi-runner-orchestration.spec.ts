@@ -677,6 +677,8 @@ let reviewExtensions: ExtensionFactory[] = [];
 const unavailableContext = process.env.PI_UNAVAILABLE_CONTEXT === "true";
 /** The private composer's response ends, but its compaction stays busy until the run's own deadline. */
 const privateHold = process.env.PI_PRIVATE_HOLD === "true";
+/** The review composer's response ends, but its compaction stays busy until the run's own deadline. */
+const publicHold = process.env.PI_PUBLIC_HOLD === "true";
 const counterevidence = process.env.PI_COUNTEREVIDENCE === "true";
 const reviewCompacted = process.env.PI_REVIEW_COMPACTED === "true";
 const reviewerOnly = process.env.PI_REVIEWER_ONLY === "true";
@@ -903,6 +905,9 @@ if (scenario !== undefined && scenario !== "") {
 					{ schemaVersion: 1, accepted: false, reasons: ["Refused"] },
 					{ status: 422 },
 				);
+			}
+			if (mode === "public-unavailable" && preparation.publicComposition === true) {
+				throw new DOMException("The preparation response was not received", "TimeoutError");
 			}
 			if (mode === "lost-ack" && publicCompletionAttempts === 1) {
 				throw new TypeError("fetch failed");
@@ -1705,17 +1710,26 @@ if (scenario !== undefined && scenario !== "") {
 					};
 					return opened;
 				}
+				// A request the runner lets through reaches this stream with the output it was granted.
+				const agent = {
+					state: { tools: [] },
+					finishTurn: async () => {
+						record("native-finish-turn");
+						return { action: "continue" };
+					},
+					streamFunction: (
+						_model: unknown,
+						_context: unknown,
+						requestOptions?: { maxTokens?: number },
+					) => {
+						record(`stream-request:${String(requestOptions?.maxTokens)}`);
+					},
+				};
 				return {
 					extensionsResult: { errors: [] },
 					session: {
 						state: { messages: [] },
-						agent: {
-							state: { tools: [] },
-							finishTurn: async () => {
-								record("native-finish-turn");
-								return { action: "continue" };
-							},
-						},
+						agent,
 						systemPrompt: "",
 						model: { contextWindow: 128_000, maxTokens: 16_384 },
 						settingsManager: { getCompactionSettings: () => ({ reserveTokens: 16_384 }) },
@@ -1819,6 +1833,36 @@ if (scenario !== undefined && scenario !== "") {
 							prompts += 1;
 							record(`prompt:${prompts}`);
 							writeFileSync(nodePath.join(cwd, `prompt-${prompts}.md`), text);
+							if (
+								scenario === "compose-request-caps" &&
+								(options.tools.includes("report_review") ||
+									options.tools.includes("report_feedback"))
+							) {
+								// Each request asks for the model's ceiling; the turn grants only what it has left.
+								const phase = options.tools.includes("report_review") ? "public" : "private";
+								const request = () => {
+									try {
+										agent.streamFunction({ maxTokens: 16_384 }, {}, { maxTokens: 16_384 });
+									} catch {
+										record(`stream-request-refused:${phase}`);
+									}
+								};
+								// Each response stays within what it was granted, so the turn ends on its work budget.
+								for (const output of [16_383, 7616, 1]) {
+									request();
+									emit({
+										type: "message_end",
+										message: {
+											role: "assistant",
+											stopReason: "stop",
+											usage: callUsage(output),
+											content: [],
+										},
+									});
+								}
+								request();
+								return;
+							}
 							if (scenario.startsWith("provider-reply-")) {
 								const mode = scenario.slice("provider-reply-".length);
 								if (prompts === 1) {
@@ -2062,7 +2106,7 @@ if (scenario !== undefined && scenario !== "") {
 									record("review-retry");
 									return;
 								}
-								if (scenario === "compose-settle-deadline") {
+								if (scenario === "compose-settle-deadline" || publicHold) {
 									// A whole review is refused, and then the response ends while its auto-compaction
 									// remains busy until the deadline: no final review is ever stored.
 									const refused = await review
@@ -3519,6 +3563,9 @@ if (scenario !== undefined && scenario !== "") {
 		"settle-safety",
 		"compose-settle-deadline",
 		"compose-private-safety",
+		"compose-private-only-safety",
+		"compose-private-unacknowledged-public",
+		"compose-request-caps",
 		"provider-error",
 		"provider-reply-unanswered-stall",
 		"provider-reply-refused-error",
@@ -3575,6 +3622,7 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-continuation-private",
 		"compose-continuation-private-prepared",
 		"compose-continuation-private-safety",
+		"compose-continuation-public-safety",
 		"compose-continuation-stale",
 		"compose-continuation-unresolved",
 		"compose-fresh-history",
@@ -3612,6 +3660,9 @@ if (scenario !== undefined && scenario !== "") {
 				["compose-continuation-private", "compose-continuation"],
 				["compose-continuation-private-prepared", "compose-continuation"],
 				["compose-continuation-private-safety", "compose-continuation"],
+				["compose-continuation-public-safety", "compose-continuation"],
+				["compose-private-only-safety", "compose-private-safety"],
+				["compose-private-unacknowledged-public", "compose-private-safety"],
 				["compose-continuation-stale", "compose-continuation"],
 				["compose-continuation-unresolved", "compose-continuation"],
 				["compose-completion-accepted", "compose"],
@@ -3708,6 +3759,8 @@ if (scenario !== undefined && scenario !== "") {
 					"does not ask the composer once more after the run reaches its safety ceiling",
 				"compose-private-safety":
 					"owes private feedback the run stopped at its safety ceiling after the public review was prepared",
+				"compose-private-unacknowledged-public":
+					"leaves a lost public preparation response for the server to decide after a private safety stop",
 				"provider-reply-unanswered-stall":
 					"retries only when no model or tool answer preceded a stall",
 				"provider-reply-refused-error":
@@ -3766,6 +3819,12 @@ if (scenario !== undefined && scenario !== "") {
 					"continues an admitted review whose public delivery stays unresolved without composing it again",
 				"compose-continuation-private-safety":
 					"owes the private feedback a continuation's own ceiling stopped after the review it composed was prepared",
+				"compose-continuation-public-safety":
+					"ends a continuation whose own ceiling stopped the review on the work, without another attempt",
+				"compose-private-only-safety":
+					"ends a run without a requested review on the work whose own ceiling stopped private feedback",
+				"compose-request-caps":
+					"grants each composer request no more output than its turn has left, and no request once it is spent",
 				"compose-overflow":
 					"compacts the session before a composition prompt that would not fit beside what it holds",
 				"compose-silent":
@@ -3936,7 +3995,9 @@ if (scenario !== undefined && scenario !== "") {
 											...SERVER_COMPOSITION_REQUEST,
 											destinations: {
 												PRACTICE_PAGE: { maxPieces: 1 },
-												ON_WORK: { maxPieces: 1 },
+												...(fixture === "compose-private-only-safety"
+													? {}
+													: { ON_WORK: { maxPieces: 1 } }),
 												...((stage === "compose-support" || stage === "compose-already-said") &&
 												fixture !== "compose-support-refused-only"
 													? {
@@ -4174,7 +4235,10 @@ if (scenario !== undefined && scenario !== "") {
 					);
 					// A continuation measures nothing: its whole budget is composition, and this one ends inside it.
 					const budgetMs =
-						new Map([["compose-continuation-private-safety", "3000"]]).get(fixture) ??
+						new Map([
+							["compose-continuation-private-safety", "3000"],
+							["compose-continuation-public-safety", "3000"],
+						]).get(fixture) ??
 						(stage === "stall" || stage.endsWith("-stall") ? "3600000" : "60000");
 					const child = spawnSync(
 						process.execPath,
@@ -4192,12 +4256,14 @@ if (scenario !== undefined && scenario !== "") {
 									: new Map([
 											["compose-continuation-stale", "stale"],
 											["compose-continuation-unresolved", "unresolved"],
+											["compose-private-unacknowledged-public", "public-unavailable"],
 										]).get(fixture),
 								PI_PRACTICE_PAGE_SUPPORT_MODE: fixture.startsWith("compose-support-")
 									? fixture.slice("compose-support-".length)
 									: new Map([["compose-already-said-inline", "first-inline"]]).get(fixture),
 								PI_UNAVAILABLE_CONTEXT: String(fixture === "compose-context-unavailable"),
 								PI_PRIVATE_HOLD: String(fixture === "compose-continuation-private-safety"),
+								PI_PUBLIC_HOLD: String(fixture === "compose-continuation-public-safety"),
 								PI_PUBLIC_HISTORY_MODE: new Map([
 									["compose-fresh-history", "fresh"],
 									["compose-history-unavailable-words", "unavailable-words"],
@@ -4906,6 +4972,51 @@ if (scenario !== undefined && scenario !== "") {
 							break;
 						}
 						case "compose-private-safety": {
+							if (fixture === "compose-private-only-safety") {
+								// No review on the work was requested, so no review exists for private feedback to follow:
+								// the run's own ceiling ends it, with no further attempt.
+								assert.equal(child.status, 0, child.stderr);
+								assert.ok(
+									!events.some(
+										(event) =>
+											event.startsWith("create:session") && event.includes("report_review"),
+									),
+									events.join("\n"),
+								);
+								assert.ok(!events.includes("prepare-public:true"), events.join("\n"));
+								const stopped: unknown = JSON.parse(
+									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+								);
+								assert.ok(isRecord(stopped));
+								assert.deepEqual(stopped.compositionFailures, [
+									{ phase: "PRIVATE_FEEDBACK", reason: "SAFETY" },
+								]);
+								break;
+							}
+							if (fixture === "compose-private-unacknowledged-public") {
+								const stopped: unknown = JSON.parse(
+									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+								);
+								assert.ok(isRecord(stopped));
+								assert.notEqual(stopped.review, null);
+								assert.equal(stopped.preparation, null);
+								assert.deepEqual(stopped.compositionFailures, [
+									{ phase: "PRIVATE_FEEDBACK", reason: "SAFETY" },
+								]);
+								assert.ok(events.includes("prepare-public:true"), events.join("\n"));
+								const privateSession = events.findIndex(
+									(event) =>
+										event.startsWith("create:session") && event.includes("report_feedback"),
+								);
+								assert.ok(privateSession !== -1, events.join("\n"));
+								assert.ok(
+									events.slice(privateSession + 1).some((event) => event.startsWith("prompt:")),
+									events.join("\n"),
+								);
+								assert.match(child.stderr, /public review preparation: UNAVAILABLE/u);
+								assert.equal(child.status, 77, child.stderr);
+								break;
+							}
 							// The public review is prepared; the run's own ceiling stopped private composition.
 							assert.equal(child.status, 77, child.stderr);
 							assert.ok(events.includes("prepare-public:true"), events.join("\n"));
@@ -4918,8 +5029,39 @@ if (scenario !== undefined && scenario !== "") {
 							]);
 							break;
 						}
-						case "compose-settle-deadline": {
+						case "compose-request-caps": {
+							// A composer request is bounded like a practice's: never more output than its turn has left,
+							// and none once the turn is spent. Each phase keeps its own allowance.
 							assert.equal(child.status, 0, child.stderr);
+							assert.deepEqual(
+								events.filter((event) => event.startsWith("stream-request")),
+								[
+									"stream-request:16384",
+									"stream-request:7617",
+									"stream-request:1",
+									"stream-request-refused:public",
+									"stream-request:16384",
+									"stream-request:7617",
+									"stream-request:1",
+									"stream-request-refused:private",
+								],
+								child.stderr,
+							);
+							const capped: unknown = JSON.parse(
+								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+							);
+							assert.ok(isRecord(capped));
+							// A spent work budget is the work's outcome, not one more attempt.
+							assert.deepEqual(capped.compositionFailures, [
+								{ phase: "PUBLIC_REVIEW", reason: "BUDGET" },
+								{ phase: "PRIVATE_FEEDBACK", reason: "BUDGET" },
+							]);
+							break;
+						}
+						case "compose-settle-deadline": {
+							// The admitting attempt's own ceiling stopped the review on the work: it is owed to one more
+							// attempt, which composes it from the same admitted results.
+							assert.equal(child.status, 77, child.stderr);
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("prompt:")),
 								["prompt:1", "prompt:2"],
@@ -6846,6 +6988,31 @@ for (const item of nullableCases) {
 								fixture === "compose-continuation-private-safety" ? 77 : 0,
 								child.stderr,
 							);
+							if (fixture === "compose-continuation-public-safety") {
+								// The continuation had the whole run for composition: its own ceiling ends the review on
+								// the work for good, with no further attempt and no private feedback started.
+								assert.equal(
+									events.filter((event) => event.startsWith("create:session")).length,
+									1,
+									events.join("\n"),
+								);
+								assert.ok(
+									!events.some((event) => event.startsWith("private-turn")),
+									events.join("\n"),
+								);
+								assert.ok(!events.includes("prepare-public:true"), events.join("\n"));
+								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
+								const stopped: unknown = JSON.parse(
+									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+								);
+								assert.ok(isRecord(stopped));
+								assert.equal(stopped.review ?? null, null);
+								assert.deepEqual(stopped.compositionFailures, [
+									{ phase: "PUBLIC_REVIEW", reason: "SAFETY" },
+									{ phase: "PRIVATE_FEEDBACK", reason: "SAFETY" },
+								]);
+								break;
+							}
 							if (fixture === "compose-continuation-private-safety") {
 								// The review composed and accepted in this attempt stays; the run's ceiling stopped the
 								// private composer, so the private feedback is owed to another attempt.
