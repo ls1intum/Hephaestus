@@ -339,6 +339,10 @@ export const Running: Story = {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByRole("button", { name: "Cancel review" })).toBeEnabled();
 		await expect(panel.queryByRole("button", { name: "Request another review" })).toBeNull();
+		// Processing starts when the attempt ends, so a running attempt shows only its own status.
+		const execution = within(panel.getByRole("list", { name: "Execution" }));
+		execution.getByText("Running");
+		await expect(execution.queryByText("Nothing to process")).toBeNull();
 	},
 };
 
@@ -350,6 +354,9 @@ export const Queued: Story = {
 			/Queued.*asked for/u,
 		);
 		within(panelElement).getByText("Practices appear here as the review reaches them.");
+		const execution = within(within(panelElement).getByRole("list", { name: "Execution" }));
+		execution.getByText("Queued");
+		await expect(execution.queryByText("Nothing to process")).toBeNull();
 	},
 };
 
@@ -362,6 +369,10 @@ export const BackingOff: Story = {
 		execution.getByText("1 of 2 · Attempt 1");
 		execution.getByText("2 of 2 · Attempt 2");
 		execution.getByText(/out of memory/u);
+		// The failed attempt ended with nothing to process; the queued retry has not reached processing.
+		await expect(execution.getByText("Nothing to process").closest("li")).toHaveTextContent(
+			"1 of 2 · Attempt 1",
+		);
 	},
 };
 

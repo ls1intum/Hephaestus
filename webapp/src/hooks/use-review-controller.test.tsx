@@ -22,6 +22,14 @@ function withProcessing(review: ReviewDetail, processingStatus: "PENDING" | "DON
 	};
 }
 
+/** The read of whether a review of one work is queued or running. */
+function activeOf(itemId: string) {
+	return listReviewsQueryKey({
+		path: { workspaceSlug: "demo" },
+		query: { itemId, status: ["QUEUED", "RUNNING"], size: 1 },
+	});
+}
+
 function render(client: QueryClient) {
 	return renderHook(() => useReviewController("demo", reviewId), {
 		wrapper: ({ children }: { children: ReactNode }) => (
@@ -37,12 +45,14 @@ function processingOf(controller: ReviewController): string | undefined {
 }
 
 describe("a review whose results are still processed", () => {
-	it("polls until processing ends, then reads its feedback checks and row again", async () => {
+	it("polls until processing ends, then reads its feedback checks, row and work's reviews again", async () => {
 		const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 		const rowKey = listReviewsQueryKey({
 			path: { workspaceSlug: "demo" },
 			query: { reviewId, size: 1 },
 		});
+		const workKey = activeOf(reviewDetailCompleted.item.id);
+		const otherWorkKey = activeOf(`${reviewDetailCompleted.item.id}0`);
 		let reviewReads = 0;
 		let checksRead = 0;
 		server.use(
@@ -70,10 +80,15 @@ describe("a review whose results are still processed", () => {
 			);
 			await waitFor(() => expect(processingOf(result.current)).toBe("PENDING"));
 			const before = checksRead;
-			client.setQueryData(rowKey, { content: [] });
+			for (const key of [rowKey, workKey, otherWorkKey]) {
+				client.setQueryData(key, { content: [] });
+			}
 			await waitFor(() => expect(processingOf(result.current)).toBe("DONE"), { timeout: 7000 });
 			await waitFor(() => expect(checksRead).toBeGreaterThan(before));
 			expect(client.getQueryState(rowKey)?.isInvalidated).toBe(true);
+			// Whether a review of the same work is still active is asked again; other work is not.
+			expect(client.getQueryState(workKey)?.isInvalidated).toBe(true);
+			expect(client.getQueryState(otherWorkKey)?.isInvalidated).toBe(false);
 		} finally {
 			unmount();
 			client.clear();

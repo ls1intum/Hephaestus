@@ -670,6 +670,8 @@ function ReviewJobs({ jobs }: { jobs: ReviewJob[] | undefined }) {
 
 function ReviewJobEntry({ job, position }: { job: ReviewJob; position: string }) {
 	const phases = jobPhases(job);
+	// The server records NONE until the job ends, so on an active job it means "not yet", not "nothing".
+	const active = job.status === "QUEUED" || job.status === "RUNNING";
 	return (
 		<li className="min-w-0 space-y-1">
 			<p className="flex flex-wrap items-center gap-2">
@@ -677,7 +679,9 @@ function ReviewJobEntry({ job, position }: { job: ReviewJob; position: string })
 					{position}Attempt {job.attempt}
 				</span>
 				<StatusBadge def={REVIEW_JOB_STATUS_DEFS[job.status]} />
-				<StatusBadge def={REVIEW_JOB_PROCESSING_DEFS[job.processingStatus]} />
+				{(!active || job.processingStatus !== "NONE") && (
+					<StatusBadge def={REVIEW_JOB_PROCESSING_DEFS[job.processingStatus]} />
+				)}
 			</p>
 			<p className="text-muted-foreground tabular-nums">
 				{phases.retried ? "Request to this attempt" : "Wait to start"}: {phases.wait} · Running:{" "}

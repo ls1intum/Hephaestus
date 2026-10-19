@@ -492,6 +492,9 @@ function ReviewLevelRead({
 	const activeQuery = useQuery({
 		...activeOptions,
 		queryFn: requestable ? activeOptions.queryFn : skipToken,
+		// Another review of the work ends with no signal to this sheet, so ask again while one is active.
+		refetchInterval: ({ state }) =>
+			(state.data?.content.length ?? 0) > 0 ? ACTIVE_REVIEW_POLL_MS : false,
 	});
 	const otherActive = (activeQuery.data?.content.length ?? 0) > 0;
 	return (

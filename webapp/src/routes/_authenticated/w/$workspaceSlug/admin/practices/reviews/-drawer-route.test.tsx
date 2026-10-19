@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getReviewLineageQueryKey } from "@/api/@tanstack/react-query.gen";
+import { getReviewLineageQueryKey, listReviewsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { ReviewDetail, ReviewLineage, ReviewResult } from "@/api/types.gen";
 import {
 	feedbackDetail,
@@ -836,6 +836,133 @@ describe("a review's trace while the review runs", () => {
 			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
 			expect(requestsTo(`/practices/reviews/${RUNNING_ID}`)).toHaveLength(settledReviews);
 			expect(requestsTo("/practices/reviews/lineage")).toHaveLength(settledLineage);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+});
+
+const requestButton = () => screen.getByRole("button", { name: "Request another review" });
+
+describe("another review of the work from a review's sheet", () => {
+	const OWN_ID = "7a3c5d2e-1b4f-4e6a-8c9d-0e1f2a3b4c5d";
+	const SIBLING_ID = "8b4d6e3f-2c5a-4f7b-9d0e-1f2a3b4c5d6e";
+	const base = reviewDetail();
+	const activeKey = listReviewsQueryKey({
+		path: { workspaceSlug: "acme" },
+		query: { itemId: base.item.id, status: ["QUEUED", "RUNNING"], size: 1 },
+	});
+
+	function reviewAs(id: string, status: ReviewDetail["status"]): ReviewDetail {
+		const active = status === "QUEUED" || status === "RUNNING";
+		return {
+			...base,
+			id,
+			status,
+			completedAt: active ? null : base.createdAt,
+			activeJobCount: active ? 1 : 0,
+		};
+	}
+
+	/** Serves the sheet's review and the reviews of its work that are still queued or running. */
+	function serveSheet(review: () => ReviewDetail, active: () => ReviewDetail[]) {
+		server.use(
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/${OWN_ID}`, () =>
+				HttpResponse.json(review()),
+			),
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/${OWN_ID}/feedback-checks`, () =>
+				HttpResponse.json([]),
+			),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
+				if (new URL(request.url).searchParams.get("itemId") !== base.item.id) {
+					return;
+				}
+				const content = active().slice(0, 1);
+				return HttpResponse.json({
+					content,
+					number: 0,
+					size: 1,
+					totalElements: active().length,
+					totalPages: active().length,
+					numberOfElements: content.length,
+					first: true,
+					last: active().length <= 1,
+					empty: content.length === 0,
+				});
+			}),
+		);
+	}
+
+	/** Every read of whether a review of the sheet's work is queued or running. */
+	const activeReads = () =>
+		requestsTo("/practices/reviews").filter(
+			(url) =>
+				url.searchParams.get("itemId") === base.item.id &&
+				values(url, "status").includes("RUNNING"),
+		);
+
+	it("releases Request another review once its own review ends, then stops asking", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		try {
+			let review = reviewAs(OWN_ID, "RUNNING");
+			let active = [review];
+			serveSheet(
+				() => review,
+				() => active,
+			);
+			const { queryClient } = renderRouteAtWithRouter(`${REVIEWS}?detail=review:${OWN_ID}`);
+			await screen.findByRole("button", { name: "Cancel review" }, ROUTE_RENDER_WAIT);
+			await vi.waitFor(() => expect(activeReads().length).toBeGreaterThan(0));
+
+			review = reviewAs(OWN_ID, "COMPLETE");
+			active = [];
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			await screen.findByRole("button", { name: "Request another review" }, ROUTE_RENDER_WAIT);
+			await vi.waitFor(() => expect(requestButton().getAttribute("aria-disabled")).toBeNull());
+			await vi.waitFor(() =>
+				expect(queryClient.getQueryState(activeKey)?.fetchStatus).toBe("idle"),
+			);
+			// Nothing is active any more, so the read of it is not repeated.
+			const settled = activeReads().length;
+			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+			expect(activeReads()).toHaveLength(settled);
+
+			await userEvent.click(requestButton());
+			await screen.findByRole("alertdialog", { name: /^Request a review of/u });
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("keeps it blocked while another review of the work is queued, and releases it when that one ends", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		try {
+			let review = reviewAs(OWN_ID, "RUNNING");
+			const sibling = reviewAs(SIBLING_ID, "QUEUED");
+			let active = [review, sibling];
+			serveSheet(
+				() => review,
+				() => active,
+			);
+			renderRouteAtWithRouter(`${REVIEWS}?detail=review:${OWN_ID}`);
+			await screen.findByRole("button", { name: "Cancel review" }, ROUTE_RENDER_WAIT);
+			await vi.waitFor(() => expect(activeReads().length).toBeGreaterThan(0));
+
+			review = reviewAs(OWN_ID, "COMPLETE");
+			active = [sibling];
+			const reads = activeReads().length;
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			await screen.findByRole("button", { name: "Request another review" }, ROUTE_RENDER_WAIT);
+			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+			// The work was asked about again, and the queued review still blocks another.
+			expect(requestButton().getAttribute("aria-disabled")).toBe("true");
+			expect(activeReads().length).toBeGreaterThan(reads);
+			await userEvent.click(requestButton());
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+
+			active = [];
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			await vi.waitFor(() => expect(requestButton().getAttribute("aria-disabled")).toBeNull());
 		} finally {
 			vi.useRealTimers();
 		}
