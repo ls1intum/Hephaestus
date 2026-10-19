@@ -6,7 +6,9 @@
  * than once per story keeps two timestamps in the same story consistent with each other and keeps a
  * rendered phrase identical across the stories in one run.
  *
- * Stories only. Component code takes the time from `useNow`.
+ * Stories only. Component code takes the time from `useNow`, which Storybook replaces with this
+ * same reading (`components/common/__mocks__/use-now.ts`). The fixtures and their render therefore
+ * agree on the day, even when a long run crosses midnight between the reading and the render.
  */
 // oxlint-disable-next-line no-restricted-properties, hephaestus/no-nondeterministic-render -- The single reading the story tree is built on, held here so that no story reads a moving clock itself.
 export const STORY_NOW = Date.now();
