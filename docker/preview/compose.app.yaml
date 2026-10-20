@@ -392,9 +392,9 @@ services:
       JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       SPRING_PROFILES_ACTIVE: prod
       APP_VERSION: ${SOURCE_COMMIT:?Coolify supplies the deployed commit}
-      # Commit previews cannot derive a release pin. An opted-in review uses an explicit digest.
+      # Inert previews still validate the runtime image; opted-in reviews require an explicit digest.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${PREVIEW_FRESH_REVIEW_ENABLED:-false}
-      HEPHAESTUS_AGENT_IMAGE_REFERENCE: ${PREVIEW_AGENT_IMAGE_REFERENCE:-}
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE: ${PREVIEW_AGENT_IMAGE_REFERENCE:-ghcr.io/hephaestus-build/agent-pi:${SOURCE_COMMIT:?Coolify supplies the deployed commit}}
       HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN: ${PREVIEW_WORKER_REGISTRATION_TOKEN:-}
       # This server has no durable checkout volume. Its mirrors are disposable across recreations.
       HEPHAESTUS_FABRIC_ROOT: /tmp/hephaestus-preview-git-repos
