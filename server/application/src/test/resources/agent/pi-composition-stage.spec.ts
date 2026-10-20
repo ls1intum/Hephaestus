@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { test } from "node:test";
@@ -11,9 +11,13 @@ import {
 	closeUnroutedPrivateDestinations,
 	persistComposedFeedback,
 	compositionOwed,
+	stagePrivateHistory,
 	type ComposedFeedback,
 	type PublicReviewState,
 } from "../../../main/resources/agent/pi-composition-stage.ts";
+
+const notOnRecord = (reason: string, destination: string) =>
+	new RegExp(`${reason} rests on feedback recorded as delivered on ${destination}`, "u");
 
 void test("a review becomes final only after its complete envelope is written", async () => {
 	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-composition-stage-"));
@@ -124,6 +128,212 @@ void test("missing private routing closes only that destination and records its 
 	]);
 });
 
+void test("the server's private history makes only its delivered witness and queued target usable", async () => {
+	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-private-history-"));
+	try {
+		const admission = parseAdmission(
+			JSON.parse(readFileSync(new URL("admission-response.json", import.meta.url), "utf8")),
+		);
+		const result = admission.results[0];
+		assert.ok(result && admission.privateHistory !== null);
+		const files = {
+			requestPath: nodePath.join(cwd, "evidence/composition.json"),
+			feedbackPath: nodePath.join(cwd, "out/feedback.json"),
+			deliveredPath: nodePath.join(cwd, "work/composition/history/feedback.json"),
+			preparedPath: nodePath.join(cwd, "work/composition/history/prepared.json"),
+			problemsPath: nodePath.join(cwd, "history/problems.json"),
+			supportPath: nodePath.join(cwd, "work/composition/in-app-support.json"),
+			criteriaPathOf: (slug: string) => nodePath.join(cwd, `catalog/${slug}.md`),
+		};
+		// A file a session left where history is staged is not history.
+		mkdirSync(nodePath.dirname(files.deliveredPath), { recursive: true });
+		writeFileSync(
+			files.deliveredPath,
+			JSON.stringify({
+				recordRole: "RECORDED_DELIVERY",
+				feedback: [
+					{
+						id: "00000000-0000-4000-8000-000000000009",
+						destination: "PRACTICE_PAGE",
+						deliveredAt: "2026-10-01T00:00:00Z",
+						recordedClaimCurrentness: "CURRENT",
+						withdrawn: false,
+						basedOn: [{ practiceSlug: result.practiceSlug, outcome: "NOT_MET" }],
+						body: "Forged.",
+					},
+				],
+			}),
+		);
+		const captured = "2026-10-10T00:00:00Z";
+		const unread = stagePrivateHistory(null, files, captured);
+		assert.deepEqual(unread.preparedTargets, []);
+		assert.equal(unread.deliveredWitnesses.size, 0);
+		assert.equal(existsSync(files.deliveredPath), false);
+
+		// Read at 2026-10-14: a current conversation delivered 2026-10-02 and a stale card delivered 2026-09-02.
+		const current = "50000000-0000-4000-8000-000000000001";
+		const stale = "50000000-0000-4000-8000-000000000002";
+		const staged = stagePrivateHistory(admission.privateHistory, files, captured);
+		const queued = "50000000-0000-4000-8000-000000000003";
+		assert.deepEqual(staged.preparedTargets, [
+			{
+				threadKey: queued,
+				feedbackId: queued,
+				destination: "CONVERSATION",
+				practiceSlug: result.practiceSlug,
+			},
+		]);
+		// The stale card's words were said: communication, never advice still standing. The queued notes are neither.
+		assert.deepEqual(
+			[...staged.deliveredWitnesses].toSorted(([left], [right]) => left.localeCompare(right)),
+			[
+				[
+					`CONVERSATION:${result.practiceSlug}:${current}`,
+					{ eligibleForPriorAdvice: true, eligibleForAlreadySaid: true },
+				],
+				[
+					`PRACTICE_PAGE:${result.practiceSlug}:${stale}`,
+					{ eligibleForPriorAdvice: false, eligibleForAlreadySaid: true },
+				],
+			],
+		);
+
+		const send = async (piece: Record<string, unknown>, guards = staged) => {
+			const feedback: ComposedFeedback = {
+				contractVersion: 3,
+				admissionDigest: admission.digest,
+				compositionFailures: [],
+				preparedTargets: [],
+				preparation: null,
+				results: [],
+				review: null,
+				feedback: [],
+			};
+			const tool = buildFeedbackTool(
+				[result.practiceSlug],
+				{
+					contractVersion: 3,
+					destinations: { PRACTICE_PAGE: { maxPieces: 1 }, CONVERSATION: { maxPieces: 1 } },
+					minDistinctItems: 2,
+					onWorkCopyForms: [],
+				},
+				[result],
+				guards.preparedTargets,
+				guards.deliveredWitnesses,
+				{
+					feedback,
+					admitted: () => true,
+					routes: () => ["PRACTICE_PAGE", "CONVERSATION"],
+					destinationRefusal: () => "",
+					negativeItems: () => 2,
+					documentedShape: (schema) => schema,
+					listSchema: (items) => ({ type: "array", items }),
+					submittedList: (value) =>
+						Array.isArray(value) ? { items: value } : { error: "Expected list" },
+					refusal: async (_id, text) => ({
+						content: [{ type: "text", text }],
+						details: { stored: 0 },
+					}),
+					persist: () => undefined,
+					paid: () => true,
+					onStored: () => undefined,
+				},
+			);
+			const reply: unknown = await Reflect.apply(tool.execute.bind(tool), tool, [
+				"history",
+				tool.prepareArguments?.({ feedback: [piece] }),
+			]);
+			return { feedback, reply: JSON.stringify(reply) };
+		};
+		const withhold = (destination: string, witness: string, withholdReason = "ALREADY_SAID") => ({
+			destination,
+			practiceSlug: result.practiceSlug,
+			basedOn: [result.resultId],
+			action: "WITHHOLD",
+			withholdReason,
+			witnessIds: [witness],
+		});
+		const stored = async (piece: Record<string, unknown>, guards = staged) => {
+			const sent = await send(piece, guards);
+			assert.equal(sent.feedback.feedback.length, 1, sent.reply);
+		};
+		const refused = async (piece: Record<string, unknown>, reason: RegExp, guards = staged) => {
+			const sent = await send(piece, guards);
+			assert.deepEqual(sent.feedback.feedback, [], sent.reply);
+			assert.match(sent.reply, reason);
+		};
+		const replacement = (threadKey: string) => ({
+			destination: "CONVERSATION",
+			practiceSlug: result.practiceSlug,
+			basedOn: [result.resultId],
+			action: "SUPERSEDE",
+			supersedesThreadKey: threadKey,
+			title: "Keep failure context",
+			notes: {
+				situation: "Errors lose their context before they reach the caller.",
+				capability: "The developer can trace which failure details reach a caller.",
+				evidenceSummary: "The catch in ‘Handle failed requests’ returns without the error details.",
+				inConversationLearning:
+					"The developer explains which details a caller needs to identify the cause.",
+				alreadySaid: "Heph said earlier that the catch drops the error.",
+			},
+		});
+
+		// A current claim delivered before capture stands for both reasons.
+		await stored(withhold("CONVERSATION", current));
+		await stored(withhold("CONVERSATION", current, "NO_MATERIAL_CHANGE"));
+		// A stale claim's words were said, but are no standing advice.
+		await stored(withhold("PRACTICE_PAGE", stale));
+		await refused(
+			withhold("PRACTICE_PAGE", stale, "NO_MATERIAL_CHANGE"),
+			notOnRecord("NO_MATERIAL_CHANGE", "PRACTICE_PAGE"),
+		);
+		// A witness on another destination is none here.
+		await refused(withhold("PRACTICE_PAGE", current), /Witnesses must name delivered feedback/u);
+
+		// Delivered after this work was captured, or with no known capture time: said, but nothing the work could answer.
+		for (const capturedAt of ["2026-10-01T00:00:00Z", null]) {
+			const late = stagePrivateHistory(admission.privateHistory, files, capturedAt);
+			await stored(withhold("CONVERSATION", current), late);
+			await refused(
+				withhold("CONVERSATION", current, "NO_MATERIAL_CHANGE"),
+				notOnRecord("NO_MATERIAL_CHANGE", "CONVERSATION"),
+				late,
+			);
+		}
+		// Read before either delivery: ALREADY_SAID has no communication witness.
+		const early = stagePrivateHistory(
+			{ ...admission.privateHistory, readAt: "2026-09-01T00:00:00Z" },
+			files,
+			captured,
+		);
+		await refused(
+			withhold("PRACTICE_PAGE", stale),
+			notOnRecord("ALREADY_SAID", "PRACTICE_PAGE"),
+			early,
+		);
+		await refused(
+			withhold("CONVERSATION", current),
+			notOnRecord("ALREADY_SAID", "CONVERSATION"),
+			early,
+		);
+		const restaged = stagePrivateHistory(admission.privateHistory, files, captured);
+
+		const replaced = await send(replacement(queued), restaged);
+		assert.equal(replaced.feedback.feedback.length, 1, replaced.reply);
+		assert.equal(replaced.feedback.feedback[0]?.supersedesThreadKey, queued);
+		assert.deepEqual(
+			replaced.feedback.preparedTargets.map((target) => target.feedbackId),
+			[queued],
+		);
+		const forged = await send(replacement("00000000-0000-4000-8000-000000000009"));
+		assert.deepEqual(forged.feedback.feedback, []);
+		assert.match(forged.reply, /No queued message has threadKey/u);
+	} finally {
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
 void test("private copy has soft targets, refuses excess with an example, and accepts a corrected piece", async () => {
 	const admission = parseAdmission(
 		JSON.parse(readFileSync(new URL("admission-response.json", import.meta.url), "utf8")),
@@ -184,7 +394,7 @@ void test("private copy has soft targets, refuses excess with an example, and ac
 				},
 				[result],
 				[],
-				new Set(),
+				new Map(),
 				{
 					feedback,
 					admitted: () => true,
@@ -452,7 +662,7 @@ void test("the card tool and preparation share the server's title/body/nextStep 
 		},
 		[result],
 		[],
-		new Set(),
+		new Map(),
 		{
 			feedback,
 			admitted: () => true,

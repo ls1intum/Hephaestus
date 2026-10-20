@@ -12,6 +12,14 @@ public interface FeedbackHistoryQuery {
 
     List<FeedbackHistoryEntry> forItem(long workspaceId, long itemId, long viewerAccountId, int limit);
 
+    /**
+     * Private feedback delivered to one developer, and conversation feedback still queued for them, on exactly the
+     * {@code routes} given: a row is read only on its own destination and when it rests on that route's practice.
+     * Empty when the developer is not an active member, which is a read not made, not an empty history.
+     */
+    Optional<PrivateFeedbackHistory> forPrivateComposition(
+            long workspaceId, long developerAccountId, Collection<PrivateFeedbackHistory.Route> routes, int limit);
+
     /** The publication context of the same read; issue it inside the snapshot that reads the history page. */
     String publicationContext(long workspaceId, long itemId, UUID reviewId, Collection<Long> developerIds);
 

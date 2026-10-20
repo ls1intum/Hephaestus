@@ -16,6 +16,7 @@ public record AdmissionResponseDTO(
         List<Withheld> withheld,
         @Nullable PracticePageSupportDTO practicePageSupport,
         @Nullable ConversationEligibilityDTO conversationEligibility,
+        @Nullable PrivateFeedbackHistoryDTO privateHistory,
         boolean publicReviewed,
         boolean privatePrepared) {
     public AdmissionResponseDTO {

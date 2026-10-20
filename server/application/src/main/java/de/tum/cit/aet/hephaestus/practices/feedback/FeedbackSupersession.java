@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,13 +23,24 @@ public class FeedbackSupersession {
 
     public boolean canReplaceConversation(long workspaceId, UUID previousId, long developerId, long practiceId) {
         var previous = feedback.lockByIdAndWorkspaceId(previousId, workspaceId).orElse(null);
-        if (previous == null
-                || previous.getDeveloperId() != developerId
+        Long practice = previous == null ? null : replaceablePractice(previous, developerId);
+        return practice != null && practice == practiceId;
+    }
+
+    /**
+     * The practice queued conversation feedback may still be replaced for: its recorded primary result's practice, or
+     * else the one practice all its support shares. Null when the piece cannot be replaced.
+     */
+    @Nullable
+    Long replaceablePractice(Feedback previous, long developerId) {
+        long workspaceId = previous.getWorkspaceId();
+        UUID previousId = previous.getId();
+        if (previous.getDeveloperId() != developerId
                 || previous.getDestination() != FeedbackDestination.CONVERSATION
                 || previous.getState() != FeedbackState.READY
                 || previous.getDeliveredAt() != null
                 || visibility.withdrawn(workspaceId, previousId)
-                || copies.hasWriteFence(workspaceId, previousId)) return false;
+                || copies.hasWriteFence(workspaceId, previousId)) return null;
         var ids = basis.findByWorkspaceIdAndFeedbackIdOrderByOrdinalAscIdAsc(workspaceId, previousId).stream()
                 .map(FeedbackBasis::getResultId)
                 .distinct()
@@ -41,9 +54,12 @@ public class FeedbackSupersession {
                 .path("primaryResultId");
         if (primary.isString())
             return support.stream()
-                    .anyMatch(result -> result.getId().toString().equals(primary.asString())
-                            && result.getPracticeId() == practiceId);
-        return !support.isEmpty() && support.stream().allMatch(result -> result.getPracticeId() == practiceId);
+                    .filter(result -> result.getId().toString().equals(primary.asString()))
+                    .map(Result::getPracticeId)
+                    .findFirst()
+                    .orElse(null);
+        var practices = support.stream().map(Result::getPracticeId).distinct().toList();
+        return practices.size() == 1 ? practices.getFirst() : null;
     }
 
     @Transactional

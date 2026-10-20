@@ -71,6 +71,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("agent.handler.PublicReviewEligibilityIntegrationTest", "review-feedbackgate"),
             assignment("practices.feedback.FeedbackPreparationReceiptIntegrationTest", "review-preparation-receipt"),
             assignment("practices.feedback.FeedbackHistoryQueryIntegrationTest", "review-feedbackhistoryquery"),
+            assignment("practices.feedback.FeedbackPrivateHistoryIntegrationTest", "review-privatehistory"),
             assignment("practices.feedback.FeedbackReviewControllerIntegrationTest", "review-feedbackreviewcontroller"),
             assignment("practices.groupdetail.PracticeGroupReviewHistoryIntegrationTest", "review-evidence"),
             assignment("practices.groupdetail.PracticeGroupReviewsControllerIntegrationTest", "review-fixture"),
@@ -174,6 +175,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "review-feedbackhistoryquery",
                     "real persisted history with exact private/public source permissions" + " controlled"),
             Map.entry(
+                    "review-privatehistory",
+                    "real private history, routing and person-copy custody with only native SCM boundaries controlled"),
+            Map.entry(
                     "review-feedbackmodereview",
                     "real feedback mode inheritance with runtime attempt authority" + " controlled"),
             Map.entry(
@@ -232,6 +236,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "core.auth.clientsession.ClientSessionMigratedSchemaTest",
             "integration.schema.ProductionSchemaContractIntegrationTest",
             "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
+            "practices.feedback.FeedbackPrivateHistoryIntegrationTest",
             "testconfig.BaseIntegrationTest",
             "testconfig.RealAuthIntegrationTest");
 
@@ -277,6 +282,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "practices.feedback.FeedbackGateIntegrationTest",
             "practices.feedback.FeedbackPreparationReceiptIntegrationTest",
             "practices.feedback.FeedbackHistoryQueryIntegrationTest",
+            "practices.feedback.FeedbackPrivateHistoryIntegrationTest",
             "practices.feedback.FeedbackReviewControllerIntegrationTest",
             "practices.groupdetail.PracticeGroupReviewHistoryIntegrationTest",
             "practices.profile.PracticeProfileReviewIntegrationTest",

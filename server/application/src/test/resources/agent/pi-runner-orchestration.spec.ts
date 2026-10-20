@@ -230,29 +230,55 @@ const HISTORY_COVERAGE = {
 	communicationHistory: "NOT_ESTABLISHED",
 };
 
-const STAGED_PREPARED_HISTORY = JSON.stringify({
-	coverage: HISTORY_COVERAGE,
-	recordRole: "PREPARED_NOT_DELIVERED",
-	prepared: [
+const historyBasis = (practiceSlug: string, outcome = "NOT_MET") => [
+	{
+		resultId: "00000000-0000-4000-8000-000000000301",
+		practiceSlug,
+		practiceVersionId: null,
+		outcome,
+	},
+];
+
+/** The server's read of this developer's earlier private feedback, answered with the admission. */
+const PRIVATE_HISTORY = {
+	readAt: "2026-10-07T10:00:00Z",
+	coverage: { maxEntries: 30, hasMore: false, omittedWithoutCopyAuthority: 1 },
+	delivered: [
 		{
-			threadKey: "queued-current",
-			feedbackId: "00000000-0000-4000-8000-000000000101",
-			practiceSlug: "test-practice",
-			destination: "CONVERSATION",
+			id: "00000000-0000-4000-8000-000000000201",
+			destination: "PRACTICE_PAGE",
+			deliveredAt: "2026-08-01T10:00:00Z",
 			recordedClaimCurrentness: "CURRENT",
+			withdrawn: false,
+			basedOn: historyBasis("test-practice"),
+			bodyRole: "PRACTICE_PAGE_CARD",
+			body: "An earlier card about the insecure call.",
+		},
+		{
+			id: "00000000-0000-4000-8000-000000000202",
+			destination: "PRACTICE_PAGE",
+			deliveredAt: "2026-08-15T10:00:00Z",
+			recordedClaimCurrentness: "STALE",
+			withdrawn: true,
+			basedOn: historyBasis("test-practice"),
+			bodyRole: null,
+			body: null,
+		},
+	],
+	queued: [
+		{
+			threadKey: "00000000-0000-4000-8000-000000000101",
+			feedbackId: "00000000-0000-4000-8000-000000000101",
+			destination: "CONVERSATION",
+			practiceSlug: "test-practice",
+			preparedAt: "2026-09-01T10:00:00Z",
+			recordedClaimCurrentness: "CURRENT",
+			basedOn: historyBasis("test-practice"),
 			bodyRole: "MENTOR_NOTES",
 			body: "Earlier prepared mentor wording.",
 		},
-		{
-			threadKey: "queued-withdrawn",
-			feedbackId: "00000000-0000-4000-8000-000000000102",
-			practiceSlug: "test-practice",
-			destination: "CONVERSATION",
-			withdrawn: true,
-			recordedClaimCurrentness: "STALE",
-		},
 	],
-});
+};
 
 const STAGED_FEEDBACK_HISTORY = JSON.stringify({
 	coverage: HISTORY_COVERAGE,
@@ -331,6 +357,15 @@ const STAGED_FEEDBACK_HISTORY = JSON.stringify({
 	],
 });
 
+/** Delivered-feedback IDs the already-said composer names as witnesses; `chat-test` names none on record. */
+const WITNESS: Record<string, string> = {
+	"app-test": "00000000-0000-4000-8000-000000000211",
+	"app-second": "00000000-0000-4000-8000-000000000212",
+	"chat-test": "00000000-0000-4000-8000-000000000221",
+	"chat-second": "00000000-0000-4000-8000-000000000222",
+	"chat-other": "00000000-0000-4000-8000-000000000223",
+};
+
 const deliveredRecord = (
 	id: string,
 	destination: string,
@@ -339,63 +374,52 @@ const deliveredRecord = (
 ) => ({
 	id,
 	destination,
-	item: {
-		kind: "scm.pull_request",
-		url: "https://gitlab.example/group/repo/-/merge_requests/1",
-	},
 	deliveredAt: "2026-08-01T10:00:00Z",
-	itemVersion: null,
-	basedOn: [{ id: `earlier-${id}`, practiceSlug, practiceVersion: null, outcome: "NOT_MET" }],
-	publicEligible: false,
 	recordedClaimCurrentness: "CURRENT",
-	bodyRole: destination === "CONVERSATION" ? "MENTOR_NOTES" : "COMPOSED_GUIDANCE",
+	withdrawn: false,
+	basedOn: historyBasis(practiceSlug),
+	bodyRole: destination === "CONVERSATION" ? "CONVERSATION_WORDS" : "PRACTICE_PAGE_CARD",
 	body: `Earlier ${destination} feedback about ${practiceSlug}.`,
 	...overrides,
 });
 
-const ALREADY_SAID_HISTORY = JSON.stringify({
-	coverage: HISTORY_COVERAGE,
-	recordRole: "RECORDED_DELIVERY",
-	feedback: [
-		deliveredRecord("app-test", "PRACTICE_PAGE", "test-practice"),
-		deliveredRecord("app-second", "PRACTICE_PAGE", "second-practice"),
-		deliveredRecord("context-test", "ON_WORK", "test-practice"),
-		deliveredRecord("chat-second", "CONVERSATION", "second-practice"),
-		deliveredRecord("chat-other", "CONVERSATION", "other-practice"),
-		deliveredRecord("chat-test-malformed", "CONVERSATION", "test-practice", { withdrawn: "false" }),
-		deliveredRecord("chat-test-met", "CONVERSATION", "test-practice", {
-			basedOn: [{ id: "earlier-met", practiceSlug: "test-practice", outcome: "MET" }],
+/** Delivered feedback for every practice but test-practice on CONVERSATION, where only unusable records exist. */
+const ALREADY_SAID_HISTORY = {
+	readAt: "2026-10-07T10:00:00Z",
+	coverage: { maxEntries: 30, hasMore: false, omittedWithoutCopyAuthority: 0 },
+	delivered: [
+		deliveredRecord(WITNESS["app-test"] ?? "", "PRACTICE_PAGE", "test-practice"),
+		deliveredRecord(WITNESS["app-second"] ?? "", "PRACTICE_PAGE", "second-practice"),
+		deliveredRecord(WITNESS["chat-second"] ?? "", "CONVERSATION", "second-practice"),
+		deliveredRecord(WITNESS["chat-other"] ?? "", "CONVERSATION", "other-practice"),
+		deliveredRecord("00000000-0000-4000-8000-000000000231", "CONVERSATION", "test-practice", {
+			basedOn: historyBasis("test-practice", "MET"),
 		}),
-		deliveredRecord("chat-test-stale", "CONVERSATION", "test-practice", {
+		deliveredRecord("00000000-0000-4000-8000-000000000232", "CONVERSATION", "test-practice", {
 			recordedClaimCurrentness: "STALE",
-			bodyRole: undefined,
-			body: undefined,
+			bodyRole: null,
+			body: null,
 		}),
-		deliveredRecord("chat-test-withdrawn", "CONVERSATION", "test-practice", {
+		deliveredRecord("00000000-0000-4000-8000-000000000233", "CONVERSATION", "test-practice", {
 			withdrawn: true,
-			bodyRole: undefined,
-			body: undefined,
+			bodyRole: null,
+			body: null,
 		}),
-		deliveredRecord("chat-test-undated", "CONVERSATION", "test-practice", { deliveredAt: null }),
 	],
-});
-
-const ALREADY_SAID_PREPARED = JSON.stringify({
-	coverage: HISTORY_COVERAGE,
-	recordRole: "PREPARED_NOT_DELIVERED",
-	prepared: [
+	queued: [
 		{
-			threadKey: "queued-test",
+			threadKey: "00000000-0000-4000-8000-000000000103",
 			feedbackId: "00000000-0000-4000-8000-000000000103",
-			practiceSlug: "test-practice",
 			destination: "CONVERSATION",
+			practiceSlug: "test-practice",
 			preparedAt: "2026-09-01T10:00:00Z",
 			recordedClaimCurrentness: "CURRENT",
+			basedOn: historyBasis("test-practice"),
 			bodyRole: "MENTOR_NOTES",
 			body: "Prepared mentor notes about test-practice.",
 		},
 	],
-});
+};
 
 /** The review composition's whole summary, as the composer wrote it, paragraphs and all. */
 const REVIEW_SUMMARY =
@@ -572,7 +596,7 @@ const withhold = (
 					} else if (id.endsWith("2")) {
 						suffix = "second";
 					}
-					return `${destination === "PRACTICE_PAGE" ? "app" : "chat"}-${suffix}`;
+					return WITNESS[`${destination === "PRACTICE_PAGE" ? "app" : "chat"}-${suffix}`] ?? "";
 				}),
 });
 
@@ -1168,6 +1192,11 @@ if (scenario !== undefined && scenario !== "") {
 			};
 		}
 
+		// The server's private history read for this fixture, if it made one.
+		const privateHistoryPath = nodePath.join(cwd, "private-history.json");
+		const privateHistory: unknown = existsSync(privateHistoryPath)
+			? JSON.parse(readFileSync(privateHistoryPath, "utf8"))
+			: null;
 		return Response.json({
 			contractVersion: 3,
 			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -1177,6 +1206,7 @@ if (scenario !== undefined && scenario !== "") {
 			withheld: [],
 			practicePageSupport: support ?? null,
 			conversationEligibility: chatRouting ?? null,
+			privateHistory,
 		});
 	});
 	const manager = {
@@ -2437,8 +2467,10 @@ if (scenario !== undefined && scenario !== "") {
 								if (unavailableContext) {
 									rmSync(nodePath.join(cwd, "catalog/practices/test-practice.md"));
 									writeFileSync(nodePath.join(cwd, "catalog/practices/second-practice.md"), "");
+									// A file a session leaves where the runner stages history is not history.
+									mkdirSync(nodePath.join(cwd, "work/composition/history"), { recursive: true });
 									writeFileSync(
-										nodePath.join(cwd, "history/feedback.json"),
+										nodePath.join(cwd, "work/composition/history/feedback.json"),
 										JSON.stringify({ unexpected: "Unknown historical prose" }),
 									);
 								}
@@ -3888,19 +3920,28 @@ if (scenario !== undefined && scenario !== "") {
 					);
 					writeFileSync(nodePath.join(cwd, "review-composer.md"), "Write the review on the work.");
 					writeFileSync(nodePath.join(cwd, "feedback-style.md"), "Write clear, useful feedback.");
+					// What the mocked server answers: the private history with the admission (private-history.json), and
+					// the public history it reads from history/feedback.json.
 					if (stage === "compose" || stage === "compose-foreign-provider") {
-						// The person's history, staged as the server stages it for the measurement and private destinations.
 						mkdirSync(nodePath.join(cwd, "history"), { recursive: true });
 						writeFileSync(nodePath.join(cwd, "history/feedback.json"), STAGED_FEEDBACK_HISTORY);
-						writeFileSync(nodePath.join(cwd, "history/prepared.json"), STAGED_PREPARED_HISTORY);
+						writeFileSync(
+							nodePath.join(cwd, "private-history.json"),
+							JSON.stringify(PRIVATE_HISTORY),
+						);
 					}
 					if (fixture === "compose-context-unavailable") {
-						mkdirSync(nodePath.join(cwd, "history"), { recursive: true });
+						// A read that found nothing: present and empty, unlike a read never made.
+						writeFileSync(
+							nodePath.join(cwd, "private-history.json"),
+							JSON.stringify({ ...PRIVATE_HISTORY, delivered: [], queued: [] }),
+						);
 					}
 					if (stage === "compose-already-said") {
-						mkdirSync(nodePath.join(cwd, "history"), { recursive: true });
-						writeFileSync(nodePath.join(cwd, "history/feedback.json"), ALREADY_SAID_HISTORY);
-						writeFileSync(nodePath.join(cwd, "history/prepared.json"), ALREADY_SAID_PREPARED);
+						writeFileSync(
+							nodePath.join(cwd, "private-history.json"),
+							JSON.stringify(ALREADY_SAID_HISTORY),
+						);
 					}
 					if (stage === "compose-support") {
 						mkdirSync(nodePath.join(cwd, "history"), { recursive: true });
@@ -4106,8 +4147,10 @@ if (scenario !== undefined && scenario !== "") {
 						nodePath.join(cwd, "evidence/manifest.json"),
 						JSON.stringify({
 							itemKind: "scm.pull_request",
+							// NO_MATERIAL_CHANGE needs advice delivered before this capture time; without one it has no witness.
 							...(fixture === "compose-fresh-history" ||
-							fixture === "compose-history-body-transport"
+							fixture === "compose-history-body-transport" ||
+							stage === "compose-already-said"
 								? { capturedAt: "2026-10-07T09:00:00Z" }
 								: {}),
 							files: [
@@ -6142,6 +6185,11 @@ for (const item of nullableCases) {
 							);
 							assert.equal(reviewTurn.split("# Test practice\nCriteria.").length, 2, reviewTurn);
 							assert.ok(!reviewTurn.includes(PRIVATE_HISTORY_SENTENCE), reviewTurn);
+							// The private history the admission brought stays out of the review on the work.
+							assert.doesNotMatch(
+								reviewTurn,
+								/work\/composition\/history|00000000-0000-4000-8000-000000000201|00000000-0000-4000-8000-000000000101/u,
+							);
 							assert.ok(!reviewTurn.includes("problem-history"), reviewTurn);
 							assert.ok(!reviewTurn.includes("00000000-0000-4000-8000-000000000010"), reviewTurn);
 							assert.ok(!reviewTurn.includes("Review the practice."), reviewTurn);
@@ -6223,30 +6271,39 @@ for (const item of nullableCases) {
 								composerTurn,
 								/Leads from the practice script|insecure call: |Complete second criterion/u,
 							);
-							// Earlier feedback keeps every fact it was staged with and names where its words are.
+							// The server's private history keeps every fact it was read with and names where its words are.
 							for (const fact of [
-								'"id": "feedback-same-work"',
+								'"id": "00000000-0000-4000-8000-000000000202"',
 								'"deliveredAt": "2026-08-15T10:00:00Z"',
-								`"itemVersion": "${"d".repeat(40)}"`,
-								'"id": "earlier-2"',
 								'"recordedClaimCurrentness": "STALE"',
 								'"withdrawn": true',
+								'"threadKey": "00000000-0000-4000-8000-000000000101"',
 							]) {
 								assert.ok(composerTurn.includes(fact), fact);
 							}
-							assert.ok(!composerTurn.includes("An earlier comment on this same change."));
+							assert.ok(!composerTurn.includes("An earlier card about the insecure call."));
 							assert.ok(!composerTurn.includes("Earlier prepared mentor wording."));
 							assert.ok(!composerTurn.includes(REVIEW_SUMMARY));
+							assert.match(composerTurn, /feedback\[0\]\.body/u);
+							assert.doesNotMatch(composerTurn, /feedback\[1\]\.body/u);
 							assert.match(composerTurn, /prepared\[0\]\.body/u);
-							assert.doesNotMatch(composerTurn, /prepared\[1\]\.body/u);
+							// Supplied history is shown as supplied; only the problem history, which no read supplies, is unknown.
+							assert.doesNotMatch(
+								composerTurn,
+								/(?:feedback|prepared)\.json` is not staged|staged with no entries/u,
+							);
+							assert.match(composerTurn, /history\/problems\.json` is not staged for this review/u);
 							assert.match(composerTurn, /review\.summary\.body/u);
 							assert.match(composerTurn, /review\.inline\[0\]\.body/u);
 							// The native evidence reader can retrieve the original source at a displayed locator.
 							const { createReadTool } = await import("@earendil-works/pi-coding-agent");
 							const reader = createReadTool(cwd);
 							for (const [path, expected] of [
-								["history/feedback.json", "An earlier comment on this same change."],
-								["history/prepared.json", "Earlier prepared mentor wording."],
+								[
+									"work/composition/history/feedback.json",
+									"An earlier card about the insecure call.",
+								],
+								["work/composition/history/prepared.json", "Earlier prepared mentor wording."],
 								["out/feedback.json", JSON.stringify(REVIEW_SUMMARY).slice(1, -1)],
 							]) {
 								assert.ok(path !== undefined && expected !== undefined);
@@ -6258,37 +6315,45 @@ for (const item of nullableCases) {
 								assert.ok(text.includes(expected), text);
 							}
 
-							// Each history file's projection keeps every staged root and row fact; a body is replaced by
-							// its locator in the unchanged file, and a row without one (withdrawn, stale) names none.
+							// The runner stages each part of the read in its own file; the projection keeps every root
+							// and row fact, a body is replaced by its locator in the unchanged file, and a row without
+							// one (withdrawn, stale) names none.
 							const projections = [
 								...composerTurn.matchAll(/```json\n(?<json>[\s\S]*?)\n```/gu),
 							].map((match): unknown => JSON.parse(match.groups?.json ?? "null"));
-							for (const [role, key, file, staged, bodyRoles] of [
+							const { readAt, coverage: historyCoverage } = PRIVATE_HISTORY;
+							for (const [role, key, file, rowsRead, bodyRoles] of [
 								[
 									"RECORDED_DELIVERY",
 									"feedback",
-									"history/feedback.json",
-									STAGED_FEEDBACK_HISTORY,
-									["COMPOSED_GUIDANCE", "COMPOSED_GUIDANCE", undefined, "UNKNOWN"],
+									"work/composition/history/feedback.json",
+									PRIVATE_HISTORY.delivered,
+									["PRACTICE_PAGE_CARD", null],
 								],
 								[
 									"PREPARED_NOT_DELIVERED",
 									"prepared",
-									"history/prepared.json",
-									STAGED_PREPARED_HISTORY,
-									["MENTOR_NOTES", undefined],
+									"work/composition/history/prepared.json",
+									PRIVATE_HISTORY.queued,
+									["MENTOR_NOTES"],
 								],
 							] as const) {
-								assert.equal(readFileSync(nodePath.join(cwd, file), "utf8"), staged);
+								const staged = readFileSync(nodePath.join(cwd, file), "utf8");
+								assert.deepEqual(JSON.parse(staged), {
+									readAt,
+									coverage: historyCoverage,
+									recordRole: role,
+									[key]: rowsRead,
+								});
 								const view = projections.find(
 									(projection) => isRecord(projection) && projection.recordRole === role,
 								);
 								assert.ok(isRecord(view), role);
-								assert.deepEqual(view.coverage, HISTORY_COVERAGE);
+								assert.deepEqual(view.coverage, historyCoverage);
 								const rows = view[key];
 								assert.ok(Array.isArray(rows));
 								assert.deepEqual(
-									rows.map((row: unknown) => (isRecord(row) ? row.bodyRole : null)),
+									rows.map((row: unknown) => (isRecord(row) ? row.bodyRole : undefined)),
 									bodyRoles,
 								);
 								const original: unknown = JSON.parse(staged);
@@ -6815,10 +6880,21 @@ for (const item of nullableCases) {
 							if (fixture === "compose-context-unavailable") {
 								assert.match(privateTurn, /Criteria of `test-practice` — not staged/u);
 								assert.match(privateTurn, /Criteria of `second-practice`[^\n]*is empty/u);
+								// A server read that found nothing is staged empty, over the file the session planted, and
+								// history no read supplied is unknown: different facts.
 								assert.match(
 									privateTurn,
-									/read `[^`]*history\/feedback\.json` for the recorded history/u,
+									/### Recorded delivered feedback — staged with no entries\n```json\n[^`]*"feedback": \[\]/u,
 								);
+								assert.match(
+									privateTurn,
+									/### Prepared feedback \(not delivered; supersession targets\) — staged with no entries\n```json\n[^`]*"prepared": \[\]/u,
+								);
+								assert.match(
+									privateTurn,
+									/### What earlier reviews recorded about this person — `[^`]*history\/problems\.json` is not staged for this review; what it would record is unknown here, not empty/u,
+								);
+								assert.doesNotMatch(privateTurn, /(?:feedback|prepared)\.json` is not staged/u);
 								assert.doesNotMatch(
 									privateTurn,
 									/Unknown historical prose|# Test practice|Long criterion|review\.summary\.body/u,
@@ -6831,6 +6907,20 @@ for (const item of nullableCases) {
 							);
 							assert.ok(!privateTurn.includes("Long criterion. Long criterion."));
 							assert.ok(privateTurn.includes("# Test practice\nCriteria."));
+							// Unstaged history locations are reported unknown instead of requiring a failed read.
+							for (const label of [
+								"What earlier reviews recorded about this person — `[^`]*history/problems\\.json`",
+								"Recorded delivered feedback — `[^`]*history/feedback\\.json`",
+								"Prepared feedback \\(not delivered; supersession targets\\) — `[^`]*history/prepared\\.json`",
+							]) {
+								assert.match(
+									privateTurn,
+									new RegExp(
+										`### ${label} is not staged for this review; what it would record is unknown here, not empty\n`,
+										"u",
+									),
+								);
+							}
 							if (fixture === "compose-fold") {
 								const publicTurn = readFileSync(nodePath.join(cwd, "prompt-3.md"), "utf8");
 								const limits =

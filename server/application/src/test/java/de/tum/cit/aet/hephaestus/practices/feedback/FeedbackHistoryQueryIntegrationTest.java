@@ -12,18 +12,24 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
+import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackHistory;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -37,6 +43,181 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
 
     @MockitoBean
     ResultSourceAuthorization publicPermission;
+
+    @MockitoBean
+    FeedbackVisibilityService visibility;
+
+    @Test
+    void shouldReadOneDevelopersDeliveredWitnessAndQueuedTargetOnTheReadPracticesOnly() {
+        var proof = negativeResult();
+        authorize(proof);
+        var witness = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT);
+        bind(witness, proof);
+        var target = piece(FeedbackDestination.CONVERSATION, FeedbackState.READY, null);
+        bind(target, proof);
+        bind(piece(FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, AT), proof);
+        var sibling = negativeResult();
+        authorize(sibling);
+        bind(piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT), sibling);
+        var practices = routes(proof);
+
+        var read = history.forPrivateComposition(workspace.getId(), developerId, practices, 10)
+                .orElseThrow();
+
+        assertThat(read.entries())
+                .extracting(entry -> entry.feedback().feedbackId())
+                .containsExactlyInAnyOrder(witness.getId(), target.getId());
+        assertThat(read.hasMore()).isFalse();
+        assertThat(read.withoutCopyAuthority()).isZero();
+        var said = read.entries().stream()
+                .filter(entry -> entry.feedback().feedbackId().equals(witness.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(said.feedback().body()).isEqualTo(witness.getBody());
+        assertThat(said.currentness()).isEqualTo(Currentness.CURRENT);
+        assertThat(said.withdrawn()).isFalse();
+        assertThat(said.replaceablePracticeSlug()).isNull();
+        assertThat(said.basedOn())
+                .containsExactly(new PrivateFeedbackHistory.Basis(
+                        proof.getId(), "regression-tests", proof.getPracticeVersionId(), ResultOutcome.NOT_MET));
+        var queued = read.entries().stream()
+                .filter(entry -> entry.feedback().feedbackId().equals(target.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(queued.replaceablePracticeSlug()).isEqualTo("regression-tests");
+        assertThat(queued.feedback().deliveredAt()).isNull();
+        verify(permission, never())
+                .find(
+                        eq(workspace.getId()),
+                        eq(proof.getId()),
+                        eq(developerId),
+                        eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
+
+        long otherId = Objects.requireNonNull(
+                persistAccount("Another composed developer").getId());
+        jdbc.update(
+                "INSERT INTO"
+                        + " membership(workspace_id,account_id,role,joined_at,review_selected,hidden,public_activity_seen)"
+                        + " VALUES (?,?,'MEMBER',now(),false,false,false)",
+                workspace.getId(),
+                otherId);
+        assertThat(history.forPrivateComposition(workspace.getId(), otherId, practices, 10)
+                        .orElseThrow()
+                        .entries())
+                .isEmpty();
+        assertThat(history.forPrivateComposition(workspace.getId() + 1, developerId, practices, 10))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldWithholdWordsTargetsAndRowsThePrivateHistoryMayNotCarry() {
+        var proof = negativeResult();
+        authorize(proof);
+        var withdrawn = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT);
+        bind(withdrawn, proof);
+        when(visibility.withdrawn(workspace.getId(), withdrawn.getId())).thenReturn(true);
+        var withdrawnTarget = piece(FeedbackDestination.CONVERSATION, FeedbackState.READY, null);
+        bind(withdrawnTarget, proof);
+        when(visibility.withdrawn(workspace.getId(), withdrawnTarget.getId())).thenReturn(true);
+        // No copy authority for this support: the permission mock finds nothing for it.
+        var lost = negativeResult();
+        bind(piece(FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, AT), lost);
+        var practices = routes(proof, lost);
+
+        var read = history.forPrivateComposition(workspace.getId(), developerId, practices, 10)
+                .orElseThrow();
+
+        assertThat(read.entries())
+                .extracting(entry -> entry.feedback().feedbackId())
+                .containsExactly(withdrawn.getId());
+        assertThat(read.withoutCopyAuthority()).isEqualTo(1);
+        var entry = read.entries().getFirst();
+        assertThat(entry.withdrawn()).isTrue();
+        assertThat(entry.feedback().body()).isNull();
+
+        proof.end(ResultEndReason.REPLACED, AT);
+        results.saveAndFlush(proof);
+        assertThat(history.forPrivateComposition(workspace.getId(), developerId, practices, 10)
+                        .orElseThrow()
+                        .entries()
+                        .getFirst()
+                        .currentness())
+                .isEqualTo(Currentness.STALE);
+    }
+
+    @Test
+    void shouldReportOlderMatchingFeedbackBeyondTheReadLimit() {
+        var proof = negativeResult();
+        authorize(proof);
+        bind(piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT), proof);
+        bind(piece(FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, AT), proof);
+
+        var read = history.forPrivateComposition(workspace.getId(), developerId, routes(proof), 1)
+                .orElseThrow();
+
+        assertThat(read.entries()).hasSize(1);
+        assertThat(read.maxEntries()).isEqualTo(1);
+        assertThat(read.hasMore()).isTrue();
+    }
+
+    @Test
+    void shouldReadEachPracticeOnlyOnTheDestinationRoutedToIt() {
+        var pageOnly = negativeResult();
+        authorize(pageOnly);
+        var conversationOnly = negativeResult();
+        authorize(conversationOnly);
+        var card = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT);
+        bind(card, pageOnly);
+        bind(piece(FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, AT), pageOnly);
+        bind(piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT), conversationOnly);
+        var said = piece(FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, AT);
+        bind(said, conversationOnly);
+
+        var read = history.forPrivateComposition(
+                        workspace.getId(),
+                        developerId,
+                        List.of(
+                                new PrivateFeedbackHistory.Route(
+                                        pageOnly.getPracticeId(), FeedbackDestination.PRACTICE_PAGE),
+                                new PrivateFeedbackHistory.Route(
+                                        conversationOnly.getPracticeId(), FeedbackDestination.CONVERSATION)),
+                        10)
+                .orElseThrow();
+
+        // Two open routes are not four: neither practice is read on the other's destination.
+        assertThat(read.entries())
+                .extracting(entry -> entry.feedback().feedbackId())
+                .containsExactlyInAnyOrder(card.getId(), said.getId());
+        assertThat(history.forPrivateComposition(workspace.getId(), developerId, List.of(), 10))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldKeepTheWordsOfAStaleClaimAsWhatWasSaid() {
+        var proof = negativeResult();
+        authorize(proof);
+        var card = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT);
+        bind(card, proof);
+        // A later review of the same work replaced the claim the card rested on.
+        proof.end(ResultEndReason.REPLACED, AT);
+        results.saveAndFlush(proof);
+
+        var entry = history.forPrivateComposition(workspace.getId(), developerId, routes(proof), 10)
+                .orElseThrow()
+                .entries()
+                .getFirst();
+
+        assertThat(entry.currentness()).isEqualTo(Currentness.STALE);
+        assertThat(entry.feedback().body()).isEqualTo(card.getBody());
+        assertThat(entry.withdrawn()).isFalse();
+    }
+
+    private static List<PrivateFeedbackHistory.Route> routes(Result... proofs) {
+        return Arrays.stream(proofs)
+                .flatMap(proof -> Stream.of(FeedbackDestination.PRACTICE_PAGE, FeedbackDestination.CONVERSATION)
+                        .map(destination -> new PrivateFeedbackHistory.Route(proof.getPracticeId(), destination)))
+                .toList();
+    }
 
     @Test
     void shouldKeepPrivateHistoryWithItsDeveloperAndWorkspace() {

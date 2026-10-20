@@ -2,9 +2,9 @@
 
 ## Input locations
 
-Read `task.json`. `<compositionRequest>`, `<practiceIndex>` and
-`<preparedFeedback>` refer to its fields, not literal filenames. `<practiceRoot>` is the directory
-containing `practiceIndex`; `<historyRoot>` is the directory containing `preparedFeedback`.
+Read `task.json`. `<compositionRequest>` and `<practiceIndex>` refer to its fields, not literal filenames.
+`<practiceRoot>` is the directory containing `practiceIndex`; `<historyRoot>` is the directory containing its
+`preparedFeedback`.
 
 ## This turn
 
@@ -30,6 +30,9 @@ communication, and it is not by itself a reason to withhold.
 
 ## What you are given
 
+This turn says which of the history files below are staged for this review. One it reports as not staged is unknown,
+not empty.
+
 - `work/composition/results.json` — the full record of what this run measured: one result per practice, each
   `NOT_MET` result with its problems, with the rationale and the citations.
 - `<historyRoot>/problems.json` — authorized earlier review records about this developer, newest first, with the
@@ -37,18 +40,20 @@ communication, and it is not by itself a reason to withhold.
   Different records at the same practice or location
   can concern different behaviors. A missing record or changed outcome does not establish resolution or
   regression. Ground any comparison in the specific behavior and its evidence.
-- `<historyRoot>/feedback.json` — authorized records of feedback **delivered** to this developer, each on its
-  recorded destination. Its `bodyRole` says what a body is: a `CONVERSATION` body is the notes supplied to the mentor, not
-  a transcript of what Heph said. Absence from it is not evidence that nothing was delivered.
-  An entry with `recordedClaimCurrentness: STALE` carries no `body`. The practice's review rules changed, or the
-  result behind it was set aside because the reviewable content of the issue it is about changed, before any new
-  review. It records that an earlier claim was delivered, never that the work still lacks anything. The same currentness
-  qualifications apply to `<preparedFeedback>`. `CURRENT` means neither happened. Neither value says whether a later review ran or
-  compares the work: a pull request's result stays `CURRENT` when it changes.
+- `work/composition/history/feedback.json` — authorized records of private feedback **delivered** to this developer,
+  on each destination open this turn for its practice. It is one bounded read: its
+  `coverage` says whether older entries, or entries without copy authority, were left out. Absence from it is not
+  evidence that nothing was delivered. Its `bodyRole` says what a body is: `PRACTICE_PAGE_CARD` is the card shown on
+  the practice page, `CONVERSATION_WORDS` the words Heph said in the conversation.
+  A `body` is the words that were delivered, where they may be copied. Its `recordedClaimCurrentness` says separately
+  whether the claim behind them still holds: `STALE` words were still said. Use each entry's currentness as supplied.
+  A delivered record establishes that feedback was said, not that its claim still holds or that a later review ran.
+  The same currentness qualifications apply to prepared feedback.
   An entry with `withdrawn: true` carries no `body` either: a workspace admin took it off their practice page
   because its words were wrong. Do not repeat, rebut or refer to it. The results behind it may still hold.
-- `<preparedFeedback>` — feedback prepared for them and **not yet delivered**, with a `threadKey` and a
-  `practiceSlug` for each.
+- `work/composition/history/prepared.json` — conversation feedback prepared for them and **not yet delivered** that a
+  new `CONVERSATION` piece may replace, with a `threadKey` and a `practiceSlug` for each. A `MENTOR_NOTES` body is the
+  notes queued for Heph.
 - `work/composition/in-app-support.json` — for `PRACTICE_PAGE` only: per NOT_MET practice, the occurrences a new
   card may cite at this read, with the work each is about. Count a card's pieces of work from it. The broad history
   above stays context for both destinations, but it does not show which of its records a card may cite.
@@ -91,15 +96,17 @@ a point already delivered on this destination, say something new there or nothin
 Staying quiet is a decision you record: `action: "WITHHOLD"` with a reason.
 
 - `BELOW_BAR` — the evidence does not clear the bar for this destination.
-- `ALREADY_SAID` — `<historyRoot>/feedback.json` records the point as already delivered on this destination. Only that
-  file supports this reason, and only for the destination it was delivered on. Name its feedback IDs in `witnessIds`.
-- `NO_MATERIAL_CHANGE` — no current fact adds anything material to the earlier feedback recorded there. Name its feedback IDs in `witnessIds`.
+- `ALREADY_SAID` — `work/composition/history/feedback.json` records the point as already delivered on this destination,
+  with its words, whether its claim is `CURRENT` or `STALE`. Only that file supports this reason, and only for the
+  destination it was delivered on. Name its feedback IDs in `witnessIds`.
+- `NO_MATERIAL_CHANGE` — no current fact adds anything material to earlier feedback recorded there whose claim is still
+  `CURRENT` and that was delivered before this work was captured. Name its feedback IDs in `witnessIds`.
 
 An empty destination with a stated reason is a correct and common outcome.
 
 ## Supersession
 
-On `CONVERSATION`, if `<preparedFeedback>` has an entry on that destination for the practice you write about, replace it:
+On `CONVERSATION`, if `work/composition/history/prepared.json` has an entry on that destination for the practice you write about, replace it:
 emit `action: "SUPERSEDE"` with that entry's `threadKey`. Only a `threadKey` you read there, on the same destination and
 the same practice, may be a supersession target. On `PRACTICE_PAGE`, a new card replaces the open card about its practice
 on its own, so write the card and name no target.
@@ -144,7 +151,7 @@ no confidence.
     the results assessed.
   - `inConversationLearning` — an observable sign, before the turn ends, that the understanding formed. A promise to
     change future work is not a sign.
-  - `alreadySaid` — where `<historyRoot>/feedback.json` records this as already delivered (the destination and roughly
+  - `alreadySaid` — where `work/composition/history/feedback.json` records this as already delivered (the destination and roughly
     when), and any later outcome the records show, as recorded. Write it when that file shows relevant earlier
     feedback that the rules above permit you to use. Omit it otherwise. It is not a verdict on whether to raise the
     concern.

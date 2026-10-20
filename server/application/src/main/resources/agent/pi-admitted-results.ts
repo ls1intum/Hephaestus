@@ -89,6 +89,50 @@ export function leanResults(results: readonly AdmittedResult[]): LeanResult[] {
 	}));
 }
 
+const instant = z.iso.datetime({ offset: true });
+const currentness = z.enum(["CURRENT", "STALE", "UNVERIFIABLE"]);
+const historyBasisSchema = z.object({
+	resultId: z.uuid(),
+	practiceSlug: z.string().min(1),
+	practiceVersionId: z.number().int().nullable(),
+	outcome: z.enum(OUTCOMES),
+});
+/** One bounded server read of earlier private feedback; absent or null means it was not read for this review. */
+const privateHistorySchema = z.object({
+	readAt: instant,
+	coverage: z.object({
+		maxEntries: z.number().int().positive(),
+		hasMore: z.boolean(),
+		omittedWithoutCopyAuthority: z.number().int().nonnegative(),
+	}),
+	delivered: z.array(
+		z.object({
+			id: z.uuid(),
+			destination: z.enum(["PRACTICE_PAGE", "CONVERSATION"]),
+			deliveredAt: instant,
+			recordedClaimCurrentness: currentness,
+			withdrawn: z.boolean(),
+			basedOn: z.array(historyBasisSchema),
+			bodyRole: z.enum(["PRACTICE_PAGE_CARD", "CONVERSATION_WORDS"]).nullable(),
+			body: z.string().nullable(),
+		}),
+	),
+	queued: z.array(
+		z.object({
+			threadKey: z.uuid(),
+			feedbackId: z.uuid(),
+			destination: z.literal("CONVERSATION"),
+			practiceSlug: z.string().min(1),
+			preparedAt: instant,
+			recordedClaimCurrentness: currentness,
+			basedOn: z.array(historyBasisSchema),
+			bodyRole: z.literal("MENTOR_NOTES").nullable(),
+			body: z.string().nullable(),
+		}),
+	),
+});
+export type PrivateHistory = z.infer<typeof privateHistorySchema>;
+
 export const admissionResponseSchema = z.looseObject({
 	contractVersion: z.literal(3),
 	admissionDigest: z.string().regex(/^[0-9a-f]{64}$/u),
@@ -98,6 +142,7 @@ export const admissionResponseSchema = z.looseObject({
 	privatePrepared: z.boolean(),
 	practicePageSupport: z.unknown().nullable(),
 	conversationEligibility: z.unknown().nullable(),
+	privateHistory: privateHistorySchema.nullish(),
 });
 
 /** Routing is read only after the results it accompanies; it never changes what was admitted. */
@@ -116,6 +161,7 @@ export function parseAdmission(value: unknown) {
 			response.conversationEligibility,
 			response.admitted,
 		),
+		privateHistory: response.privateHistory ?? null,
 	};
 }
 export type Admission = ReturnType<typeof parseAdmission>;

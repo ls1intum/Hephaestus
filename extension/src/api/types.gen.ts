@@ -303,6 +303,7 @@ export type AdmissionResponse = {
     conversationEligibility: ConversationEligibility | null;
     jobId: string;
     practicePageSupport: PracticePageSupport | null;
+    privateHistory: PrivateFeedbackHistory | null;
     privatePrepared: boolean;
     publicReviewed: boolean;
     reviewId: string;
@@ -1068,6 +1069,18 @@ export type CopySupport = {
     position?: number;
 };
 
+export type Coverage = {
+    /**
+     * older matching feedback exists beyond <code>maxEntries</code>
+     */
+    hasMore?: boolean;
+    maxEntries?: number;
+    /**
+     * matching feedback left out because its support may not be copied here
+     */
+    omittedWithoutCopyAuthority?: number;
+};
+
 export type CoverageOmission = {
     count?: number;
     items?: Array<string>;
@@ -1402,6 +1415,17 @@ export type CurrentUserView = {
     roles?: Array<string>;
     status?: string;
     username?: string;
+};
+
+export type Delivered = {
+    basedOn: Array<PrivateFeedbackHistoryBasis>;
+    body: string | null;
+    bodyRole: 'PRACTICE_PAGE_CARD' | 'CONVERSATION_WORDS' | 'MENTOR_NOTES' | null;
+    deliveredAt: string;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    id: string;
+    recordedClaimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    withdrawn: boolean;
 };
 
 export type DeliveredFeedbackPractice = {
@@ -3572,6 +3596,26 @@ export type PreviewRequest = {
 };
 
 /**
+ * The private feedback this developer received, and conversation feedback still queued for them, on each private
+ * destination this composition may write for its practice. It is one bounded read, never the complete history:
+ * <code>coverage</code> says what it leaves out. A body is present where its words may be copied. It records what was
+ * said. <code>recordedClaimCurrentness</code> says separately whether the claim behind it still holds.
+ */
+export type PrivateFeedbackHistory = {
+    coverage: Coverage;
+    delivered: Array<Delivered>;
+    queued: Array<Queued>;
+    readAt: string;
+};
+
+export type PrivateFeedbackHistoryBasis = {
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceSlug: string;
+    practiceVersionId: null | number;
+    resultId: string;
+};
+
+/**
  * Draft connection probe using a supplied (never-persisted) credential
  */
 export type ProbeLlmConnectionRequest = {
@@ -3865,6 +3909,21 @@ export type QuestionSummary = {
      * Net Promoter Score, −100…100, for an NPS question
      */
     score?: number;
+};
+
+/**
+ * Conversation feedback not yet delivered that a new piece on <code>practiceSlug</code> may replace.
+ */
+export type Queued = {
+    basedOn: Array<PrivateFeedbackHistoryBasis>;
+    body: string | null;
+    bodyRole: 'PRACTICE_PAGE_CARD' | 'CONVERSATION_WORDS' | 'MENTOR_NOTES' | null;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    feedbackId: string;
+    practiceSlug: string;
+    preparedAt: string;
+    recordedClaimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    threadKey: string;
 };
 
 export type QuietDecision = {

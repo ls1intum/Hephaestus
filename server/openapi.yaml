@@ -12009,6 +12009,10 @@ components:
           anyOf:
           - $ref: "#/components/schemas/PracticePageSupport"
           - type: "null"
+        privateHistory:
+          anyOf:
+          - $ref: "#/components/schemas/PrivateFeedbackHistory"
+          - type: "null"
         privatePrepared:
           type: boolean
         publicReviewed:
@@ -12028,6 +12032,7 @@ components:
       - conversationEligibility
       - jobId
       - practicePageSupport
+      - privateHistory
       - privatePrepared
       - publicReviewed
       - reviewId
@@ -13837,6 +13842,20 @@ components:
         position:
           type: integer
           format: int32
+    Coverage:
+      type: object
+      properties:
+        hasMore:
+          type: boolean
+          description: older matching feedback exists beyond <code>maxEntries</code>
+        maxEntries:
+          type: integer
+          format: int32
+        omittedWithoutCopyAuthority:
+          type: integer
+          format: int32
+          description: matching feedback left out because its support may not be copied
+            here
     CoverageOmission:
       type: object
       properties:
@@ -14505,6 +14524,55 @@ components:
           type: string
         username:
           type: string
+    Delivered:
+      type: object
+      properties:
+        basedOn:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrivateFeedbackHistoryBasis"
+        body:
+          type:
+          - string
+          - "null"
+        bodyRole:
+          type:
+          - string
+          - "null"
+          enum:
+          - PRACTICE_PAGE_CARD
+          - CONVERSATION_WORDS
+          - MENTOR_NOTES
+          - null
+        deliveredAt:
+          type: string
+          format: date-time
+        destination:
+          type: string
+          enum:
+          - ON_WORK
+          - PRACTICE_PAGE
+          - CONVERSATION
+        id:
+          type: string
+          format: uuid
+        recordedClaimCurrentness:
+          type: string
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        withdrawn:
+          type: boolean
+      required:
+      - basedOn
+      - body
+      - bodyRole
+      - deliveredAt
+      - destination
+      - id
+      - recordedClaimCurrentness
+      - withdrawn
     DeliveredFeedbackPractice:
       type: object
       properties:
@@ -19667,6 +19735,57 @@ components:
           minItems: 0
       required:
       - identities
+    PrivateFeedbackHistory:
+      type: object
+      description: |-
+        The private feedback this developer received, and conversation feedback still queued for them, on each private
+         destination this composition may write for its practice. It is one bounded read, never the complete history:
+         <code>coverage</code> says what it leaves out. A body is present where its words may be copied. It records what was
+         said. <code>recordedClaimCurrentness</code> says separately whether the claim behind it still holds.
+      properties:
+        coverage:
+          $ref: "#/components/schemas/Coverage"
+        delivered:
+          type: array
+          items:
+            $ref: "#/components/schemas/Delivered"
+        queued:
+          type: array
+          items:
+            $ref: "#/components/schemas/Queued"
+        readAt:
+          type: string
+          format: date-time
+      required:
+      - coverage
+      - delivered
+      - queued
+      - readAt
+    PrivateFeedbackHistoryBasis:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum:
+          - MET
+          - NOT_MET
+          - DOES_NOT_APPLY
+          - COULD_NOT_DETERMINE
+        practiceSlug:
+          type: string
+        practiceVersionId:
+          type:
+          - "null"
+          - integer
+          format: int64
+        resultId:
+          type: string
+          format: uuid
+      required:
+      - outcome
+      - practiceSlug
+      - practiceVersionId
+      - resultId
     ProbeLlmConnectionRequest:
       type: object
       description: Draft connection probe using a supplied (never-persisted) credential
@@ -20501,6 +20620,60 @@ components:
       - answered
       - counts
       - questionId
+    Queued:
+      type: object
+      description: Conversation feedback not yet delivered that a new piece on <code>practiceSlug</code>
+        may replace.
+      properties:
+        basedOn:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrivateFeedbackHistoryBasis"
+        body:
+          type:
+          - string
+          - "null"
+        bodyRole:
+          type:
+          - string
+          - "null"
+          enum:
+          - PRACTICE_PAGE_CARD
+          - CONVERSATION_WORDS
+          - MENTOR_NOTES
+          - null
+        destination:
+          type: string
+          enum:
+          - ON_WORK
+          - PRACTICE_PAGE
+          - CONVERSATION
+        feedbackId:
+          type: string
+          format: uuid
+        practiceSlug:
+          type: string
+        preparedAt:
+          type: string
+          format: date-time
+        recordedClaimCurrentness:
+          type: string
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        threadKey:
+          type: string
+      required:
+      - basedOn
+      - body
+      - bodyRole
+      - destination
+      - feedbackId
+      - practiceSlug
+      - preparedAt
+      - recordedClaimCurrentness
+      - threadKey
     QuietDecision:
       type: object
       properties:

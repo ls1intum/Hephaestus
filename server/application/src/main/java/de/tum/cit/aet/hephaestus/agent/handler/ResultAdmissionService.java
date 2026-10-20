@@ -179,6 +179,7 @@ public class ResultAdmissionService {
                 withheld,
                 privateRead == null ? null : FeedbackCompositionService.page(privateRead),
                 privateRead == null ? null : FeedbackCompositionService.conversation(privateRead),
+                privateRead == null ? null : FeedbackCompositionService.privateHistory(privateRead),
                 assignments.publicReviewed(job),
                 privatePrepared(job));
     }
@@ -191,7 +192,7 @@ public class ResultAdmissionService {
                     requireIdentity(owned, request.reviewId(), request.jobId(), request.attempt());
                     if (!isAdmitted(owned) || assignments.review(owned).kind() != ReviewKind.ITEM)
                         throw new AdmissionConflictException();
-                    return composition.read(
+                    return composition.readForPreparation(
                             owned,
                             proof.forAttempt(
                                     owned.getWorkspaceId(),

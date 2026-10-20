@@ -2071,7 +2071,6 @@ export async function runReviewJob(): Promise<void> {
 	const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
 	const REVIEW_COMPOSER_PROMPT_PATH = `${CWD}/review-composer.md`;
 	const FEEDBACK_STYLE_PATH = `${CWD}/feedback-style.md`;
-	const PREPARED_FEEDBACK_PATH = INPUT_PATHS.preparedFeedback;
 	const COMPOSITION_RESULTS_PATH = `${CWD}/work/composition/results.json`;
 	const PRACTICE_PAGE_SUPPORT_PATH = `${CWD}/work/composition/in-app-support.json`;
 
@@ -2082,10 +2081,13 @@ export async function runReviewJob(): Promise<void> {
 		}
 		return admission;
 	}
+	// Private history arrives with the admission and is written where the inputs mount cannot be: under work/.
 	const compositionFiles = {
 		requestPath: COMPOSITION_REQUEST_PATH,
 		feedbackPath: FEEDBACK_PATH,
-		preparedPath: PREPARED_FEEDBACK_PATH,
+		deliveredPath: `${CWD}/work/composition/history/feedback.json`,
+		preparedPath: `${CWD}/work/composition/history/prepared.json`,
+		problemsPath: `${nodePath.dirname(INPUT_PATHS.preparedFeedback)}/problems.json`,
 		supportPath: PRACTICE_PAGE_SUPPORT_PATH,
 		criteriaPathOf,
 	};

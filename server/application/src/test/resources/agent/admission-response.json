@@ -72,6 +72,70 @@
 			}
 		]
 	},
+	"privateHistory": {
+		"readAt": "2026-10-14T00:00:00Z",
+		"coverage": {
+			"maxEntries": 30,
+			"hasMore": false,
+			"omittedWithoutCopyAuthority": 1
+		},
+		"delivered": [
+			{
+				"id": "50000000-0000-4000-8000-000000000001",
+				"destination": "CONVERSATION",
+				"deliveredAt": "2026-10-02T00:00:00Z",
+				"recordedClaimCurrentness": "CURRENT",
+				"withdrawn": false,
+				"basedOn": [
+					{
+						"resultId": "60000000-0000-4000-8000-000000000001",
+						"practiceSlug": "handles-errors",
+						"practiceVersionId": 7,
+						"outcome": "NOT_MET"
+					}
+				],
+				"bodyRole": "CONVERSATION_WORDS",
+				"body": "Heph said the catch drops the error."
+			},
+			{
+				"id": "50000000-0000-4000-8000-000000000002",
+				"destination": "PRACTICE_PAGE",
+				"deliveredAt": "2026-09-02T00:00:00Z",
+				"recordedClaimCurrentness": "STALE",
+				"withdrawn": false,
+				"basedOn": [
+					{
+						"resultId": "60000000-0000-4000-8000-000000000001",
+						"practiceSlug": "handles-errors",
+						"practiceVersionId": 7,
+						"outcome": "NOT_MET"
+					}
+				],
+				"bodyRole": "PRACTICE_PAGE_CARD",
+				"body": "A card whose claim no longer holds."
+			}
+		],
+		"queued": [
+			{
+				"threadKey": "50000000-0000-4000-8000-000000000003",
+				"feedbackId": "50000000-0000-4000-8000-000000000003",
+				"destination": "CONVERSATION",
+				"practiceSlug": "handles-errors",
+				"preparedAt": "2026-09-01T00:00:00Z",
+				"recordedClaimCurrentness": "CURRENT",
+				"basedOn": [
+					{
+						"resultId": "60000000-0000-4000-8000-000000000001",
+						"practiceSlug": "handles-errors",
+						"practiceVersionId": 7,
+						"outcome": "NOT_MET"
+					}
+				],
+				"bodyRole": "MENTOR_NOTES",
+				"body": "Notes queued for Heph about dropped errors."
+			}
+		]
+	},
 	"publicReviewed": false,
 	"privatePrepared": false
 }

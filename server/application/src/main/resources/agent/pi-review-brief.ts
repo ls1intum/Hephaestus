@@ -854,6 +854,13 @@ function readDiscussion(
 	return { statements, qualifications };
 }
 
+/** When the reviewed work was captured, as its folder index records it; null when it records no valid time. */
+export function captureTime(folderIndex: unknown): string | null {
+	return isRecord(folderIndex) && typeof folderIndex.itemKind === "string"
+		? instantOf(folderIndex.capturedAt)
+		: null;
+}
+
 /**
  * What was said in public on the same reviewed work up to its capture, from the exact discussion files the capture
  * recorded for it: who wrote what, when, and on which head the provider bound it. A source left out says why, and is
@@ -871,7 +878,7 @@ export function buildPublicReviewHistory(
 		return { capturedAt: null, itemVersion: null, recipient, sources: [], statements: [] };
 	}
 	const index = folderIndex;
-	const capturedAt = instantOf(index.capturedAt);
+	const capturedAt = captureTime(index);
 	const coreKind = CORE_SOURCE.get(folderIndex.itemKind);
 	let otherWork: string | null = null;
 	let itemVersion: string | null = null;
