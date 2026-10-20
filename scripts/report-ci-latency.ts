@@ -39,8 +39,17 @@ export function selectLatencyRuns(value: unknown, releaseBranch: string, now: nu
 		);
 }
 
+// The sampling window still holds runs from before the integration tier gained a third shard.
+const INTEGRATION_LAYOUTS = [
+	["providers-and-startup", "application"],
+	["providers", "runtime-and-startup", "application"],
+];
+
 export function isFullVerification(jobs: readonly { name: string }[]) {
 	const names = new Set(jobs.map((job) => job.name));
+	const integrationJobs = [...names].filter((name) =>
+		name.startsWith("Test / App Server: Integration ("),
+	);
 	return (
 		[
 			"Test / App Server: Unit and architecture",
@@ -50,7 +59,11 @@ export function isFullVerification(jobs: readonly { name: string }[]) {
 			"Build / App Server: Generated artifacts",
 		].every((name) => names.has(name)) &&
 		(names.has("Quality / Webapp") || names.has("Quality / Webapp / Gates")) &&
-		jobs.filter((job) => job.name.startsWith("Test / App Server: Integration (")).length === 2
+		INTEGRATION_LAYOUTS.some(
+			(shards) =>
+				shards.length === integrationJobs.length &&
+				shards.every((shard) => names.has(`Test / App Server: Integration (${shard})`)),
+		)
 	);
 }
 

@@ -14,7 +14,8 @@ const requiredJobs = [
 	"App Server image / Build linux/amd64 Docker Image",
 	"Test / App Server: Unit and architecture",
 	"Test / App Server: Integration (application)",
-	"Test / App Server: Integration (providers-and-startup)",
+	"Test / App Server: Integration (providers)",
+	"Test / App Server: Integration (runtime-and-startup)",
 	"Security / Dependencies, secrets, and policy",
 	"CI Status Gate",
 ];

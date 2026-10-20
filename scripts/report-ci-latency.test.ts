@@ -58,25 +58,45 @@ void test("sampling excludes stale/future, retried, failed and release validatio
 	);
 });
 
+const verificationJobs = [
+	"Test / App Server: Unit and architecture",
+	"Quality / Webapp",
+	"Quality / Webapp: Stories",
+	"Build / Webapp: E2E",
+	"Build / App Server: Database",
+	"Build / App Server: Generated artifacts",
+];
+function integration(...shards: string[]) {
+	return shards.map((shard) => `Test / App Server: Integration (${shard})`);
+}
+
 void test("lightweight PRs cannot make full verification's latency budget pass", () => {
-	const names = [
-		"Test / App Server: Unit and architecture",
-		"Quality / Webapp",
-		"Quality / Webapp: Stories",
-		"Build / Webapp: E2E",
-		"Build / App Server: Database",
-		"Build / App Server: Generated artifacts",
-		"Test / App Server: Integration (providers)",
-		"Test / App Server: Integration (application)",
-	];
-	for (const webappName of ["Quality / Webapp", "Quality / Webapp / Gates"]) {
-		const jobs = names.map((name) => ({ name: name === "Quality / Webapp" ? webappName : name }));
-		assert.equal(isFullVerification(jobs), true);
-		for (const { name } of jobs) {
-			assert.equal(isFullVerification(jobs.filter((job) => job.name !== name)), false, name);
+	for (const shards of [
+		["providers", "runtime-and-startup", "application"],
+		["providers-and-startup", "application"],
+	]) {
+		const names = [...verificationJobs, ...integration(...shards)];
+		for (const webappName of ["Quality / Webapp", "Quality / Webapp / Gates"]) {
+			const jobs = names.map((name) => ({ name: name === "Quality / Webapp" ? webappName : name }));
+			assert.equal(isFullVerification(jobs), true, shards.join(","));
+			for (const { name } of jobs) {
+				assert.equal(isFullVerification(jobs.filter((job) => job.name !== name)), false, name);
+			}
 		}
 	}
 	assert.equal(isFullVerification([{ name: "Quality / Tooling and Docs" }]), false);
+});
+
+void test("only a complete integration shard layout counts as full verification", () => {
+	for (const shards of [
+		["providers", "application", "unexpected"],
+		["providers-and-startup", "providers", "application"],
+		["providers-and-startup", "application", "runtime-and-startup"],
+		["providers", "runtime-and-startup", "application", "unexpected"],
+	]) {
+		const jobs = [...verificationJobs, ...integration(...shards)].map((name) => ({ name }));
+		assert.equal(isFullVerification(jobs), false, shards.join(","));
+	}
 });
 
 void test("the target constrains both the median and tail, and insufficient data is not success", () => {

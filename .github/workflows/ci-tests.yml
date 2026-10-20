@@ -68,7 +68,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - shard: providers-and-startup
+          - shard: providers
+          - shard: runtime-and-startup
           - shard: application
     permissions:
       contents: read

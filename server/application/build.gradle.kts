@@ -213,7 +213,8 @@ val testTiers =
     )
 val integrationInventories =
     mapOf(
-        "integrationProvidersInventory" to "providers-and-startup",
+        "integrationProvidersInventory" to "providers",
+        "integrationRuntimeAndStartupInventory" to "runtime-and-startup",
         "integrationApplicationInventory" to "application",
     )
 val testInventories =
@@ -272,9 +273,9 @@ tasks.test {
 }
 
 fun Test.selectIntegrationShard(shard: String) {
-    val providerTests =
+    val providerTests = listOf("de.tum.cit.aet.hephaestus.integration.*")
+    val runtimeAndStartupTests =
         listOf(
-            "de.tum.cit.aet.hephaestus.integration.*",
             "de.tum.cit.aet.hephaestus.StartupBudgetIntegrationTest",
             "de.tum.cit.aet.hephaestus.core.database.*",
             "de.tum.cit.aet.hephaestus.agent.job.*",
@@ -282,8 +283,10 @@ fun Test.selectIntegrationShard(shard: String) {
         )
     when (shard) {
         "" -> Unit
-        "providers-and-startup" -> filter { providerTests.forEach(::includeTestsMatching) }
-        "application" -> filter { providerTests.forEach(::excludeTestsMatching) }
+        "providers" -> filter { providerTests.forEach(::includeTestsMatching) }
+        "runtime-and-startup" -> filter { runtimeAndStartupTests.forEach(::includeTestsMatching) }
+        "application" ->
+            filter { (providerTests + runtimeAndStartupTests).forEach(::excludeTestsMatching) }
         else -> error("Unknown integration shard: $shard")
     }
 }

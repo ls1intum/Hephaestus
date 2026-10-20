@@ -81,7 +81,11 @@ async function main(): Promise<void> {
 		"integrationInventory",
 		"databaseInventory",
 	];
-	const shardInventories = ["integrationProvidersInventory", "integrationApplicationInventory"];
+	const shardInventories = [
+		"integrationProvidersInventory",
+		"integrationRuntimeAndStartupInventory",
+		"integrationApplicationInventory",
+	];
 	// Dry-run reports are isolated from execution and coverage reports.
 	await rm(reports, { recursive: true, force: true });
 	await run(
