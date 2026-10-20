@@ -95,6 +95,7 @@ function GroupRow({
 					direction={standing?.direction ?? undefined}
 					support={standing?.trendSupport ?? undefined}
 					scope="group"
+					basis={standing?.basis}
 				/>
 			)}
 

@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.result.trend.TrendSupport;
 import de.tum.cit.aet.hephaestus.practices.spi.GuidanceSource;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.StandingBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.time.Clock;
 import java.time.Instant;
@@ -108,7 +109,17 @@ public class PracticeGroupStandingService {
                 hasDisplayableData ? input.feedbackSpanDays() : null,
                 hasDisplayableData ? input.feedbackSince() : null,
                 groupEvidence(cards, hasProblems, hasStrengths),
-                hasDisplayableData ? input.sources() : List.of());
+                hasDisplayableData ? input.sources() : List.of(),
+                hasDisplayableData ? basis(verdicts) : null);
+    }
+
+    // A group standing averages its practices' verdicts, so it carries the weakest basis among them.
+    private static StandingBasis basis(List<PracticeStandingDTO> verdicts) {
+        return verdicts.stream()
+                .map(PracticeStandingDTO::basis)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(StandingBasis.CURRENT_REVIEWS);
     }
 
     private static List<PracticeStandingDTO> votingVerdicts(

@@ -108,6 +108,13 @@ public interface ReviewItemRepository extends JpaRepository<ReviewItem, ReviewIt
     List<ReviewItem> findByWorkspaceIdAndResultIdOrderByReviewIdAscPracticeIdAscItemIdAsc(
             long workspaceId, UUID resultId);
 
+    /** Every assignment of the given reviews, for one read that resolves many results' producers at once. */
+    List<ReviewItem> findByWorkspaceIdAndReviewIdIn(long workspaceId, Collection<UUID> reviewIds);
+
+    /** Every assignment that retains one of the given results, from any review, in one read. */
+    List<ReviewItem> findByWorkspaceIdAndResultIdInOrderByReviewIdAscPracticeIdAscItemIdAsc(
+            long workspaceId, Collection<UUID> resultIds);
+
     List<ReviewItem> findByWorkspaceIdAndReviewIdOrderByPracticeIdAscItemIdAsc(long workspaceId, UUID reviewId);
 
     List<ReviewItem> findByWorkspaceIdAndReviewIdAndStateOrderByPracticeIdAscItemIdAsc(

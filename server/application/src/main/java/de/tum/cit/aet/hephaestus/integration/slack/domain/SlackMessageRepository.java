@@ -22,7 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
  */
 public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long> {
 
-    String MESSAGE_READ_GUARD = """
+    /**
+     * Whether a stored message may be read at all: tenant and team, an active connection, an active channel consent,
+     * not tombstoned, its author not opted out, and not erased. The one home of these clauses for every reader.
+     */
+    String MESSAGE_VISIBILITY_GUARD = """
           AND m.workspaceId=:workspaceId AND c.workspaceId=:workspaceId AND m.slackTeamId=c.slackTeamId
           AND EXISTS (SELECT 1 FROM Connection active WHERE active.workspace.id=:workspaceId
             AND active.kind=de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.SLACK
@@ -33,18 +37,25 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
             (SELECT 1 FROM SlackParticipantConsent p WHERE p.workspaceId=:workspaceId
              AND p.slackUserId=m.authorSlackUserId AND p.ingestionOptedOut=TRUE)
           AND NOT EXISTS (
-            SELECT 1 FROM Identity i, IdentityProvider p, Account a
-            WHERE i.providerId=p.id AND i.account.id=a.id
-              AND p.type=de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType.SLACK
-              AND p.serverUrl='https://slack.com' AND i.providerUserKey=m.authorSlackUserId AND i.teamKey=m.slackTeamId
-              AND a.aiChoice=de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice.NO_AI)
-          AND NOT EXISTS (
             SELECT 1 FROM IdentityRestriction s, IdentityProvider provider
             WHERE s.kind=de.tum.cit.aet.hephaestus.core.privacy.IdentityRestriction.Kind.ERASED AND s.providerId=provider.id
               AND provider.type=de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType.SLACK
               AND provider.serverUrl='https://slack.com'
               AND s.providerUserKey=m.authorSlackUserId AND s.teamKey=m.slackTeamId)
         """;
+
+    /** Every read by or for AI also honours the author's AI choice. */
+    String MESSAGE_AI_CONSENT_GUARD = """
+          AND NOT EXISTS (
+            SELECT 1 FROM Identity i, IdentityProvider p, Account a
+            WHERE i.providerId=p.id AND i.account.id=a.id
+              AND p.type=de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType.SLACK
+              AND p.serverUrl='https://slack.com' AND i.providerUserKey=m.authorSlackUserId AND i.teamKey=m.slackTeamId
+              AND a.aiChoice=de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice.NO_AI)
+        """;
+
+    /** The guard of every message read by or for AI: payloads, capture, conversation and readability. */
+    String MESSAGE_READ_GUARD = MESSAGE_VISIBILITY_GUARD + MESSAGE_AI_CONSENT_GUARD;
 
     @Query("""
         SELECT m.id AS id, m.slackChannelId AS slackChannelId, m.slackTs AS slackTs,
@@ -274,6 +285,21 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
           AND (m.slackThreadTs=:threadTs OR m.slackTs=:threadTs)
         """ + MESSAGE_READ_GUARD)
     long countReadableTurns(
+            @Param("workspaceId") long workspaceId,
+            @Param("channelId") String channelId,
+            @Param("threadTs") String threadTs);
+
+    /**
+     * The turns of one thread a human recorded standing may count: every visibility clause, without the authors' AI
+     * choice. A count only, never a body; no AI reader uses it.
+     */
+    @Query("""
+        SELECT COUNT(m) FROM SlackMessage m JOIN SlackMonitoredChannel c
+          ON c.workspaceId=m.workspaceId AND c.slackChannelId=m.slackChannelId
+        WHERE m.workspaceId=:workspaceId AND m.slackChannelId=:channelId
+          AND (m.slackThreadTs=:threadTs OR m.slackTs=:threadTs)
+        """ + MESSAGE_VISIBILITY_GUARD)
+    long countHumanStandingReadableTurns(
             @Param("workspaceId") long workspaceId,
             @Param("channelId") String channelId,
             @Param("threadTs") String threadTs);

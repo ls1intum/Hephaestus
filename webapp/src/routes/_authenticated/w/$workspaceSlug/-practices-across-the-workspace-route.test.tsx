@@ -5,13 +5,19 @@ import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
+import { EARLIER_REVIEWS_COUNTED } from "@/components/practice-vocabulary/standing-basis-defs";
 import {
+	FIGURES_LOAD_ERROR,
 	LOADING_STATUS,
 	SLOW_LOAD_SHORT,
 } from "@/components/practices-across-the-workspace/across-workspace-copy";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
-import { ACROSS_WORKSPACE } from "@/stories/practices-across-the-workspace-story-data";
+import {
+	ACROSS_WORKSPACE,
+	EARLIER_REVIEWS_WORKSPACE,
+	TILES_BY_WINDOW,
+} from "@/stories/practices-across-the-workspace-story-data";
 import { deferred, sleep } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
@@ -21,6 +27,8 @@ vi.setConfig({ testTimeout: ROUTE_RENDER_WAIT.timeout });
 const PAGE = "/w/acme/practices-across-the-workspace";
 const PROFILE = "/w/acme/practice-profile";
 const GROUP_OPEN = `${PAGE}?detail=practice-group:review-ready-work`;
+const OVERVIEW = "*/workspaces/:workspaceSlug/practices/workspace-overview";
+const TILES = "*/workspaces/:workspaceSlug/practices/tiles";
 
 /** Every request the page made, so a test can count the reads. */
 let requests: { url: URL }[] = [];
@@ -37,9 +45,14 @@ beforeEach(() => {
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
 			HttpResponse.json(ownMembership("MEMBER")),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/workspace-overview", () =>
-			HttpResponse.json(ACROSS_WORKSPACE),
-		),
+		http.get(OVERVIEW, () => HttpResponse.json(ACROSS_WORKSPACE)),
+		http.get(TILES, ({ request }) => {
+			const window = new URL(request.url).searchParams.get("window");
+			const tiles = Object.values(TILES_BY_WINDOW).find((each) => each.window === window);
+			return tiles === undefined
+				? HttpResponse.json({ title: "Bad Request" }, { status: 400 })
+				: HttpResponse.json(tiles);
+		}),
 	);
 });
 
@@ -48,7 +61,13 @@ afterEach(() => {
 });
 
 const overviewReads = () =>
-	requests.filter((request) => request.url.pathname.endsWith("/practices/workspace-overview"));
+	requests.filter(({ url }) => url.pathname.endsWith("/practices/workspace-overview"));
+
+/** The window of each tiles read, in the order the page asked. */
+const tileWindows = () =>
+	requests
+		.filter(({ url }) => url.pathname.endsWith("/practices/tiles"))
+		.map(({ url }) => url.searchParams.get("window"));
 
 /** The reader's own profile reads, which this page never makes: the profile makes them. */
 const profileReads = () =>
@@ -78,20 +97,46 @@ async function renderPage(path = PAGE) {
 }
 
 describe("Practices across the workspace", () => {
-	it("lists each group with its practices and results from one read, and none of the reader's own", async () => {
+	it("draws each group's developers once by standing and marks the reader, from one overview read", async () => {
 		await renderPage();
 		const table = within(screen.getByRole("table", { name: "All practice groups" }));
-		const packaging = table
-			.getAllByRole("row")
-			.find((row) => row.textContent.startsWith("Packaging work for review"));
-		expect(packaging?.textContent).toContain("5 practices");
-		expect(packaging?.textContent).toContain("Met 43");
-		expect(screen.queryByText("Sign your commits")).toBeNull();
+		table.getByRole("img", {
+			name: "28 developers in this workspace: 7 Needs attention, 6 Mixed feedback, 8 Going well, 7 none yet. The You marker is on Needs attention.",
+		});
+		// Parts of one and two show as they are; the reader without a verdict sits in none yet.
+		table.getByRole("img", {
+			name: "28 developers in this workspace: 1 Needs attention, 0 Mixed feedback, 2 Going well, 25 none yet. The You marker is on none yet.",
+		});
 		expect(overviewReads()).toHaveLength(1);
 		expect(profileReads()).toStrictEqual([]);
 	});
 
-	it("opens a group over the page with each practice's developers and results", async () => {
+	it("reads the tiles of the chosen window only, and not the bars again", async () => {
+		const router = await renderPage();
+		await screen.findByText("11", undefined, ROUTE_RENDER_WAIT);
+		expect(tileWindows()).toStrictEqual(["DAYS_30"]);
+
+		const range = screen.getByRole("toolbar", { name: "Time range" });
+		await userEvent.click(within(range).getByRole("button", { name: "90 days" }));
+
+		await waitFor(() => {
+			expect(router.state.location.search).toMatchObject({ window: "DAYS_90" });
+		});
+		await screen.findByText("29", undefined, ROUTE_RENDER_WAIT);
+		expect(tileWindows()).toStrictEqual(["DAYS_30", "DAYS_90"]);
+		expect(overviewReads()).toHaveLength(1);
+		screen.getByRole("img", {
+			name: "28 developers in this workspace: 7 Needs attention, 6 Mixed feedback, 8 Going well, 7 none yet. The You marker is on Needs attention.",
+		});
+	});
+
+	it("reads the window named in the address", async () => {
+		await renderPage(`${PAGE}?window=ALL_TIME`);
+		await screen.findByText("64", undefined, ROUTE_RENDER_WAIT);
+		expect(tileWindows()).toStrictEqual(["ALL_TIME"]);
+	});
+
+	it("opens a group over the page with each practice's split", async () => {
 		const router = await renderPage();
 		await userEvent.click(
 			screen.getByRole("button", { name: "Open group Packaging work for review" }),
@@ -106,16 +151,16 @@ describe("Practices across the workspace", () => {
 		const level = within(
 			await screen.findByRole("dialog", { name: "Packaging work for review" }, ROUTE_RENDER_WAIT),
 		);
-		await level.findByRole(
-			"table",
-			{ name: "Practices of Packaging work for review" },
-			ROUTE_RENDER_WAIT,
+		const practices = within(
+			await level.findByRole(
+				"table",
+				{ name: "Practices of Packaging work for review" },
+				ROUTE_RENDER_WAIT,
+			),
 		);
-		const diff = level
-			.getAllByRole("row")
-			.find((row) => row.textContent.startsWith("Keep the diff reviewable in one sitting"));
-		expect(diff?.textContent).toContain("21 developers");
-		expect(diff?.textContent).toContain("Not met 9");
+		practices.getByRole("img", {
+			name: "28 developers in this workspace: 9 Needs attention, 4 Mixed feedback, 8 Going well, 7 none yet. The You marker is on Needs attention.",
+		});
 		expect(overviewReads()).toHaveLength(1);
 		expect(profileReads()).toStrictEqual([]);
 
@@ -174,7 +219,7 @@ describe("Practices across the workspace", () => {
 
 	it("says it could not load the practice groups when the overview fails, in the open level too", async () => {
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/workspace-overview", () =>
+			http.get(OVERVIEW, () =>
 				HttpResponse.json({ title: "Internal Server Error" }, { status: 500 }),
 			),
 		);
@@ -189,6 +234,29 @@ describe("Practices across the workspace", () => {
 		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
 			"practice-group:review-ready-work",
 		]);
+	});
+
+	it("keeps the bars when only the window's figures fail", async () => {
+		server.use(
+			http.get(TILES, () => HttpResponse.json({ title: "Internal Server Error" }, { status: 500 })),
+		);
+		await renderPage();
+		await screen.findByText(FIGURES_LOAD_ERROR, undefined, ROUTE_RENDER_WAIT);
+		screen.getByRole("table", { name: "All practice groups" });
+	});
+
+	it("says once that standings rest on earlier reviews, and marks the reader's own", async () => {
+		server.use(http.get(OVERVIEW, () => HttpResponse.json(EARLIER_REVIEWS_WORKSPACE)));
+		await renderPage();
+		screen.getByText(`${EARLIER_REVIEWS_COUNTED.title}.`);
+		const table = within(screen.getByRole("table", { name: "All practice groups" }));
+		table.getByRole("button", { name: "Based on earlier reviews, criteria unknown" });
+	});
+
+	it("says nothing about earlier reviews when every counted standing is current", async () => {
+		await renderPage();
+		await screen.findByText("11", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText(`${EARLIER_REVIEWS_COUNTED.title}.`)).toBeNull();
 	});
 
 	it("reads the overview once and not again on a refocus", async () => {
@@ -206,7 +274,7 @@ describe("Practices across the workspace", () => {
 	it("says once that it counts, then that the counts take long", async () => {
 		const counted = deferred();
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/workspace-overview", async () => {
+			http.get(OVERVIEW, async () => {
 				await counted.promise;
 				return HttpResponse.json(ACROSS_WORKSPACE);
 			}),

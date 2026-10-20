@@ -1,4 +1,5 @@
 import {
+	type Active,
 	type CollisionDetection,
 	closestCenter,
 	DndContext,
@@ -7,6 +8,7 @@ import {
 	DragOverlay,
 	type DragStartEvent,
 	KeyboardSensor,
+	type Over,
 	PointerSensor,
 	pointerWithin,
 	useDroppable,
@@ -16,6 +18,7 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
 	arrayMove,
+	hasSortableData,
 	SortableContext,
 	sortableKeyboardCoordinates,
 	useSortable,
@@ -136,6 +139,25 @@ const bucketDndId = (groupSlug: string | null) =>
 	`bucket:${groupSlug ?? UNASSIGNED_CATALOG_BUCKET}`;
 const entryDndId = (slug: string) => `entry:${slug}`;
 
+/**
+ * Where a keyboard drag goes when it reaches a row of its own list: after the row when that row was
+ * below it, before it when it was above, as the list shows the rows making way. Undefined for a row
+ * of another list, which the geometry still decides.
+ *
+ * A keyboard step down puts the dragged row's bottom on the next row's bottom
+ * (`sortableKeyboardCoordinates`). Comparing their centres then depends on the two heights, and on
+ * whether the drag preview has been measured yet: a row no shorter than the next one landed back in
+ * its own place.
+ */
+function listOrder(active: Active, over: Over): boolean | undefined {
+	if (!hasSortableData(active) || !hasSortableData(over)) {
+		return undefined;
+	}
+	const from = active.data.current.sortable;
+	const to = over.data.current.sortable;
+	return from.containerId === to.containerId ? to.index > from.index : undefined;
+}
+
 export function SortableCatalogTree<
 	TGroup extends SortableCatalogGroup,
 	TEntry extends SortableCatalogEntry,
@@ -165,6 +187,8 @@ export function SortableCatalogTree<
 	const [dropTarget, setDropTarget] = useState<ActiveEntryDrop | null>(null);
 	const [collapsedGroups, setCollapsedGroups] = useState<readonly string[]>([]);
 	const focusAfterMove = useRef<string | null>(null);
+	// Whether the drag in progress started from the keyboard, as `resolveEntryDropTarget` reads it.
+	const keyboardDrag = useRef(false);
 	const sortedGroups = [...groups].sort(byPosition);
 	const visibleEntries = visibleEntrySlugs
 		? entries.filter((entry) => visibleEntrySlugs.has(entry.slug))
@@ -240,9 +264,11 @@ export function SortableCatalogTree<
 			return getCatalogDropTarget(entries, activeData.entrySlug, groupSlug);
 		}
 		const { translated } = active.rect.current;
-		const afterAnchor = translated
-			? translated.top + translated.height / 2 > over.rect.top + over.rect.height / 2
-			: false;
+		const afterAnchor =
+			(keyboardDrag.current ? listOrder(active, over) : undefined) ??
+			(translated
+				? translated.top + translated.height / 2 > over.rect.top + over.rect.height / 2
+				: false);
 		return getCatalogDropTarget(
 			entries,
 			activeData.entrySlug,
@@ -257,7 +283,8 @@ export function SortableCatalogTree<
 		setDropTarget(null);
 	};
 
-	const handleDragStart = ({ active }: DragStartEvent) => {
+	const handleDragStart = ({ active, activatorEvent }: DragStartEvent) => {
+		keyboardDrag.current = activatorEvent instanceof KeyboardEvent;
 		const data = catalogDndData(active.data.current);
 		if (data?.type === "group") {
 			setActiveDrag({ type: "group", slug: data.groupSlug });

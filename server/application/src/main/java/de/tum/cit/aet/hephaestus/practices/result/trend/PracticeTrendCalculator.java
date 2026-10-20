@@ -14,8 +14,14 @@ final class PracticeTrendCalculator {
 
     static PracticeTrend calculatePractice(
             List<ResultView> practiceResults, Instant cutoff, TrendProperties properties) {
-        OpportunityBundler.Bundles bundles =
-                OpportunityBundler.bundle(practiceResults, cutoff, properties.getBundleSize());
+        return calculate(OpportunityBundler.bundle(practiceResults, cutoff, properties.getBundleSize()), properties);
+    }
+
+    static PracticeTrend calculateSelected(List<ResultView> selected, Instant cutoff, TrendProperties properties) {
+        return calculate(OpportunityBundler.bundleSelected(selected, cutoff, properties.getBundleSize()), properties);
+    }
+
+    private static PracticeTrend calculate(OpportunityBundler.Bundles bundles, TrendProperties properties) {
         int missing = bundles.opportunitiesUntilComparable(properties.getBundleSize(), properties.getMinBundleSize());
         // Counted before the cap: the cap shortens a chart, not the work a reader is told was reviewed.
         Map<Long, ItemKind> reviewedWork = bundles.trail().stream()

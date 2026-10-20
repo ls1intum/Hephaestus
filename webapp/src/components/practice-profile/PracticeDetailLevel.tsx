@@ -24,6 +24,7 @@ import {
 	PracticeFeedbackCardSkeleton,
 } from "@/components/practice-vocabulary/PracticeFeedbackCard";
 import { StandingBadge, TrendNote } from "@/components/practice-vocabulary/StandingBadge";
+import { StandingBasisNote } from "@/components/practice-vocabulary/StandingBasisNote";
 import { ReviewFeed, ReviewFeedSkeleton } from "@/components/profile/ReviewFeed";
 import {
 	EMPTY_REVIEW_FEED,
@@ -350,6 +351,7 @@ export function PracticeDetailLevel({
 										support={practice.trendSupport ?? undefined}
 										scope="practice"
 									/>
+									<StandingBasisNote basis={practice.basis} />
 								</>
 							)}
 						</>

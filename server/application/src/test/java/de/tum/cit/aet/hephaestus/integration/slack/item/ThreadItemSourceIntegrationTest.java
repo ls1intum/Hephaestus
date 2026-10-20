@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.core.privacy.IdentityRestriction;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
@@ -23,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.slack.capture.ThreadCaptureSource;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessage;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
@@ -43,11 +45,14 @@ import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -74,6 +79,9 @@ class ThreadItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityRepository identities;
+
+    @PersistenceContext
+    private @Nullable EntityManager entities;
 
     @Autowired
     private IdentityProviderRepository providers;
@@ -157,6 +165,66 @@ class ThreadItemSourceIntegrationTest extends BaseIntegrationTest {
                 .containsEntry(
                         ThreadCaptureSource.SOURCE,
                         new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE));
+    }
+
+    @Test
+    void shouldCountAHumanStandingOverANoAiAuthorUntilAVisibilityControlHidesTheThread() {
+        var fixture = fixture();
+        var human = SourceReadAudience.HUMAN_RECORDED_STANDING;
+        var contextualAuthor = accounts.findById(fixture.secondAccountId()).orElseThrow();
+        contextualAuthor.setAiChoice(AiChoice.NO_AI);
+        contextualAuthor.setAiChoiceAt(Instant.now());
+        accounts.saveAndFlush(contextualAuthor);
+
+        for (var purpose : SourceUsePurpose.values()) {
+            assertThat(source.permits(fixture.item(), purpose)).isFalse();
+            assertThat(source.permits(fixture.item(), purpose, SourceReadAudience.PROCESSING))
+                    .isFalse();
+        }
+        assertThat(source.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isTrue();
+        assertThat(source.current(fixture.item())).isEmpty();
+
+        consent.optOutOfIngestion(fixture.item().workspaceId(), "U2");
+        assertThat(source.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
+    }
+
+    @Test
+    void shouldRefuseTheHumanStandingWhenANoAiAuthorHasAPermanentErasureFence() {
+        var fixture = fixture();
+        var author = accounts.findById(fixture.secondAccountId()).orElseThrow();
+        author.setAiChoice(AiChoice.NO_AI);
+        author.setAiChoiceAt(Instant.now());
+        accounts.saveAndFlush(author);
+        var human = SourceReadAudience.HUMAN_RECORDED_STANDING;
+        assertThat(source.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isTrue();
+
+        var erased = new IdentityRestriction();
+        erased.setProviderId(fixture.providerId());
+        erased.setProviderUserKey("U2");
+        erased.setTeamKey(fixture.teamId());
+        erased.setKind(IdentityRestriction.Kind.ERASED);
+        var entityManager = Objects.requireNonNull(entities);
+        entityManager.persist(erased);
+        entityManager.flush();
+
+        assertThat(source.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
+    }
+
+    @Test
+    void shouldRefuseTheHumanStandingWhenTheChannelConsentIsNoLongerActive() {
+        var fixture = fixture();
+        var human = SourceReadAudience.HUMAN_RECORDED_STANDING;
+        assertThat(source.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isTrue();
+        jdbc.update(
+                "UPDATE slack_monitored_channel SET consent_state='PAUSED' WHERE workspace_id=? AND slack_channel_id='C1'",
+                fixture.item().workspaceId());
+        assertThat(source.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
     }
 
     @Test
@@ -274,7 +342,7 @@ class ThreadItemSourceIntegrationTest extends BaseIntegrationTest {
         message(workspaceId, teamId, first, "U1", "1700000000.000000", "First turn");
         message(workspaceId, teamId, second, "U2", "1700000001.000000", "Second turn");
         var item = items.upsert(new ItemRegistration(workspaceId, ThreadEvents.THREAD, thread.getId(), null, null));
-        return new Fixture(item, second);
+        return new Fixture(item, second, Objects.requireNonNull(provider.getId()), teamId);
     }
 
     private long human(Workspace workspace, long providerId, String teamId, String subject) {
@@ -309,5 +377,5 @@ class ThreadItemSourceIntegrationTest extends BaseIntegrationTest {
                 UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(ThreadCaptureSource.SOURCE), "2.0.0", 3);
     }
 
-    private record Fixture(ItemRef item, long secondAccountId) {}
+    private record Fixture(ItemRef item, long secondAccountId, long providerId, String teamId) {}
 }

@@ -6026,7 +6026,9 @@ export const getOwnPracticeStandingsOptions = (options: Options<GetOwnPracticeSt
 export const getPracticeWorkspaceTilesQueryKey = (options: Options<GetPracticeWorkspaceTilesData>) => createQueryKey('getPracticeWorkspaceTiles', options, false, ['practices-across-workspace']);
 
 /**
- * List practice result totals across the workspace
+ * The reader's figures over one window beside the workspace's middle half
+ *
+ * A middle half shows whenever one or more developers are counted in the window.
  */
 export const getPracticeWorkspaceTilesOptions = (options: Options<GetPracticeWorkspaceTilesData>) => queryOptions<GetPracticeWorkspaceTilesResponse, DefaultError, GetPracticeWorkspaceTilesResponse, ReturnType<typeof getPracticeWorkspaceTilesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -6044,7 +6046,9 @@ export const getPracticeWorkspaceTilesOptions = (options: Options<GetPracticeWor
 export const getPracticeWorkspaceOverviewQueryKey = (options: Options<GetPracticeWorkspaceOverviewData>) => createQueryKey('getPracticeWorkspaceOverview', options, false, ['practices-across-workspace']);
 
 /**
- * Get practice results across the workspace
+ * How the workspace's developers split across practice groups and practices, the reader marked
+ *
+ * Counts developers, never names them. Every split shows all its parts, however few developers they count. The splits count every developer's current standing once and take no window.
  */
 export const getPracticeWorkspaceOverviewOptions = (options: Options<GetPracticeWorkspaceOverviewData>) => queryOptions<GetPracticeWorkspaceOverviewResponse, DefaultError, GetPracticeWorkspaceOverviewResponse, ReturnType<typeof getPracticeWorkspaceOverviewQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

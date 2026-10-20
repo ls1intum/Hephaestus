@@ -34,6 +34,20 @@ public class PracticeTrendService {
         return PracticeTrendCalculator.calculatePractice(evidence, since, properties);
     }
 
+    /**
+     * The trend of live runs a standing reader selected itself: each piece of work's live run that still stands,
+     * also one a requested or backfilled review replaced as the current claim.
+     */
+    public PracticeTrend calculateSelectedPractice(List<ResultView> selectedLiveRuns, Instant since) {
+        return PracticeTrendCalculator.calculateSelected(selectedLiveRuns, since, properties);
+    }
+
+    /** The recency-weighted share of rows a standing reader selected, read without a trend. */
+    public OptionalDouble selectedMetShare(List<ResultView> selected, Instant since, int window, double decay) {
+        return PracticeTrend.recentMetShare(
+                OpportunityBundler.selectedOpportunities(selected, since).reversed(), window, decay);
+    }
+
     public OptionalDouble selfSelectedMetShare(List<ResultView> evidence, Instant since, int window, double decay) {
         return PracticeTrend.recentMetShare(
                 OpportunityBundler.opportunities(evidence, since, true).reversed(), window, decay);

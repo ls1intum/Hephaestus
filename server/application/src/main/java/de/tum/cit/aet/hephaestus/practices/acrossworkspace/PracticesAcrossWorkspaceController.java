@@ -1,34 +1,47 @@
 package de.tum.cit.aet.hephaestus.practices.acrossworkspace;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.PracticeWorkspaceOverviewDTO;
-import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.PracticeWorkspaceTileDTO;
+import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.PracticesAcrossWorkspaceDTO;
+import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.PracticesAcrossWorkspaceTilesDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
+/**
+ * Practices across the workspace, read by the calling developer: everyone, the caller included, inside a count, and
+ * the caller's own figures beside the workspace's. Like the Practice profile, the route takes no user parameter.
+ */
 @ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/practices")
 @PreAuthorize("@workspaceSecure.isMember()")
 @RequiredArgsConstructor
 public class PracticesAcrossWorkspaceController {
-    private final PracticesAcrossWorkspaceService query;
+    private final PracticesAcrossWorkspaceService service;
 
     @GetMapping("/workspace-overview")
-    @Operation(operationId = "getPracticeWorkspaceOverview", summary = "Get practice results across the workspace")
-    public PracticeWorkspaceOverviewDTO overview(WorkspaceContext ws) {
-        return query.read(ws);
+    @Operation(
+            operationId = "getPracticeWorkspaceOverview",
+            summary = "How the workspace's developers split across practice groups and practices, the reader marked",
+            description = "Counts developers, never names them. Every split shows all its parts, however few"
+                    + " developers they count. The splits count every developer's current standing once and take no"
+                    + " window.")
+    public PracticesAcrossWorkspaceDTO overview(WorkspaceContext ws) {
+        return service.read(ws);
     }
 
     @GetMapping("/tiles")
-    @Operation(operationId = "getPracticeWorkspaceTiles", summary = "List practice result totals across the workspace")
-    public List<PracticeWorkspaceTileDTO> tiles(WorkspaceContext ws) {
-        return query.read(ws).practices();
+    @Operation(
+            operationId = "getPracticeWorkspaceTiles",
+            summary = "The reader's figures over one window beside the workspace's middle half",
+            description = "A middle half shows whenever one or more developers are counted in the window.")
+    public PracticesAcrossWorkspaceTilesDTO tiles(
+            WorkspaceContext ws, @RequestParam PracticesAcrossWorkspaceWindow window) {
+        return service.readTiles(ws, window);
     }
 }

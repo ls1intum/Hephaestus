@@ -18,14 +18,20 @@ import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -69,6 +75,15 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
     @Autowired
     ResultSourceAuthorization authorization;
 
+    @Autowired
+    ResultVisibilityPolicy visibility;
+
+    @Autowired
+    ResultRepository results;
+
+    @Autowired
+    EntityManagerFactory entities;
+
     @MockitoBean
     ScmItemSourceAccess source;
 
@@ -80,6 +95,8 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
         scenario = data.scenario();
         when(source.kinds()).thenReturn(Set.of(new ItemKind("scm.pull_request")));
         when(source.permits(any(), any())).thenReturn(true);
+        // The human recorded standing asks the source's typed check; the real adapter is proven elsewhere.
+        when(source.permits(any(), any(), any())).thenReturn(true);
     }
 
     WebTestClient.ResponseSpec get(String path) {
@@ -269,6 +286,8 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
         assertThat(authorization.permits(
                         scenario.workspace().getId(), result.getId(), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
                 .isFalse();
+        assertThat(authorization.permitsHumanStanding(scenario.workspace().getId(), List.of(stored(result))))
+                .isEmpty();
         get("/practices/reviews/results/" + result.getId())
                 .expectStatus()
                 .isOk()
@@ -311,6 +330,134 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
         assertThat(authorization.permitsHistory(
                         scenario.workspace().getId(), result.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isFalse();
+    }
+
+    @Test
+    void shouldCountAMigratedStandingOfANoAiDeveloperWhileEveryProcessingReadStillRefusesIt() {
+        var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now().minusSeconds(60));
+        migrated(result, Objects.requireNonNull(result.getEvidence()).toString());
+        long workspaceId = scenario.workspace().getId();
+        jdbc.update(
+                "UPDATE account SET ai_choice='NO_AI',ai_choice_at=now() WHERE id=?",
+                scenario.account().getId());
+        var row = stored(result);
+
+        assertThat(authorization.permitsHumanStanding(workspaceId, List.of(row)))
+                .containsExactly(row.getId());
+        assertThat(visibility.permitsStandingAt(workspaceId, List.of(row), Instant.now()))
+                .containsExactly(row.getId());
+        // History, delivery, review and conversation keep the AI choice.
+        for (var purpose : SourceUsePurpose.values()) {
+            assertThat(authorization.permitsHistory(workspaceId, row.getId(), purpose))
+                    .isFalse();
+            assertThat(authorization.permits(workspaceId, row.getId(), purpose)).isFalse();
+        }
+        assertThat(visibility.permitsAt(
+                        workspaceId, List.of(row), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, Instant.now()))
+                .isEmpty();
+        assertThat(authorization.permitsHumanStanding(workspaceId + 1, List.of(row)))
+                .isEmpty();
+
+        when(source.permits(any(), any(), any())).thenReturn(false);
+        assertThat(authorization.permitsHumanStanding(workspaceId, List.of(row)))
+                .isEmpty();
+        when(source.permits(any(), any(), any())).thenReturn(true);
+        jdbc.update(
+                "UPDATE account SET status='DELETING' WHERE id=?",
+                scenario.account().getId());
+        assertThat(authorization.permitsHumanStanding(workspaceId, List.of(row)))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldCountAnUnpinnedMigratedStandingButRefuseAVersionOfAnotherWorkspace() {
+        var result = data.result(scenario, ResultOutcome.MET, Instant.now().minusSeconds(60));
+        migrated(result, Objects.requireNonNull(result.getEvidence()).toString());
+        long workspaceId = scenario.workspace().getId();
+        historical(
+                "UPDATE result SET practice_version_id=NULL WHERE workspace_id=? AND id=?",
+                workspaceId,
+                result.getId());
+        assertThat(visibility.permitsStandingAt(workspaceId, List.of(stored(result)), Instant.now()))
+                .containsExactly(result.getId());
+
+        var foreign = Objects.requireNonNull(
+                data.scenario().practice().getCurrentVersion().getId());
+        historical(
+                "UPDATE result SET practice_version_id=? WHERE workspace_id=? AND id=?",
+                foreign,
+                workspaceId,
+                result.getId());
+        assertThat(visibility.permitsStandingAt(workspaceId, List.of(stored(result)), Instant.now()))
+                .isEmpty();
+
+        historical(
+                "UPDATE result SET practice_version_id=? WHERE workspace_id=? AND id=?",
+                Objects.requireNonNull(scenario.practice().getCurrentVersion().getId()),
+                workspaceId,
+                result.getId());
+        assertThat(visibility.permitsStandingAt(workspaceId, List.of(stored(result)), Instant.now()))
+                .containsExactly(result.getId());
+        jdbc.update(
+                "INSERT INTO result_mark(id,workspace_id,result_id,kind,reason,created_at)"
+                        + " VALUES (?,?,?,'INCORRECT','Wrong verdict',now() - interval '1 minute')",
+                UUID.randomUUID(),
+                workspaceId,
+                result.getId());
+        assertThat(visibility.permitsStandingAt(workspaceId, List.of(stored(result)), Instant.now()))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldAuthorizeManyResultsOfOneWorkInBoundedQueriesWithTheAnswersOfSingleReads() {
+        long workspaceId = scenario.workspace().getId();
+        var rows = chain(6);
+        var expected = singleReads(workspaceId, rows);
+        // The migrated rows count as earlier reviews; the newest keeps current proof without a capture receipt.
+        assertThat(expected).hasSize(5);
+
+        var all = statements(() -> authorization.permitsHumanStanding(workspaceId, rows));
+        var two = statements(
+                () -> authorization.permitsHumanStanding(workspaceId, List.of(rows.getFirst(), rows.getLast())));
+        assertThat(all.permitted()).isEqualTo(expected);
+        // Read row by row, the four extra results would add two assignment queries each.
+        assertThat(all.statements()).isEqualTo(two.statements());
+
+        var foreign = statements(() -> authorization.permitsHumanStanding(workspaceId + 1, rows));
+        assertThat(foreign.permitted()).isEmpty();
+        assertThat(foreign.statements()).isZero();
+
+        when(source.permits(any(), any(), any())).thenReturn(false);
+        assertThat(authorization.permitsHumanStanding(workspaceId, rows)).isEmpty();
+        assertThat(singleReads(workspaceId, rows)).isEmpty();
+    }
+
+    @Test
+    void shouldRefuseOnlyTheResultWhoseRetainedCustodyConflictsWhenReadTogether() {
+        long workspaceId = scenario.workspace().getId();
+        var rows = chain(2);
+        var older = rows.getFirst();
+        var newer = rows.getLast();
+        migrated(newer, Objects.requireNonNull(newer.getEvidence()).toString());
+        historical(
+                "UPDATE review_item SET detail=CAST(? AS jsonb) WHERE workspace_id=? AND result_id=?",
+                retainedCustody(true),
+                workspaceId,
+                older.getId());
+        var both = List.of(stored(older), stored(newer));
+        assertThat(authorization.permitsHumanStanding(workspaceId, both))
+                .containsExactlyInAnyOrder(older.getId(), newer.getId());
+
+        // Another review's assignment reuses the older result with a different receipt, and stops producing the newer.
+        historical(
+                "UPDATE review_item SET result_id=?,detail=CAST(? AS jsonb) WHERE workspace_id=? AND result_id=?",
+                older.getId(),
+                retainedCustody(false),
+                workspaceId,
+                newer.getId());
+        var conflicted = List.of(stored(older), stored(newer));
+        assertThat(authorization.permitsHumanStanding(workspaceId, conflicted)).containsExactly(newer.getId());
+        assertThat(singleReads(workspaceId, conflicted)).containsExactly(newer.getId());
     }
 
     @ParameterizedTest
@@ -480,6 +627,74 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
                 job,
                 UUID.randomUUID(),
                 payload);
+    }
+
+    /**
+     * {@code size} results of one practice on one work, each ended by the store before the next is recorded, so one
+     * holds the claim. All but the newest are then carried over as earlier reviews.
+     */
+    private List<Result> chain(int size) {
+        var start = Instant.now().minusSeconds(3600);
+        List<Result> chain = new ArrayList<>();
+        for (int index = 0; index < size; index++) {
+            var at = start.plusSeconds(60L * index);
+            if (!chain.isEmpty()) data.end(chain.getLast(), at);
+            chain.add(data.result(scenario, index % 2 == 0 ? ResultOutcome.NOT_MET : ResultOutcome.MET, at));
+        }
+        chain.subList(0, size - 1)
+                .forEach(row ->
+                        migrated(row, Objects.requireNonNull(row.getEvidence()).toString()));
+        return chain.stream().map(this::stored).toList();
+    }
+
+    /** What reading each row on its own permits: the answer a read of many must match. */
+    private Set<UUID> singleReads(long workspaceId, List<Result> rows) {
+        return rows.stream()
+                .filter(row -> authorization
+                        .permitsHumanStanding(workspaceId, List.of(row))
+                        .contains(row.getId()))
+                .map(Result::getId)
+                .collect(Collectors.toSet());
+    }
+
+    private String retainedCustody(boolean complete) {
+        var detail = json.createObjectNode();
+        detail.set("custody", json.valueToTree(new HistoryCustody(complete, false, List.of(), List.of(), List.of())));
+        return detail.toString();
+    }
+
+    private record Counted(Set<UUID> permitted, long statements) {}
+
+    /**
+     * The statements Hibernate prepares during one read, with statistics on only for it. Statements through a
+     * `JdbcTemplate`, such as the suppression checks, are not counted.
+     */
+    private Counted statements(Supplier<Set<UUID>> read) {
+        var statistics = entities.unwrap(SessionFactory.class).getStatistics();
+        boolean enabled = statistics.isStatisticsEnabled();
+        statistics.clear();
+        statistics.setStatisticsEnabled(true);
+        try {
+            var permitted = read.get();
+            return new Counted(permitted, statistics.getPrepareStatementCount());
+        } finally {
+            statistics.setStatisticsEnabled(enabled);
+            statistics.clear();
+        }
+    }
+
+    private Result stored(Result result) {
+        return results.findByIdAndWorkspaceId(
+                        result.getId(), scenario.workspace().getId())
+                .orElseThrow();
+    }
+
+    private void historical(String update, Object... arguments) {
+        // Only migration writes these historical rows; ordinary writes keep their guards.
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            jdbc.execute("SET LOCAL session_replication_role=replica");
+            jdbc.update(update, arguments);
+        });
     }
 
     private void migrated(Result result, String evidence) {

@@ -3236,6 +3236,10 @@ export type PracticeGroup = {
 };
 
 export type PracticeGroupStanding = {
+    /**
+     * The weakest basis among the practice verdicts the group standing averages. Absent without a verdict
+     */
+    basis: 'CURRENT_REVIEWS' | 'EARLIER_REVIEWS' | 'EARLIER_REVIEWS_CRITERIA_UNKNOWN' | null;
     direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE' | null;
     feedbackSince: Date | null;
     feedbackSpanDays: null | number;
@@ -3523,6 +3527,10 @@ export type PracticeScriptSummary = {
 };
 
 export type PracticeStanding = {
+    /**
+     * What a verdict was read from: current reviews, or only outcomes recorded by earlier reviews, which carry no current proof, also when the criteria they were assessed against are unknown. Absent without a verdict
+     */
+    basis: 'CURRENT_REVIEWS' | 'EARLIER_REVIEWS' | 'EARLIER_REVIEWS_CRITERIA_UNKNOWN' | null;
     direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE' | null;
     doesNotApplyOnly: boolean;
     groupName: string | null;
@@ -3590,17 +3598,56 @@ export type PracticeVisual = {
     svg: string;
 };
 
-export type PracticeWorkspaceOverview = {
-    developers: number;
-    practices: Array<PracticeWorkspaceTile>;
+/**
+ * How the workspace's developers with a current standing split across the practice groups, counted in developers and never naming one, and the open feedback beside the reader's own. Nothing here reads a window; the tiles that do are read on their own
+ */
+export type PracticesAcrossWorkspace = {
+    /**
+     * One row per practice group shown on the practice pages with a practice review is admitted for, in catalog order
+     */
+    groups: Array<WorkspaceGroupSplit>;
+    /**
+     * Whether a counted standing was read only from earlier reviews, which carry no current proof
+     */
+    includesEarlierReviews: boolean;
+    /**
+     * The reader's open feedback, counted by the rule the practice profile shows it open by, beside the middle half of the developers the page counts: both open now
+     */
+    openFeedback: WorkspaceTile;
 };
 
-export type PracticeWorkspaceTile = {
-    developers: number;
-    group: GroupRef | null;
-    outcomes: OutcomeVector;
-    practiceName: string;
-    practiceSlug: string;
+/**
+ * The reader's figures over one window beside the middle half of the developers with a standing in it
+ */
+export type PracticesAcrossWorkspaceTiles = {
+    /**
+     * Developers with a standing in a practice group shown in the window, the developers the tiles compare
+     */
+    developersWithAStandingInWindow: number;
+    /**
+     * Whether a counted standing in the window was read only from earlier reviews
+     */
+    includesEarlierReviews: boolean;
+    /**
+     * The reader's practices going well
+     */
+    practicesGoingWell: WorkspaceTile;
+    /**
+     * The reader's practices needing attention
+     */
+    practicesNeedingAttention: WorkspaceTile;
+    /**
+     * Pieces of the reader's work reviewed in the window
+     */
+    reviewedWork: WorkspaceTile;
+    /**
+     * The window the tiles read evidence over
+     */
+    window: 'ALL_TIME' | 'DAYS_30' | 'DAYS_90';
+    /**
+     * The practices the reader's profile lists, the denominator of the practice tiles
+     */
+    yourPractices: number;
 };
 
 export type PrepareFeedbackRequest = {
@@ -6363,6 +6410,44 @@ export type WorkspaceAiOption = {
 };
 
 /**
+ * One practice group: how the developers with a standing split across it, and where the reader is
+ */
+export type WorkspaceGroupSplit = {
+    /**
+     * Group colour name
+     */
+    groupColor: string | null;
+    /**
+     * Group icon name
+     */
+    groupIcon: string | null;
+    /**
+     * Group name
+     */
+    groupName: string;
+    /**
+     * Group slug
+     */
+    groupSlug: string;
+    /**
+     * The group's practices review is admitted for, the same for every reader, each split on its own, in catalog order
+     */
+    practices: Array<WorkspacePracticeSplit>;
+    /**
+     * How the developers with a standing split across the group
+     */
+    split: WorkspaceSplit;
+    /**
+     * What the reader's group verdict was read from, as their practice profile says. Absent without one
+     */
+    yourBasis: 'CURRENT_REVIEWS' | 'EARLIER_REVIEWS' | 'EARLIER_REVIEWS_CRITERIA_UNKNOWN' | null;
+    /**
+     * The reader's current standing in the group, the one their practice profile shows: the part they are marked in. Absent unless the split counts the reader
+     */
+    yourStanding: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY' | null;
+};
+
+/**
  * Summary information about a workspace for list views
  */
 export type WorkspaceListItem = {
@@ -6713,6 +6798,32 @@ export type WorkspacePasskeyPolicy = {
 };
 
 /**
+ * One practice of a group: how the developers with a standing split, and where the reader is
+ */
+export type WorkspacePracticeSplit = {
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * How the developers with a standing split across the practice
+     */
+    split: WorkspaceSplit;
+    /**
+     * What the reader's verdict was read from, as their practice profile says. Absent without one
+     */
+    yourBasis: 'CURRENT_REVIEWS' | 'EARLIER_REVIEWS' | 'EARLIER_REVIEWS_CRITERIA_UNKNOWN' | null;
+    /**
+     * The reader's current standing in the practice, the one their practice profile shows: the part they are marked in. Absent unless the split counts the reader
+     */
+    yourStanding: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY' | null;
+};
+
+/**
  * Available workspace creation providers and their configuration
  */
 export type WorkspaceProviders = {
@@ -6730,11 +6841,57 @@ export type WorkspaceProviders = {
     gitlab?: GitLabProvider;
 };
 
+/**
+ * The middle half of the developers counted: the 25th to the 75th percentile
+ */
+export type WorkspaceRange = {
+    /**
+     * The 75th percentile
+     */
+    high: number;
+    /**
+     * The 25th percentile
+     */
+    low: number;
+};
+
 export type WorkspaceReviewScope = {
     accountIds: Array<string>;
     people: 'ALL' | 'SELECTED';
     repositories: 'ALL' | 'SELECTED';
     selectedRepositories: Array<ReviewScopeRepository>;
+};
+
+/**
+ * How the developers with a standing split across one practice group or one practice, counted in developers: a part per verdict, none yet, and their total
+ */
+export type WorkspaceSplit = {
+    /**
+     * Every developer the split counts, the parts and none yet together, the reader included when counted
+     */
+    developers: number;
+    /**
+     * Developers with a standing in a group shown but none here
+     */
+    noneYet: number;
+    /**
+     * Developers at each verdict, Needs attention, Mixed feedback and Going well in that order
+     */
+    parts: Array<WorkspaceSplitPart>;
+};
+
+/**
+ * The developers at one verdict in a split
+ */
+export type WorkspaceSplitPart = {
+    /**
+     * Developers at the verdict, the reader included when counted
+     */
+    developers: number;
+    /**
+     * The verdict the part counts
+     */
+    standing: 'DEVELOPING' | 'MIXED' | 'STRENGTH';
 };
 
 /**
@@ -6775,6 +6932,20 @@ export type WorkspaceTeamSettings = {
      * The workspace ID these settings belong to
      */
     workspaceId: number;
+};
+
+/**
+ * One figure: the reader's own value, then the middle half of the developers counted
+ */
+export type WorkspaceTile = {
+    /**
+     * The workspace's middle half; absent while no developer is counted
+     */
+    middle: WorkspaceRange | null;
+    /**
+     * The reader's own value
+     */
+    yours: number;
 };
 
 export type WorsenedBasis = Omit<ClaimBasis, 'type'> & {
@@ -13899,7 +14070,9 @@ export type GetPracticeWorkspaceTilesData = {
          */
         workspaceSlug: string;
     };
-    query?: never;
+    query: {
+        window: 'ALL_TIME' | 'DAYS_30' | 'DAYS_90';
+    };
     url: '/workspaces/{workspaceSlug}/practices/tiles';
 };
 
@@ -13907,7 +14080,7 @@ export type GetPracticeWorkspaceTilesResponses = {
     /**
      * OK
      */
-    200: Array<PracticeWorkspaceTile>;
+    200: PracticesAcrossWorkspaceTiles;
 };
 
 export type GetPracticeWorkspaceTilesResponse = GetPracticeWorkspaceTilesResponses[keyof GetPracticeWorkspaceTilesResponses];
@@ -13928,7 +14101,7 @@ export type GetPracticeWorkspaceOverviewResponses = {
     /**
      * OK
      */
-    200: PracticeWorkspaceOverview;
+    200: PracticesAcrossWorkspace;
 };
 
 export type GetPracticeWorkspaceOverviewResponse = GetPracticeWorkspaceOverviewResponses[keyof GetPracticeWorkspaceOverviewResponses];

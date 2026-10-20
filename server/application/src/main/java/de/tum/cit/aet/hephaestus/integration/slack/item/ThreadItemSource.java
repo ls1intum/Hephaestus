@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.slack.capture.ThreadCaptureSource;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
@@ -80,15 +81,37 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
     @Override
     @Transactional(readOnly = true)
     public boolean permits(ItemRef item, SourceUsePurpose purpose) {
+        return permitted(item, SourceReadAudience.PROCESSING);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean permits(ItemRef item, SourceUsePurpose purpose, SourceReadAudience audience) {
+        return permitted(item, Objects.requireNonNull(audience));
+    }
+
+    /**
+     * A consented thread on an active connection, every live turn of it readable. Processing reads its readability
+     * through the AI read guard; a human recorded standing counts the same turns without the authors' AI choice and
+     * reads no message body.
+     */
+    private boolean permitted(ItemRef item, SourceReadAudience audience) {
         if (!supports(item)) return false;
         Long sourceId = item.sourceId();
         if (sourceId == null) return false;
         return threads.findConsentedCandidateRow(item.workspaceId(), sourceId)
                 .filter(thread -> connectionFor(item.workspaceId(), thread).isPresent())
-                .filter(thread -> projection.threadReadability(
-                                item.workspaceId(), thread.getSlackChannelId(), thread.getSlackThreadTs())
-                        == ConversationThreadProjection.ThreadReadability.READABLE)
+                .filter(thread -> audience == SourceReadAudience.PROCESSING
+                        ? projection.threadReadability(
+                                        item.workspaceId(), thread.getSlackChannelId(), thread.getSlackThreadTs())
+                                == ConversationThreadProjection.ThreadReadability.READABLE
+                        : humanReadable(item.workspaceId(), thread.getSlackChannelId(), thread.getSlackThreadTs()))
                 .isPresent();
+    }
+
+    private boolean humanReadable(long workspaceId, String channelId, String threadTs) {
+        long live = messages.countLiveTurns(workspaceId, channelId, threadTs);
+        return live > 0 && messages.countHumanStandingReadableTurns(workspaceId, channelId, threadTs) == live;
     }
 
     @Override

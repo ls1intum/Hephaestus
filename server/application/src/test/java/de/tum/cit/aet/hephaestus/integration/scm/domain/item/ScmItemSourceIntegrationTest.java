@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
@@ -30,6 +32,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewStateValue;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
@@ -57,6 +60,8 @@ import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.result.ResultCurrentness;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -853,6 +858,72 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                 .isEmpty();
         assertThat(results.findById(reopened.getId()).orElseThrow().getEndReason())
                 .isEqualTo(ResultEndReason.WORK_CHANGED);
+    }
+
+    @Autowired
+    private ResultSourceAuthorization authorization;
+
+    @Autowired
+    private ResultVisibilityPolicy visibility;
+
+    @Autowired
+    private IdentityRepository identityRows;
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldCountAHumanStandingOverANoAiAuthorThroughTheRealSourceWhileEveryAiReadStaysRefused(
+            IdentityProviderType type) {
+        var fixture = fixture(type);
+        long workspaceId = fixture.workspace().getId();
+        var issue = progressIssue(fixture, 130, null);
+        var holder = writer.upsert(new ItemRegistration(
+                workspaceId, ScmItemEvents.REPOSITORY, fixture.repository().getId(), null, null));
+        var item = writer.upsert(
+                new ItemRegistration(workspaceId, ScmItemEvents.ISSUE, issue.getId(), holder.itemId(), null));
+        var scenario = parentScenario(fixture, item);
+        var recorded =
+                resultData.result(scenario, ResultOutcome.NOT_MET, Instant.now().minusSeconds(30));
+        // The issue's author is another member, who chose No AI; the developer did not.
+        var author = resultData.member(workspaceId);
+        var identity = new Identity();
+        identity.setAccount(author);
+        identity.setProviderId(Objects.requireNonNull(fixture.provider().getId()));
+        identity.setProviderUserKey(String.valueOf(fixture.author().getNativeId()));
+        identityRows.saveAndFlush(identity);
+        jdbc.update("UPDATE account SET ai_choice='NO_AI',ai_choice_at=now() WHERE id=?", author.getId());
+        // Only migration writes historical rows; this one is carried over as an earlier review.
+        transactions.executeWithoutResult(status -> {
+            jdbc.execute("SET LOCAL session_replication_role=replica");
+            jdbc.update(
+                    "UPDATE result SET evidence_version=0 WHERE workspace_id=? AND id=?",
+                    workspaceId,
+                    recorded.getId());
+        });
+        var row = results.findByIdAndWorkspaceId(recorded.getId(), workspaceId).orElseThrow();
+
+        for (var purpose : SourceUsePurpose.values()) {
+            assertThat(sourceAccess.permits(item, purpose)).isFalse();
+            assertThat(authorization.permitsHistory(workspaceId, row.getId(), purpose))
+                    .isFalse();
+        }
+        assertThat(sourceAccess.permits(
+                        item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, SourceReadAudience.HUMAN_RECORDED_STANDING))
+                .isTrue();
+        assertThat(visibility.permitsStandingAt(workspaceId, List.of(row), Instant.now()))
+                .containsExactly(row.getId());
+        assertThat(visibility.permitsAt(
+                        workspaceId, List.of(row), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, Instant.now()))
+                .isEmpty();
+
+        // The work is gone from the source: the human standing loses it too.
+        jdbc.update("UPDATE issue SET deleted_at=now() WHERE id=?", issue.getId());
+        assertThat(sourceAccess.permits(
+                        item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, SourceReadAudience.HUMAN_RECORDED_STANDING))
+                .isFalse();
+        assertThat(visibility.permitsStandingAt(workspaceId, List.of(row), Instant.now()))
+                .isEmpty();
     }
 
     private ReviewIntegrationData.Scenario parentScenario(Fixture fixture, ItemRef item) {

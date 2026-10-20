@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.practices.result;
 import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
@@ -18,6 +20,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
@@ -294,6 +297,85 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
                         ReviewItem.builder().detail(second).build()));
         assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isFalse();
+    }
+
+    @Test
+    void shouldCountAStandingOfAMemberWhoChoseNoAiWhileEveryProcessingCheckStillRefusesIt() {
+        var standingPurpose = SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY;
+        when(source.permits(item, standingPurpose)).thenReturn(true);
+        when(source.permits(item, standingPurpose, SourceReadAudience.HUMAN_RECORDED_STANDING))
+                .thenReturn(true);
+        var copy = new PersonCopyIdentity("GITHUB", "https://github.com", "native-7", null);
+        when(people.providers())
+                .thenReturn(List.of(new PersonIdentityResolver.Provider(8, "GITHUB", "https://github.com")));
+        when(people.accountFor(new PersonIdentity(8, "native-7", null))).thenReturn(Optional.of(7L));
+        when(accounts.find(7))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        7, Account.Status.ACTIVE, "Person", AiChoice.NO_AI, null, true)));
+        var current = resultBuilder(result).reviewId(job).developerId(7L).build();
+        var history = resultBuilder(result)
+                .id(UUID.randomUUID())
+                .evidenceVersion((short) 0)
+                .reviewId(job)
+                .developerId(7L)
+                .build();
+        var producer = ReviewItem.builder()
+                .workspaceId(1)
+                .reviewId(job)
+                .practiceId(current.getPracticeId())
+                .itemId(2)
+                .resultId(current.getId())
+                .jobId(job)
+                .build();
+        // A single check reads its own producer; a read of many reads its reviews' assignments together.
+        when(assignments.findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(1, job, current.getPracticeId(), 2))
+                .thenReturn(Optional.of(producer));
+        when(assignments.findByWorkspaceIdAndReviewIdIn(1, List.of(job))).thenReturn(List.of(producer));
+        when(custody.find(1, List.of(job))).thenReturn(receipt(List.of(copy)));
+        when(results.findByIdAndWorkspaceId(current.getId(), 1)).thenReturn(Optional.of(current));
+        when(results.findByIdAndWorkspaceId(history.getId(), 1)).thenReturn(Optional.of(history));
+
+        assertThat(authorization.permitsHumanStanding(1, List.of(current, history)))
+                .containsExactlyInAnyOrder(current.getId(), history.getId());
+        // Every AI, history and delivery reader keeps the AI choice.
+        assertThat(authorization.permits(1, current.getId(), standingPurpose)).isFalse();
+        assertThat(authorization.permitsHistory(1, history.getId(), standingPurpose))
+                .isFalse();
+        assertThat(authorization.permitsHumanStanding(
+                        2,
+                        List.of(current, resultBuilder(current).workspaceId(2).build())))
+                .isEmpty();
+
+        when(suppression.isAccountSuppressed(7)).thenReturn(true);
+        assertThat(authorization.permitsHumanStanding(1, List.of(current, history)))
+                .isEmpty();
+        when(suppression.isAccountSuppressed(7)).thenReturn(false);
+        when(source.permits(item, standingPurpose, SourceReadAudience.HUMAN_RECORDED_STANDING))
+                .thenReturn(false);
+        assertThat(authorization.permitsHumanStanding(1, List.of(current, history)))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldAskTheSourceForTheHumanReadOnlyWhenCountingAStanding() {
+        var purpose = SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY;
+        var history = resultBuilder(result)
+                .evidenceVersion((short) 0)
+                .reviewId(job)
+                .developerId(7L)
+                .build();
+        when(accounts.find(7))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        7, Account.Status.ACTIVE, "Person", AiChoice.CLOUD, null, true)));
+        when(results.findByIdAndWorkspaceId(history.getId(), 1)).thenReturn(Optional.of(history));
+        // The source alone decides: it refuses every AI read of the item and permits only the human standing.
+        when(source.permits(item, purpose)).thenReturn(false);
+        when(source.permits(item, purpose, SourceReadAudience.HUMAN_RECORDED_STANDING))
+                .thenReturn(true);
+
+        assertThat(authorization.permitsHumanStanding(1, List.of(history))).containsExactly(history.getId());
+        assertThat(authorization.permitsHistory(1, history.getId(), purpose)).isFalse();
+        verify(source, never()).permits(item, purpose, SourceReadAudience.PROCESSING);
     }
 
     @Test
