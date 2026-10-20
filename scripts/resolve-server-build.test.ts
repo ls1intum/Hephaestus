@@ -18,7 +18,8 @@ const requiredJobs = [
 	"App Server image / Build linux/amd64 Docker Image",
 	"Test / App Server: Unit and architecture",
 	"Test / App Server: Integration (application)",
-	"Test / App Server: Integration (providers-and-startup)",
+	"Test / App Server: Integration (providers)",
+	"Test / App Server: Integration (runtime-and-startup)",
 	"Security / Dependencies, secrets, and policy",
 	"CI Status Gate",
 ];
@@ -101,7 +102,20 @@ await test("every required artifact, test, security and final verdict must succe
 			data.jobs = data.jobs.map((job) => (job.name === missing ? { ...job, conclusion } : job));
 			assert.equal(await resolve(data), undefined, `${missing}: ${conclusion}`);
 		}
+		const absent = fixture();
+		absent.jobs = absent.jobs.filter((job) => job.name !== missing);
+		assert.equal(await resolve(absent), undefined, `${missing}: absent`);
 	}
+});
+
+await test("a run from the earlier two-shard integration layout cannot approve reuse", async () => {
+	const data = fixture();
+	data.jobs = [
+		...data.jobs.filter((job) => !job.name.startsWith("Test / App Server: Integration (")),
+		{ name: "Test / App Server: Integration (providers-and-startup)", conclusion: "success" },
+		{ name: "Test / App Server: Integration (application)", conclusion: "success" },
+	];
+	assert.equal(await resolve(data), undefined);
 });
 
 await test("rejects expired, unhashed and foreign artifacts even when the run passed", async () => {

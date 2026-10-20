@@ -24,6 +24,22 @@ void test("rejects missing tests, overlapping shards, unexpected tests and empty
 	assert.doesNotThrow(() => assertCoverage(inventory, [inventory, new Set(["b"])], false));
 });
 
+void test("requires every integration shard to own a non-empty, disjoint part of the tier", () => {
+	const integration = new Set(["Provider#a", "Startup#b", "Application#c"]);
+	const providers = new Set(["Provider#a"]);
+	const runtimeAndStartup = new Set(["Startup#b"]);
+	const application = new Set(["Application#c"]);
+	assert.doesNotThrow(() =>
+		assertCoverage(integration, [providers, runtimeAndStartup, application], true),
+	);
+	const empty = [providers, new Set<string>(), application];
+	assert.throws(() => assertCoverage(integration, empty, true), /contains no tests/u);
+	const omitted = [providers, runtimeAndStartup, providers];
+	assert.throws(() => assertCoverage(integration, omitted, true), /omitted/u);
+	const overlapping = [providers, runtimeAndStartup, new Set(["Application#c", "Provider#a"])];
+	assert.throws(() => assertCoverage(integration, overlapping, true), /overlap/u);
+});
+
 void test("rejects executed tests as inventory evidence", () => {
 	for (const outcome of ["", '<failure message="Failed assertion"/>']) {
 		assert.throws(() =>

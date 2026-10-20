@@ -664,7 +664,11 @@ void describe("CI contract", () => {
 		const workflow = parseDocument(await readFile(".github/workflows/ci-tests.yml", "utf8"));
 		const matrix = workflow.getIn(["jobs", "server-integration", "strategy", "matrix"]);
 		assert.ok(isMap(matrix));
-		assert.deepEqual(matrixValues(matrix, "shard"), ["providers-and-startup", "application"]);
+		assert.deepEqual(matrixValues(matrix, "shard"), [
+			"providers",
+			"runtime-and-startup",
+			"application",
+		]);
 		assert.equal(
 			runScript(workflow, ["jobs", "server-verification"], "Verify test tier and shard discovery"),
 			"vp run test:server:selection",
@@ -1066,7 +1070,7 @@ void describe("CI contract", () => {
 		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
 		const workflow = parseDocument(source);
 		const integration = job(source, "server-integration");
-		assert.match(integration, /fail-fast: false/u, "One failing shard must not hide the other");
+		assert.match(integration, /fail-fast: false/u, "One failing shard must not hide the others");
 		const jobPath = ["jobs", "server-integration"];
 		const run = namedStep(workflow, jobPath, "Run integration tests");
 		const environment = run.get("env");
