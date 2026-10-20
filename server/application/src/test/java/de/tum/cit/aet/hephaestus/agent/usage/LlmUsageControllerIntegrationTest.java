@@ -30,6 +30,7 @@ import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -40,6 +41,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 @Tag("integration")
 class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @BeforeEach
+    void setUpAdminIdentity() {
+        persistUser("admin");
+    }
 
     @Autowired
     private WebTestClient webTestClient;

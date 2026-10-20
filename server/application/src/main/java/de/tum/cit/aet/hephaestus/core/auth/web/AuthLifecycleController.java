@@ -63,7 +63,11 @@ public class AuthLifecycleController {
         boolean sessionContinues = sessionService.refresh(
                 CurrentAccount.requireId(),
                 CurrentAccount.requireJti(),
-                TokenConstraints.session(CurrentAccount.sessionExpiresAt(), CurrentAccount.authTime()),
+                new TokenConstraints(
+                        CurrentAccount.sessionExpiresAt(),
+                        CurrentAccount.authTime(),
+                        null,
+                        CurrentAccount.passkeyTime()),
                 request,
                 response);
         return sessionContinues

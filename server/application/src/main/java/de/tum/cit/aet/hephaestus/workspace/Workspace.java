@@ -40,6 +40,10 @@ import org.jspecify.annotations.Nullable;
 @ToString
 public class Workspace {
 
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean adminPasskeyRequired;
+
     @Column(name = "practice_catalog_installed_at")
     private @Nullable Instant practiceCatalogInstalledAt;
 

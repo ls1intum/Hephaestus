@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Settings2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { usePasskeySettings } from "@/hooks/use-passkey-settings";
 
 import {
 	adminGetInstanceSettingsOptions,
@@ -25,6 +26,7 @@ import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
 import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
+import { PasskeySettings } from "@/components/settings/PasskeySettings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirmAccess } from "@/hooks/use-confirm-access";
 import { instanceAdminHead } from "@/lib/page-title";
@@ -42,6 +44,7 @@ export const Route = createFileRoute("/_authenticated/admin/settings")({
 });
 
 function WorkspaceSettingsPage() {
+	const passkeys = usePasskeySettings();
 	const queryClient = useQueryClient();
 	const settingsOptions = adminGetInstanceSettingsOptions();
 	const settingsQuery = useQuery(settingsOptions);
@@ -207,6 +210,7 @@ function WorkspaceSettingsPage() {
 					onSendTest={(to) => testEmailMutation.mutate({ body: { to } })}
 				/>
 			</div>
+			<PasskeySettings {...passkeys} />
 
 			<ConfirmAccessDialog
 				open={challenge !== undefined}

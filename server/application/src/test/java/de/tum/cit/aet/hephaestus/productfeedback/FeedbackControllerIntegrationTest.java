@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 @Tag("integration")
 class FeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @BeforeEach
+    void setUpAdminIdentity() {
+        persistUser("admin");
+    }
 
     @Autowired
     private WebTestClient webTestClient;
