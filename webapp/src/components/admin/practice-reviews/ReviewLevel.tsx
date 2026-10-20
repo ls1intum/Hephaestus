@@ -42,7 +42,7 @@ import { itemKindNoun, itemName } from "@/lib/item-kinds";
 import { formatCostUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
-import { jobPhases } from "./job-utils";
+import { firstStartedAt, jobPhases } from "./job-utils";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
 import {
 	type SheetEvent,
@@ -89,21 +89,20 @@ function kindLabel(review: ReviewDetail): string {
 
 export const RUNTIME_EXPIRED = "Execution details are no longer available.";
 
-/** "9 min" between two times, or undefined while either is missing. */
+/** "9 min" between two times, or undefined while either is missing or they are out of order. */
 function between(from: Date | null | undefined, to: Date | null | undefined): string | undefined {
-	return from === null || from === undefined || to === null || to === undefined
+	return from === null ||
+		from === undefined ||
+		to === null ||
+		to === undefined ||
+		to.getTime() < from.getTime()
 		? undefined
 		: durationText((to.getTime() - from.getTime()) / 1000);
 }
 
-function firstStart(review: ReviewDetail): Date | undefined {
-	let earliest: Date | undefined;
-	for (const { startedAt } of [...(review.runtime?.jobs ?? []), ...review.stageTiming]) {
-		if (startedAt !== null && (earliest === undefined || startedAt < earliest)) {
-			earliest = startedAt;
-		}
-	}
-	return earliest;
+/** Attempts count from 0 on the wire; people count from 1. */
+function attemptLabel(attempt: number): string {
+	return `Attempt ${attempt + 1}`;
 }
 
 function reviewNow(review: ReviewDetail): string | undefined {
@@ -223,19 +222,23 @@ export function ReviewLevel({
 	);
 }
 
+/**
+ * The review's own figure is its time from request to finish. Only that interval survives every
+ * attempt; a run time would leave out the attempts before the latest.
+ */
 function ReviewStatusLine({ review }: { review: ReviewDetail }) {
-	const started = firstStart(review);
+	const started = firstStartedAt(review.runtime?.jobs ?? []);
 	let at: { label: string; date: Date } = { label: "asked for", date: review.createdAt };
 	if (review.completedAt !== null) {
 		at = { label: "finished", date: review.completedAt };
 	} else if (started !== undefined) {
 		at = { label: "started", date: started };
 	}
-	const ran = between(started, review.completedAt);
+	const elapsed = between(review.createdAt, review.completedAt);
 	return (
 		<SheetStatusLine
 			status={<ReviewStatusMark def={REVIEW_STATUS_DEFS[review.status]} />}
-			figure={ran === undefined ? undefined : `ran ${ran}`}
+			figure={elapsed === undefined ? undefined : `${elapsed} from request`}
 			at={at}
 		/>
 	);
@@ -456,9 +459,10 @@ export function reviewHistory(review: ReviewDetail): SheetEvent[] {
 			by: review.requestedBy === null ? undefined : accountName(review.requestedBy),
 		},
 	];
-	const started = firstStart(review);
-	const queued = between(review.createdAt, started);
+	const jobs = review.runtime?.jobs ?? [];
+	const started = firstStartedAt(jobs);
 	if (started !== undefined) {
+		const queued = between(review.createdAt, started);
 		events.push({
 			key: "started",
 			at: started,
@@ -466,25 +470,35 @@ export function reviewHistory(review: ReviewDetail): SheetEvent[] {
 			detail: queued === undefined ? undefined : `after ${queued} in the queue`,
 		});
 	}
-	for (const job of review.runtime?.jobs ?? []) {
-		if (job.attempt > 1) {
+	// A later attempt's queue runs from when that attempt became available, not from the request.
+	for (const job of jobs.filter((entry) => entry.attempt > 0)) {
+		if (job.startedAt !== null) {
+			const queued = between(job.availableAt, job.startedAt);
+			const wait = queued === undefined ? "" : `, after ${queued} in the queue`;
+			events.push({
+				key: `attempt-${job.id}`,
+				at: job.startedAt,
+				title: "Latest attempt started",
+				detail: `${attemptLabel(job.attempt)}${wait}. When the review first started is no longer recorded.`,
+			});
+		} else if (job.status === "QUEUED") {
 			events.push({
 				key: `retry-${job.id}`,
 				at: job.availableAt,
 				title: "Retry due",
-				detail: `Attempt ${job.attempt} waits until then after an earlier attempt stopped.`,
+				detail: `${attemptLabel(job.attempt)} waits until then after an earlier attempt ended.`,
 			});
 		}
 	}
 	if (review.completedAt !== null) {
-		const ran = between(started, review.completedAt);
+		const elapsed = between(review.createdAt, review.completedAt);
 		events.push({
 			key: "ended",
 			at: review.completedAt,
 			title: REVIEW_STATUS_DEFS[review.status].label,
 			detail: (
 				<>
-					{ran !== undefined && <span className="block">after {ran} running</span>}
+					{elapsed !== undefined && <span className="block">{elapsed} after it was asked for</span>}
 					{review.stopReason !== null && (
 						<span className="block">{REVIEW_STOP_REASON_SENTENCES[review.stopReason]}</span>
 					)}
@@ -635,7 +649,7 @@ function UsageAttempts({ attempts }: { attempts: ReviewUsageAttempt[] }) {
 						key={`${attempt.jobId}-${attempt.attempt}`}
 						className="flex flex-wrap gap-x-2 tabular-nums"
 					>
-						<span className="font-medium">Attempt {attempt.attempt}</span>
+						<span className="font-medium">{attemptLabel(attempt.attempt)}</span>
 						<span>{attemptCostText(attempt)}</span>
 						<span className="text-muted-foreground">
 							{formatTokens(attempt.inputTokens)} read · {formatTokens(attempt.outputTokens)}{" "}
@@ -676,7 +690,8 @@ function ReviewJobEntry({ job, position }: { job: ReviewJob; position: string })
 		<li className="min-w-0 space-y-1">
 			<p className="flex flex-wrap items-center gap-2">
 				<span className="font-medium">
-					{position}Attempt {job.attempt}
+					{position}
+					{attemptLabel(job.attempt)}
 				</span>
 				<StatusBadge def={REVIEW_JOB_STATUS_DEFS[job.status]} />
 				{(!active || job.processingStatus !== "NONE") && (
@@ -684,8 +699,7 @@ function ReviewJobEntry({ job, position }: { job: ReviewJob; position: string })
 				)}
 			</p>
 			<p className="text-muted-foreground tabular-nums">
-				{phases.retried ? "Request to this attempt" : "Wait to start"}: {phases.wait} · Running:{" "}
-				{phases.execution}
+				Wait to start: {phases.wait} · Running: {phases.execution}
 				{job.exitCode !== null && ` · Exit code ${job.exitCode}`}
 			</p>
 			<p className="text-muted-foreground">

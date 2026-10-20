@@ -100,7 +100,7 @@ public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
 
     @Query("""
         SELECT new de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository$TimingJob(
-          j.reviewId,j.status,j.availableAt,j.startedAt,j.executionStartedAt,j.completedAt,j.holdReason)
+          j.reviewId,j.status,j.attempt,j.availableAt,j.startedAt,j.executionStartedAt,j.completedAt,j.holdReason)
         FROM ReviewJob j WHERE j.workspaceId=:workspaceId AND j.reviewId IN :reviewIds
         ORDER BY j.availableAt,j.id
         """)
@@ -129,6 +129,7 @@ public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
     record TimingJob(
             UUID reviewId,
             ReviewJobStatus status,
+            int attempt,
             Instant availableAt,
             @Nullable Instant startedAt,
             @Nullable Instant executionStartedAt,

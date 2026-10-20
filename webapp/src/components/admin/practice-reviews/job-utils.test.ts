@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { jobPhases } from "./job-utils";
+import { firstStartedAt, jobPhases } from "./job-utils";
 
 const NOW = new Date("2026-05-20T12:00:00Z").getTime();
+const at = (seconds: number) => new Date(NOW + seconds * 1000);
 
 describe("jobPhases", () => {
-	const at = (seconds: number) => new Date(NOW + seconds * 1000);
 	const finished = {
 		status: "COMPLETED",
-		attempt: 1,
+		attempt: 0,
 		availableAt: at(0),
 		startedAt: at(12),
 		completedAt: at(312),
@@ -18,7 +18,6 @@ describe("jobPhases", () => {
 		expect(jobPhases(finished)).toStrictEqual({
 			wait: "12 seconds",
 			execution: "5 minutes",
-			retried: false,
 		});
 	});
 
@@ -37,7 +36,7 @@ describe("jobPhases", () => {
 		});
 		expect(
 			jobPhases({ ...finished, status: "QUEUED", startedAt: null, completedAt: null }),
-		).toStrictEqual({ wait: "In progress", execution: "Not started", retried: false });
+		).toStrictEqual({ wait: "In progress", execution: "Not started" });
 	});
 
 	it("records nothing that depends on an unreadable or reversed boundary", () => {
@@ -47,11 +46,32 @@ describe("jobPhases", () => {
 		});
 		expect(jobPhases({ ...finished, completedAt: at(5) }).execution).toBe("Not recorded");
 	});
+});
 
-	it("marks a retried job's wait as this attempt's", () => {
-		expect(jobPhases({ ...finished, attempt: 3 })).toMatchObject({
-			wait: "12 seconds",
-			retried: true,
-		});
+describe("firstStartedAt", () => {
+	it("keeps the earliest start while every job is on its first attempt", () => {
+		expect(
+			firstStartedAt([
+				{ attempt: 0, startedAt: at(70) },
+				{ attempt: 0, startedAt: at(40) },
+				{ attempt: 0, startedAt: null },
+			]),
+		).toStrictEqual(at(40));
+	});
+
+	// Attempt 1 is already the second attempt, and its job no longer holds the first one's start.
+	it("knows no first start once a job continued, even beside an older start", () => {
+		expect(firstStartedAt([{ attempt: 1, startedAt: at(894) }])).toBeUndefined();
+		expect(
+			firstStartedAt([
+				{ attempt: 0, startedAt: at(40) },
+				{ attempt: 1, startedAt: at(894) },
+			]),
+		).toBeUndefined();
+	});
+
+	it("knows no start where no job has started or none is kept", () => {
+		expect(firstStartedAt([{ attempt: 0, startedAt: null }])).toBeUndefined();
+		expect(firstStartedAt([])).toBeUndefined();
 	});
 });

@@ -1,12 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
-import type { PracticeScriptRun, ReviewDetail } from "@/api/types.gen";
+import type { PracticeScriptRun, ReviewDetail, ReviewJob } from "@/api/types.gen";
 import { eventLabel } from "@/components/practice-trace/fixtures";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
+import { minutesBefore } from "@/stories/story-clock";
 import { listOpenedBy } from "@/test/detail-stack";
 
 import {
@@ -96,12 +97,15 @@ export const Default: Story = {
 			"Every practice",
 			SHEET_SECTIONS.technical,
 		]);
-		// Status, duration and the finishing time once, in the status line.
+		// Status, time from request and the finishing time once, in the status line.
 		const status = panelElement.querySelector("[data-sheet-status]");
-		await expect(status).toHaveTextContent(/Complete.*ran .*finished/u);
+		await expect(status).toHaveTextContent(/Complete.*5 min from request.*finished/u);
+		// The first attempt still holds its own start, so the queue and run stay split.
 		const history = within(panel.getByRole("list", { name: "History" }));
 		history.getByText("Asked for");
 		history.getByText("Started");
+		history.getByText("after 40 s in the queue");
+		history.getByText("5 min after it was asked for");
 		panel.getByText("Started by");
 		panel.getByText(/Marked ready for review/u);
 		panel.getByText("Review ID");
@@ -376,6 +380,134 @@ export const BackingOff: Story = {
 	},
 };
 
+const REQUESTED = minutesBefore(30);
+const afterRequest = (seconds: number) => new Date(REQUESTED.getTime() + seconds * 1000);
+
+/**
+ * A review whose job continued into a second attempt. The job keeps only that attempt's times, and
+ * the stage timing repeats them, so neither holds when the first attempt started.
+ */
+function continuedReview(status: ReviewDetail["status"], job: Partial<ReviewJob>): ReviewDetail {
+	const latest: ReviewJob = {
+		id: "0a0a0a0a-1111-4111-8111-000000000101",
+		attempt: 1,
+		status: "COMPLETED",
+		processingStatus: "DONE",
+		availableAt: afterRequest(890),
+		startedAt: afterRequest(894),
+		completedAt: afterRequest(1117),
+		exitCode: 0,
+		errorMessage: null,
+		traceId: "4bf92f3577b34da6a3ce929d0e0e4799",
+		...job,
+	};
+	const done = status !== "RUNNING" && status !== "QUEUED";
+	return {
+		...reviewDetailCompleted,
+		status,
+		createdAt: REQUESTED,
+		orderedAt: REQUESTED,
+		completedAt: done ? afterRequest(1117) : null,
+		activeJobCount: done ? 0 : 1,
+		runtime: { jobs: [latest] },
+		stageTiming: [
+			{
+				stage: "RUN",
+				startedAt: latest.startedAt,
+				completedAt: latest.completedAt,
+				durationMs:
+					latest.startedAt === null || latest.completedAt === null
+						? null
+						: latest.completedAt.getTime() - latest.startedAt.getTime(),
+			},
+		],
+	};
+}
+
+/**
+ * Asked for, then the first attempt ran for about a quarter of an hour, and its job continued as a
+ * second attempt that started 4 s after it became available. The whole review took 19 min from its
+ * request; the 15 min before the second attempt were not a queue, and its 4 min were not the run.
+ */
+export const ContinuedPastItsFirstAttempt: Story = {
+	args: { review: ready(continuedReview("PARTIAL", {})) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		const status = panelElement.querySelector("[data-sheet-status]");
+		await expect(status).toHaveTextContent(/Partial.*19 min from request.*finished/u);
+		await expect(status).not.toHaveTextContent(/ran |4 min/u);
+		const historyList = panel.getByRole("list", { name: "History" });
+		const history = within(historyList);
+		await expect(history.queryByText("Started")).toBeNull();
+		await expect(history.getByText("Latest attempt started").closest("li")).toHaveTextContent(
+			"Attempt 2, after 4 s in the queue. When the review first started is no longer recorded.",
+		);
+		history.getByText("19 min after it was asked for");
+		await expect(historyList).not.toHaveTextContent(/15 min|running|Retry due/u);
+		const execution = panel.getByRole("list", { name: "Execution" });
+		await expect(execution).toHaveTextContent("Attempt 2");
+		await expect(execution).toHaveTextContent("Wait to start: 4 seconds · Running: 3 minutes");
+	},
+};
+
+/**
+ * A first attempt keeps its start, but the review finishes a minute after the worker. The history
+ * gives the whole elapsed time; Execution gives only the worker's time.
+ */
+export const FirstAttemptKeepsItsStart: Story = {
+	args: {
+		review: ready({
+			...continuedReview("COMPLETE", { attempt: 0, availableAt: REQUESTED }),
+			completedAt: afterRequest(1177),
+		}),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
+			/Complete.*20 min from request.*finished/u,
+		);
+		const history = within(panel.getByRole("list", { name: "History" }));
+		history.getByText("Started");
+		history.getByText("after 15 min in the queue");
+		history.getByText("20 min after it was asked for");
+		await expect(panel.getByRole("list", { name: "History" })).not.toHaveTextContent(/running/u);
+		await expect(panel.getByRole("list", { name: "Execution" })).toHaveTextContent(
+			"Running: 3 minutes",
+		);
+		await expect(history.queryByText("Latest attempt started")).toBeNull();
+		await expect(panel.getByRole("list", { name: "Execution" })).toHaveTextContent("Attempt 1");
+	},
+};
+
+/** The second attempt still runs: it names when that attempt started and claims no end. */
+export const ContinuedAndRunning: Story = {
+	args: {
+		review: ready(
+			continuedReview("RUNNING", {
+				status: "RUNNING",
+				processingStatus: "NONE",
+				completedAt: null,
+				exitCode: null,
+			}),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		const status = panelElement.querySelector("[data-sheet-status]");
+		await expect(status).toHaveTextContent(/Running.*asked for/u);
+		await expect(status).not.toHaveTextContent(/from request|started/u);
+		const historyList = panel.getByRole("list", { name: "History" });
+		const history = within(historyList);
+		history.getByText("Asked for");
+		history.getByText("Latest attempt started");
+		await expect(history.getAllByRole("listitem")).toHaveLength(2);
+		await expect(historyList).not.toHaveTextContent(/after it was asked for|running/u);
+	},
+};
+
 export const ScanWithManyRuns: Story = {
 	args: { review: ready(reviewDetailScanManyJobs), onRequestReview: undefined },
 	play: async () => {
@@ -412,12 +544,20 @@ export const PartialScan: Story = {
 	},
 };
 
+/** Without its execution details the review keeps its request and its end, and claims no start. */
 export const RuntimeExpired: Story = {
 	args: { review: ready(reviewDetailExpiredRuntime) },
 	play: async () => {
-		const panel = within(await settledDrawerPanel());
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
 		panel.getByText(RUNTIME_EXPIRED);
 		panel.getByRole("list", { name: "Every practice in this review" });
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
+			/Failed.*5 min from request.*finished/u,
+		);
+		const history = within(panel.getByRole("list", { name: "History" }));
+		history.getByText("5 min after it was asked for");
+		await expect(history.queryByText(/started/iu)).toBeNull();
 	},
 };
 
