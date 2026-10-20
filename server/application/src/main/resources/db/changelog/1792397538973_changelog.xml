@@ -402,4 +402,62 @@ END $$
             <stop>Restore the verified pre-upgrade backup; this migration does not keep the earlier Heph chat history.</stop>
         </rollback>
     </changeSet>
+    <changeSet id="1792397538973-28" author="hephaestus">
+        <createTable tableName="mentor_turn_attempt_usage">
+            <column name="attempt" type="INTEGER">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="mentor_turn_attempt_usagePK"/>
+            </column>
+            <column name="turn_id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="mentor_turn_attempt_usagePK"/>
+            </column>
+            <column name="applied_per_1m_cache_read_usd" type="numeric(18, 8)"/>
+            <column name="applied_per_1m_cache_write_usd" type="numeric(18, 8)"/>
+            <column name="applied_per_1m_input_usd" type="numeric(18, 8)"/>
+            <column name="applied_per_1m_output_usd" type="numeric(18, 8)"/>
+            <column name="applied_price_id" type="BIGINT"/>
+            <column name="applied_workspace_model_id" type="BIGINT"/>
+            <column defaultValueNumeric="0" name="cache_read_tokens" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column defaultValueNumeric="0" name="cache_write_tokens" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column defaultValueNumeric="0" name="calls" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="funding_source" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column defaultValueNumeric="0" name="input_tokens" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="model" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="occurred_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+            <column defaultValueNumeric="0" name="output_tokens" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="pricing_state" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column defaultValueNumeric="0" name="reasoning_tokens" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+    <changeSet id="1792397538973-29" author="hephaestus">
+        <addUniqueConstraint columnNames="turn_id, attempt, workspace_id" constraintName="uk_mentor_turn_attempt_usage_tenant" tableName="mentor_turn_attempt_usage"/>
+    </changeSet>
+    <changeSet id="1792397538973-30" author="hephaestus">
+        <addForeignKeyConstraint baseTableName="mentor_turn_attempt_usage" baseColumnNames="turn_id,workspace_id" referencedTableName="mentor_turn" referencedColumnNames="id,workspace_id" constraintName="sfk_mentor_turn_attempt_usage_turn_workspace" onDelete="CASCADE" validate="true"/>
+        <addForeignKeyConstraint baseTableName="mentor_turn_attempt_usage" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="sfk_mentor_turn_attempt_usage_workspace" onDelete="RESTRICT" validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="mentor_turn_attempt_usage" constraintName="sfk_mentor_turn_attempt_usage_workspace"/>
+            <dropForeignKeyConstraint baseTableName="mentor_turn_attempt_usage" constraintName="sfk_mentor_turn_attempt_usage_turn_workspace"/>
+        </rollback>
+    </changeSet>
 </databaseChangeLog>

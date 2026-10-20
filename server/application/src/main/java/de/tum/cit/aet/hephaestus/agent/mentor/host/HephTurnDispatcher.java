@@ -85,6 +85,7 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
 
     private final Semaphore wake = new Semaphore(0);
     private volatile boolean active;
+    private volatile @Nullable Thread claimer;
 
     public HephTurnDispatcher(
             MentorTurnStarter starter,
@@ -157,7 +158,7 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
     public void start() {
         active = true;
         notifications.subscribe(this);
-        Thread.ofPlatform().name("heph-turn-claimer").daemon(true).start(this::claimLoop);
+        claimer = Thread.ofPlatform().name("heph-turn-claimer").daemon(true).start(this::claimLoop);
     }
 
     /** Stops claiming, lets running turns finish for a while, then removes the host. */
@@ -202,6 +203,16 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
 
     private void drain() {
         long until = System.nanoTime() + DRAIN_TIMEOUT.toNanos();
+        // A claim that passed the active check before the stop ends its start first, so the turn it started is
+        // waited for below, within the same deadline.
+        Thread claiming = claimer;
+        if (claiming != null && !claiming.equals(Thread.currentThread())) {
+            try {
+                claiming.join(Duration.ofNanos(until - System.nanoTime()));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
         synchronized (running) {
             long remaining;
             while (!running.isEmpty() && (remaining = until - System.nanoTime()) > 0) {

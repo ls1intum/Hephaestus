@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.host;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobExecutor;
@@ -19,13 +21,19 @@ import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.WorkerPropertiesFi
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.HostSandbox;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.mentor.MentorLedgerNotifications;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurn;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurnService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,10 +62,26 @@ class HephTurnDispatcherShutdownTest extends BaseUnitTest {
 
     private final AtomicBoolean hephEnded = new AtomicBoolean();
 
-    /** A host whose removal is the end of the Heph drain, held until the test releases it. */
+    /** The command frames the host received. */
+    private final BlockingQueue<String> frames = new LinkedBlockingQueue<>();
+
+    /**
+     * A host that is ready and takes every command, and whose removal is the end of the Heph drain, held until the test
+     * releases it.
+     */
     private final class HeldHost extends HephHost {
         HeldHost() {
             super(mock(HostSandbox.class));
+        }
+
+        @Override
+        boolean awaitReady(Duration timeout) {
+            return true;
+        }
+
+        @Override
+        void send(String frame) {
+            frames.add(frame);
         }
 
         @Override
@@ -168,11 +192,82 @@ class HephTurnDispatcherShutdownTest extends BaseUnitTest {
         assertThat(hephEnded.get()).isTrue();
     }
 
+    @Test
+    void shouldLetAClaimThatAlreadyStartedRunItsTurnBeforeTheHostIsRemovedWhenTheWorkerStops() throws Exception {
+        UUID turnId = UUID.randomUUID();
+        MentorTurn turn = mock(MentorTurn.class);
+        when(turn.getId()).thenReturn(turnId);
+        when(turn.getWorkspaceId()).thenReturn(7L);
+        when(turn.getAttempt()).thenReturn(1);
+        when(turn.getConversationId()).thenReturn(UUID.randomUUID());
+        when(turn.getStatus()).thenReturn(MentorTurn.Status.RUNNING);
+        MentorTurnService turns = mock(MentorTurnService.class);
+        when(turns.require(7L, turnId)).thenReturn(turn);
+        CountDownLatch claimEntered = new CountDownLatch(1);
+        CountDownLatch releaseClaim = new CountDownLatch(1);
+        MentorTurnStarter starter = mock(MentorTurnStarter.class);
+        // The claim committed and its turn was admitted; it returns only when the test lets it.
+        when(starter.startNext(any(), any())).thenAnswer(invocation -> {
+            claimEntered.countDown();
+            if (!releaseClaim.await(10, TimeUnit.SECONDS)) {
+                return Optional.empty();
+            }
+            return Optional.of(
+                    new MentorTurnStarter.StartedTurn(turn, 11L, LlmCatalogTestFixtures.admittedMentorConfig()));
+        });
+        MentorTurnCompletion completion = mock(MentorTurnCompletion.class);
+        HephTurnDispatcher dispatcher = dispatcher(starter, turns, completion);
+        dispatcher.start();
+        dispatcher.resync();
+        assertThat(claimEntered.await(10, TimeUnit.SECONDS)).isTrue();
+
+        Thread stopping = Thread.ofPlatform().name("worker-stop").daemon(true).unstarted(dispatcher::stop);
+        try {
+            stopping.start();
+            // The stop either waits, or it reached the host removal: both are observed, not timed.
+            await().atMost(Duration.ofSeconds(10))
+                    .until(() -> hephWaits.getCount() == 0
+                            || stopping.getState() == Thread.State.WAITING
+                            || stopping.getState() == Thread.State.TIMED_WAITING);
+            assertThat(hephWaits.getCount())
+                    .as("the host is not removed while a claim that already started still starts its turn")
+                    .isEqualTo(1);
+
+            releaseClaim.countDown();
+            String start =
+                    Objects.requireNonNull(frames.poll(10, TimeUnit.SECONDS), "the claimed turn starts on the host");
+            assertThat(new JsonMapper().readTree(start).path("type").asString()).isEqualTo("start");
+            assertThat(dispatcher.runs(turnId, 1)).isTrue();
+            assertThat(hephWaits.getCount()).as("the drain waits for the turn").isEqualTo(1);
+
+            dispatcher.ended(turnId, 1);
+            assertThat(hephWaits.await(10, TimeUnit.SECONDS))
+                    .as("the host is removed once the turn ended")
+                    .isTrue();
+            release.countDown();
+            assertThat(stopping.join(Duration.ofSeconds(10))).isTrue();
+            verifyNoInteractions(completion);
+        } finally {
+            releaseClaim.countDown();
+            dispatcher.ended(turnId, 1);
+            release.countDown();
+            if (stopping.isAlive()) {
+                stopping.join(Duration.ofSeconds(10));
+            }
+        }
+    }
+
     private HephTurnDispatcher dispatcher() {
+        return dispatcher(
+                mock(MentorTurnStarter.class), mock(MentorTurnService.class), mock(MentorTurnCompletion.class));
+    }
+
+    private HephTurnDispatcher dispatcher(
+            MentorTurnStarter starter, MentorTurnService turns, MentorTurnCompletion completion) {
         return new HephTurnDispatcher(
-                mock(MentorTurnStarter.class),
-                mock(MentorTurnService.class),
-                mock(MentorTurnCompletion.class),
+                starter,
+                turns,
+                completion,
                 mock(MentorLedgerNotifications.class),
                 new HeldHost(),
                 new ProxyCallsInFlight(),

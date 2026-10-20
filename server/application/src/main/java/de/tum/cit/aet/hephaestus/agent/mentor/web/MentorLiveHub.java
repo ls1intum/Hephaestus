@@ -293,7 +293,9 @@ public class MentorLiveHub implements MentorLedgerNotifications.Listener {
             try {
                 stream.emitter.send(event.data());
             } catch (IOException | RuntimeException gone) {
-                log.debug("Heph live stream closed while sending: {}", gone.toString());
+                log.debug(
+                        "Heph live stream closed while sending: {}",
+                        gone.getClass().getSimpleName());
                 close(stream);
                 return;
             }

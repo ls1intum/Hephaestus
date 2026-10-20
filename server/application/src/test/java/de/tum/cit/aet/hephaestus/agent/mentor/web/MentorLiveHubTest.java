@@ -9,6 +9,10 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.mentor.MentorConversationDTO;
 import de.tum.cit.aet.hephaestus.mentor.MentorEntry;
@@ -29,9 +33,11 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 
@@ -150,6 +156,34 @@ class MentorLiveHubTest extends BaseUnitTest {
         assertThat(emitter.names()).containsExactly("snapshot");
     }
 
+    @Test
+    void shouldCloseTheStreamWithoutLoggingPrivateFailureTextWhenSendingFails() {
+        Logger logger = (Logger) LoggerFactory.getLogger(MentorLiveHub.class);
+        Level previous = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            logger.setLevel(Level.DEBUG);
+            emitter.failSends(new IOException("private-conversation-canary@example.test"));
+
+            hub.subscribe(WORKSPACE, ACCOUNT);
+
+            await().atMost(WAIT).untilTrue(emitter.completed);
+            assertThat(emitter.frames()).isEmpty();
+            assertThat(appender.list).singleElement().satisfies(event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
+                assertThat(event.getFormattedMessage())
+                        .isEqualTo("Heph live stream closed while sending: IOException")
+                        .doesNotContain("private-conversation-canary");
+            });
+        } finally {
+            logger.setLevel(previous);
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
     /** Records what the hub writes; it can hold the writer inside its first send. */
     private static final class RecordingEmitter extends SseEmitter {
 
@@ -157,6 +191,11 @@ class MentorLiveHubTest extends BaseUnitTest {
         private final CountDownLatch held = new CountDownLatch(1);
         private final CountDownLatch released = new CountDownLatch(1);
         private volatile boolean holding;
+        private volatile @Nullable IOException sendFailure;
+
+        void failSends(IOException failure) {
+            sendFailure = failure;
+        }
 
         void holdSends() {
             holding = true;
@@ -172,6 +211,10 @@ class MentorLiveHubTest extends BaseUnitTest {
 
         @Override
         public void send(Set<DataWithMediaType> data) throws IOException {
+            IOException failure = sendFailure;
+            if (failure != null) {
+                throw failure;
+            }
             if (holding) {
                 held.countDown();
                 try {
