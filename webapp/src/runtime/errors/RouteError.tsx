@@ -1,18 +1,9 @@
-import { type ErrorComponentProps, useRouter } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useRouter } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
-import { captureException } from "@/runtime/sentry";
 
-export function RouteError({ error }: ErrorComponentProps) {
+export function RouteError() {
 	const router = useRouter();
-	const reportedError = useRef<unknown>(undefined);
-	useEffect(() => {
-		if (reportedError.current !== error) {
-			captureException(error);
-			reportedError.current = error;
-		}
-	}, [error]);
 
 	return (
 		<div className="flex min-h-[50vh] items-center justify-center p-6">

@@ -246,7 +246,7 @@ public class GitHubPullRequestReviewSyncService {
                                         pullRequest.getNumber(),
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -401,7 +401,8 @@ public class GitHubPullRequestReviewSyncService {
                 String errorDetail;
                 if (e instanceof UnexpectedRollbackException) {
                     retryable = true;
-                    errorDetail = "Transaction rolled back (likely deadlock): " + e.getMessage();
+                    errorDetail = "Transaction rolled back (likely deadlock): "
+                            + e.getClass().getSimpleName();
                 } else {
                     ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                     retryable = classification.category() == GitHubExceptionClassifier.Category.RETRYABLE;
@@ -538,7 +539,7 @@ public class GitHubPullRequestReviewSyncService {
                                         reviewId,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {

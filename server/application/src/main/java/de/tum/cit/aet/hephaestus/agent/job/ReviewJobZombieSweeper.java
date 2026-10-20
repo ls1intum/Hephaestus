@@ -120,7 +120,10 @@ public class ReviewJobZombieSweeper {
                     }
                 }
             } catch (Exception e) {
-                log.warn("Failed to reap stale job: jobId={}, error={}", job.getId(), e.getMessage());
+                log.warn(
+                        "Failed to reap stale job: jobId={}, errorType={}",
+                        job.getId(),
+                        e.getClass().getName());
             }
         }
     }
@@ -177,7 +180,10 @@ public class ReviewJobZombieSweeper {
                     log.warn("Orphaned job {} failed at attempt {}", orphan.getJobId(), orphan.getAttempt());
                 }
             } catch (Exception e) {
-                log.warn("Failed to recover orphaned job {}: {}", orphan.getJobId(), e.getMessage());
+                log.warn(
+                        "Failed to recover orphaned job {}: errorType={}",
+                        orphan.getJobId(),
+                        e.getClass().getName());
             }
         }
     }
@@ -204,7 +210,10 @@ public class ReviewJobZombieSweeper {
         try {
             return ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         } catch (RuntimeException e) {
-            log.warn("Could not read config snapshot for job {}: {}", job.getId(), e.getMessage());
+            log.warn(
+                    "Could not read config snapshot for job {}: errorType={}",
+                    job.getId(),
+                    e.getClass().getName());
             return null;
         }
     }

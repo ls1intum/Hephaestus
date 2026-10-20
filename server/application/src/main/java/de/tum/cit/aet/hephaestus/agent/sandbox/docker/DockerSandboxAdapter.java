@@ -49,20 +49,13 @@ public class DockerSandboxAdapter implements SandboxManager {
      */
     private static final int WHOLE_TRANSCRIPT = 0;
 
-    /** The error-path echo is cut to {@link #MAX_LOG_EVENT_CHARS} before it is logged, so it reads a tail. */
+    /** The error path measures a bounded tail; only its size reaches the log. */
     private static final int ERROR_ECHO_TAIL_LINES = 500;
 
     private static final String PROXY_URL_PLACEHOLDER = "{appServerIp}";
 
     private static final String MDC_JOB_ID = "sandbox.jobId";
     private static final String MDC_CONTAINER_ID = "sandbox.containerId";
-
-    /**
-     * Limits each diagnostic event so a large container log cannot overflow the aggregator. This is the
-     * <em>emission</em> limit; {@link DockerClientOperations#MAX_LOG_CHARS} is the upstream
-     * <em>collection</em> limit.
-     */
-    private static final int MAX_LOG_EVENT_CHARS = 32 * 1024;
 
     /**
      * Overrides repository, global and system Git config; explicit {@code git -c} options take precedence.
@@ -326,7 +319,7 @@ public class DockerSandboxAdapter implements SandboxManager {
         } catch (SandboxException e) {
             executionsFailed.increment();
             captureLogsOnError(containerId);
-            log.error("Sandbox execution failed: error={}", e.getMessage(), e);
+            log.error("Sandbox execution failed: errorType={}", e.getClass().getName(), e);
             throw e;
         } catch (Exception e) {
             if (e instanceof InterruptedException) {
@@ -449,19 +442,26 @@ public class DockerSandboxAdapter implements SandboxManager {
         try {
             logTranscriptTail(containerManager.getLogs(containerId, ERROR_ECHO_TAIL_LINES));
         } catch (Exception e) {
-            log.debug("Could not capture container logs on error path: {}", e.getMessage());
+            log.debug(
+                    "Could not capture container logs on error path: errorType={}",
+                    e.getClass().getName());
         }
     }
 
+    /**
+     * The transcript holds what the run was asked, what it read and the provider errors it saw, so no log level
+     * receives it; the log gets its size only. The worker's bounded debug session transcripts (ADR 0041) are the
+     * diagnostic path.
+     */
     private static void logTranscriptTail(@Nullable String logs) {
         if (logs == null || logs.isEmpty()) {
             return;
         }
-        String truncated = logs.length() > MAX_LOG_EVENT_CHARS
-                ? "[" + logs.length() + " characters total, tail follows] ...\n"
-                        + logs.substring(logs.length() - MAX_LOG_EVENT_CHARS)
-                : logs;
-        log.warn("Container logs before cleanup:\n{}", truncated);
+        log.atWarn()
+                .addKeyValue("event.name", "sandbox.transcript.withheld")
+                .addKeyValue("sandbox.transcript.characters", logs.length())
+                .addKeyValue("sandbox.transcript.lines", logs.lines().count())
+                .log("Container logs before cleanup are withheld from the shared log");
     }
 
     /**
@@ -521,7 +521,11 @@ public class DockerSandboxAdapter implements SandboxManager {
             meterRegistry
                     .counter(AgentMetrics.SANDBOX_CLEANUP_FAILURES, "step", operation)
                     .increment();
-            log.warn("Cleanup failed ({}): jobId={}, error={}", operation, jobId, e.getMessage());
+            log.warn(
+                    "Cleanup failed ({}): jobId={}, errorType={}",
+                    operation,
+                    jobId,
+                    e.getClass().getName());
         }
     }
 }

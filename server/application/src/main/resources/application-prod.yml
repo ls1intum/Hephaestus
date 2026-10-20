@@ -150,9 +150,3 @@ hephaestus:
     agent:
         image:
             require-digest: true
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # SENTRY ERROR TRACKING (Production)
-    # ═══════════════════════════════════════════════════════════════════════════
-    sentry:
-        dsn: ${SENTRY_DSN}

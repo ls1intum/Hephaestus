@@ -282,7 +282,7 @@ public class CommitMetadataEnrichmentService {
                                         "Retrying commit metadata enrichment after transport error: repo={}, attempt={}, error={}",
                                         nameWithOwner,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(GRAPHQL_BATCH_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
@@ -450,7 +450,10 @@ public class CommitMetadataEnrichmentService {
 
                 processed++;
             } catch (Exception e) {
-                log.debug("Failed to process metadata for commit: sha={}, error={}", sha, e.getMessage());
+                log.debug(
+                        "Failed to process metadata for commit: sha={}, error={}",
+                        sha,
+                        e.getClass().getSimpleName());
             }
         }
 
@@ -842,7 +845,7 @@ public class CommitMetadataEnrichmentService {
                                         description,
                                         nameWithOwner,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {

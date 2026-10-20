@@ -344,9 +344,8 @@ public class WorkerControlClient {
                 failuresSinceSuccess++;
                 if (failuresSinceSuccess <= 3) {
                     log.warn(
-                            "Control-channel attempt failed: {} ({})",
-                            e.getClass().getSimpleName(),
-                            e.getMessage());
+                            "Control-channel attempt failed: errorType={}",
+                            e.getClass().getName());
                 } else {
                     log.debug(
                             "Control-channel attempt failed (suppressed; failures={}): {}",

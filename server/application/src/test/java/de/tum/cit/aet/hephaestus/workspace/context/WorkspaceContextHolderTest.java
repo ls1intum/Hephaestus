@@ -49,7 +49,7 @@ class WorkspaceContextHolderTest {
         WorkspaceContextHolder.setContext(context);
 
         assertEquals("42", MDC.get("workspace.id"));
-        assertEquals("test-slug", MDC.get("workspace_slug"));
+        assertNull(MDC.get("workspace_slug"), "the slug is chosen text and stays out of every log line");
         assertEquals("999", MDC.get("installation_id"));
     }
 
@@ -73,7 +73,7 @@ class WorkspaceContextHolderTest {
         WorkspaceContextHolder.setContext(context);
 
         assertEquals("1", MDC.get("workspace.id"));
-        assertEquals("test", MDC.get("workspace_slug"));
+        assertNull(MDC.get("workspace_slug"));
         assertNull(MDC.get("installation_id"));
     }
 

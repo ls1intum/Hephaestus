@@ -102,7 +102,10 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
             }
         } catch (Exception e) {
             // Rate limit field may not be present in all queries
-            log.trace("Could not extract rate limit from response for scope {}: {}", scopeId, e.getMessage());
+            log.trace(
+                    "Could not extract rate limit from response for scope {}: {}",
+                    scopeId,
+                    e.getClass().getSimpleName());
         }
         return null;
     }

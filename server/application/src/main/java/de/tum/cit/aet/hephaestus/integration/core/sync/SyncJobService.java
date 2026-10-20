@@ -214,11 +214,14 @@ public class SyncJobService implements SmartLifecycle {
             completeJob(jobId, finalStatus, null, handle);
         } catch (Exception e) {
             if (handle.cancelledReported()) {
-                log.info("Sync job {} aborted after its runner observed cancellation: {}", jobId, e.toString());
+                log.info(
+                        "Sync job {} aborted after its runner observed cancellation: {}",
+                        jobId,
+                        e.getClass().getName());
                 completeJob(jobId, SyncJobStatus.CANCELLED, null, handle);
                 return;
             }
-            log.warn("Sync job {} failed: {}", jobId, e.toString(), e);
+            log.warn("Sync job {} failed: {}", jobId, e.getClass().getName(), e);
             completeJob(jobId, SyncJobStatus.FAILED, truncate(summarize(e)), handle);
         } finally {
             if (registered) {
@@ -343,7 +346,10 @@ public class SyncJobService implements SmartLifecycle {
             });
         } catch (Exception e) {
             // Visible, not silent: a stalled heartbeat risks the zombie sweep reaping a healthy job.
-            log.warn("Sync job lease heartbeat failed for {} job(s): {}", ids.size(), e.toString());
+            log.warn(
+                    "Sync job lease heartbeat failed for {} job(s): {}",
+                    ids.size(),
+                    e.getClass().getName());
         }
     }
 
@@ -459,7 +465,9 @@ public class SyncJobService implements SmartLifecycle {
                     }
                 });
             } catch (Exception e) {
-                log.warn("Could not persist sync-job shutdown cancellation: {}", e.toString());
+                log.warn(
+                        "Could not persist sync-job shutdown cancellation: {}",
+                        e.getClass().getName());
             }
         } finally {
             callback.run();
@@ -601,7 +609,10 @@ public class SyncJobService implements SmartLifecycle {
             transactionTemplate.executeWithoutResult(
                     status -> syncJobRepository.pruneOldJobs(connectionId, RETENTION_LIMIT));
         } catch (Exception e) {
-            log.warn("Sync job retention prune failed for connection {}: {}", connectionId, e.toString());
+            log.warn(
+                    "Sync job retention prune failed for connection {}: {}",
+                    connectionId,
+                    e.getClass().getName());
         }
     }
 

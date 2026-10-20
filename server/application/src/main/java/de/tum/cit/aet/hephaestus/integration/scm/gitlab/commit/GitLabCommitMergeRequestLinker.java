@@ -287,7 +287,7 @@ public class GitLabCommitMergeRequestLinker {
                                 "Failed to link commits for MR: projectPath={}, iid={}, error={}",
                                 safeProjectPath,
                                 iid,
-                                e.getMessage());
+                                e.getClass().getSimpleName());
                     }
                 }
 
@@ -504,7 +504,10 @@ public class GitLabCommitMergeRequestLinker {
             Thread.currentThread().interrupt();
             return null;
         } catch (Exception e) {
-            log.warn("Fallback MR commits fetch failed: context={}, error={}", context, e.getMessage());
+            log.warn(
+                    "Fallback MR commits fetch failed: context={}, error={}",
+                    context,
+                    e.getClass().getSimpleName());
             return null;
         }
 

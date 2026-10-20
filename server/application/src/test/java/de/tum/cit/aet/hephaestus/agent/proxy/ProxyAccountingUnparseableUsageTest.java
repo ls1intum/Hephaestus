@@ -7,6 +7,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
@@ -17,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
@@ -65,6 +69,33 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
                         .count())
                 .isZero();
         verify(mentorTurnUsageAccumulator, never()).accumulate(any(), any());
+    }
+
+    @Test
+    void shouldLogTheParseFailureTypeWithoutTheModelAnswer() {
+        ProxyRouting.BilledAttempt attempt = new ProxyRouting.BilledAttempt(
+                UsageSourceType.REVIEW_JOB, UUID.randomUUID(), 1, BigDecimal.ZERO, "worker-1");
+        // An unquoted token is what a parser quotes back in its message.
+        byte[] answer = "{\"choices\":[{\"text\":privateanswercanary}]}".getBytes(StandardCharsets.UTF_8);
+        Logger logger = (Logger) LoggerFactory.getLogger(ProxyAccounting.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            accounting.recordUsage(attempt, null, LlmApiProtocol.OPENAI_COMPLETIONS, answer);
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list).hasSize(1);
+        ILoggingEvent event = appender.list.getFirst();
+        assertThat(event.getFormattedMessage())
+                .contains(attempt.sourceId().toString())
+                .doesNotContain("canary");
+        assertThat(event.getThrowableProxy()).isNull();
+        assertThat(event.getKeyValuePairs()).extracting(pair -> pair.key).containsExactly("event.name", "error.type");
+        assertThat(event.getKeyValuePairs().toString()).doesNotContain("canary");
     }
 
     private double missing(String sourceType) {

@@ -70,7 +70,10 @@ public class CommitEnrichmentEventListener {
                     repoRef.nameWithOwner(),
                     enriched);
         } catch (Exception e) {
-            log.warn("Webhook commit enrichment failed: repo={}, error={}", repoRef.nameWithOwner(), e.getMessage());
+            log.warn(
+                    "Webhook commit enrichment failed: repo={}, error={}",
+                    repoRef.nameWithOwner(),
+                    e.getClass().getSimpleName());
         }
     }
 }

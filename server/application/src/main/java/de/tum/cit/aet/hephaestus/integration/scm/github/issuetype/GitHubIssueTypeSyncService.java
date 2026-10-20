@@ -166,7 +166,7 @@ public class GitHubIssueTypeSyncService {
                                         safeOrgLogin,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {

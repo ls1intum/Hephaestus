@@ -54,7 +54,6 @@ Compose maps `POSTGRES_PASSWORD` to `DATABASE_PASSWORD` and owns the runtime-rol
 | `hephaestus.agent.image.require-digest`         | `HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST`         |
 | `hephaestus.agent.image.reference`              | `HEPHAESTUS_AGENT_IMAGE_REFERENCE`              |
 | `hephaestus.sandbox.docker.container-runtime`   | `SANDBOX_DOCKER_CONTAINER_RUNTIME`              |
-| `hephaestus.sentry.dsn`                         | `SENTRY_DSN`                                    |
 | `spring.mail.host`                              | `SPRING_MAIL_HOST`                              |
 | `hephaestus.email.from`                         | `HEPHAESTUS_EMAIL_FROM`                         |
 
@@ -383,17 +382,6 @@ For further host protection:
 
 2. Recommended: put a proxy such as Tecnativa's `docker-socket-proxy`, configured with `EXEC=0`, in front of the daemon socket.
 3. Recommended: set `userns-remap=default` in `/etc/docker/daemon.json`.
-
-## Optional observability
-
-Sentry is optional.
-If configured, `hephaestus.sentry.dsn` must use HTTPS.
-The fact is `OPTIONAL` and never prevents startup.
-Before activation, complete the processing review in the [processor checklist](./dsms/processor-checklist#follow-up-if-the-processing-surface-changes).
-
-Frontend error rates include only browsers whose users accepted error monitoring.
-Treat them as consent-biased diagnostics, not an availability metric or a basis to compare deployments.
-Server-side error rates do not have this selection bias.
 
 ## Email
 

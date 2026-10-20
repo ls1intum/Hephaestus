@@ -99,7 +99,10 @@ final class ProxyStreamUsageTap implements Consumer<byte[]> {
             }
         } catch (RuntimeException e) {
             malformedUsage = true;
-            log.debug("Unparseable SSE frame while looking for usage: {}", e.toString());
+            // The type only: a parser's message quotes the frame, which carries the model's answer.
+            log.debug(
+                    "Unparseable SSE frame while looking for usage: {}",
+                    e.getClass().getName());
         }
     }
 

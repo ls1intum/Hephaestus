@@ -50,9 +50,8 @@ public class DockerClientOperations
     /**
      * How much of a container's output is held in memory before its middle is dropped, split evenly
      * between the beginning and the ending. A review's transcript is the only account of what it did,
-     * so the whole of it is kept unless a run is large enough to threaten the collecting process; see
-     * {@link DockerSandboxAdapter#MAX_LOG_EVENT_CHARS} for the separate limit on what is echoed to the
-     * application's own log.
+     * so the whole of it is kept unless a run is large enough to threaten the collecting process. None
+     * of it is written to the application's own log.
      */
     static final int MAX_LOG_CHARS = 8 * 1024 * 1024; // 8 MB
 
@@ -82,7 +81,7 @@ public class DockerClientOperations
             dockerClient.pingCmd().exec();
             return true;
         } catch (Exception e) {
-            log.debug("Docker ping failed: {}", e.getMessage());
+            log.debug("Docker ping failed: errorType={}", e.getClass().getName());
             return false;
         }
     }
@@ -95,7 +94,10 @@ public class DockerClientOperations
         } catch (NotFoundException e) {
             return false;
         } catch (Exception e) {
-            log.debug("imageIsPresent check failed for {}: {}", image, e.getMessage());
+            log.debug(
+                    "imageIsPresent check failed for {}: errorType={}",
+                    image,
+                    e.getClass().getName());
             return false;
         }
     }
@@ -109,7 +111,10 @@ public class DockerClientOperations
         } catch (NotFoundException e) {
             return Optional.empty();
         } catch (Exception e) {
-            log.debug("imageLabels lookup failed for {}: {}", image, e.getMessage());
+            log.debug(
+                    "imageLabels lookup failed for {}: errorType={}",
+                    image,
+                    e.getClass().getName());
             return Optional.empty();
         }
     }
@@ -139,7 +144,10 @@ public class DockerClientOperations
             log.warn("Docker pull interrupted: image={}", image);
             return false;
         } catch (Exception e) {
-            log.warn("Docker pull failed (will fall back to cached image): image={}, error={}", image, e.getMessage());
+            log.warn(
+                    "Docker pull failed (will fall back to cached image): image={}, errorType={}",
+                    image,
+                    e.getClass().getName());
             return false;
         }
     }
@@ -297,7 +305,10 @@ public class DockerClientOperations
                 try {
                     callback.close();
                 } catch (Exception closeEx) {
-                    log.debug("Failed to close wait callback for container {}: {}", containerId, closeEx.getMessage());
+                    log.debug(
+                            "Failed to close wait callback for container {}: errorType={}",
+                            containerId,
+                            closeEx.getClass().getName());
                 }
             }
         } catch (DockerException e) {
@@ -351,7 +362,10 @@ public class DockerClientOperations
             log.warn("Interrupted collecting logs for container {}", containerId);
             return "";
         } catch (Exception e) {
-            log.warn("Failed to collect logs for container {}: {}", containerId, e.getMessage());
+            log.warn(
+                    "Failed to collect logs for container {}: errorType={}",
+                    containerId,
+                    e.getClass().getName());
             return "";
         }
     }

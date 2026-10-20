@@ -27,6 +27,12 @@ spring:
     lifecycle:
         timeout-per-shutdown-phase: 6m
 
+logging:
+    structured:
+        json:
+            add:
+                "[runtime.role]": worker
+
 server:
     # No user-facing API: keep the application connector on loopback. Metrics and probes
     # use the separate management listener, reachable on the private container network.

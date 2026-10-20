@@ -118,6 +118,25 @@ jobs:
             exit 1
           fi
 
+      - name: Validate the opt-in journald logging overlay
+        working-directory: docker/self-host
+        run: |
+          set -euo pipefail
+          rendered=$(docker compose -f compose.yaml -f ../observability/compose.journald.yaml config --format json)
+          # Exactly the three Java runtime roles carry the tag the collector reads; json-file size
+          # options must be gone, because the journald driver refuses to start a container with them.
+          # The webapp's nginx error log and PostgreSQL stay on bounded local json-file logs.
+          jq -e '
+            ([.services["application-server", "application-worker", "webhook-server"].logging
+              | .driver == "journald" and .options.tag == "hephaestus-runtime" and .options.mode == "non-blocking"
+                and (.options | has("max-size") | not)] | all) and
+            ([.services | to_entries[] | select(.value.logging.driver? == "journald") | .key] | sort
+              == ["application-server", "application-worker", "webhook-server"]) and
+            .services.webapp.logging.driver == "json-file" and
+            .services.postgres.logging.driver == "json-file"
+          ' <<< "$rendered" >/dev/null || {
+            echo "::error::the journald overlay must move exactly the three Java runtime roles and drop json-file options"; exit 1; }
+
       - name: Assert the merged stack matches single-host intent
         working-directory: docker/self-host
         run: |

@@ -1,0 +1,64 @@
+rules:
+  - id: java-exception-content-in-logs
+    languages: [java]
+    severity: ERROR
+    message: Log bounded exception classes or status facts, not exception messages or provider response bodies.
+    metadata:
+      category: security
+      cwe: ["CWE-532: Insertion of Sensitive Information into Log File"]
+    mode: taint
+    pattern-sources:
+      - pattern: $EXCEPTION.getMessage()
+        exact: true
+      - pattern: $EXCEPTION.getLocalizedMessage()
+        exact: true
+      - pattern: $EXCEPTION.getResponseBodyAsString(...)
+        exact: true
+    pattern-propagators:
+      - pattern: $BUILDER.addArgument($VALUE)
+        from: $VALUE
+        to: $BUILDER
+      - pattern: $BUILDER.addKeyValue($KEY, $VALUE)
+        from: $VALUE
+        to: $BUILDER
+      - pattern: $BUILDER.setMessage($VALUE)
+        from: $VALUE
+        to: $BUILDER
+    pattern-sinks:
+      - patterns:
+          - pattern: $LOGGER.$LEVEL(...)
+          - metavariable-regex:
+              metavariable: $LOGGER
+              regex: ^(this\.)?(log|logger|LOG|LOGGER)$
+          - metavariable-regex:
+              metavariable: $LEVEL
+              regex: ^(trace|debug|info|warn|error)$
+      - patterns:
+          - pattern: (org.slf4j.Logger $LOGGER).$LEVEL(...)
+          - metavariable-regex:
+              metavariable: $LEVEL
+              regex: ^(trace|debug|info|warn|error)$
+      - patterns:
+          - pattern: $LOGGER.$AT(...). ... .log(...)
+          - metavariable-regex:
+              metavariable: $LOGGER
+              regex: ^(this\.)?(log|logger|LOG|LOGGER)$
+          - metavariable-regex:
+              metavariable: $AT
+              regex: ^at(Trace|Debug|Info|Warn|Error|Level)$
+      - pattern: (org.slf4j.spi.LoggingEventBuilder $BUILDER).log(...)
+      - patterns:
+          - pattern: $BUILDER.log(...)
+          - pattern-either:
+              - pattern-inside: |
+                  $BUILDER = $LOGGER.$AT(...);
+                  ...
+              - pattern-inside: |
+                  $BUILDER = $LOGGER.$AT(...). ... .$METHOD(...);
+                  ...
+          - metavariable-regex:
+              metavariable: $LOGGER
+              regex: ^(this\.)?(log|logger|LOG|LOGGER)$
+          - metavariable-regex:
+              metavariable: $AT
+              regex: ^at(Trace|Debug|Info|Warn|Error|Level)$

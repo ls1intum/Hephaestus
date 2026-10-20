@@ -240,17 +240,15 @@ public class GitLabGraphQlConfig {
                         .doBeforeRetry(signal -> {
                             Throwable failure = signal.failure();
                             log.warn(
-                                    "Retrying GitLab GraphQL request after transport error: errorType={}, message={}, attempt={}",
+                                    "Retrying GitLab GraphQL request after transport error: errorType={}, attempt={}",
                                     failure.getClass().getSimpleName(),
-                                    failure.getMessage(),
                                     signal.totalRetries() + 1);
                         })
                         .onRetryExhaustedThrow((spec, signal) -> {
                             Throwable failure = signal.failure();
                             log.error(
-                                    "Failed GitLab GraphQL request after transport retries exhausted: errorType={}, message={}",
-                                    failure.getClass().getSimpleName(),
-                                    failure.getMessage());
+                                    "Failed GitLab GraphQL request after transport retries exhausted: errorType={}",
+                                    failure.getClass().getSimpleName());
                             return new GitLabTransportRetryExhaustedException(
                                     "GitLab GraphQL request failed after transport retries: " + failure.getMessage(),
                                     failure);

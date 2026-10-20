@@ -27,7 +27,6 @@ const env: NodeJS.ProcessEnv = {
 	GH_AUTH_TOKEN: "",
 	APP_HOSTNAME: base,
 	IMAGE_TAG: "smoke",
-	SENTRY_DSN: "",
 };
 const productionFiles = ["proxy", "app"].map((stack) =>
 	path.join(root, `docker/compose.${stack}.yaml`),
@@ -312,7 +311,7 @@ try {
 					`${directory}/tls.key:/smoke/tls.key:ro`,
 				],
 			},
-			webapp: { ports: [], depends_on: {}, environment: { SENTRY_DSN: "" } },
+			webapp: { ports: [], depends_on: {} },
 			"application-server": {
 				ports: [],
 				entrypoint: ["nginx", "-g", "daemon off;"],

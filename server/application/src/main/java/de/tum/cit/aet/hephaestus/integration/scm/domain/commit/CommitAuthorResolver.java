@@ -219,7 +219,10 @@ public class CommitAuthorResolver {
         } catch (RuntimeException e) {
             // Never let an email backfill failure abort commit sync: the authoritative
             // work (user_id resolution) is already done. Log and move on.
-            log.debug("Failed to backfill user email: userId={}, error={}", userId, e.getMessage());
+            log.debug(
+                    "Failed to backfill user email: userId={}, error={}",
+                    userId,
+                    e.getClass().getSimpleName());
         }
         return userId;
     }

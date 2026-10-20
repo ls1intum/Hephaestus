@@ -860,10 +860,6 @@ jobs:
 
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
-    secrets:
-      SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
-      SENTRY_ORG: ${{ github.event_name == 'push' && secrets.SENTRY_ORG || '' }}
-      SENTRY_PROJECT: ${{ github.event_name == 'push' && secrets.SENTRY_PROJECT || '' }}
     needs: [detect-changes, vulnerability-database]
     # Same-repository previews require every image at the PR head tag; unchanged images are aliased
     # here and the application image is built by Build. A fork and a merge group have no preview, so

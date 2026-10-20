@@ -153,7 +153,11 @@ public class OAuthCallbackController {
         try {
             binding = oauthStateService.consume(state);
         } catch (IllegalArgumentException e) {
-            log.warn("OAuth callback for kind={} rejected state: {}", kind, e.getMessage());
+            // The response explains the rejection; the log keeps the kind and failure class only.
+            log.warn(
+                    "OAuth callback for kind={} rejected state: {}",
+                    kind,
+                    e.getClass().getSimpleName());
             return failure(kind.name(), "invalid_state", e.getMessage(), HttpStatus.BAD_REQUEST, wantsJson);
         }
 
@@ -208,7 +212,7 @@ public class OAuthCallbackController {
                     "Strategy.finalizeConnect threw for kind={} workspace={}: {}",
                     kind,
                     binding.workspaceId(),
-                    e.toString());
+                    e.getClass().getSimpleName());
             return workspaceRedirect(
                     failure(kind.name(), "strategy_error", e.getMessage(), HttpStatus.BAD_REQUEST, wantsJson), binding);
         }
@@ -235,7 +239,7 @@ public class OAuthCallbackController {
             log.warn(
                     "OAuth complete rejected by transition guard for connection={}: {}",
                     connection.getId(),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return failure(kind.name(), "transition_conflict", e.getMessage(), HttpStatus.CONFLICT, wantsJson);
         }
         return redirect(properties.successRedirect());

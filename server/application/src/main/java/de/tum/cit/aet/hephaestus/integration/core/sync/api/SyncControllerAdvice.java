@@ -21,7 +21,8 @@ class SyncControllerAdvice {
 
     @ExceptionHandler(NoSuchElementException.class)
     ProblemDetail handleNotFound(NoSuchElementException exception) {
-        log.info("Sync lookup failed: {}", exception.getMessage());
+        // The response carries the message; the log names the failure only.
+        log.info("Sync lookup failed: {}", exception.getClass().getSimpleName());
         return problem(
                 HttpStatus.NOT_FOUND,
                 "Resource not found",
@@ -30,7 +31,7 @@ class SyncControllerAdvice {
 
     @ExceptionHandler(SyncStateConflictException.class)
     ProblemDetail handleStateConflict(SyncStateConflictException exception) {
-        log.info("Sync state conflict: {}", exception.getMessage());
+        log.info("Sync state conflict: {}", exception.getClass().getSimpleName());
         ProblemDetail problem = problem(
                 HttpStatus.CONFLICT,
                 "Invalid state",
@@ -41,7 +42,7 @@ class SyncControllerAdvice {
 
     @ExceptionHandler(SyncNotSupportedException.class)
     ProblemDetail handleNotSupported(SyncNotSupportedException exception) {
-        log.info("Sync not supported: {}", exception.getMessage());
+        log.info("Sync not supported: kind={}", exception.kind());
         ProblemDetail problem = problem(
                 HttpStatus.CONFLICT,
                 "Manual sync not supported",
@@ -52,7 +53,7 @@ class SyncControllerAdvice {
 
     @ExceptionHandler(TaskRejectedException.class)
     ProblemDetail handleDispatchRejected(TaskRejectedException exception) {
-        log.warn("Sync dispatch rejected: {}", exception.getMessage());
+        log.warn("Sync dispatch rejected: {}", exception.getClass().getSimpleName());
         return problem(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "Sync dispatch rejected",

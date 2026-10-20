@@ -57,10 +57,10 @@ public class ReviewCommandListener {
                 | ItemCaptureException
                 | ReviewRequestRejected refused) {
             log.warn(
-                    "Review command refused: workspaceId={}, itemId={}, reason={}",
+                    "Review command refused: workspaceId={}, itemId={}, reasonType={}",
                     command.workspaceId(),
                     command.itemId(),
-                    refused.getMessage());
+                    refused.getClass().getName());
         }
     }
 }

@@ -72,7 +72,9 @@ public class AgentQueueHealthSampler {
         } catch (Exception e) {
             // Keep the last-good gauge values: a DB blip must not read as "queue is empty".
             samplerFailures.increment();
-            log.warn("Queue-health sample failed, keeping last-good values: {}", e.getMessage());
+            log.warn(
+                    "Queue-health sample failed, keeping last-good values: errorType={}",
+                    e.getClass().getName());
         }
     }
 }

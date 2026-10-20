@@ -134,7 +134,9 @@ public class SandboxReconciler {
                             .map(ReviewJob::getId)
                             .collect(Collectors.toSet()));
         } catch (Exception e) {
-            log.warn("Skipping sandbox reconciliation — active jobs are unreadable: {}", e.getMessage());
+            log.warn(
+                    "Skipping sandbox reconciliation — active jobs are unreadable: errorType={}",
+                    e.getClass().getName());
             skippedSweeps.increment();
             return Optional.empty();
         }
@@ -186,11 +188,16 @@ public class SandboxReconciler {
                 } catch (Exception e) {
                     // Still there, so its network is still in use.
                     inUse.add(UUID.fromString(jobIdStr));
-                    log.warn("Failed to cleanup orphaned container {}: {}", container.id(), e.getMessage());
+                    log.warn(
+                            "Failed to cleanup orphaned container {}: errorType={}",
+                            container.id(),
+                            e.getClass().getName());
                 }
             }
         } catch (Exception e) {
-            log.warn("Skipping sandbox reconciliation — managed containers are unreadable: {}", e.getMessage());
+            log.warn(
+                    "Skipping sandbox reconciliation — managed containers are unreadable: errorType={}",
+                    e.getClass().getName());
             skippedSweeps.increment();
             return Optional.empty();
         }
@@ -275,11 +282,16 @@ public class SandboxReconciler {
                 } catch (IllegalArgumentException e) {
                     log.debug("Network {} has non-UUID suffix: {}", name, jobIdStr);
                 } catch (Exception e) {
-                    log.warn("Failed to cleanup orphaned network {}: {}", name, e.getMessage());
+                    log.warn(
+                            "Failed to cleanup orphaned network {}: errorType={}",
+                            name,
+                            e.getClass().getName());
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to scan for orphaned networks: {}", e.getMessage());
+            log.warn(
+                    "Failed to scan for orphaned networks: errorType={}",
+                    e.getClass().getName());
         }
     }
 }

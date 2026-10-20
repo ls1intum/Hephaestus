@@ -36,5 +36,9 @@ hephaestus:
     # it off this pod; no separate flag is needed.
 
 logging:
+    structured:
+        json:
+            add:
+                "[runtime.role]": webhook
     level:
         de.tum.cit.aet.hephaestus.integration.core.webhook: INFO

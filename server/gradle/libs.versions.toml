@@ -23,8 +23,6 @@ spring-modulith = "2.1.1"
 liquibase = "5.0.4"
 liquibase-hibernate7 = "5.0.4"
 springdoc = "3.1.1"
-sentry = "8.55.0"
-logstash-logback-encoder = "9.0"
 slack-bolt = "1.51.0"
 jnats = "2.26.2"
 jgit = "7.7.1.202607240634-r"
@@ -67,7 +65,6 @@ pitest-junit5 = { module = "org.pitest:pitest-junit5-plugin", version.ref = "pit
 jspecify = { module = "org.jspecify:jspecify" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
-logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstash-logback-encoder" }
 context-propagation = { module = "io.micrometer:context-propagation" }
 micrometer-tracing-bridge-otel = { module = "io.micrometer:micrometer-tracing-bridge-otel" }
 spring-boot-starter-opentelemetry = { module = "org.springframework.boot:spring-boot-starter-opentelemetry" }
@@ -122,7 +119,6 @@ mockwebserver3 = { module = "com.squareup.okhttp3:mockwebserver3" }
 jakarta-ws-rs-api = { module = "jakarta.ws.rs:jakarta.ws.rs-api" }
 jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api" }
 hibernate-validator = { module = "org.hibernate.validator:hibernate-validator" }
-sentry = { module = "io.sentry:sentry-spring-boot-4-starter", version.ref = "sentry" }
 spring-boot-starter-graphql = { module = "org.springframework.boot:spring-boot-starter-graphql" }
 resilience4j-spring-boot4 = { module = "io.github.resilience4j:resilience4j-spring-boot4", version.ref = "resilience4j" }
 resilience4j-micrometer = { module = "io.github.resilience4j:resilience4j-micrometer", version.ref = "resilience4j" }

@@ -163,7 +163,7 @@ public class GitHubRepositorySyncService {
                                     "Retrying repository sync after transport error: repoName={}, attempt={}, error={}",
                                     safeNameWithOwner,
                                     signal.totalRetries() + 1,
-                                    signal.failure().getMessage())))
+                                    signal.failure().getClass().getSimpleName())))
                     .block(syncProperties.graphqlTimeout());
 
             if (response == null || !response.isValid() || !response.getErrors().isEmpty()) {

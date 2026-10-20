@@ -123,7 +123,12 @@ public class ProxyAccounting {
         try {
             usage = ProxyTokenUsage.from(objectMapper.readTree(upstreamBody), protocol);
         } catch (Exception e) {
-            log.warn("Could not parse upstream usage for {} — this call's tokens go unbilled", attempt.sourceId(), e);
+            // A parser's message quotes the input it rejected, and this input is the model's answer. The type
+            // tells a non-JSON answer from an unreadable usage block without it.
+            log.atWarn()
+                    .addKeyValue("event.name", "llm.proxy.usage.unparseable")
+                    .addKeyValue("error.type", e.getClass().getName())
+                    .log("Could not parse upstream usage for {} — this call's tokens go unbilled", attempt.sourceId());
             recordMalformedUsage(attempt);
             // An unreadable body is not also an absent one: the practice script row still counts the
             // call, and only the unparseable counter records the gap.

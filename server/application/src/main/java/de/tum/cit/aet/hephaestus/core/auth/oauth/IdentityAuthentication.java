@@ -65,7 +65,7 @@ public class IdentityAuthentication {
             jwt = jwtDecoder.decode(token);
             accountId = Long.parseLong(jwt.getSubject());
         } catch (JwtException | NumberFormatException ex) {
-            log.warn("auth.link: token rejected: {}", ex.getMessage());
+            log.warn("auth.link: token rejected: errorType={}", ex.getClass().getName());
             return null;
         }
         passkeys.requirePersonal(authenticationConverter.convert(jwt));
