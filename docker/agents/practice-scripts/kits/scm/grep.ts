@@ -162,9 +162,10 @@ export async function grep(
 		return [];
 	}
 
-	// -Z ends the file name with a NUL, so a name holding `:<n>:` still splits; -I skips binary files,
+	// --null ends the file name with a NUL on GNU and BSD grep; -Z means decompression on BSD.
+	// A name holding `:<n>:` still splits; -I skips binary files,
 	// whose only output would be a "Binary file … matches" line with no line to cite.
-	const grepArgs = ["grep", "-H", "-n", "-Z", "-I", fixedString ? "-F" : "-E"];
+	const grepArgs = ["grep", "-H", "-n", "--null", "-I", fixedString ? "-F" : "-E"];
 
 	if ((glob !== undefined && glob !== "") || opts.paths !== undefined) {
 		// A basename-only glob matches only the root dir; prepend "**/" for recursion.
