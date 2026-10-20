@@ -295,6 +295,14 @@ void describe("preview drift from the reference stack", () => {
 		assert.match(drift[0] ?? "", /BRAND_NEW_SWITCH/u);
 	});
 
+	void test("deliberately omits the signing secret while Slack is disabled", () => {
+		assert.equal(REQUIRED_SWITCHES.HEPHAESTUS_INTEGRATION_SLACK_ENABLED, "false");
+		assert.deepEqual(
+			findEnvDrift(reference("      HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET: unused"), preview),
+			[],
+		);
+	});
+
 	void test("stays quiet for a variable recorded as deliberately omitted", () => {
 		assert.deepEqual(findEnvDrift(reference("      SANDBOX_CPUS: 2"), preview), []);
 	});
@@ -551,7 +559,7 @@ void describe("owned preview reviews", () => {
 				[
 					"-eu",
 					"-c",
-					`psql() { case "$*" in *obj_description*) printf "%s\\n" "$TEST_POLICY" ;; *) printf "%s\\n" "hephaestus_preview_seeded" ;; esac; };\n${markerCheck}`,
+					`psql() { case "$*" in *obj_description*) printf "%s\\n" "$TEST_POLICY" ;; *) printf "%s\\n" "hephaestus_preview_seeded" ;; esac; };\n${markerCheck}\nexit 73`,
 				],
 				{
 					env: {
@@ -567,8 +575,10 @@ void describe("owned preview reviews", () => {
 					encoding: "utf8",
 				},
 			).status;
-		assert.equal(markerRun("", "true"), 1);
-		assert.equal(markerRun("owned-review-policy-v1", "true"), 0);
-		assert.equal(markerRun("", "false"), 0);
+		for (const freshReview of ["false", "true"]) {
+			assert.equal(markerRun("", freshReview), 1);
+			assert.equal(markerRun("owned-review-policy-v1", freshReview), 1);
+			assert.equal(markerRun("owned-review-policy-v2", freshReview), 0);
+		}
 	});
 });

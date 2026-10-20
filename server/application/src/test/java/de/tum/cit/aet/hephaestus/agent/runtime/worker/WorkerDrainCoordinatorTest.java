@@ -20,6 +20,8 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -85,7 +87,7 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldCompleteShutdownWithoutRepeatingCleanupWhenContainerStopsAreIncomplete() {
+    void shouldCompleteShutdownWithoutRepeatingCleanupWhenContainerStopsAreIncomplete() throws Exception {
         WorkerProperties props = propsWithDrain(Duration.ZERO);
         ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
         when(executor.cancelInFlight(ReviewJobCancellationReason.DRAIN_IMMEDIATE))
@@ -99,14 +101,50 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
                 new SimpleMeterRegistry());
         coordinator.start();
         AtomicInteger completed = new AtomicInteger();
+        CountDownLatch bothCompleted = new CountDownLatch(2);
+        Runnable callback = () -> {
+            completed.incrementAndGet();
+            bothCompleted.countDown();
+        };
 
-        coordinator.stop(completed::incrementAndGet);
-        coordinator.stop(completed::incrementAndGet);
+        coordinator.stop(callback);
+        coordinator.stop(callback);
 
+        assertThat(bothCompleted.await(10, TimeUnit.SECONDS)).isTrue();
         assertThat(completed.get()).isEqualTo(2);
         assertThat(coordinator.isRunning()).isFalse();
         assertThat(coordinator.isDraining()).isTrue();
         verify(executor, times(1)).cancelInFlight(ReviewJobCancellationReason.DRAIN_IMMEDIATE);
+    }
+
+    @Test
+    void shouldRefuseNewJobsAndReturnBeforeTheReviewsInFlightEndWhenStoppedWithACallback() throws Exception {
+        WorkerProperties props = propsWithDrain(Duration.ofSeconds(5));
+        ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
+        CountDownLatch reviewsEnd = new CountDownLatch(1);
+        when(executor.awaitInFlight(any(Duration.class)))
+                .thenAnswer(invocation -> reviewsEnd.await(10, TimeUnit.SECONDS));
+        ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+        WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
+                mock(WorkerControlClient.class),
+                new WorkerCapacityState(props),
+                props,
+                Optional.of(executor),
+                events,
+                new SimpleMeterRegistry());
+        coordinator.start();
+        CountDownLatch stopped = new CountDownLatch(1);
+
+        coordinator.stop(stopped::countDown);
+
+        // Spring stops the other beans of the phase only once this returns: it must not wait for the reviews.
+        assertThat(stopped.getCount()).as("the drain still waits").isEqualTo(1);
+        verify(executor).stopAcceptingNewJobs();
+        verifyReadinessStateRefusingTrafficWasPublished(events);
+        reviewsEnd.countDown();
+        assertThat(stopped.await(10, TimeUnit.SECONDS)).isTrue();
+        verify(executor).awaitInFlight(Duration.ofSeconds(5));
+        verify(executor, never()).cancelInFlight(any());
     }
 
     @Test

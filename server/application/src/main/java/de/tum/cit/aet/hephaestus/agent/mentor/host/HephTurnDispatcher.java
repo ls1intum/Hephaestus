@@ -163,11 +163,44 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
     /** Stops claiming, lets running turns finish for a while, then removes the host. */
     @Override
     public void stop() {
-        if (!active) {
+        if (stopClaiming()) {
+            drain();
+        }
+    }
+
+    /**
+     * Stops claiming on the calling thread, then drains on a thread of its own. Spring calls this for every bean of the
+     * phase before it waits for their callbacks, so the review drain of the same phase runs alongside this one, and the
+     * web server's phase still starts only after both ended.
+     */
+    @Override
+    public void stop(Runnable callback) {
+        if (!stopClaiming()) {
+            callback.run();
             return;
+        }
+        Thread.ofPlatform().name("heph-turn-drain").start(() -> {
+            try {
+                drain();
+            } catch (RuntimeException e) {
+                log.warn("Heph drain failed: {}", e.getClass().getSimpleName());
+            } finally {
+                callback.run();
+            }
+        });
+    }
+
+    /** False when claiming had already stopped. */
+    private synchronized boolean stopClaiming() {
+        if (!active) {
+            return false;
         }
         active = false;
         wake.release();
+        return true;
+    }
+
+    private void drain() {
         long until = System.nanoTime() + DRAIN_TIMEOUT.toNanos();
         synchronized (running) {
             long remaining;

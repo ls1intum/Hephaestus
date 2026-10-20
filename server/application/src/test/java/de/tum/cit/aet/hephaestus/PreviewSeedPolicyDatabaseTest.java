@@ -19,7 +19,10 @@ import liquibase.resource.ClassLoaderResourceAccessor;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 @Tag("database")
 class PreviewSeedPolicyDatabaseTest {
@@ -166,6 +169,84 @@ class PreviewSeedPolicyDatabaseTest {
         }
     }
 
+    @Test
+    void shouldParkClonedHephWorkWithoutEndingOrBillingItsAttempts() throws Exception {
+        var database = PostgreSQLTestContainer.createMigratedDatabase("preview_seed_policy_heph");
+        var populator = new ResourceDatabasePopulator(
+                new ClassPathResource("db/practice-native/result-parent.sql"),
+                new ClassPathResource("db/practice-native/feedback-parent.sql"));
+        populator.execute(new DriverManagerDataSource(database.jdbcUrl(), database.username(), database.password()));
+        var policy = readPolicy();
+        try (var connection =
+                        DriverManager.getConnection(database.jdbcUrl(), database.username(), database.password());
+                var statement = connection.createStatement()) {
+            statement.execute(CLONED_HEPH_ROWS);
+            String turns =
+                    "SELECT jsonb_agg(to_jsonb(t) ORDER BY id)::text FROM mentor_turn t WHERE workspace_id=978001";
+            String history = """
+                SELECT jsonb_build_object(
+                    'measurements', (SELECT jsonb_agg(to_jsonb(u) ORDER BY turn_id,attempt)
+                        FROM mentor_turn_attempt_usage u WHERE workspace_id=978001),
+                    'ledger', (SELECT jsonb_agg(to_jsonb(e) ORDER BY id)
+                        FROM llm_usage_event e WHERE workspace_id=978001),
+                    'copies', (SELECT jsonb_agg(to_jsonb(c) ORDER BY id)
+                        FROM feedback_copy c WHERE workspace_id=978001),
+                    'feedback', (SELECT jsonb_agg(to_jsonb(f) ORDER BY id)
+                        FROM feedback f WHERE workspace_id=978001))::text
+                """;
+            String facts = """
+                SELECT jsonb_agg(to_jsonb(t)-'status'-'worker_id'-'leased_until' ORDER BY id)::text
+                FROM mentor_turn t WHERE workspace_id=978001
+                """;
+            String terminal = """
+                SELECT jsonb_agg(to_jsonb(t) ORDER BY id)::text FROM mentor_turn t WHERE workspace_id=978001
+                    AND request_id IN ('preview-done','preview-failed','preview-stopped')
+                """;
+            String binding =
+                    "SELECT (to_jsonb(b)-'enabled'-'updated_at')::text FROM workspace_agent_binding b WHERE id=997101";
+            var bindingBefore = scalar(connection, binding);
+            var historyBefore = scalar(connection, history);
+            var factsBefore = scalar(connection, facts);
+            var terminalBefore = scalar(connection, terminal);
+            assertThat(scalar(connection, """
+                SELECT count(*) FROM mentor_turn WHERE workspace_id=978001
+                    AND (status IN ('QUEUED','RUNNING') OR (status='STOPPED' AND leased_until IS NOT NULL))
+                """)).isEqualTo("3");
+            assertThat(scalar(connection, """
+                SELECT count(*) FROM feedback_copy WHERE workspace_id=978001 AND kind='CHAT_TURN'
+                    AND state='WRITE_STARTED' AND posted_at IS NULL AND readback='UNKNOWN'
+                """)).isEqualTo("1");
+            assertThat(Long.parseLong(scalar(connection, policy.verification())))
+                    .isPositive();
+
+            statement.execute(policy.sql());
+
+            assertThat(scalar(connection, """
+                SELECT count(*) FROM mentor_turn WHERE workspace_id=978001
+                    AND request_id IN ('native-turn','preview-queued','preview-held')
+                    AND status='STOPPED' AND worker_id IS NULL AND leased_until IS NULL
+                """))
+                    .as("cloned queued work and both kinds of held lease are parked")
+                    .isEqualTo("3");
+            assertThat(scalar(connection, """
+                SELECT count(*) FROM workspace_agent_binding WHERE id=997101 AND workspace_id=978001
+                    AND purpose='MENTOR' AND NOT enabled
+                """)).isEqualTo("1");
+            assertThat(scalar(connection, binding)).isEqualTo(bindingBefore);
+            assertThat(scalar(connection, facts)).isEqualTo(factsBefore);
+            assertThat(scalar(connection, terminal)).isEqualTo(terminalBefore);
+            assertThat(scalar(connection, history)).isEqualTo(historyBefore);
+            assertThat(scalar(connection, policy.verification())).isEqualTo("0");
+            var parked = scalar(connection, turns);
+
+            statement.execute(policy.sql());
+
+            assertThat(scalar(connection, turns)).isEqualTo(parked);
+            assertThat(scalar(connection, history)).isEqualTo(historyBefore);
+            assertThat(scalar(connection, policy.verification())).isEqualTo("0");
+        }
+    }
+
     // A cutover test can use the same policy with its own migrated schema and fixtures.
     static SeedPolicy readPolicy() throws Exception {
         var compose = Path.of(System.getProperty("basedir", "."), "../../docker/preview/compose.app.yaml");
@@ -195,6 +276,59 @@ class PreviewSeedPolicyDatabaseTest {
     }
 
     record SeedPolicy(String sql, String verification) {}
+
+    private static final String CLONED_HEPH_ROWS = """
+        INSERT INTO instance_settings(id) VALUES(1) ON CONFLICT DO NOTHING;
+        UPDATE instance_settings SET silent_mode_engaged=false;
+        INSERT INTO llm_connection(id,slug,display_name,base_url,api_protocol,enabled,created_at)
+        VALUES(997101,'preview-heph','Preview Heph','https://preview-policy.example','openai-responses',true,now());
+        INSERT INTO llm_model(id,connection_id,slug,display_name,upstream_model_id,created_at)
+        VALUES(997101,997101,'preview-heph','Preview Heph','cloned-model',now());
+        INSERT INTO workspace_agent_binding(id,workspace_id,purpose,enabled,instance_model_id,created_at)
+        VALUES(997101,978001,'MENTOR',true,997101,now());
+        INSERT INTO mentor_conversation(id,workspace_id,account_id,created_at,last_activity_at)
+        VALUES(md5('preview-held')::uuid,978001,978007,'2026-01-05T00:00:00Z','2026-01-05T00:00:00Z');
+        INSERT INTO mentor_turn(id,workspace_id,conversation_id,request_id,status,surface,attempt,
+            created_at,started_at,finished_at,worker_id,leased_until,input_tokens,llm_calls)
+        SELECT md5(request)::uuid,978001,
+            CASE WHEN request='preview-held' THEN md5('preview-held')::uuid
+                ELSE '00000000-0000-0000-0000-000000978051'::uuid END,
+            request,status,'APP',CASE WHEN status='QUEUED' THEN 0 ELSE 1 END,'2026-01-05T00:00:00Z',
+            CASE WHEN status<>'QUEUED' THEN '2026-01-05T00:01:00Z'::timestamptz END,
+            CASE WHEN request IN ('preview-done','preview-failed','preview-stopped')
+                THEN '2026-01-05T00:02:00Z'::timestamptz END,
+            CASE WHEN request='preview-held' THEN 'staging-worker' END,
+            CASE WHEN request='preview-held' THEN '2026-01-05T00:03:00Z'::timestamptz END,
+            CASE WHEN status='QUEUED' THEN 0 ELSE 40 END,CASE WHEN status='QUEUED' THEN 0 ELSE 2 END
+        FROM (VALUES('preview-queued','QUEUED'),('preview-held','STOPPED'),('preview-done','DONE'),
+            ('preview-failed','FAILED'),('preview-stopped','STOPPED')) seed(request,status);
+        UPDATE mentor_turn SET worker_id='staging-worker',leased_until='2026-01-05T00:03:00Z',
+            input_tokens=40,llm_calls=2,partial='{"messages":[]}',
+            admission='{"model":"cloned-model","price":{"fundingSource":"INSTANCE","pricingState":"NO_CHARGE",
+                "appliedPriceId":null,"appliedWorkspaceModelId":null,"per1mInputUsd":"0","per1mOutputUsd":"0",
+                "per1mCacheReadUsd":"0","per1mCacheWriteUsd":"0"},"route":{"apiProtocol":"openai-responses",
+                "baseUrl":"https://preview-policy.example","connectionScope":"INSTANCE","connectionId":997101,
+                "modelId":997101},"contextWindow":32768,"maxOutputTokens":8192,"reasoningEffort":null}'
+        WHERE id='00000000-0000-0000-0000-000000978053';
+        INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,kind,surface,text,turn_id,created_at)
+        SELECT md5(t.request_id||':question')::uuid,t.workspace_id,t.conversation_id,
+            CASE WHEN request_id='native-turn' THEN 2 ELSE 3 END,'USER','APP','A cloned question.',t.id,
+            '2026-01-05T00:00:00Z' FROM mentor_turn t
+        WHERE t.workspace_id=978001 AND request_id IN ('native-turn','preview-queued');
+        INSERT INTO mentor_turn_attempt_usage(turn_id,attempt,workspace_id,model,funding_source,pricing_state,
+            occurred_at,calls,input_tokens,applied_per_1m_input_usd,applied_per_1m_output_usd,
+            applied_per_1m_cache_read_usd,applied_per_1m_cache_write_usd)
+        SELECT id,attempt,workspace_id,'cloned-model','INSTANCE','NO_CHARGE',finished_at,2,40,0,0,0,0
+        FROM mentor_turn WHERE workspace_id=978001 AND request_id IN ('native-turn','preview-held','preview-done');
+        INSERT INTO llm_usage_event(id,workspace_id,job_type,source_type,source_id,source_attempt,model,
+            input_tokens,total_calls,cost_usd,occurred_at,pricing_state,usage_provenance,measurement_verification)
+        VALUES(md5('preview-heph-ledger')::uuid,978001,'MENTOR_TURN','MENTOR_TURN',md5('preview-done')::uuid,
+            1,'cloned-model',40,2,0,'2026-01-05T00:02:00Z','NO_CHARGE','PROXY','VERIFIED');
+        UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at=now(),
+            mentor_turn_id='00000000-0000-0000-0000-000000978053',readback='UNKNOWN',
+            stop_reason='DELIVERY_UNCONFIRMED'
+        WHERE id='00000000-0000-0000-0000-000000978045';
+        """;
 
     private static final String RELEASED_ROWS = """
         INSERT INTO workspace(id,account_login,account_type,display_name,slug,status,
