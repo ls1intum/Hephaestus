@@ -18,7 +18,10 @@ public record AdmissionResponseDTO(
         @Nullable ConversationEligibilityDTO conversationEligibility,
         @Nullable PrivateFeedbackHistoryDTO privateHistory,
         boolean publicReviewed,
-        boolean privatePrepared) {
+        PrivateProgressDTO privateProgress) {
+    /** The admission answer's own contract; the request and practice script contracts version separately. */
+    public static final int CONTRACT_VERSION = 4;
+
     public AdmissionResponseDTO {
         admitted = List.copyOf(admitted);
         withheld = List.copyOf(withheld);

@@ -33,8 +33,10 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedPackage;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackProgress;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -82,6 +84,9 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
         lenient()
                 .when(feedback.compositionContext(anyLong(), any(), any()))
                 .thenReturn(new FeedbackCompositionContext(null, null));
+        lenient()
+                .when(feedback.privateProgress(anyLong(), any(), anyLong(), any()))
+                .thenReturn(PrivateFeedbackProgress.NONE);
         service = new ResultAdmissionService(
                 jobs,
                 output,
@@ -215,5 +220,38 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                 new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 0, List.of(), List.of(), false, null));
         assertThat(job.getPublicReviewDigest()).isNull();
         verifyNoInteractions(members);
+    }
+
+    @Test
+    void shouldOwePrivateFeedbackUntilPreparedPiecesDecideEveryNotMetPractice() {
+        job.setAdmissionAttempt(0);
+        job.setAdmissionDigest("admitted");
+        UUID carded = UUID.randomUUID(), pending = UUID.randomUUID(), met = UUID.randomUUID();
+        var admitted = List.of(
+                admitted(carded, 11, ResultOutcome.NOT_MET),
+                admitted(pending, 12, ResultOutcome.NOT_MET),
+                admitted(met, 13, ResultOutcome.MET));
+        when(proof.forAttempt(1, job.getReviewId(), job.getId(), 0)).thenReturn(admitted);
+        when(feedback.privateProgress(1, job.getReviewId(), 5, List.of(carded, pending, met)))
+                .thenReturn(
+                        PrivateFeedbackProgress.NONE,
+                        new PrivateFeedbackProgress(Set.of(carded), 1, 0),
+                        new PrivateFeedbackProgress(Set.of(carded, pending), 1, 0));
+
+        assertThat(service.privateFeedbackOwed(job)).as("nothing prepared yet").isTrue();
+        assertThat(service.privateFeedbackOwed(job))
+                .as("a card decides one practice, the other is open")
+                .isTrue();
+        assertThat(service.privateFeedbackOwed(job))
+                .as("a withholding decides the other; the MET practice owes nothing")
+                .isFalse();
+    }
+
+    private static AdmittedResultSnapshot admitted(UUID id, long practiceId, ResultOutcome outcome) {
+        var candidate = mock(ResultCandidate.class);
+        when(candidate.developerId()).thenReturn(5L);
+        lenient().when(candidate.practiceId()).thenReturn(practiceId);
+        lenient().when(candidate.outcome()).thenReturn(outcome);
+        return new AdmittedResultSnapshot(id, candidate, List.of());
     }
 }

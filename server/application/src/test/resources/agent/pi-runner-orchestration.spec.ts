@@ -1198,10 +1198,14 @@ if (scenario !== undefined && scenario !== "") {
 			? JSON.parse(readFileSync(privateHistoryPath, "utf8"))
 			: null;
 		return Response.json({
-			contractVersion: 3,
+			contractVersion: 4,
 			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
-			privatePrepared: false,
+			privateProgress: {
+				decidedResultIds: [],
+				practicePageDeliveries: 0,
+				conversationDeliveries: 0,
+			},
 			admitted: rows.map(admissionDto),
 			withheld: [],
 			practicePageSupport: support ?? null,
@@ -3846,7 +3850,7 @@ if (scenario !== undefined && scenario !== "") {
 				"compose-continuation":
 					"continues an admitted review by composing the review on the work and then its private feedback, measuring and admitting nothing",
 				"compose-continuation-private-prepared":
-					"continues an admitted review whose private piece is prepared by composing only the review on the work",
+					"continues an admitted review whose private practices are all decided by composing only the review on the work, with no private failure",
 				"compose-continuation-unresolved":
 					"continues an admitted review whose public delivery stays unresolved without composing it again",
 				"compose-continuation-private-safety":
@@ -4059,16 +4063,23 @@ if (scenario !== undefined && scenario !== "") {
 						writeFileSync(
 							nodePath.join(cwd, "evidence/composition-continuation.json"),
 							JSON.stringify({
-								contractVersion: 3,
+								contractVersion: 4,
 								admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 								publicReviewed: [
 									"compose-continuation-reviewed",
 									"compose-continuation-private",
 								].includes(fixture),
-								privatePrepared: [
+								// An earlier attempt's accepted card decides the one NOT_MET practice and uses the page's room.
+								privateProgress: [
 									"compose-continuation-reviewed",
 									"compose-continuation-private-prepared",
-								].includes(fixture),
+								].includes(fixture)
+									? {
+											decidedResultIds: [admittedResult.resultId],
+											practicePageDeliveries: 1,
+											conversationDeliveries: 0,
+										}
+									: { decidedResultIds: [], practicePageDeliveries: 0, conversationDeliveries: 0 },
 								admitted: [continued],
 								withheld: [],
 								// The server's reread for this attempt: the page is routed, the conversation is not.
@@ -5970,7 +5981,7 @@ for (const item of nullableCases) {
 								);
 								assert.match(
 									child.stderr,
-									/PRACTICE_PAGE closed for this run: no practice is routed to it/u,
+									/PRACTICE_PAGE closed for this run: no undecided practice is routed to it/u,
 								);
 							}
 							if (mode === "routing-missing") {
@@ -5990,7 +6001,7 @@ for (const item of nullableCases) {
 								);
 								assert.match(
 									child.stderr,
-									/CONVERSATION closed for this run: no practice is routed to it/u,
+									/CONVERSATION closed for this run: no undecided practice is routed to it/u,
 								);
 							}
 							if (mode === "inline") {
@@ -5998,11 +6009,11 @@ for (const item of nullableCases) {
 								assert.equal(payload.feedback.length, 0);
 								assert.match(
 									child.stderr,
-									/PRACTICE_PAGE closed for this run: no practice is routed to it/u,
+									/PRACTICE_PAGE closed for this run: no undecided practice is routed to it/u,
 								);
 								assert.match(
 									child.stderr,
-									/CONVERSATION closed for this run: no practice is routed to it/u,
+									/CONVERSATION closed for this run: no undecided practice is routed to it/u,
 								);
 							}
 							break;
@@ -7178,10 +7189,7 @@ for (const item of nullableCases) {
 								assert.ok(Array.isArray(continued.compositionFailures));
 								assert.ok(
 									!continued.compositionFailures.some(
-										(failure: unknown) =>
-											isRecord(failure) &&
-											(failure.phase === "PUBLIC_REVIEW" ||
-												failure.reason === "PRIVATE_NOT_RECOVERED"),
+										(failure: unknown) => isRecord(failure) && failure.phase === "PUBLIC_REVIEW",
 									),
 									JSON.stringify(continued.compositionFailures),
 								);
@@ -7220,7 +7228,7 @@ for (const item of nullableCases) {
 							}
 							const created = events.filter((event) => event.startsWith("create:session"));
 							if (fixture === "compose-continuation-private-prepared") {
-								// One session, the review composer's: an accepted private piece closes private composition.
+								// One session, the review composer's: the earlier card already decides the only private practice.
 								assert.deepEqual(created, ["create:session tools=report_review"]);
 								assert.equal(
 									readFileSync(nodePath.join(cwd, "system-prompt.md"), "utf8"),
@@ -7288,10 +7296,9 @@ for (const item of nullableCases) {
 							);
 							assert.ok(feedback.review !== null);
 							if (fixture === "compose-continuation-private-prepared") {
+								// Nothing private is left to compose, so nothing private failed.
 								assert.deepEqual(feedback.feedback, []);
-								assert.deepEqual(feedback.compositionFailures, [
-									{ phase: "PRIVATE_FEEDBACK", reason: "PRIVATE_NOT_RECOVERED" },
-								]);
+								assert.deepEqual(feedback.compositionFailures, []);
 								break;
 							}
 							// The private feedback the earlier attempt never composed, from the server's current reread.

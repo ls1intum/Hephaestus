@@ -285,10 +285,14 @@ void test("a composition continuation derives no change, runs no program and wri
 			writeFileSync(
 				nodePath.join(cwd, "evidence/composition-continuation.json"),
 				JSON.stringify({
-					contractVersion: 3,
+					contractVersion: 4,
 					admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					publicReviewed: false,
-					privatePrepared: false,
+					privateProgress: {
+						decidedResultIds: [],
+						practicePageDeliveries: 0,
+						conversationDeliveries: 0,
+					},
 					admitted: [],
 					withheld: [],
 					practicePageSupport: null,

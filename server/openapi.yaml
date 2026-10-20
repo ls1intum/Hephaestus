@@ -12013,8 +12013,8 @@ components:
           anyOf:
           - $ref: "#/components/schemas/PrivateFeedbackHistory"
           - type: "null"
-        privatePrepared:
-          type: boolean
+        privateProgress:
+          $ref: "#/components/schemas/PrivateProgress"
         publicReviewed:
           type: boolean
         reviewId:
@@ -12033,7 +12033,7 @@ components:
       - jobId
       - practicePageSupport
       - privateHistory
-      - privatePrepared
+      - privateProgress
       - publicReviewed
       - reviewId
       - withheld
@@ -19786,6 +19786,27 @@ components:
       - practiceSlug
       - practiceVersionId
       - resultId
+    PrivateProgress:
+      type: object
+      description: |-
+        What an earlier attempt of this review already prepared privately: the admitted results its pieces decide, and the
+         pieces composed for delivery on each private destination. It carries no words.
+      properties:
+        conversationDeliveries:
+          type: integer
+          format: int32
+        decidedResultIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        practicePageDeliveries:
+          type: integer
+          format: int32
+      required:
+      - conversationDeliveries
+      - decidedResultIds
+      - practicePageDeliveries
     ProbeLlmConnectionRequest:
       type: object
       description: Draft connection probe using a supplied (never-persisted) credential

@@ -132,14 +132,19 @@ const privateHistorySchema = z.object({
 	),
 });
 export type PrivateHistory = z.infer<typeof privateHistorySchema>;
+const count = z.number().int().nonnegative();
 
 export const admissionResponseSchema = z.looseObject({
-	contractVersion: z.literal(3),
+	contractVersion: z.literal(4),
 	admissionDigest: z.string().regex(/^[0-9a-f]{64}$/u),
 	admitted: z.array(admittedResultSchema),
 	withheld: z.array(z.object({ practiceSlug: z.string(), reason: z.string() })),
 	publicReviewed: z.boolean(),
-	privatePrepared: z.boolean(),
+	privateProgress: z.object({
+		decidedResultIds: z.array(z.uuid()),
+		practicePageDeliveries: count,
+		conversationDeliveries: count,
+	}),
 	practicePageSupport: z.unknown().nullable(),
 	conversationEligibility: z.unknown().nullable(),
 	privateHistory: privateHistorySchema.nullish(),
@@ -151,11 +156,27 @@ export function parseAdmission(value: unknown) {
 	for (const withheld of response.withheld) {
 		console.error(`[pi-runner] admission withheld ${withheld.practiceSlug}: ${withheld.reason}`);
 	}
+	const { decidedResultIds, practicePageDeliveries, conversationDeliveries } =
+		response.privateProgress;
+	const decided = new Set(decidedResultIds);
 	return {
 		results: response.admitted,
 		digest: response.admissionDigest,
 		publicReviewed: response.publicReviewed,
-		privatePrepared: response.privatePrepared,
+		// What earlier attempts of this review prepared privately: the practices they decided and the room they used.
+		privateProgress: {
+			decidedPractices: [
+				...new Set(
+					response.admitted
+						.filter((result) => decided.has(result.resultId))
+						.map((result) => result.practiceSlug),
+				),
+			].toSorted(),
+			deliveries: {
+				PRACTICE_PAGE: practicePageDeliveries,
+				CONVERSATION: conversationDeliveries,
+			},
+		},
 		practicePageSupport: readPracticePageSupport(response.practicePageSupport, response.admitted),
 		conversationEligibility: readConversationEligibility(
 			response.conversationEligibility,

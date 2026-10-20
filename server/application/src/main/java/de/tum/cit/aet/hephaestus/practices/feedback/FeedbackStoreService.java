@@ -25,7 +25,9 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackUsefulness;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedPackage;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackProgress;
 import java.time.Clock;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -61,6 +63,13 @@ public class FeedbackStoreService implements FeedbackStore {
     public FeedbackCompositionContext compositionContext(
             long workspaceId, UUID reviewId, List<UUID> admittedResultIds) {
         return composition.read(workspaceId, reviewId, admittedResultIds);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrivateFeedbackProgress privateProgress(
+            long workspaceId, UUID reviewId, long developerId, Collection<UUID> admittedResultIds) {
+        return prepared.privateProgress(workspaceId, reviewId, developerId, admittedResultIds);
     }
 
     @Override

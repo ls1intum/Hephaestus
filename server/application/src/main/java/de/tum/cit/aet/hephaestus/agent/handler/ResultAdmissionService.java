@@ -12,10 +12,13 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackResponseDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrivateProgressDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackProgress;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
@@ -23,6 +26,7 @@ import java.io.Serial;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -155,7 +159,9 @@ public class ResultAdmissionService {
                         entry.path("reason").asString()));
             }
         FeedbackCompositionService.Read privateRead = null;
+        var progress = PrivateFeedbackProgress.NONE;
         if (assignments.review(job).kind() == ReviewKind.ITEM && !admitted.isEmpty()) {
+            progress = composition.privateProgress(job, admitted);
             if (duringCapture) privateRead = composition.readForCapture(job, admitted);
             else {
                 var identity = new AdmissionIdentity(
@@ -170,7 +176,7 @@ public class ResultAdmissionService {
             }
         }
         return new AdmissionResponseDTO(
-                3,
+                AdmissionResponseDTO.CONTRACT_VERSION,
                 job.getReviewId(),
                 job.getId(),
                 citationAttempt(job),
@@ -181,7 +187,12 @@ public class ResultAdmissionService {
                 privateRead == null ? null : FeedbackCompositionService.conversation(privateRead),
                 privateRead == null ? null : FeedbackCompositionService.privateHistory(privateRead),
                 assignments.publicReviewed(job),
-                privatePrepared(job));
+                new PrivateProgressDTO(
+                        progress.decidedResultIds().stream()
+                                .sorted(Comparator.comparing(UUID::toString))
+                                .toList(),
+                        progress.practicePageDeliveries(),
+                        progress.conversationDeliveries()));
     }
 
     public PrepareFeedbackResponseDTO prepareFeedback(AdmissionIdentity identity, PrepareFeedbackRequestDTO request) {
@@ -261,9 +272,21 @@ public class ResultAdmissionService {
         return job.getAdmissionAttempt() != null && job.getAdmissionDigest() != null;
     }
 
-    /** Once a private piece of this job is prepared, no later attempt composes private feedback again. */
-    public static boolean privatePrepared(ReviewJob job) {
-        return job.getPracticePagePreparedAt() != null || job.getConversationPreparedAt() != null;
+    /**
+     * Whether private feedback may still be owed: the review has no prepared private piece on its admitted results yet,
+     * or one of its NOT_MET practices has none. Only the prepared pieces themselves settle a practice.
+     */
+    public boolean privateFeedbackOwed(ReviewJob job) {
+        var admitted = proof.forAttempt(job.getWorkspaceId(), job.getReviewId(), job.getId(), citationAttempt(job));
+        var decided = composition.privateProgress(job, admitted).decidedResultIds();
+        if (decided.isEmpty()) return true;
+        var settled = admitted.stream()
+                .filter(row -> decided.contains(row.id()))
+                .map(row -> row.candidate().practiceId())
+                .collect(Collectors.toSet());
+        return admitted.stream()
+                .anyMatch(row -> row.candidate().outcome() == ResultOutcome.NOT_MET
+                        && !settled.contains(row.candidate().practiceId()));
     }
 
     public static int citationAttempt(ReviewJob job) {

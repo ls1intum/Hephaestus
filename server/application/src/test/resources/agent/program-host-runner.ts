@@ -366,10 +366,14 @@ if (scenario !== undefined && scenario !== "") {
 			reviewInputPresent: existsSync(nodePath.join(cwd, "work/review-input")),
 		});
 		return Response.json({
-			contractVersion: 3,
+			contractVersion: 4,
 			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
-			privatePrepared: false,
+			privateProgress: {
+				decidedResultIds: [],
+				practicePageDeliveries: 0,
+				conversationDeliveries: 0,
+			},
 			admitted: [],
 			withheld: [],
 			practicePageSupport: null,

@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageSupport;
 import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackHistory;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackProgress;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -112,6 +113,20 @@ public class FeedbackCompositionService {
     /** Preparation rechecks routing and page support only; earlier private feedback is no input to it. */
     public Read readForPreparation(ReviewJob job, List<AdmittedResultSnapshot> admitted) {
         return read(job, admitted, false);
+    }
+
+    /** The private feedback this review already prepared on these admitted results, for the one person they name. */
+    public PrivateFeedbackProgress privateProgress(ReviewJob job, List<AdmittedResultSnapshot> admitted) {
+        var people = admitted.stream()
+                .map(row -> row.candidate().developerId())
+                .distinct()
+                .toList();
+        if (people.size() != 1 || people.getFirst() == null) return PrivateFeedbackProgress.NONE;
+        return feedback.privateProgress(
+                job.getWorkspaceId(),
+                job.getReviewId(),
+                Objects.requireNonNull(people.getFirst()),
+                admitted.stream().map(AdmittedResultSnapshot::id).toList());
     }
 
     private Read read(ReviewJob job, List<AdmittedResultSnapshot> admitted, boolean withHistory) {

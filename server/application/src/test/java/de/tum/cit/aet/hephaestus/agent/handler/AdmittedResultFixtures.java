@@ -13,6 +13,7 @@ public final class AdmittedResultFixtures {
 
     public static JsonNode evidence(String sourceKind, String sourcePath, String path, String quote) {
         var evidence = new JsonMapper().createObjectNode();
+        evidence.putArray("openQuestions");
         var citation = evidence.putArray("citations")
                 .addObject()
                 .put("sourceKind", sourceKind)

@@ -304,7 +304,7 @@ export type AdmissionResponse = {
     jobId: string;
     practicePageSupport: PracticePageSupport | null;
     privateHistory: PrivateFeedbackHistory | null;
-    privatePrepared: boolean;
+    privateProgress: PrivateProgress;
     publicReviewed: boolean;
     reviewId: string;
     withheld: Array<Withheld>;
@@ -3613,6 +3613,16 @@ export type PrivateFeedbackHistoryBasis = {
     practiceSlug: string;
     practiceVersionId: null | number;
     resultId: string;
+};
+
+/**
+ * What an earlier attempt of this review already prepared privately: the admitted results its pieces decide, and the
+ * pieces composed for delivery on each private destination. It carries no words.
+ */
+export type PrivateProgress = {
+    conversationDeliveries: number;
+    decidedResultIds: Array<string>;
+    practicePageDeliveries: number;
 };
 
 /**

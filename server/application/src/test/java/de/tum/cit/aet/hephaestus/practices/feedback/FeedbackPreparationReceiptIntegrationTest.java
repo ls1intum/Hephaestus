@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.delivery.PracticePageFeedbac
 import de.tum.cit.aet.hephaestus.practices.feedback.page.PracticePageFeedbackService;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
 import de.tum.cit.aet.hephaestus.practices.model.Problem;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
@@ -37,10 +38,12 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackProgress;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -474,6 +477,134 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
         assertThat(card.body()).isEqualTo(fixture.path("reported").path("body").asString());
         assertThat(card.nextStep())
                 .isEqualTo(fixture.path("reported").path("nextStep").asString());
+    }
+
+    @Test
+    void shouldProjectWhatPreparedPrivatePiecesDecideAndTheRoomTheirComposedIntentUses() {
+        when(pageRouter.supportsPattern(any(), anyList())).thenReturn(true);
+        var named = supportingResult;
+        var grouped = negativeResult();
+        var carded = negativeResult();
+        var job = new ReviewJob();
+        job.setId(UUID.randomUUID());
+        job.setWorkspaceId(workspace.getId());
+        job.setReviewId(reviewId);
+        job.setInput(new ReviewJobInput(itemId, List.of()));
+        var admitted = List.of(snapshot(named), snapshot(grouped), snapshot(carded));
+        // One conversation rests on two practices; a composer's page withholding and a card follow.
+        var conversation = new ComposedFeedback(
+                FeedbackDestination.CONVERSATION,
+                List.of(named.getId(), grouped.getId()),
+                "Discuss the shared failure handling.",
+                List.of(),
+                null,
+                new FeedbackCompositionTrace(
+                        List.of(new FeedbackCompositionTrace.CopySupport(
+                                FeedbackCopyKind.CHAT_TURN, 0, support(named, grouped))),
+                        List.of(),
+                        null,
+                        null),
+                null);
+        var withheld = new ComposedFeedback(
+                FeedbackDestination.PRACTICE_PAGE,
+                List.of(grouped.getId()),
+                null,
+                List.of(),
+                FeedbackStopReason.COMPOSER_WITHHELD,
+                new FeedbackCompositionTrace(
+                        List.of(),
+                        List.of(new FeedbackCompositionTrace.QuietDecision(support(grouped), "BELOW_BAR", List.of())),
+                        null,
+                        null),
+                null);
+        var card = new ComposedFeedback(
+                FeedbackDestination.PRACTICE_PAGE,
+                List.of(carded.getId()),
+                null,
+                List.of(),
+                null,
+                new FeedbackCompositionTrace(
+                        List.of(new FeedbackCompositionTrace.CopySupport(FeedbackCopyKind.SUMMARY, 0, support(carded))),
+                        List.of(),
+                        null,
+                        null),
+                new ComposedFeedback.Page(
+                        "Keep failure context",
+                        "Failures lose their context across these changes.",
+                        "Check that the context reaches the caller."));
+        var drafts = FeedbackDraftBuilder.build(
+                job,
+                new PrepareFeedbackRequestDTO(
+                        reviewId,
+                        job.getId(),
+                        0,
+                        List.of(named.getId(), grouped.getId(), carded.getId()),
+                        List.of(conversation, withheld, card),
+                        false,
+                        null),
+                admitted,
+                List.of(),
+                Map.of());
+        for (var draft : drafts) store.prepareAll(workspace.getId(), reviewId, List.of(draft));
+        // The server withholds the card after it was composed to be delivered; its room stays used.
+        var cardId = drafts.getLast().id();
+        store.withhold(feedback.findById(cardId).orElseThrow(), FeedbackStopReason.RESULT_MARKED_INCORRECT);
+        assertThat(feedback.findById(cardId).orElseThrow().getState()).isEqualTo(FeedbackState.WITHHELD);
+        var everything = List.of(named.getId(), grouped.getId(), carded.getId());
+
+        var progress = store.privateProgress(workspace.getId(), reviewId, developerId, everything);
+        assertThat(progress.decidedResultIds()).containsExactlyInAnyOrderElementsOf(everything);
+        assertThat(progress.practicePageDeliveries()).isEqualTo(1);
+        assertThat(progress.conversationDeliveries()).isEqualTo(1);
+
+        // An exact replay changes nothing; a changed piece under the same identity is refused.
+        store.prepareAll(workspace.getId(), reviewId, List.of(drafts.getFirst()));
+        var changed = drafts.getFirst();
+        assertThatThrownBy(() -> store.prepareAll(
+                        workspace.getId(),
+                        reviewId,
+                        List.of(new FeedbackDraft(
+                                changed.id(),
+                                changed.workspaceId(),
+                                changed.reviewId(),
+                                changed.itemId(),
+                                changed.developerId(),
+                                changed.destination(),
+                                changed.state(),
+                                changed.stopReason(),
+                                "Different words for the same piece.",
+                                changed.basis(),
+                                changed.copies(),
+                                changed.checks(),
+                                changed.composition(),
+                                changed.page()))))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(store.privateProgress(workspace.getId(), reviewId, developerId, everything))
+                .isEqualTo(progress);
+
+        // Only the admitted results asked about count, and only for this review's developer.
+        var withoutCard = store.privateProgress(
+                workspace.getId(), reviewId, developerId, List.of(named.getId(), grouped.getId()));
+        assertThat(withoutCard.decidedResultIds()).containsExactlyInAnyOrder(named.getId(), grouped.getId());
+        assertThat(withoutCard.practicePageDeliveries()).isZero();
+        assertThat(withoutCard.conversationDeliveries()).isEqualTo(1);
+        assertThat(store.privateProgress(workspace.getId(), reviewId, developerId + 1, everything))
+                .isEqualTo(PrivateFeedbackProgress.NONE);
+        assertThat(store.privateProgress(workspace.getId(), UUID.randomUUID(), developerId, everything))
+                .isEqualTo(PrivateFeedbackProgress.NONE);
+    }
+
+    private AdmittedResultSnapshot snapshot(Result result) {
+        var candidate = mock(ResultCandidate.class);
+        when(candidate.developerId()).thenReturn(developerId);
+        when(candidate.practiceId()).thenReturn(result.getPracticeId());
+        return new AdmittedResultSnapshot(result.getId(), candidate, List.of());
+    }
+
+    private static List<FeedbackCompositionTrace.Support> support(Result... results) {
+        return Arrays.stream(results)
+                .map(result -> new FeedbackCompositionTrace.Support(result.getId(), null))
+                .toList();
     }
 
     private FeedbackDraft conversation(long developer) {

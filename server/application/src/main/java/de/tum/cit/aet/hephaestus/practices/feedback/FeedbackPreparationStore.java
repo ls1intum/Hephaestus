@@ -23,13 +23,18 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedPackage;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackProgress;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,6 +99,23 @@ public class FeedbackPreparationStore {
                 pieces.stream()
                         .map(piece -> new PreparedFeedback(piece.feedbackId(), piece.packageDigest(), preparedAt))
                         .toList());
+    }
+
+    /** What this review's prepared private pieces decide on the admitted results, and the room they were composed to use. */
+    @Transactional(readOnly = true)
+    public PrivateFeedbackProgress privateProgress(
+            long workspaceId, UUID reviewId, long developerId, Collection<UUID> admittedResultIds) {
+        if (admittedResultIds.isEmpty()) return PrivateFeedbackProgress.NONE;
+        var decided = new HashSet<UUID>();
+        var delivering = new HashMap<UUID, FeedbackDestination>();
+        for (var row : basis.findPrivateDecisions(workspaceId, reviewId, developerId, admittedResultIds)) {
+            decided.add(row.getResultId());
+            if (row.getDelivering()) delivering.put(row.getFeedbackId(), row.getDestination());
+        }
+        return new PrivateFeedbackProgress(
+                decided,
+                Collections.frequency(delivering.values(), FeedbackDestination.PRACTICE_PAGE),
+                Collections.frequency(delivering.values(), FeedbackDestination.CONVERSATION));
     }
 
     private Instant preparationReceipt(Review review, String packageDigest, Instant acceptedAt) {

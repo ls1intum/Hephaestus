@@ -107,7 +107,7 @@ class AdmissionResponseDTOTest {
                 true,
                 true);
         var response = new AdmissionResponseDTO(
-                3,
+                AdmissionResponseDTO.CONTRACT_VERSION,
                 UUID.fromString("10000000-0000-4000-8000-000000000001"),
                 UUID.fromString("20000000-0000-4000-8000-000000000001"),
                 0,
@@ -118,7 +118,7 @@ class AdmissionResponseDTOTest {
                 FeedbackCompositionService.conversation(read),
                 FeedbackCompositionService.privateHistory(read),
                 false,
-                false);
+                new PrivateProgressDTO(List.of(), 0, 0));
         try (var fixture = Objects.requireNonNull(getClass().getResourceAsStream("/agent/admission-response.json"))) {
             assertThat(mapper.readTree(mapper.writeValueAsString(response))).isEqualTo(mapper.readTree(fixture));
         }

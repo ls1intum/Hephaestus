@@ -63,6 +63,37 @@ void test("admission accepts the unchanged raw response", () => {
 	assert.doesNotThrow(() => parseAdmission(response));
 });
 
+void test("admission refuses the version 3 answer and an answer without private progress", () => {
+	const { privateProgress: _progress, ...withoutProgress } = response;
+	assert.throws(() =>
+		parseAdmission({ ...withoutProgress, contractVersion: 3, privatePrepared: false }),
+	);
+	assert.throws(() => parseAdmission({ ...withoutProgress, privatePrepared: false }));
+});
+
+void test("earlier private progress decides only the practices of results this admission holds", () => {
+	const admission = parseAdmission(response);
+	const result = admission.results[0];
+	assert.ok(result);
+	assert.deepEqual(admission.privateProgress, {
+		decidedPractices: [],
+		deliveries: { PRACTICE_PAGE: 0, CONVERSATION: 0 },
+	});
+	const progressed = parseAdmission({
+		...response,
+		privateProgress: {
+			// The second id belongs to no admitted result: it decides nothing here.
+			decidedResultIds: [result.resultId, "00000000-0000-4000-8000-00000000abcd"],
+			practicePageDeliveries: 1,
+			conversationDeliveries: 0,
+		},
+	});
+	assert.deepEqual(progressed.privateProgress, {
+		decidedPractices: [result.practiceSlug],
+		deliveries: { PRACTICE_PAGE: 1, CONVERSATION: 0 },
+	});
+});
+
 void test("admission retries an interrupted answer with the exact frozen request", async () => {
 	const request = { results: ["frozen measurement"] };
 	const sent: string[] = [];
@@ -95,11 +126,20 @@ void test("an explicit admission refusal is terminal", async () => {
 });
 
 for (const [field, value, path] of [
-	["contractVersion", 2, ["contractVersion"]],
+	["contractVersion", 3, ["contractVersion"]],
 	["admissionDigest", "not a digest", ["admissionDigest"]],
 	["withheld", [{ practiceSlug: "names-things" }], ["withheld", 0, "reason"]],
 	["publicReviewed", "false", ["publicReviewed"]],
-	["privatePrepared", "false", ["privatePrepared"]],
+	[
+		"privateProgress",
+		{ decidedResultIds: ["result-1"], practicePageDeliveries: 0, conversationDeliveries: 0 },
+		["privateProgress", "decidedResultIds", 0],
+	],
+	[
+		"privateProgress",
+		{ decidedResultIds: [], practicePageDeliveries: -1, conversationDeliveries: 0 },
+		["privateProgress", "practicePageDeliveries"],
+	],
 ] as const) {
 	void test(`admission rejects malformed ${field} at its issue path`, () => {
 		assert.throws(

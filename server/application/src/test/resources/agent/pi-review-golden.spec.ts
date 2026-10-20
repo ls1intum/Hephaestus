@@ -266,10 +266,14 @@ if (scenario !== undefined && scenario !== "") {
 			capture("admission.json", JSON.stringify(posted));
 		}
 		return Response.json({
-			contractVersion: 3,
+			contractVersion: 4,
 			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
-			privatePrepared: false,
+			privateProgress: {
+				decidedResultIds: [],
+				practicePageDeliveries: 0,
+				conversationDeliveries: 0,
+			},
 			admitted: [],
 			withheld: [],
 			practicePageSupport: null,

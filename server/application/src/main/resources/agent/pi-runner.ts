@@ -3701,7 +3701,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		process.exit(compositionExit());
 
 		// Recovery performs no new admission. Like the measured attempt, it composes the review on the work unless that
-		// review is accepted, then private feedback unless a private piece is prepared, from the server's current reread.
+		// review is accepted, then private feedback for the practices no prepared piece decides, from the server's
+		// current reread.
 		async function continueAdmittedReview(): Promise<void> {
 			measuring = false;
 			measurementClosed = true;
@@ -3717,22 +3718,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				PRIVATE_DESTINATIONS.some(
 					(destination) => compositionRequest.destinations[destination] !== undefined,
 				);
-			const publicWork = admission.publicReviewed
-				? "no review on the work"
-				: "the review on the work";
-			const privateWork =
-				privateRequested && !admission.privatePrepared ? "private feedback" : "no private feedback";
-			console.error(
-				`[pi-runner] Continuing an admitted review: ${admission.results.length} result(s), ` +
-					`${unreachedSlugs.length} practice(s) not reached; composing ${publicWork} and ${privateWork}`,
-			);
-			if (privateRequested && admission.privatePrepared) {
-				// An accepted private piece closes private composition: no practice is routed to it again.
-				if (undecidedPrivatePractices(admission, composedFeedback, null).length > 0) {
-					recordCompositionFailure(composedFeedback, "PRIVATE_FEEDBACK", "PRIVATE_NOT_RECOVERED");
-				}
-				routedDestinations = new Map();
-			} else if (privateRequested) {
+			if (privateRequested) {
 				// Routing comes from the server's reread for this attempt, not from the earlier attempt.
 				routedDestinations = closeUnroutedPrivateDestinations(
 					compositionRequest,
@@ -3740,6 +3726,21 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					composedFeedback,
 				);
 			}
+			const publicWork = admission.publicReviewed
+				? "no review on the work"
+				: "the review on the work";
+			const pendingPrivatePractices = privateRequested
+				? undecidedPrivatePractices(admission, composedFeedback, routedDestinations)
+				: [];
+			const privateWork =
+				pendingPrivatePractices.length > 0
+					? `private feedback for ${pendingPrivatePractices.join(", ")}`
+					: "no private feedback";
+			console.error(
+				`[pi-runner] Continuing an admitted review: ${admission.results.length} result(s), ` +
+					`${unreachedSlugs.length} practice(s) not reached, ` +
+					`${admission.privateProgress.decidedPractices.length} decided privately earlier; composing ${publicWork} and ${privateWork}`,
+			);
 			persistComposedFeedback();
 			if (compositionRequest !== null) {
 				await composeAdmittedFeedback({
