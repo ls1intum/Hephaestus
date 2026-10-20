@@ -28,7 +28,7 @@ it("says Heph is busy with other questions only once a queued turn has waited a 
 	act(() => {
 		vi.advanceTimersByTime(1);
 	});
-	expect(result.current).toBe("Heph is answering other questions first…");
+	expect(result.current).toBe("Waiting for Heph to start…");
 
 	rerender({
 		status: "RUNNING",

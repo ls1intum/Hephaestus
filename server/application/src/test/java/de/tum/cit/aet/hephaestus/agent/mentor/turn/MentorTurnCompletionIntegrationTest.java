@@ -61,6 +61,9 @@ class MentorTurnCompletionIntegrationTest extends AbstractWorkspaceIntegrationTe
     private MentorTurnCompletion completion;
 
     @Autowired
+    private MentorAttemptUsageService attemptUsage;
+
+    @Autowired
     private MeterRegistry metrics;
 
     @Autowired
@@ -275,18 +278,24 @@ class MentorTurnCompletionIntegrationTest extends AbstractWorkspaceIntegrationTe
                 new MentorTurnService.Question(
                         MentorTurn.Surface.APP, "Question", UUID.randomUUID().toString(), null, null));
         MentorTurn turn = turns.claimNext(WORKER, lease).orElseThrow();
-        turns.admit(
-                turn.getId(),
-                turn.getAttempt(),
-                WORKER,
-                MentorTurnAdmission.of(ADMITTED, Objects.requireNonNull(ADMITTED.priceSnapshot()))
-                        .toJson());
+        admit(turn);
         return turn;
     }
 
+    /** Admits the attempt as the worker does, which also creates its usage measurement. */
+    private void admit(MentorTurn turn) {
+        assertThat(attemptUsage.admit(
+                        turn.getId(),
+                        turn.getAttempt(),
+                        WORKER,
+                        MentorTurnAdmission.of(ADMITTED, Objects.requireNonNull(ADMITTED.priceSnapshot()))))
+                .isTrue();
+    }
+
+    /** One proxied call, settled on its attempt as the proxy's accumulator settles it. */
     private void proxyCall(MentorTurn turn, long input) {
-        transactionTemplate.executeWithoutResult(tx -> turnRepository.accumulateUsage(
-                turn.getId(), turn.getAttempt(), new MentorTurnUsage(input, 10, 0, 0, 0, 1)));
+        transactionTemplate.executeWithoutResult(tx ->
+                attemptUsage.settleCall(turn.getId(), turn.getAttempt(), new MentorTurnUsage(input, 10, 0, 0, 0, 1)));
     }
 
     /** One row of the usage ledger, as billed. */
@@ -314,12 +323,7 @@ class MentorTurnCompletionIntegrationTest extends AbstractWorkspaceIntegrationTe
                         .orElseThrow()));
         ConversationReceipts.awaitSettled(jdbc);
         MentorTurn second = turns.claimNext(WORKER, Duration.ofMinutes(5)).orElseThrow();
-        turns.admit(
-                second.getId(),
-                second.getAttempt(),
-                WORKER,
-                MentorTurnAdmission.of(ADMITTED, Objects.requireNonNull(ADMITTED.priceSnapshot()))
-                        .toJson());
+        admit(second);
         proxyCall(second, 70_000);
         end(second, MentorTurn.Status.DONE, List.of());
 
@@ -394,12 +398,7 @@ class MentorTurnCompletionIntegrationTest extends AbstractWorkspaceIntegrationTe
         assertThat(requeued.getStatus()).isEqualTo(MentorTurn.Status.QUEUED);
         assertThat(requeued.getInputTokens()).isZero();
         MentorTurn second = turns.claimNext(WORKER, Duration.ofSeconds(-1)).orElseThrow();
-        turns.admit(
-                second.getId(),
-                second.getAttempt(),
-                WORKER,
-                MentorTurnAdmission.of(ADMITTED, Objects.requireNonNull(ADMITTED.priceSnapshot()))
-                        .toJson());
+        admit(second);
         proxyCall(second, 70_000);
 
         reaper.reap();

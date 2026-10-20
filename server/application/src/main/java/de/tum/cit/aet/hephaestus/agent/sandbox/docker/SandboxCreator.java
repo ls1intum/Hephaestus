@@ -84,7 +84,8 @@ public class SandboxCreator {
             }
             reportUnidentified("no running container has id " + host);
         } catch (RuntimeException e) {
-            reportUnidentified("inspecting " + host + " failed: " + e.getMessage());
+            reportUnidentified(
+                    "inspecting " + host + " failed: errorType=" + e.getClass().getName());
         }
         return Map.of();
     }
@@ -121,7 +122,10 @@ public class SandboxCreator {
                                     : Liveness.GONE)
                     .orElse(Liveness.GONE);
         } catch (RuntimeException e) {
-            log.debug("Could not inspect sandbox creator {}: {}", id, e.getMessage());
+            log.debug(
+                    "Could not inspect sandbox creator {}: errorType={}",
+                    id,
+                    e.getClass().getName());
             return Liveness.UNREADABLE;
         }
     }

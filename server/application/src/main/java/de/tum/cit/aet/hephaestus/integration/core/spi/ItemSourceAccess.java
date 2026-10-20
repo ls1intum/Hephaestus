@@ -7,5 +7,14 @@ import java.util.Set;
 public interface ItemSourceAccess {
     Set<ItemKind> kinds();
 
+    /** The check for {@link SourceReadAudience#PROCESSING}: every read by or for AI. */
     boolean permits(ItemRef item, SourceUsePurpose purpose);
+
+    /**
+     * The check for one audience. An adapter that has not decided what a human recorded standing may read refuses it,
+     * so a new source never widens that read by omission.
+     */
+    default boolean permits(ItemRef item, SourceUsePurpose purpose, SourceReadAudience audience) {
+        return audience == SourceReadAudience.PROCESSING && permits(item, purpose);
+    }
 }

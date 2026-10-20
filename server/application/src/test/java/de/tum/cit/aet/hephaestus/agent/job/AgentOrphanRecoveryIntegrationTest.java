@@ -39,7 +39,6 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
@@ -158,7 +157,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private ReviewJobZombieSweeper sweeper;
 
     @Autowired
-    private LlmUsageRecorder usageRecorder;
+    private ReviewAttemptUsageService attemptUsage;
 
     @Autowired
     private MeterRegistry meterRegistry;
@@ -295,7 +294,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 jobRepository,
                 properties,
                 objectMapper,
-                usageRecorder,
+                attemptUsage,
                 Optional.of(continuation),
                 Optional.of(new PracticeScriptRunRecorder(
                         scriptReports, scriptRuns, meterRegistry, objectMapper, assignments)));
@@ -304,7 +303,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 workerRegistryRepository,
                 objectMapper,
                 transactionTemplate,
-                usageRecorder,
+                attemptUsage,
                 meterRegistry,
                 new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
                 recovery);
@@ -1514,7 +1513,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 objectMapper,
                 meterRegistry,
                 new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
-                usageRecorder,
+                attemptUsage,
                 new PracticeScriptRunRecorder(scriptReports, scriptRuns, meterRegistry, objectMapper, assignments),
                 null,
                 Optional.empty(),

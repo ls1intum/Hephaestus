@@ -162,7 +162,7 @@ public class GitHubProjectItemFieldValueSyncService {
                                         itemId,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {

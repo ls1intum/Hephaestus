@@ -66,7 +66,11 @@ public class ContributorService {
             collectContributorsForRepository("hephaestus-build", "Hephaestus", uniqueContributors);
             return sortContributors(uniqueContributors);
         } catch (WebClientResponseException e) {
-            log.error("HTTP error fetching global contributors: {} - {}", e.getStatusCode(), e.getMessage(), e);
+            log.error(
+                    "HTTP error fetching global contributors: status={}, errorType={}",
+                    e.getStatusCode().value(),
+                    e.getClass().getName(),
+                    e);
             return new ArrayList<>();
         }
     }
@@ -93,11 +97,11 @@ public class ContributorService {
             }
         } catch (WebClientResponseException e) {
             log.warn(
-                    "HTTP error fetching contributors for repository {}/{}: {} - {}",
+                    "HTTP error fetching contributors for repository {}/{}: status={}, errorType={}",
                     owner,
                     repo,
-                    e.getStatusCode(),
-                    e.getMessage(),
+                    e.getStatusCode().value(),
+                    e.getClass().getName(),
                     e);
         }
     }
@@ -137,7 +141,11 @@ public class ContributorService {
                     .block();
             return user != null ? user.name() : null;
         } catch (WebClientResponseException e) {
-            log.debug("HTTP error fetching full name for user {}: {} - {}", login, e.getStatusCode(), e.getMessage());
+            log.debug(
+                    "HTTP error fetching full name for user {}: status={}, errorType={}",
+                    login,
+                    e.getStatusCode().value(),
+                    e.getClass().getName());
             return null;
         }
     }

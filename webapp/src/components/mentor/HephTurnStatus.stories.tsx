@@ -138,15 +138,15 @@ export const SlackTurnRunning: Story = {
 };
 
 /**
- * Waiting to start because Heph is busy with other questions. The line says so after a second, so a
- * turn that starts at once never shows it.
+ * Waiting to start. The line says only that it waits, true whether other questions are ahead or no
+ * worker is running, and only after a second, so a turn that starts at once never shows it.
  */
 export const WaitingToStart: Story = {
 	args: { turn: { createdAt: minutesBefore(1), status: "QUEUED", surface: "APP" } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Thinking…")).toBeVisible();
 		await expect(
-			await canvas.findByText("Heph is answering other questions first…", {}, { timeout: 3000 }),
+			await canvas.findByText("Waiting for Heph to start…", {}, { timeout: 3000 }),
 		).toBeVisible();
 	},
 };

@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -13,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
@@ -48,13 +52,17 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
     private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
     private final JsonMapper mapper = new JsonMapper();
     private final MentorTurnRepository turns = mock(MentorTurnRepository.class);
-    private final ProxyRoutingService routing = new ProxyRoutingService(jobs, turns, mapper);
+    private final ReviewAttemptUsageService attemptUsage = mock(ReviewAttemptUsageService.class);
+    private final ProxyRoutingService routing = new ProxyRoutingService(jobs, turns, mapper, attemptUsage);
     private final ReviewJob job = new ReviewJob();
     private final Instant workDeadline = Instant.now().plusSeconds(30);
     private ProxyIdentity identity;
 
     @BeforeEach
     void setup() {
+        lenient()
+                .when(attemptUsage.registerCall(any(), anyLong(), anyInt(), any(), any(), any()))
+                .thenReturn(true);
         job.setId(UUID.randomUUID());
         RuntimeJobTestData.initialize(job, 7L);
         job.setStatus(ReviewJobStatus.RUNNING);
@@ -123,6 +131,16 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void refusesAReviewCallItsAttemptCannotRegister() {
+        when(attemptUsage.registerCall(any(), anyLong(), anyInt(), any(), any(), any()))
+                .thenReturn(false);
+        assertThatThrownBy(() -> routing.resolve(identity, request("/internal/llm/responses")))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        failure -> assertThat(failure.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
+    }
+
+    @Test
     void missingSlotIsA404AndDoesNotQueryUsage() {
         assertThatThrownBy(() -> routing.resolve(identity, request("/internal/llm/practice-script/reranking/rerank")))
                 .isInstanceOfSatisfying(
@@ -139,7 +157,7 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
                 .isInstanceOfSatisfying(
                         ResponseStatusException.class,
                         failure -> assertThat(failure.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
-        verifyNoInteractions(jobs, turns);
+        verifyNoInteractions(jobs, turns, attemptUsage);
     }
 
     @Test
@@ -158,7 +176,7 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
         assertThat(route.attempt().number()).isEqualTo(3);
         assertThat(route.attempt().workerId()).isEqualTo("worker");
         assertThat(route.attempt().spentUsd()).isEqualByComparingTo("2");
-        verifyNoInteractions(jobs);
+        verifyNoInteractions(jobs, attemptUsage);
     }
 
     @Test

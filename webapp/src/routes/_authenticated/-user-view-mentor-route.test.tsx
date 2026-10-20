@@ -72,6 +72,15 @@ it("opens the viewed member's conversation read-only, without a live stream", as
 	expect(FakeEventSource.instances).toHaveLength(0);
 });
 
+it("says that a viewed member with no conversation has no messages, rather than show an empty log", async () => {
+	server.use(...new MentorFake("engineering").handlers());
+
+	renderRouteAt("/w/engineering/mentor", queryClient);
+	await screen.findByText("No messages yet", {}, ROUTE_RENDER_WAIT);
+	// The greeting invites the reader to ask, which a view cannot.
+	expect(screen.queryByRole("textbox")).toBeNull();
+});
+
 const stepUpRequired = () =>
 	HttpResponse.json({ status: 403, code: "step_up_required", maxAgeSeconds: 300 }, { status: 403 });
 

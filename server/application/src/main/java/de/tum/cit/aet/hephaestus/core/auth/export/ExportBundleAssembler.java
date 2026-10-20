@@ -13,6 +13,8 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.auth.spi.NotificationPreferencesExportQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationQuery;
+import de.tum.cit.aet.hephaestus.core.auth.webauthn.PasskeyCredentialRepository;
+import de.tum.cit.aet.hephaestus.core.auth.webauthn.PasskeyJson;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
@@ -32,6 +34,8 @@ public class ExportBundleAssembler {
     /** Auth-event export window. */
     private static final int AUTH_EVENT_WINDOW_MONTHS = 12;
 
+    private final PasskeyCredentialRepository passkeys;
+    private final PasskeyJson passkeyJson;
     private final AccountService accountService;
     private final AccountFeatureRepository accountFeatureRepository;
     private final AuthEventRepository authEventRepository;
@@ -53,7 +57,11 @@ public class ExportBundleAssembler {
             Clock clock,
             AccountAiChoiceExport aiChoiceExport,
             NotificationPreferencesExportQuery notificationPreferences,
-            ResearchParticipationQuery researchParticipation) {
+            ResearchParticipationQuery researchParticipation,
+            PasskeyCredentialRepository passkeys,
+            PasskeyJson passkeyJson) {
+        this.passkeys = passkeys;
+        this.passkeyJson = passkeyJson;
         this.accountService = accountService;
         this.accountFeatureRepository = accountFeatureRepository;
         this.authEventRepository = authEventRepository;
@@ -81,7 +89,8 @@ public class ExportBundleAssembler {
                 // appRole deliberately not disclosed here — see ExportBundle.Profile (Art.
                 // 20(1) scope).
                 account.getStatus().name(),
-                Objects.requireNonNull(account.getCreatedAt()));
+                Objects.requireNonNull(account.getCreatedAt()),
+                account.isPasskeyProtectionEnabled());
 
         List<ExportBundle.Identity> identityViews = identities.stream()
                 .map(identity -> toIdentity(identity, profiles.get(key(identity))))
@@ -126,7 +135,14 @@ public class ExportBundleAssembler {
                 preferences,
                 authEvents,
                 aiChoiceExport.choice(accountId),
-                notificationPreferences.preferences(accountId));
+                notificationPreferences.preferences(accountId),
+                passkeys.findByAccountId(accountId).stream()
+                        .map(p -> {
+                            var credential = passkeyJson.readCredential(p.getRecordJson());
+                            return new ExportBundle.Passkey(
+                                    credential.getLabel(), credential.getCreated(), credential.getLastUsed());
+                        })
+                        .toList());
     }
 
     private static GitProviderRegistry.IdentityKey key(Identity identity) {

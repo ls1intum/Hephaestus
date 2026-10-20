@@ -354,7 +354,7 @@ public class GitLabWebhookService {
                     "Webhook deregistration failed (best-effort): workspaceId={}, webhookId={}, error={}",
                     workspace.getId(),
                     config.gitlabWebhookId(),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
         }
 
         clearWebhookFields(workspace);
@@ -370,7 +370,7 @@ public class GitLabWebhookService {
                     "Webhook deregistration at deactivation was a no-op (best-effort): workspaceId={}, connectionId={}, reason={}",
                     workspaceId,
                     connectionId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
         }
     }
 

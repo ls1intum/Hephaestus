@@ -38,6 +38,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemService;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -57,10 +58,28 @@ import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.ReviewOn;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPublicationContext;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackStoreService;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackSendTransactions;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionTrace;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyInput;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
@@ -93,6 +112,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -192,6 +212,24 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
     @Autowired
     PracticeRepository practices;
 
+    @Autowired
+    FeedbackStoreService feedbackStore;
+
+    @Autowired
+    FeedbackPublicationContext publication;
+
+    @Autowired
+    FeedbackSendTransactions delivery;
+
+    @Autowired
+    FeedbackRepository feedbackRows;
+
+    @Autowired
+    FeedbackCopyRepository copyRows;
+
+    @Autowired
+    FeedbackSendRepository sends;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
@@ -206,6 +244,11 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
                                 "review",
                                 ModelKind.CHAT,
                                 new FrozenModel("instance:1", "OPENAI_COMPLETIONS", "test-model", null, Map.of()))));
+    }
+
+    @AfterEach
+    void restoreInstanceDeliveryBrake() {
+        jdbc.update("UPDATE instance_settings SET silent_mode_engaged=true WHERE id=1");
     }
 
     @ParameterizedTest
@@ -327,6 +370,188 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
 
         assertThat(resultRows.findById(historical).orElseThrow().getEndReason()).isEqualTo(ResultEndReason.OUTRANKED);
         assertThat(resultRows.findById(incumbent).orElseThrow().getEndedAt()).isNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldRefuseAPreparedOldCapturePieceAndFenceTheNewerOneAfterATitleOnlyEdit(IdentityProviderType type) {
+        jdbc.update("""
+            INSERT INTO instance_settings(id,silent_mode_engaged,version) VALUES(1,false,0)
+            ON CONFLICT(id) DO UPDATE SET silent_mode_engaged=false
+            """);
+        var prepared = prepare(type, false);
+        var item = prepared.item();
+        var pull = pulls.findById(Objects.requireNonNull(item.sourceId())).orElseThrow();
+        var author =
+                users.findById(Objects.requireNonNull(pull.getAuthor()).getId()).orElseThrow();
+        var practice = practices
+                .findByWorkspaceIdAndSlug(item.workspaceId(), "event-test")
+                .orElseThrow();
+        practice.setFeedbackMode(FeedbackMode.AUTOMATIC);
+        practices.saveAndFlush(practice);
+        var scenario = new ReviewIntegrationData.Scenario(
+                workspaces.findById(item.workspaceId()).orElseThrow(),
+                accounts.findById(account(author)).orElseThrow(),
+                practices
+                        .findByWorkspaceIdAndSlug(item.workspaceId(), "event-test")
+                        .orElseThrow(),
+                itemRows.findByIdAndWorkspaceId(item.itemId(), item.workspaceId())
+                        .orElseThrow());
+        long developer = Objects.requireNonNull(scenario.account().getId());
+        var old = admissions.pending(
+                scenario,
+                Instant.now().minusSeconds(120),
+                developer,
+                prepared.version().value());
+        // Captured at the old title too, but admitted only after the newer review.
+        var late = admissions.pending(
+                scenario,
+                Instant.now().minusSeconds(90),
+                developer,
+                prepared.version().value());
+        running(old);
+        var oldResult = admit(old);
+        assertThat(resultRows.findById(oldResult).orElseThrow().getEndedAt()).isNull();
+        var oldPiece = onWork(
+                old,
+                oldResult,
+                publication.issue(
+                        item.workspaceId(), item.itemId(), old.review().getId(), List.of(developer)));
+        var oldFeedback = feedbackRows.findById(oldPiece).orElseThrow();
+        assertThat(oldFeedback.getState())
+                .as("Prepared public piece: %s", oldFeedback.getStopReason())
+                .isEqualTo(FeedbackState.READY);
+        assertThat(sends.findById(oldPiece).orElseThrow().getState()).isEqualTo(FeedbackSendState.PENDING);
+
+        transactions.executeWithoutResult(ignored -> {
+            var changed = pulls.findById(pull.getId()).orElseThrow();
+            changed.setTitle("A retitled change");
+            pulls.saveAndFlush(changed);
+            publisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
+                    ScmEventPayload.PullRequestData.from(changed),
+                    Set.of("title"),
+                    new EventContext(
+                            UUID.randomUUID(),
+                            Instant.now(),
+                            item.workspaceId(),
+                            null,
+                            DataSource.WEBHOOK,
+                            "edited",
+                            UUID.randomUUID().toString(),
+                            type,
+                            author.getId())));
+        });
+        var canonical = source.pin(item, null).version();
+        assertThat(canonical.value()).isNotEqualTo(prepared.version().value());
+        assertThat(canonical.baseVersion()).isEqualTo(prepared.version().baseVersion());
+        assertThat(ScmVersion.reviewedHead(canonical)).isEqualTo(ScmVersion.reviewedHead(prepared.version()));
+        var newer = admissions.pending(scenario, Instant.now().minusSeconds(60), developer, canonical.value());
+        running(newer);
+        var newerResult = admit(newer);
+        assertThat(resultRows.findById(oldResult).orElseThrow().getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
+        running(late);
+        var lateRow = resultRows.findById(admit(late)).orElseThrow();
+        assertThat(lateRow.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(lateRow.getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
+        assertThat(resultRows.findById(newerResult).orElseThrow().getEndedAt()).isNull();
+
+        String oldOwner = "owner-" + oldPiece;
+        assertThat(delivery.claim(item.workspaceId(), oldPiece, oldOwner)).isNotNull();
+        assertThat(delivery.fence(
+                        item.workspaceId(),
+                        oldPiece,
+                        oldOwner,
+                        List.of(FeedbackIds.copy(oldPiece, FeedbackCopyKind.SUMMARY, 0)),
+                        List.of()))
+                .isFalse();
+        var refused = feedbackRows.findById(oldPiece).orElseThrow();
+        assertThat(refused.getState()).isEqualTo(FeedbackState.WITHHELD);
+        assertThat(refused.getStopReason()).isEqualTo(FeedbackStopReason.REVIEWED_VERSION_CHANGED);
+        assertThat(copyRows.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(item.workspaceId(), oldPiece))
+                .isNotEmpty()
+                .allSatisfy(copy -> {
+                    assertThat(copy.getState()).isNotEqualTo(FeedbackCopyState.WRITE_STARTED);
+                    assertThat(copy.getWriteStartedAt()).isNull();
+                });
+
+        // The newer composer reads history only after the old piece was refused.
+        var newerPiece = onWork(
+                newer,
+                newerResult,
+                publication.issue(
+                        item.workspaceId(), item.itemId(), newer.review().getId(), List.of(developer)));
+        assertThat(feedbackRows.findById(newerPiece).orElseThrow().getState()).isEqualTo(FeedbackState.READY);
+        String newerOwner = "owner-" + newerPiece;
+        var summary = FeedbackIds.copy(newerPiece, FeedbackCopyKind.SUMMARY, 0);
+        assertThat(delivery.claim(item.workspaceId(), newerPiece, newerOwner)).isNotNull();
+        assertThat(delivery.fence(item.workspaceId(), newerPiece, newerOwner, List.of(summary), List.of()))
+                .isTrue();
+        assertThat(copyRows.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(item.workspaceId(), newerPiece))
+                .singleElement()
+                .satisfies(copy -> {
+                    assertThat(copy.getId()).isEqualTo(summary);
+                    assertThat(copy.getState()).isEqualTo(FeedbackCopyState.WRITE_STARTED);
+                });
+    }
+
+    private UUID admit(ReviewAdmissionData.Pending pending) {
+        return resultStore
+                .admit(
+                        pending.review().getWorkspaceId(),
+                        pending.review().getId(),
+                        pending.jobId(),
+                        1,
+                        List.of(admissions.candidate(pending, ResultOutcome.NOT_MET)))
+                .resultIds()
+                .getFirst();
+    }
+
+    /** One public summary prepared through the real store, retaining the publication context its composer read. */
+    private UUID onWork(ReviewAdmissionData.Pending pending, UUID resultId, String context) {
+        long workspaceId = pending.review().getWorkspaceId();
+        UUID reviewId = pending.review().getId();
+        long developer = Objects.requireNonNull(pending.developerId());
+        UUID id = FeedbackIds.onWork(workspaceId, reviewId, developer);
+        UUID copy = FeedbackIds.copy(id, FeedbackCopyKind.SUMMARY, 0);
+        feedbackStore.prepareAll(
+                workspaceId,
+                reviewId,
+                List.of(new FeedbackDraft(
+                        id,
+                        workspaceId,
+                        reviewId,
+                        pending.review().getItemId(),
+                        developer,
+                        FeedbackDestination.ON_WORK,
+                        FeedbackState.READY,
+                        null,
+                        "Check the changed branch.",
+                        List.of(new FeedbackBasisInput(resultId, null, 0)),
+                        List.of(new FeedbackCopyInput(
+                                copy,
+                                FeedbackCopyKind.SUMMARY,
+                                0,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                copy.toString(),
+                                FeedbackIds.writeMarker(copy))),
+                        Map.of(),
+                        new FeedbackCompositionTrace(
+                                List.of(new FeedbackCompositionTrace.CopySupport(
+                                        FeedbackCopyKind.SUMMARY,
+                                        0,
+                                        List.of(new FeedbackCompositionTrace.Support(resultId, null)))),
+                                List.of(),
+                                null,
+                                null,
+                                context),
+                        null)));
+        return id;
     }
 
     @ParameterizedTest

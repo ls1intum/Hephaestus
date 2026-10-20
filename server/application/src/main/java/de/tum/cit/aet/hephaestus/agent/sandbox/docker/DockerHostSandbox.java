@@ -24,6 +24,10 @@ public class DockerHostSandbox implements HostSandbox {
     private static final String CONTAINER_USER = "1000:1000";
     private static final String CONTAINER_HOSTNAME = "host";
 
+    private static final String UNIDENTIFIED_CONTAINER =
+            "This worker runs in a container that it cannot identify, so it cannot join the internal network of its"
+                    + " Heph host. Keep the worker container's default hostname.";
+
     private final SandboxNetworkManager networks;
     private final SandboxWorkspaceManager workspaces;
     private final SandboxContainerManager containers;
@@ -73,8 +77,9 @@ public class DockerHostSandbox implements HostSandbox {
         // host's internal network either; it starts no host rather than give the host that route.
         boolean outsideDocker = labels.isEmpty();
         if (outsideDocker && !creator.outsideContainer()) {
-            throw new IOException("This worker runs in a container that it cannot identify, so it cannot join the "
-                    + "internal network of its Heph host. Keep the worker container's default hostname.");
+            // Logged here, where the cause is known: callers log an exception's class only.
+            log.warn(UNIDENTIFIED_CONTAINER);
+            throw new IOException(UNIDENTIFIED_CONTAINER);
         }
         labels.put(SandboxLabels.OWNER, owner);
         labels.put(SandboxLabels.KIND, SandboxLabels.KIND_HEPH_HOST);
@@ -112,6 +117,11 @@ public class DockerHostSandbox implements HostSandbox {
                     extraHosts);
             var initialized = attempt.initialize(template, spec.limits().maxRuntime(), ignored -> {});
             if (!initialized.succeeded()) {
+                log.warn(
+                        "The workspace of host {} could not be initialized: exitCode={}, timedOut={}",
+                        id,
+                        initialized.exitCode(),
+                        initialized.timedOut());
                 throw new IOException("The workspace of host " + id + " could not be initialized (exit "
                         + initialized.exitCode() + (initialized.timedOut() ? ", timed out" : "") + ")");
             }
@@ -145,20 +155,22 @@ public class DockerHostSandbox implements HostSandbox {
     }
 
     /**
-     * Removes what the host runs on. The host writes its diagnostics to its output, so the end of that output goes to
-     * this worker's log first: why a host could not start, or what it reported before it was lost.
+     * Removes what the host runs on. The host's output is not read: anything in the host can write to it, Pi and Node
+     * included, so it can hold the conversation, a provider's answer or a credential. What the worker logs of a host
+     * is its id and the class of a failed removal step.
      */
     private void remove(UUID id, Resources resources) {
+        log.info("Removing host {}", id);
         String containerId = resources.containerId();
         if (containerId != null) {
-            String output = containers.getLogs(containerId, DockerSandboxAdapter.ERROR_ECHO_TAIL_LINES);
-            if (!output.isBlank()) {
-                log.warn("Output of host {} before its removal:\n{}", id, DockerSandboxAdapter.eventTail(output));
-            }
             try {
                 containers.forceRemove(containerId);
             } catch (RuntimeException e) {
-                log.warn("Could not remove the container of host {}: {}", id, e.getMessage());
+                // The class only, here and below: a Docker client exception can quote the daemon's response body.
+                log.warn(
+                        "Could not remove the container of host {}: {}",
+                        id,
+                        e.getClass().getSimpleName());
             }
         }
         SandboxAttemptLauncher.Attempt attempt = resources.attempt();
@@ -166,7 +178,10 @@ public class DockerHostSandbox implements HostSandbox {
             try {
                 attempt.close();
             } catch (IOException | RuntimeException e) {
-                log.warn("Could not remove the workspace of host {}: {}", id, e.getMessage());
+                log.warn(
+                        "Could not remove the workspace of host {}: {}",
+                        id,
+                        e.getClass().getSimpleName());
             }
         }
         String networkId = resources.networkId();
@@ -175,12 +190,18 @@ public class DockerHostSandbox implements HostSandbox {
                 networks.disconnectAppServer(networkId);
             } catch (RuntimeException e) {
                 // Not worth stopping for: the removal below reports what the daemon actually refuses.
-                log.debug("Could not disconnect from the network of host {}: {}", id, e.getMessage());
+                log.debug(
+                        "Could not disconnect from the network of host {}: {}",
+                        id,
+                        e.getClass().getSimpleName());
             }
             try {
                 networks.removeNetwork(networkId);
             } catch (RuntimeException e) {
-                log.warn("Could not remove the network of host {}: {}", id, e.getMessage());
+                log.warn(
+                        "Could not remove the network of host {}: {}",
+                        id,
+                        e.getClass().getSimpleName());
             }
         }
     }

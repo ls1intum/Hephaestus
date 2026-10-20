@@ -70,7 +70,10 @@ public class HephHostChannelConfiguration implements WebSocketConfigurer {
                     return true;
                 }
             } catch (RuntimeException refused) {
-                log.debug("Refused a Heph host command channel: {}", refused.getMessage());
+                // The class only: the message can quote the path or the credential the caller sent.
+                log.debug(
+                        "Refused a Heph host command channel: {}",
+                        refused.getClass().getSimpleName());
             }
             response.setStatusCode(HttpStatus.NOT_FOUND);
             return false;

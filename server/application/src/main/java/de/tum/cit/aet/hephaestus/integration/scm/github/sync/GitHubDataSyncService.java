@@ -1200,7 +1200,10 @@ public class GitHubDataSyncService {
                     Objects.requireNonNull(repository.getProvider().getId()),
                     repository);
         } catch (Exception e) {
-            log.warn("Commit author enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
+            log.warn(
+                    "Commit author enrichment failed: repoId={}, error={}",
+                    repository.getId(),
+                    e.getClass().getSimpleName());
             return -1;
         }
     }
@@ -1221,7 +1224,10 @@ public class GitHubDataSyncService {
             return commitMetadataEnrichmentService.enrichCommitMetadata(
                     repository.getId(), repository.getNameWithOwner(), syncTarget.scopeId());
         } catch (Exception e) {
-            log.warn("Commit metadata enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
+            log.warn(
+                    "Commit metadata enrichment failed: repoId={}, error={}",
+                    repository.getId(),
+                    e.getClass().getSimpleName());
             return -1;
         }
     }
@@ -1271,7 +1277,8 @@ public class GitHubDataSyncService {
                 String errorDetail;
                 if (e instanceof UnexpectedRollbackException) {
                     retryable = true;
-                    errorDetail = "Transaction rolled back (likely deadlock): " + e.getMessage();
+                    errorDetail = "Transaction rolled back (likely deadlock): "
+                            + e.getClass().getSimpleName();
                 } else {
                     ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                     retryable = classification.category() == Category.RETRYABLE;

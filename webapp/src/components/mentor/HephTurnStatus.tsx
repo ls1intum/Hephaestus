@@ -14,7 +14,7 @@ type ShownTurn = Pick<MentorTurn, "status" | "surface" | "partial">;
 /** What the status line says while a turn runs, or while it `waiting` to start. */
 function turnStatusLabel(turn: ShownTurn, waiting: boolean): string {
 	if (waiting) {
-		return "Heph is answering other questions first…";
+		return "Waiting for Heph to start…";
 	}
 	if (turn.surface === "SLACK") {
 		return "Answering in Slack…";
@@ -65,8 +65,9 @@ function formatWaited(seconds: number): string {
 }
 
 /**
- * The status line's words. A turn still queued after a second waits because Heph is busy with other
- * questions, and says so. Most turns start well within that second, so the line does not flicker.
+ * The status line's words. A turn still queued after a second says only that it waits: the app cannot
+ * tell whether other questions are ahead or no worker can start it. Most turns start well within
+ * that second, so the line does not flicker.
  */
 export function useTurnStatusLabel(turn: ShownTurn | undefined): string {
 	const waiting = useSpinDelay(turn?.status === "QUEUED", {

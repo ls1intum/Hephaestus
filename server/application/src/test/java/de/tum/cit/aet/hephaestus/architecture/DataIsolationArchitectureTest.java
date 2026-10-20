@@ -123,6 +123,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             "Identity", // Federated-login association; user-scoped
             "AccountFeature", // Per-account feature opt-ins
             "AuthEvent", // Append-only auth audit; references workspace optionally, not scoped by it
+            "PasskeyCredential", // Account-bound credential; spans workspaces
+            "PasskeyChallenge", // Account and browser-session challenge; spans workspaces
+            "PasskeyRecoveryCode", // Account recovery-code hash; spans workspaces
             "IssuedJwt", // JWT revocation list; account-scoped
             "ClientSession", // Installed-client session (refresh family); account-scoped like IssuedJwt
             "ClientSignInHandoff", // Single-use installed-client sign-in code; precedes any workspace choice
@@ -138,7 +141,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
     @Nested
     class EntityWorkspaceRelationshipTests {
 
-        /**
+        /*
          * Every entity that contains business data must be traceable to a workspace either
          * directly (workspace field) or through relationships (repository.organization.workspaceId).
          */

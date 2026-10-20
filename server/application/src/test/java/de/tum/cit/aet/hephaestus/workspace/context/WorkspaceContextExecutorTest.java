@@ -99,7 +99,8 @@ class WorkspaceContextExecutorTest {
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
         assertEquals("99", capturedWorkspaceId.get());
-        assertEquals("mdc-test", capturedSlug.get());
+        // The slug is chosen text; the opaque id is what log lines carry.
+        assertNull(capturedSlug.get());
     }
 
     @Test

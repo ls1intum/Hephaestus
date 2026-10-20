@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen } from "storybook/test";
+import { useState } from "react";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import { RemovableToken } from "@/components/common/RemovableToken";
+import { Button } from "@/components/ui/button";
 import { expectDismissed, expectSettledVisible } from "@/stories/overlay";
 
 import {
@@ -14,7 +16,7 @@ import {
 } from "./fixtures";
 import { HephComposer } from "./HephComposer";
 import { HephMessage } from "./HephMessage";
-import { HephPanel } from "./HephPanel";
+import { HephPanel, type HephPanelProps } from "./HephPanel";
 import { HephTimeline } from "./HephTimeline";
 
 /** Long enough to scroll in the panel, so the jump to the end has somewhere to go. */
@@ -28,6 +30,22 @@ const LONG_CONVERSATION = [
 	})),
 	...CONVERSATION,
 ];
+
+function threadTimeline() {
+	return (
+		<HephTimeline
+			label="Thread"
+			workspaceSlug={WORKSPACE_SLUG}
+			state={ready({ entries: [{ ...SLACK_ANSWER, parentEntryId: SLACK_QUESTION.id }] })}
+			developer={DEVELOPER}
+			onCopy={fn()}
+			lead={<HephMessage message={SLACK_QUESTION} developer={DEVELOPER} />}
+			composer={
+				<HephComposer label="Reply in thread" placeholder="Reply in thread" onSend={fn()} />
+			}
+		/>
+	);
+}
 
 const conversation = (
 	<HephTimeline
@@ -108,23 +126,53 @@ export const Open: Story = {
 	},
 };
 
+/** Opens a thread from inside the open panel, as a summary button in the conversation does. */
+function OpensThread(args: HephPanelProps) {
+	const [open, setOpen] = useState(false);
+	return (
+		<HephPanel
+			{...args}
+			thread={open ? { focusTitle: true, onBack: () => setOpen(false) } : undefined}
+		>
+			{open ? (
+				args.children
+			) : (
+				<Button variant="link" onClick={() => setOpen(true)}>
+					1 reply
+				</Button>
+			)}
+		</HephPanel>
+	);
+}
+
+/**
+ * On a tablet the panel stays one column of at most 28rem. A thread replaces the conversation in it
+ * rather than squeezing beside it, its title takes focus, and Back returns to the conversation.
+ */
+export const ThreadOnTablet: Story = {
+	args: { children: threadTimeline() },
+	parameters: { viewport: { defaultViewport: "tablet" } },
+	render: (args) => <OpensThread {...args} />,
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Open Heph, AI mentor" }));
+		await userEvent.click(await screen.findByRole("button", { name: "1 reply" }));
+		const panel = await screen.findByRole("dialog", { name: "Thread" });
+		await expectSettledVisible(panel);
+		await expect(panel.getBoundingClientRect().width).toBeLessThanOrEqual(28 * 16);
+		await waitFor(async () => {
+			await expect(within(panel).getByRole("heading", { name: "Thread" })).toHaveFocus();
+		});
+		await expect(within(panel).getByRole("textbox", { name: "Reply in thread" })).toBeVisible();
+		await userEvent.click(within(panel).getByRole("button", { name: "Back to the conversation" }));
+		await expect(await screen.findByRole("button", { name: "1 reply" })).toBeVisible();
+	},
+};
+
 /** A thread is pushed over the conversation; Back returns to it. */
 export const ThreadPushed: Story = {
 	args: {
 		thread: { onBack: fn(), focusTitle: false },
-		children: (
-			<HephTimeline
-				label="Thread"
-				workspaceSlug={WORKSPACE_SLUG}
-				state={ready({ entries: [{ ...SLACK_ANSWER, parentEntryId: SLACK_QUESTION.id }] })}
-				developer={DEVELOPER}
-				onCopy={fn()}
-				lead={<HephMessage message={SLACK_QUESTION} developer={DEVELOPER} />}
-				composer={
-					<HephComposer label="Reply in thread" placeholder="Reply in thread" onSend={fn()} />
-				}
-			/>
-		),
+		children: threadTimeline(),
 	},
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Open Heph, AI mentor" }));

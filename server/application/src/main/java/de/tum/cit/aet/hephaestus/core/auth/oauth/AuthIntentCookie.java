@@ -134,10 +134,14 @@ public class AuthIntentCookie {
                     }
                     return intent;
                 } catch (RuntimeException ex) {
-                    log.warn("auth.oauth: rejecting tampered/expired auth-intent cookie: {}", ex.getMessage());
+                    log.warn(
+                            "auth.oauth: rejecting tampered/expired auth-intent cookie: errorType={}",
+                            ex.getClass().getName());
                     return null;
                 } catch (Exception ex) {
-                    log.warn("auth.oauth: auth-intent cookie deserialize failed: {}", ex.getMessage());
+                    log.warn(
+                            "auth.oauth: auth-intent cookie deserialize failed: errorType={}",
+                            ex.getClass().getName());
                     return null;
                 }
             }

@@ -8,6 +8,7 @@ import {
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { usePasskeySettings } from "@/hooks/use-passkey-settings";
 
 import {
 	getAccountAiChoiceOptions,
@@ -50,6 +51,7 @@ import type {
 import { WORDING_VERSION } from "@/components/auth/consent-wording";
 import type { EmailPreferencesSectionProps } from "@/components/settings/EmailPreferencesSection";
 import type { LinkedAccountsSectionProps } from "@/components/settings/LinkedAccountsSection";
+import { PasskeySettings } from "@/components/settings/PasskeySettings";
 import type { PublicActivitySectionProps } from "@/components/settings/PublicActivitySection";
 import type { SessionsSectionProps } from "@/components/settings/SessionsSection";
 import { SettingsPage } from "@/components/settings/SettingsPage";
@@ -72,6 +74,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 });
 
 function RouteComponent() {
+	const passkeys = usePasskeySettings();
 	const queryClient = useQueryClient();
 	const { logout, linkAccount, isAppAdmin, linkedProviders } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
@@ -468,6 +471,7 @@ function RouteComponent() {
 
 	return (
 		<SettingsPage
+			passkeys={<PasskeySettings {...passkeys} />}
 			emailPreferencesProps={emailPreferencesProps}
 			weeklyDigestProps={{ state: weeklyDigestState }}
 			isLoading={isLoading}

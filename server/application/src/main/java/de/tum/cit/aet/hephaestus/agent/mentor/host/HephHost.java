@@ -80,11 +80,11 @@ public class HephHost {
             try {
                 launched = sandbox.launch(HephHostSpec.spec());
             } catch (IOException e) {
-                // The message names the cause, such as a worker container that cannot be identified.
-                log.warn("Could not start the Heph host: {}", e.getMessage());
+                // The class only: the sandbox logs a cause it knows, such as a worker container it cannot identify.
+                log.warn("Could not start the Heph host: {}", e.getClass().getSimpleName());
                 return false;
             } catch (RuntimeException e) {
-                log.warn("Could not start the Heph host: {}", e.getMessage(), e);
+                log.warn("Could not start the Heph host: {}", e.getClass().getSimpleName(), e);
                 return false;
             }
             boolean shutDown;
@@ -197,7 +197,7 @@ public class HephHost {
             try {
                 sender.sendMessage(new PingMessage());
             } catch (IOException | RuntimeException e) {
-                failure = "could not be pinged: " + e.getMessage();
+                failure = "could not be pinged: " + e.getClass().getSimpleName();
             }
         }
         if (failure == null) {
@@ -214,7 +214,9 @@ public class HephHost {
         try {
             open.close(CloseStatus.SESSION_NOT_RELIABLE);
         } catch (IOException | RuntimeException e) {
-            log.debug("Could not close the Heph host command channel: {}", e.getMessage());
+            log.debug(
+                    "Could not close the Heph host command channel: {}",
+                    e.getClass().getSimpleName());
         }
         // The close callback reports this too; whichever comes second finds the host gone already.
         disconnected(open);
@@ -251,7 +253,9 @@ public class HephHost {
             try {
                 open.close(CloseStatus.GOING_AWAY);
             } catch (IOException e) {
-                log.debug("Could not close the Heph host command channel: {}", e.getMessage());
+                log.debug(
+                        "Could not close the Heph host command channel: {}",
+                        e.getClass().getSimpleName());
             }
         }
         if (gone != null) {

@@ -70,6 +70,17 @@ See [Update an existing Slack app](https://docs.hephaestus.build/admin/productio
 
 **Configuration.**
 
+- With Slack enabled, the application server now answers Slack interactivity, the App Home and Heph buttons.
+  It commits a button's consent change before Slack gets its answer.
+  The webhook role does not answer `/webhooks/slack/interactivity`; it keeps `/webhooks/slack` for Events.
+  - Give `HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET` to `application-server` as well.
+    With Slack enabled and the secret blank, `application-server` does not start.
+    `docker/compose.app.yaml` passes it.
+  - Route the exact path `/webhooks/slack/interactivity` to `application-server`, without stripping it.
+    The route must outrank the `/webhooks` route of `webhook-server`.
+    `docker/compose.app.yaml` adds this route (`https-slack-interactivity`, priority 110).
+    A custom proxy needs the same route.
+    If the Slack app's **Interactivity request URL** names a separate webhook host, point it at a host that reaches `application-server` ([Slack app configuration](https://docs.hephaestus.build/admin/production-setup#slack-app-configuration)).
 - Remove the Traefik sticky-cookie labels (`__Secure-hep_workspace_aff`) from a custom proxy configuration.
   `docker/compose.app.yaml` does not have them.
   The `X-Hephaestus-Replica` response header is removed.

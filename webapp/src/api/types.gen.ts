@@ -3358,6 +3358,35 @@ export type ParticipationCounts = {
     responded: number;
 };
 
+export type PasskeyCredential = {
+    createdAt?: Date;
+    id: string;
+    label: string;
+    lastUsedAt?: Date;
+};
+
+export type PasskeyOptions = {
+    challengeId: string;
+    optionsJson: string;
+};
+
+export type PasskeyProtectionRequest = {
+    enabled: boolean;
+};
+
+export type PasskeyRecoveryCodes = {
+    codes: Array<string>;
+};
+
+export type PasskeyStatus = {
+    credentials: Array<PasskeyCredential>;
+    instanceAdminRequired: boolean;
+    protectionEnabled: boolean;
+    recoveryRequired: boolean;
+    verified: boolean;
+    workspaceAdminRequired: boolean;
+};
+
 export type PersonDataProvider = {
     id: number;
     serverUrl: string;
@@ -3446,6 +3475,10 @@ export type PracticeGroup = {
 };
 
 export type PracticeGroupStanding = {
+    /**
+     * The weakest basis among the practice verdicts the group standing averages. Absent without a verdict
+     */
+    basis: 'CURRENT_REVIEWS' | 'EARLIER_REVIEWS' | 'EARLIER_REVIEWS_CRITERIA_UNKNOWN' | null;
     direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE' | null;
     feedbackSince: Date | null;
     feedbackSpanDays: null | number;
@@ -3733,6 +3766,10 @@ export type PracticeScriptSummary = {
 };
 
 export type PracticeStanding = {
+    /**
+     * What a verdict was read from: current reviews, or only outcomes recorded by earlier reviews, which carry no current proof, also when the criteria they were assessed against are unknown. Absent without a verdict
+     */
+    basis: 'CURRENT_REVIEWS' | 'EARLIER_REVIEWS' | 'EARLIER_REVIEWS_CRITERIA_UNKNOWN' | null;
     direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE' | null;
     doesNotApplyOnly: boolean;
     groupName: string | null;
@@ -3800,17 +3837,56 @@ export type PracticeVisual = {
     svg: string;
 };
 
-export type PracticeWorkspaceOverview = {
-    developers: number;
-    practices: Array<PracticeWorkspaceTile>;
+/**
+ * How the workspace's developers with a current standing split across the practice groups, counted in developers and never naming one, and the open feedback beside the reader's own. Nothing here reads a window; the tiles that do are read on their own
+ */
+export type PracticesAcrossWorkspace = {
+    /**
+     * One row per practice group shown on the practice pages with a practice review is admitted for, in catalog order
+     */
+    groups: Array<WorkspaceGroupSplit>;
+    /**
+     * Whether a counted standing was read only from earlier reviews, which carry no current proof
+     */
+    includesEarlierReviews: boolean;
+    /**
+     * The reader's open feedback, counted by the rule the practice profile shows it open by, beside the middle half of the developers the page counts: both open now
+     */
+    openFeedback: WorkspaceTile;
 };
 
-export type PracticeWorkspaceTile = {
-    developers: number;
-    group: GroupRef | null;
-    outcomes: OutcomeVector;
-    practiceName: string;
-    practiceSlug: string;
+/**
+ * The reader's figures over one window beside the middle half of the developers with a standing in it
+ */
+export type PracticesAcrossWorkspaceTiles = {
+    /**
+     * Developers with a standing in a practice group shown in the window, the developers the tiles compare
+     */
+    developersWithAStandingInWindow: number;
+    /**
+     * Whether a counted standing in the window was read only from earlier reviews
+     */
+    includesEarlierReviews: boolean;
+    /**
+     * The reader's practices going well
+     */
+    practicesGoingWell: WorkspaceTile;
+    /**
+     * The reader's practices needing attention
+     */
+    practicesNeedingAttention: WorkspaceTile;
+    /**
+     * Pieces of the reader's work reviewed in the window
+     */
+    reviewedWork: WorkspaceTile;
+    /**
+     * The window the tiles read evidence over
+     */
+    window: 'ALL_TIME' | 'DAYS_30' | 'DAYS_90';
+    /**
+     * The practices the reader's profile lists, the denominator of the practice tiles
+     */
+    yourPractices: number;
 };
 
 export type PrepareFeedbackRequest = {
@@ -4231,6 +4307,10 @@ export type ReasonCount = {
     reason: string;
 };
 
+export type RecoverPasskeyRequest = {
+    code: string;
+};
+
 /**
  * Register an Outline collection for mirroring (lands ENABLED + PENDING)
  */
@@ -4239,6 +4319,12 @@ export type RegisterOutlineCollectionRequest = {
      * Outline collection id (UUID)
      */
     collectionId: string;
+};
+
+export type RegisterPasskeyRequest = {
+    challengeId: string;
+    credentialJson: string;
+    label: string;
 };
 
 /**
@@ -6269,6 +6355,10 @@ export type UpdateWorkspaceLlmModelRequest = {
     reasoningEffort?: 'NONE' | 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'XHIGH' | 'MAX';
 };
 
+export type UpdateWorkspacePasskeyPolicy = {
+    required: boolean;
+};
+
 export type UpdateWorkspacePublicActivityRequest = {
     allowSearchEngines: boolean;
     publicActivityEnabled: boolean;
@@ -6357,6 +6447,11 @@ export type UserViewAccount = {
 export type Value = {
     label?: string;
     value?: string;
+};
+
+export type VerifyPasskeyRequest = {
+    challengeId: string;
+    credentialJson: string;
 };
 
 /**
@@ -6629,6 +6724,44 @@ export type WorkspaceAiOption = {
     mentorReady: boolean;
     models: Array<WorkspaceAiModel>;
     practiceReviewsReady: boolean;
+};
+
+/**
+ * One practice group: how the developers with a standing split across it, and where the reader is
+ */
+export type WorkspaceGroupSplit = {
+    /**
+     * Group colour name
+     */
+    groupColor: string | null;
+    /**
+     * Group icon name
+     */
+    groupIcon: string | null;
+    /**
+     * Group name
+     */
+    groupName: string;
+    /**
+     * Group slug
+     */
+    groupSlug: string;
+    /**
+     * The group's practices review is admitted for, the same for every reader, each split on its own, in catalog order
+     */
+    practices: Array<WorkspacePracticeSplit>;
+    /**
+     * How the developers with a standing split across the group
+     */
+    split: WorkspaceSplit;
+    /**
+     * What the reader's group verdict was read from, as their practice profile says. Absent without one
+     */
+    yourBasis: 'CURRENT_REVIEWS' | 'EARLIER_REVIEWS' | 'EARLIER_REVIEWS_CRITERIA_UNKNOWN' | null;
+    /**
+     * The reader's current standing in the group, the one their practice profile shows: the part they are marked in. Absent unless the split counts the reader
+     */
+    yourStanding: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY' | null;
 };
 
 /**
@@ -6980,6 +7113,37 @@ export type WorkspaceOnboardingSettings = {
     revision: number;
 };
 
+export type WorkspacePasskeyPolicy = {
+    instanceRequired: boolean;
+    required: boolean;
+};
+
+/**
+ * One practice of a group: how the developers with a standing split, and where the reader is
+ */
+export type WorkspacePracticeSplit = {
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * How the developers with a standing split across the practice
+     */
+    split: WorkspaceSplit;
+    /**
+     * What the reader's verdict was read from, as their practice profile says. Absent without one
+     */
+    yourBasis: 'CURRENT_REVIEWS' | 'EARLIER_REVIEWS' | 'EARLIER_REVIEWS_CRITERIA_UNKNOWN' | null;
+    /**
+     * The reader's current standing in the practice, the one their practice profile shows: the part they are marked in. Absent unless the split counts the reader
+     */
+    yourStanding: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY' | null;
+};
+
 /**
  * Available workspace creation providers and their configuration
  */
@@ -6998,11 +7162,57 @@ export type WorkspaceProviders = {
     gitlab?: GitLabProvider;
 };
 
+/**
+ * The middle half of the developers counted: the 25th to the 75th percentile
+ */
+export type WorkspaceRange = {
+    /**
+     * The 75th percentile
+     */
+    high: number;
+    /**
+     * The 25th percentile
+     */
+    low: number;
+};
+
 export type WorkspaceReviewScope = {
     accountIds: Array<string>;
     people: 'ALL' | 'SELECTED';
     repositories: 'ALL' | 'SELECTED';
     selectedRepositories: Array<ReviewScopeRepository>;
+};
+
+/**
+ * How the developers with a standing split across one practice group or one practice, counted in developers: a part per verdict, none yet, and their total
+ */
+export type WorkspaceSplit = {
+    /**
+     * Every developer the split counts, the parts and none yet together, the reader included when counted
+     */
+    developers: number;
+    /**
+     * Developers with a standing in a group shown but none here
+     */
+    noneYet: number;
+    /**
+     * Developers at each verdict, Needs attention, Mixed feedback and Going well in that order
+     */
+    parts: Array<WorkspaceSplitPart>;
+};
+
+/**
+ * The developers at one verdict in a split
+ */
+export type WorkspaceSplitPart = {
+    /**
+     * Developers at the verdict, the reader included when counted
+     */
+    developers: number;
+    /**
+     * The verdict the part counts
+     */
+    standing: 'DEVELOPING' | 'MIXED' | 'STRENGTH';
 };
 
 /**
@@ -7045,6 +7255,20 @@ export type WorkspaceTeamSettings = {
     workspaceId: number;
 };
 
+/**
+ * One figure: the reader's own value, then the middle half of the developers counted
+ */
+export type WorkspaceTile = {
+    /**
+     * The workspace's middle half; absent while no developer is counted
+     */
+    middle: WorkspaceRange | null;
+    /**
+     * The reader's own value
+     */
+    yours: number;
+};
+
 export type WorsenedBasis = Omit<ClaimBasis, 'type'> & {
     base?: number;
     explanation?: string;
@@ -7078,7 +7302,7 @@ export type AdminListAuthEventsData = {
         size?: number;
         accountId?: number;
         actingAccountId?: number;
-        eventType?: Array<'USER_VIEW' | 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'PERSON_DATA_PREVIEWED' | 'PERSON_DATA_EXPORTED' | 'PERSON_DATA_ERASURE_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'WORKSPACE_ELEVATION' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED' | 'PUBLIC_ACTIVITY_CHANGED'>;
+        eventType?: Array<'USER_VIEW' | 'LOGIN' | 'PASSKEY_CHANGED' | 'PASSKEY_VERIFIED' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'PERSON_DATA_PREVIEWED' | 'PERSON_DATA_EXPORTED' | 'PERSON_DATA_ERASURE_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'WORKSPACE_ELEVATION' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED' | 'PUBLIC_ACTIVITY_CHANGED'>;
         result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
@@ -7101,7 +7325,7 @@ export type AdminExportAuthEventsData = {
     query?: {
         accountId?: number;
         actingAccountId?: number;
-        eventType?: Array<'USER_VIEW' | 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'PERSON_DATA_PREVIEWED' | 'PERSON_DATA_EXPORTED' | 'PERSON_DATA_ERASURE_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'WORKSPACE_ELEVATION' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED' | 'PUBLIC_ACTIVITY_CHANGED'>;
+        eventType?: Array<'USER_VIEW' | 'LOGIN' | 'PASSKEY_CHANGED' | 'PASSKEY_VERIFIED' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'PERSON_DATA_PREVIEWED' | 'PERSON_DATA_EXPORTED' | 'PERSON_DATA_ERASURE_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'WORKSPACE_ELEVATION' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED' | 'PUBLIC_ACTIVITY_CHANGED'>;
         result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
@@ -9280,6 +9504,142 @@ export type UpdateNotificationPreferencesResponses = {
 };
 
 export type UpdateNotificationPreferencesResponse = UpdateNotificationPreferencesResponses[keyof UpdateNotificationPreferencesResponses];
+
+export type GetPasskeyStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/passkeys';
+};
+
+export type GetPasskeyStatusResponses = {
+    /**
+     * OK
+     */
+    200: PasskeyStatus;
+};
+
+export type GetPasskeyStatusResponse = GetPasskeyStatusResponses[keyof GetPasskeyStatusResponses];
+
+export type RegisterPasskeyData = {
+    body: RegisterPasskeyRequest;
+    path?: never;
+    query?: never;
+    url: '/user/passkeys';
+};
+
+export type RegisterPasskeyResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type UpdatePasskeyProtectionData = {
+    body: PasskeyProtectionRequest;
+    path?: never;
+    query?: never;
+    url: '/user/passkeys/protection';
+};
+
+export type UpdatePasskeyProtectionResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type RecoverPasskeysData = {
+    body: RecoverPasskeyRequest;
+    path?: never;
+    query?: never;
+    url: '/user/passkeys/recovery';
+};
+
+export type RecoverPasskeysResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type CreatePasskeyRecoveryCodesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/passkeys/recovery-codes';
+};
+
+export type CreatePasskeyRecoveryCodesResponses = {
+    /**
+     * OK
+     */
+    200: PasskeyRecoveryCodes;
+};
+
+export type CreatePasskeyRecoveryCodesResponse = CreatePasskeyRecoveryCodesResponses[keyof CreatePasskeyRecoveryCodesResponses];
+
+export type GetPasskeyRegistrationOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/passkeys/registration-options';
+};
+
+export type GetPasskeyRegistrationOptionsResponses = {
+    /**
+     * OK
+     */
+    200: PasskeyOptions;
+};
+
+export type GetPasskeyRegistrationOptionsResponse = GetPasskeyRegistrationOptionsResponses[keyof GetPasskeyRegistrationOptionsResponses];
+
+export type VerifyPasskeyData = {
+    body: VerifyPasskeyRequest;
+    path?: never;
+    query?: never;
+    url: '/user/passkeys/verification';
+};
+
+export type VerifyPasskeyResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetPasskeyVerificationOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/passkeys/verification-options';
+};
+
+export type GetPasskeyVerificationOptionsResponses = {
+    /**
+     * OK
+     */
+    200: PasskeyOptions;
+};
+
+export type GetPasskeyVerificationOptionsResponse = GetPasskeyVerificationOptionsResponses[keyof GetPasskeyVerificationOptionsResponses];
+
+export type RemovePasskeyData = {
+    body?: never;
+    path: {
+        credentialId: string;
+    };
+    query?: never;
+    url: '/user/passkeys/{credentialId}';
+};
+
+export type RemovePasskeyResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type GetPublicActivityChoiceData = {
     body?: never;
@@ -11662,6 +12022,48 @@ export type UpdateOutlineCollectionStateResponses = {
 };
 
 export type UpdateOutlineCollectionStateResponse = UpdateOutlineCollectionStateResponses[keyof UpdateOutlineCollectionStateResponses];
+
+export type GetWorkspacePasskeyPolicyData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/passkey-policy';
+};
+
+export type GetWorkspacePasskeyPolicyResponses = {
+    /**
+     * OK
+     */
+    200: WorkspacePasskeyPolicy;
+};
+
+export type GetWorkspacePasskeyPolicyResponse = GetWorkspacePasskeyPolicyResponses[keyof GetWorkspacePasskeyPolicyResponses];
+
+export type UpdateWorkspacePasskeyPolicyData = {
+    body: UpdateWorkspacePasskeyPolicy;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/passkey-policy';
+};
+
+export type UpdateWorkspacePasskeyPolicyResponses = {
+    /**
+     * OK
+     */
+    200: WorkspacePasskeyPolicy;
+};
+
+export type UpdateWorkspacePasskeyPolicyResponse = UpdateWorkspacePasskeyPolicyResponses[keyof UpdateWorkspacePasskeyPolicyResponses];
 
 export type ListAdoptablePracticesData = {
     body?: never;
@@ -14067,7 +14469,9 @@ export type GetPracticeWorkspaceTilesData = {
          */
         workspaceSlug: string;
     };
-    query?: never;
+    query: {
+        window: 'ALL_TIME' | 'DAYS_30' | 'DAYS_90';
+    };
     url: '/workspaces/{workspaceSlug}/practices/tiles';
 };
 
@@ -14075,7 +14479,7 @@ export type GetPracticeWorkspaceTilesResponses = {
     /**
      * OK
      */
-    200: Array<PracticeWorkspaceTile>;
+    200: PracticesAcrossWorkspaceTiles;
 };
 
 export type GetPracticeWorkspaceTilesResponse = GetPracticeWorkspaceTilesResponses[keyof GetPracticeWorkspaceTilesResponses];
@@ -14096,7 +14500,7 @@ export type GetPracticeWorkspaceOverviewResponses = {
     /**
      * OK
      */
-    200: PracticeWorkspaceOverview;
+    200: PracticesAcrossWorkspace;
 };
 
 export type GetPracticeWorkspaceOverviewResponse = GetPracticeWorkspaceOverviewResponses[keyof GetPracticeWorkspaceOverviewResponses];

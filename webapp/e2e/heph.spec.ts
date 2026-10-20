@@ -80,7 +80,7 @@ test("a question waits for Heph, follow-ups queue behind it, and a fourth is ref
 	const first = await ask(page, uniqueQuestion("First question"));
 	// No worker starts it, so after its first second it says it waits for Heph.
 	await expect(
-		page.getByRole("status").filter({ hasText: "Heph is answering other questions first…" }),
+		page.getByRole("status").filter({ hasText: "Waiting for Heph to start…" }),
 	).toBeAttached();
 
 	const second = await ask(page, uniqueQuestion("Second question"));

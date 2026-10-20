@@ -75,7 +75,10 @@ public record MentorTurnAdmission(
         try {
             return Optional.of(MAPPER.treeToValue(document, MentorTurnAdmission.class));
         } catch (JacksonException unreadable) {
-            log.warn("Unreadable mentor turn admission: {}", unreadable.getMessage());
+            // The class only: a parser message can quote the stored admission.
+            log.warn(
+                    "Unreadable mentor turn admission: {}",
+                    unreadable.getClass().getSimpleName());
             return Optional.empty();
         }
     }

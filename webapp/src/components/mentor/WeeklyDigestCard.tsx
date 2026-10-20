@@ -123,9 +123,10 @@ function FeedbackRow({ row, workspaceSlug }: { row: WeeklyDigestFeedback; worksp
 /**
  * A weekly digest in the developer's Heph conversation: the feedback that reached them in one week,
  * each piece linked to where it landed, what changed on their Practice profile, and how many cards
- * wait unread there. Facts only, read again every time the conversation is: feedback taken back
- * since drops out, and a withdrawn card keeps only its practice. It never shows a count of what
- * reached them, a score or a streak.
+ * wait unread there. Facts only, read again every time the conversation is: a Practice page card
+ * leaves the waiting count once it is read, feedback that no longer shows drops out, and a
+ * withdrawn card keeps only its practice. So a digest can come to show nothing, which says only
+ * that, not why. It never shows a count of what reached them, a score or a streak.
  */
 export function WeeklyDigestCard({
 	digest,
@@ -169,7 +170,9 @@ export function WeeklyDigestCard({
 				<div className="flex flex-col gap-4">
 					<p className="font-medium">{week}</p>
 					{empty && (
-						<p className="text-muted-foreground">Everything from this week was taken back since.</p>
+						<p className="text-muted-foreground">
+							There is no feedback or profile change to show here now.
+						</p>
 					)}
 					{digest.feedback.length > 0 && (
 						<div className="flex flex-col gap-2">

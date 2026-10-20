@@ -36,6 +36,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("core.auth.clientsession.ClientSessionIntegrationTest", "dev-login"),
             assignment("core.auth.consent.ConsentSignInBootstrapIntegrationTest", "consent-sign-in"),
             assignment("core.auth.dev.DevLoginIntegrationTest", "dev-login"),
+            assignment("core.auth.webauthn.PasskeyLifecycleIntegrationTest", "required-passkeys"),
             assignment("core.database.PracticeV1ReviewJobsIntegrationTest", "practice-upgrade-history"),
             assignment("integration.core.oauth.SlackOAuthCallbackConflictIntegrationTest", "slack-signed"),
             assignment("integration.core.sync.api.SyncControllerIntegrationTest", "sync-controller-focused"),
@@ -144,6 +145,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "worker role with the real LLM proxy on a free sandbox gateway port," + " calling live models"),
             Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
             Map.entry(
+                    "required-passkeys",
+                    "mandatory instance-admin policy with real signed cookies, WebAuthn signatures, and database-backed recovery"),
+            Map.entry(
                     "review-disabled-integrations",
                     "persisted mixed-provider history and real timing reads with Slack and Outline adapters disabled"),
             Map.entry(
@@ -235,6 +239,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "testconfig.RealAuthIntegrationTest");
 
     private static final Set<String> PROPERTY_SOURCE_TESTS = names(
+            "core.auth.webauthn.PasskeyLifecycleIntegrationTest",
             "core.database.PracticeV1ReviewJobsIntegrationTest",
             "core.auth.clientsession.ClientSessionConcurrencyIntegrationTest",
             "core.auth.clientsession.ClientSessionIntegrationTest",

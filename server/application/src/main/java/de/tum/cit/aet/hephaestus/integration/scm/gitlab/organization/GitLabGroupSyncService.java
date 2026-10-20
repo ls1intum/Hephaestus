@@ -336,7 +336,7 @@ public class GitLabGroupSyncService {
                         log.warn(
                                 "Failed to process project: fullPath={}, error={}",
                                 sanitizeForLog(project.fullPath()),
-                                e.getMessage());
+                                e.getClass().getSimpleName());
                     }
                 }
 
@@ -578,7 +578,7 @@ public class GitLabGroupSyncService {
                         log.warn(
                                 "Failed to reconcile project: fullPath={}, error={}",
                                 sanitizeForLog(project.fullPath()),
-                                e.getMessage());
+                                e.getClass().getSimpleName());
                     }
                 }
 

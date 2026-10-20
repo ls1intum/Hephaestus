@@ -1,11 +1,12 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation } from "@tanstack/react-router";
-import { useId, useState } from "react";
+import { type RefObject, useId, useRef, useState } from "react";
+import { useResizeObserver } from "usehooks-ts";
 import { z } from "zod";
 
 import { getMemberOnboardingOptions } from "@/api/@tanstack/react-query.gen";
 import type { ThreadFocus } from "@/components/mentor/HephTimeline";
-import { ThreadPanel } from "@/components/mentor/ThreadPanel";
+import { pixelsPerRem, ThreadPanel } from "@/components/mentor/ThreadPanel";
 import { WorkspaceMentorPreferenceNotice } from "@/components/onboarding/WorkspaceMentorPreferenceNotice";
 import { useHephLive } from "@/hooks/use-heph-live";
 import { type MentorNotice, mentorNotice } from "@/lib/mentor-preference";
@@ -83,11 +84,21 @@ function MentorPage({
 	const setSearch = useSearchState();
 	const panelId = useId();
 	const [threadFocus, setThreadFocus] = useState<ThreadFocus>();
+	// The region the conversation and its thread share. Its width does not change with how the
+	// thread shows, so the choice between a column and a drawer cannot flip back and forth, and it
+	// already leaves out the sidebar, collapsed or open, and the rest of the page.
+	const host = useRef<HTMLDivElement>(null);
+	const { width: availableWidth } = useResizeObserver({
+		// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- usehooks-ts 3 types `ref` without the `| null` that React 19 gives `useRef(null)`; the hook reads `current` only once mounted.
+		ref: host as RefObject<HTMLDivElement>,
+	});
+	// Read with each new measurement, so it follows the reader's text size as it stands then.
+	const availableRem = availableWidth === undefined ? undefined : availableWidth / pixelsPerRem();
 	const livePaused = useHephLive(workspaceSlug, !readOnly);
 	const canAsk = notice === undefined && !readOnly;
 
 	return (
-		<div className="flex min-h-0 flex-1">
+		<div ref={host} className="flex min-h-0 flex-1">
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 				{notice ? (
 					<WorkspaceMentorPreferenceNotice
@@ -124,6 +135,7 @@ function MentorPage({
 					key={thread}
 					id={panelId}
 					focusHeading={threadFocus === "heading"}
+					availableRem={availableRem}
 					onClose={() => {
 						setThreadFocus(undefined);
 						void setSearch((previous) => ({ ...previous, thread: undefined, entry: undefined }));

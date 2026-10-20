@@ -123,7 +123,11 @@ public class WorkspaceContentSource implements ContentSource {
         try {
             step.run();
         } catch (RuntimeException e) {
-            log.warn("Mentor workspace sub-context '{}' failed, degrading to empty: {}", context, e.toString(), e);
+            log.warn(
+                    "Mentor workspace sub-context '{}' failed, degrading to empty: {}",
+                    context,
+                    e.getClass().getName(),
+                    e);
             try {
                 fallback.run();
             } catch (RuntimeException ignored) {
@@ -137,7 +141,11 @@ public class WorkspaceContentSource implements ContentSource {
         try {
             return query.get();
         } catch (RuntimeException e) {
-            log.warn("Mentor workspace query '{}' failed, degrading to empty: {}", context, e.toString(), e);
+            log.warn(
+                    "Mentor workspace query '{}' failed, degrading to empty: {}",
+                    context,
+                    e.getClass().getName(),
+                    e);
             return List.of();
         }
     }

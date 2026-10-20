@@ -5,7 +5,6 @@ import { cn } from "cn";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { hasText } from "@/lib/text";
-import { optionalIntegrationsAvailable, requestConsentReopen } from "@/runtime/consent";
 
 export interface FooterProps {
 	className?: string;
@@ -84,15 +83,6 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 						>
 							Imprint
 						</Link>
-						{optionalIntegrationsAvailable && (
-							<button
-								type="button"
-								onClick={() => requestConsentReopen()}
-								className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-							>
-								Cookie preferences
-							</button>
-						)}
 					</nav>
 
 					{showBuildInfo && (

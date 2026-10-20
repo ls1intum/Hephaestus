@@ -55,11 +55,17 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
             job.setStatus(ReviewJobStatus.FAILED);
             job.setExitCode(1);
             jobs.saveAndFlush(job);
-            TerminalUsage.resolve(
+            TerminalUsageTestFixtures.project(
+                    TerminalUsage.resolve(
                             new LlmUsage("model", 0, 0, 0, 0, 0, 0.0, 0),
                             jobs.findLlmUsageById(job.getId()).orElseThrow(),
-                            List.of())
-                    .appendTo(usageRecorder, jobs, job.getWorkspaceId(), job, null, priced());
+                            List.of()),
+                    usageRecorder,
+                    jobs,
+                    job.getWorkspaceId(),
+                    job,
+                    null,
+                    priced());
         });
 
         var stored = jobs.findById(job.getId()).orElseThrow();
@@ -81,8 +87,14 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
             job.setStatus(ReviewJobStatus.FAILED);
             job.setExitCode(1);
             jobs.saveAndFlush(job);
-            TerminalUsage.resolve(new LlmUsage("model", 0, 0, 0, 0, 0, 0.0, 2), null, List.of())
-                    .appendTo(usageRecorder, jobs, job.getWorkspaceId(), job, null, priced());
+            TerminalUsageTestFixtures.project(
+                    TerminalUsage.resolve(new LlmUsage("model", 0, 0, 0, 0, 0, 0.0, 2), null, List.of()),
+                    usageRecorder,
+                    jobs,
+                    job.getWorkspaceId(),
+                    job,
+                    null,
+                    priced());
         });
 
         assertThat(usage.findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(

@@ -419,6 +419,49 @@ export const DraggingARowPastTheNextRowsMidpoint: Story = {
 	},
 };
 
+/**
+ * A keyboard step down lands after the next row, whatever the two rows' heights. These rows are
+ * the same height, and a step puts the dragged row's bottom on the next row's bottom, so comparing
+ * their centres resolved the drop back to the row's own place and the move did nothing.
+ */
+export const KeyboardStepDownPassesTheNextRow: Story = {
+	play: async ({ args, canvas }) => {
+		const name = "Explain what changed and why";
+		canvas.getByRole("button", { name: `Reorder ${name}` }).focus();
+		// Real key presses: dnd-kit's keyboard sensor starts listening a task after the pick-up.
+		await userEvent.keyboard("[Space]");
+		await waitFor(async () => expect(announcement()).toBe(`Picked up ${name}.`));
+		await userEvent.keyboard("[ArrowDown]");
+		await waitFor(async () =>
+			expect(announcement()).toBe(`Moving ${name}, position 3 of 3 in Delivery.`),
+		);
+		await userEvent.keyboard("[Space]");
+		await waitFor(async () =>
+			expect(announcement()).toBe(`Moved ${name} to position 3 of 3 in Delivery.`),
+		);
+		await expect(args.onPlaceEntry).toHaveBeenCalledWith("explain-why", "delivery", 2);
+	},
+};
+
+/** The same in the other direction: a step up lands before the row above. */
+export const KeyboardStepUpPassesThePreviousRow: Story = {
+	play: async ({ args, canvas }) => {
+		const name = "Explain what changed and why";
+		canvas.getByRole("button", { name: `Reorder ${name}` }).focus();
+		await userEvent.keyboard("[Space]");
+		await waitFor(async () => expect(announcement()).toBe(`Picked up ${name}.`));
+		await userEvent.keyboard("[ArrowUp]");
+		await waitFor(async () =>
+			expect(announcement()).toBe(`Moving ${name}, position 1 of 3 in Delivery.`),
+		);
+		await userEvent.keyboard("[Space]");
+		await waitFor(async () =>
+			expect(announcement()).toBe(`Moved ${name} to position 1 of 3 in Delivery.`),
+		);
+		await expect(args.onPlaceEntry).toHaveBeenCalledWith("explain-why", "delivery", 0);
+	},
+};
+
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async ({ canvasElement }) => {

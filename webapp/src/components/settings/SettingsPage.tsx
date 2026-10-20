@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { UserRoundCog } from "lucide-react";
 import { useState } from "react";
 
@@ -5,10 +7,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { optionalIntegrationsAvailable } from "@/runtime/consent";
 
 import { AiChoiceSection, type AiChoiceSectionProps } from "./AiChoiceSection";
-import { CookiePreferencesSection } from "./CookiePreferencesSection";
 import { DangerZoneSection } from "./DangerZoneSection";
 import {
 	EmailPreferencesSection,
@@ -37,6 +37,7 @@ import {
 } from "./WeeklyDigestSection";
 
 export interface SettingsPageProps {
+	passkeys?: ReactNode;
 	emailPreferencesProps: EmailPreferencesSectionProps;
 	weeklyDigestProps: WeeklyDigestSectionProps;
 	practiceFeedbackProps: PracticeFeedbackSectionProps;
@@ -55,6 +56,7 @@ export interface SettingsPageProps {
 }
 
 export function SettingsPage({
+	passkeys,
 	emailPreferencesProps,
 	weeklyDigestProps,
 	practiceFeedbackProps,
@@ -157,6 +159,12 @@ export function SettingsPage({
 
 				<Separator />
 				<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
+				{passkeys !== undefined && (
+					<>
+						<Separator />
+						{passkeys}
+					</>
+				)}
 
 				{showSlackPreferencesSection && (
 					<>
@@ -167,13 +175,6 @@ export function SettingsPage({
 
 				<Separator />
 				<SessionsSection {...sessionsProps} />
-
-				{optionalIntegrationsAvailable && (
-					<>
-						<Separator />
-						<CookiePreferencesSection />
-					</>
-				)}
 
 				<Separator />
 				<DangerZoneSection onAccountDeleted={onAccountDeleted} />

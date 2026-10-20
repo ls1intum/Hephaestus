@@ -231,8 +231,10 @@ public class MentorTurnService {
         MentorTurn turn = held(turnId, attempt, workerId);
         Set<UUID> feedbackCalled = MentorPiEntries.feedbackCalled(appended, turn.getPartial());
         append(turn, stored, copiesData);
-        turn.end(outcome, error, clock.instant());
+        Instant endedAt = clock.instant();
+        turn.end(outcome, error, endedAt);
         turns.flush();
+        events.publishEvent(new MentorLedgerEvents.AttemptEnded(turn.getWorkspaceId(), turnId, attempt, endedAt));
         changed(turn);
         return new EndedTurn(turn, accountId(turn), usage(turn), feedbackCalled);
     }
@@ -340,6 +342,8 @@ public class MentorTurnService {
         Instant startedAt = Objects.requireNonNull(turn.getStartedAt(), "A leased turn has started");
         // Under the turn's lock, which a claim of the attempt shares: every claim it made committed before this.
         Instant lostAt = turns.databaseClock();
+        // Dates the attempt's spend in this transaction, before the requeue resets the turn.
+        events.publishEvent(new MentorLedgerEvents.AttemptEnded(turn.getWorkspaceId(), turn.getId(), attempt, lostAt));
         if (retry) {
             turn.requeue();
         } else {

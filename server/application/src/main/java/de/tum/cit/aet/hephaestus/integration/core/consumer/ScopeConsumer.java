@@ -283,7 +283,10 @@ public final class ScopeConsumer {
         try {
             sub.close();
         } catch (Exception e) {
-            log.debug("Failed to close subscription quietly: consumerName={}, error={}", consumerName, e.getMessage());
+            log.debug(
+                    "Failed to close subscription quietly: consumerName={}, error={}",
+                    consumerName,
+                    e.getClass().getSimpleName());
         }
     }
 

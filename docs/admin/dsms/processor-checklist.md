@@ -11,7 +11,7 @@ The existing TUM record lists these recipients:
   Each recipient needs its own evidence (see below).
 - Slack: per-workspace opt-in.
 - AI model providers for research benchmark runs: pseudonymized data only, after recipient-specific verification.
- The LRZ (gitlab.lrz.de) is **not** a processor. It is a separate controller under the EDPB 07/2020 framework. Outline has no fixed operator or origin. It remains disabled until the operator records a per-instance role, hosting region, transfer basis, and AVV status. The webapp includes optional consent-controlled Sentry. The actual production endpoint and enabled state require deployment evidence. Code alone cannot prove that it is off.
+ The LRZ (gitlab.lrz.de) is **not** a processor. It is a separate controller under the EDPB 07/2020 framework. Outline has no fixed operator or origin. It remains disabled until the operator records a per-instance role, hosting region, transfer basis, and AVV status. The webapp and the server include no error-reporting service.
 
 First-party product feedback and survey responses remain inside the instance PostgreSQL database.
 Optional email alerts do not contain those responses, but the configured relay receives recipient
@@ -64,23 +64,19 @@ For transfers, verify the appropriate basis for the exact recipient and covered 
 2. Alternatively, verify the appropriate SCC module and transfer assessment with supplementary measures where required. Module 2 is controller-to-processor. It is not automatically the right module for separate controllers or a processor chain. EU hosting and DPF participation do not by themselves
 prove every support or subprocessor flow stays in the EEA. Keep evidence and a review date.
 
-### Optional Sentry and monitoring
+### Optional log collection and monitoring
 
-Record `[Sentry operator, endpoint, hosting, retention, contract and transfer safeguard]` before
-activation. Controller-owned self-hosting and SaaS have different roles. The browser requires a DSN
-and error-monitoring consent, strips request, user and breadcrumb fields, and disables message/body
-collection. Error text and stacks can still carry personal data.
+Record `[log store operator, endpoint, hosting, retention, access, contract and transfer safeguard]`
+before you collect container logs. Controller-owned self-hosting and an external service have different
+roles. Collected lines carry stacks, workspace and job identifiers and trace IDs. Library exception
+text can still carry personal data.
 
-1. Inspect synthetic reports.
-2. Apply server-side scrubbing.
+1. Inspect synthetic lines from each runtime role before activation.
+2. Restrict read access to the operators who need it.
+3. Set the store's retention to the recorded period.
 
-Withdrawal stops new client reports, not previously received reports.
-
-The backend also includes Sentry. A nonblank DSN initializes it outside the specs profile. This configuration is not limited to the server role. Inspect the DSN supplied to each server, worker and webhook process.
-
-Browser consent does not control it. It disables default PII and strips request, user and breadcrumb fields. It retains operational trace correlation. Record a separate lawful basis and recipient scope for server diagnostics. Browser consent withdrawal does not turn off server monitoring.
-
-Sentry-side rights and retention need their own procedure.
+A release before 1.0 could send error reports to Sentry. That recipient keeps what it received under
+its own retention. Removing the integration does not delete those reports.
 
 Optional trace export also needs an
 approved collector and retention. It can contain workspace and run identifiers. Private metrics
@@ -130,7 +126,7 @@ Amend this file, the Art. 30 record, and the privacy statement before deploying 
 - A new identity provider beyond GitHub and gitlab.lrz.de.
 - Enabling Outline for a new origin or changing its operator, hosting region, or contractual role.
 - SMTP email delivery becomes active. The chosen SMTP host becomes a recipient of personal data. A TUM-internal relay falls under the TUM-internal framework. An external relay needs an Art. 28 DPA.
-- Activating browser or server Sentry. Record the exact operator, role, region, retention and transfer path. Do not assume all SaaS endpoints have the same legal entity or geography. Amend the notice and reassess the DPIA. An external processor needs an Art. 28 agreement.
+- Collecting container logs into a log store, or adding a recipient to one. Record the exact operator, role, region, retention and transfer path. Amend the notice and reassess the DPIA. An external processor needs an Art. 28 agreement.
 - The application adds external storage (S3, CDN) or serves a third-party font, script, image, or embed. This requires a recipient-role assessment, any applicable agreement and a privacy-statement entry.
 - Heph gains internet access or the practice-review sandbox network posture expands beyond the governed worker gateway. This triggers a re-audit under §5 of `dpia-prescreen.md`.
 - An existing processor receives a new source privacy class. Its region or provider retention changes. Product evidence gains an operator/research evaluation use. An existing DPA does not by itself authorize a new purpose or data category. Complete the [source governance gate](./item-source-governance.md).
@@ -141,7 +137,7 @@ Amend this file, the Art. 30 record, and the privacy statement before deploying 
 
 Avatar components pass provider image URLs to browser image elements. Hephaestus does not proxy these requests. The image host receives visitor network metadata and the requested URL, including from
 people browsing public pages without signing in. Record `[hosts, roles, basis, transfer safeguard and
-retention]`. The person's Sentry choice does not cover an image-host request.
+retention]`.
 
 Third-party hosting does not automatically imply Art. 28 status. Assess its actual role.
 
@@ -151,7 +147,7 @@ Third-party hosting does not automatically imply Art. 28 status. Assess its actu
 - [European Commission transfer safeguards and SCCs](https://commission.europa.eu/law/law-topic/data-protection/international-dimension-data-protection/standard-contractual-clauses-scc_en): choose the module for the actual roles.
 - [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data): distinguish training, abuse monitoring and endpoint-specific application state. Do not infer these terms for a compatible third-party API.
 - [Microsoft Azure OpenAI data privacy](https://learn.microsoft.com/en-us/legal/cognitive-services/openai/data-privacy): verify deployment geography and any modified abuse-monitoring approval.
-- [Sentry scrubbing](https://docs.sentry.io/security-legal-pii/scrubbing/): client minimization needs recipient-side review too.
+- [Loki label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/) and [structured metadata](https://grafana.com/docs/loki/latest/get-started/labels/structured-metadata/): keep per-request and per-person values out of index labels.
 - [GitLab account deletion](https://docs.gitlab.com/user/profile/account/delete_account/): upstream deletion is separate from Hephaestus copies and attribution.
 
 Recheck these terms against the contract and exact service version when a provider changes. Published

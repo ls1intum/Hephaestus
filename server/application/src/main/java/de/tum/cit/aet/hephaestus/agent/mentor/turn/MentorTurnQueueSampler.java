@@ -41,7 +41,9 @@ public class MentorTurnQueueSampler {
             queued.set(turns.countByStatus(MentorTurn.Status.QUEUED));
         } catch (RuntimeException e) {
             // A database blip must not read as an empty queue.
-            log.warn("Heph turn queue sample failed, keeping the last value: {}", e.getMessage());
+            log.warn(
+                    "Heph turn queue sample failed, keeping the last value: {}",
+                    e.getClass().getSimpleName());
         }
     }
 }

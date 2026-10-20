@@ -23,7 +23,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Records the LLM usage of review jobs and mentor turns for spending totals and budget caps.
- * Source identity and usage stay frozen; an operator can price an unpriced row.
+ * Source identity, model, funding source, rates and date stay frozen; an operator can price an unpriced row. A
+ * review job attempt's rows project its measurement: a call that returns after the attempt ended replaces their
+ * measurement ({@link LlmUsageRecorder#project}). A Heph turn attempt's row projects its measurement the same way.
  *
  * <p>{@code sourceId} is a soft reference (no FK) to the originating {@code review_job.id} or
  * {@code mentor_turn.id}: accounting must survive source-row deletion. Source kind, id, and
@@ -169,12 +171,12 @@ public class LlmUsageEvent {
     private long searchUnits;
 
     @ColumnDefault("0")
-    @Column(name = "unreported_calls", nullable = false, updatable = false)
+    @Column(name = "unreported_calls", nullable = false)
     private int unreportedCalls;
 
     @NonNull
     @ColumnDefault("'UNKNOWN'")
     @Enumerated(EnumType.STRING)
-    @Column(name = "measurement_verification", nullable = false, length = 16, updatable = false)
+    @Column(name = "measurement_verification", nullable = false, length = 16)
     private MeasurementVerification measurementVerification = MeasurementVerification.UNKNOWN;
 }

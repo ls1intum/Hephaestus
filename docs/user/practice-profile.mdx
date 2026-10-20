@@ -291,7 +291,14 @@ For example: "Read from your last 4 reviewed pull requests. In the last 90 days,
 
 A piece of work counts when a review could judge the practice on it.
 Eligible decided results provide the evidence for these counts.
-A request is not a separate evidence-only class.
+Your standing uses automatic reviews first.
+Requested reviews contribute where those reviews establish no standing.
+
+A practice or group marked **Based on earlier reviews** includes historical assessments.
+Those assessments do not show whether the current criteria are met.
+They contribute no trend or feedback quotes.
+**Based on earlier reviews, criteria unknown** means that the original criterion version is unavailable.
+
 A group counts each piece of work once, even when several of its practices judged it.
 
 If fewer than three pieces of work back a standing, its sentence calls it an early read.
@@ -313,30 +320,50 @@ An instance admin who reads your profile with **View as user** does not see the 
 
 ## Practices across the workspace
 
-Practices across the workspace shows how each practice goes across your workspace.
-It counts developers and results and never names a developer.
-Each result comes from AI review of the work and can be wrong, so it is not a grade.
-Your own results stay in your Practice profile.
+Practices across the workspace shows where the developers in your workspace stand.
+It counts developers and never names one.
+Each standing comes from AI review of the work and can be wrong, so it is not a grade.
+Your own standings stay in your Practice profile.
 The page keeps its explanations behind an info button (i).
 Point at the button, move to it with the keyboard, or tap it to read the explanation.
 
 1. In the sidebar, under **Practice profile**, select **Across the workspace**.
    If the sidebar shows only icons, select the **Across the workspace** icon.
 
-### Results by practice group
+### Your figures
 
-**All practice groups** has one row for each practice group.
-The line under the title tells how many developers the workspace reviews.
-Each row shows how many practices the group has and how many results were **Met**, **Not met**, **Does not apply**, and **Could not determine**.
-The page counts only current results: results from the last 90 days, reviewed under the practice as it is now.
-A row without them shows **No current results**, even if older results exist.
+Four tiles set your own figure beside the workspace's typical range for that figure.
+The range is the middle half, from the 25th to the 75th percentile.
+The time-window figures count developers with a standing within that window.
+Open feedback can also count developers without a standing.
+A blue marker shows your value.
+
+- **Pieces of work reviewed**, **Practices going well**, and **Practices needing attention** use the selected time range.
+  Select **30 days**, **90 days**, or **All time**.
+- **Open feedback** counts the feedback that is open now, whatever the time range.
+
+### The bars
+
+**All practice groups** has one bar for each practice group.
+Each bar counts the developers with a standing by the standing that their Practice profile shows.
+Each developer counts once, however much of their work was reviewed.
+The **You** marker shows your part, but only when the bar counts you.
+The bars show standings now, so the time range does not change them.
+
+A practice that is reviewed only by people, or by nobody, has no standing and is not on the page.
+Turning feedback off does not remove the practice's standing.
+
+If some standings include earlier assessments, the page says so.
+When your standing includes them, your own row carries **Based on earlier reviews**, as your profile does.
+If the original criterion version is unavailable, the mark reads **Based on earlier reviews, criteria unknown**.
 
 ### Small counts
 
 The page shows every count, however small, and everyone sees the same counts.
-It never names a developer, but a small count can tell other members about your results:
+It never names a developer, but a small count can tell other members where you stand:
 
-- If few developers have results for a practice, a member who knows them can tell how your work went.
+- A small bar segment can identify one or two developers if a member knows them.
+- A typical range of one or two developers can show their values.
 - A member who compares the page before and after your next review can see the counts change.
 
 A workspace admin can hide you from the workspace. Then the page does not count you.
@@ -344,8 +371,8 @@ A workspace admin can hide you from the workspace. Then the page does not count 
 ### Open a group
 
 1. Select **Open group**.
-   A panel shows the group's practices, with **Developers with results** and the result counts for each practice.
-2. To see your own results, select **See your own standing** at the foot of the panel.
+   A panel shows the group's bar and a bar for each of its practices.
+2. To see your own standing, select **See your own standing** at the foot of the panel.
    To go to one practice in your profile, select **Open in your Practice profile** on its row.
 
 At the end of the page, **See your own standing** opens **All practice groups** in your profile.

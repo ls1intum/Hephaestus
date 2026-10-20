@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
+import de.tum.cit.aet.hephaestus.agent.job.FrozenCharge;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ScriptUsage;
@@ -35,11 +37,17 @@ class ProxyRoutingService {
     private final ReviewJobRepository agentJobRepository;
     private final MentorTurnRepository mentorTurns;
     private final ObjectMapper objectMapper;
+    private final ReviewAttemptUsageService attemptUsage;
 
-    ProxyRoutingService(ReviewJobRepository jobs, MentorTurnRepository mentorTurns, ObjectMapper mapper) {
+    ProxyRoutingService(
+            ReviewJobRepository jobs,
+            MentorTurnRepository mentorTurns,
+            ObjectMapper mapper,
+            ReviewAttemptUsageService attemptUsage) {
         this.agentJobRepository = jobs;
         this.mentorTurns = mentorTurns;
         this.objectMapper = mapper;
+        this.attemptUsage = attemptUsage;
     }
 
     ProxyRouting resolve(ProxyIdentity identity, HttpServletRequest request) {
@@ -61,12 +69,33 @@ class ProxyRoutingService {
         var snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         // The live checks above decide whether this attempt may call at all; the signed deadline decides until when.
         Instant workDeadline = jwt.workDeadline();
-        if (!request.getRequestURI().startsWith(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH))
+        if (!request.getRequestURI().startsWith(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH)) {
+            register(job, identity.workerId(), ModelKind.CHAT, snapshot.model());
             return reviewRouting(job, snapshot, workDeadline);
+        }
         var slot = practiceScriptSlot(request.getRequestURI());
         if (slot == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        return practiceScriptRouting(job, snapshot, slot, workDeadline)
+        ProxyRouting routing = practiceScriptRouting(job, snapshot, slot, workDeadline)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        FrozenModel model = slot == ModelKind.CHAT ? snapshot.model() : snapshot.practiceScriptSlot(slot);
+        register(job, identity.workerId(), slot, model);
+        return routing;
+    }
+
+    /**
+     * Registers the call on its attempt before anything is forwarded, and freezes what the call's model costs. A
+     * later claim freezes a new configuration onto the row, so a call that returns after a hand-off is priced from
+     * this registration. The attempt must still run on this worker; otherwise the call does not start.
+     */
+    private void register(ReviewJob job, @Nullable String workerId, ModelKind kind, @Nullable FrozenModel model) {
+        boolean running = attemptUsage.registerCall(
+                job.getId(),
+                job.getWorkspaceId(),
+                job.getAttempt(),
+                workerId,
+                kind,
+                model == null ? FrozenCharge.UNKNOWN : FrozenCharge.of(model));
+        if (!running) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Review attempt unavailable");
     }
 
     /**
@@ -171,7 +200,8 @@ class ProxyRoutingService {
                         spentUsd,
                         job.getWorkerId(),
                         directModelTokens,
-                        directModelSearchUnits),
+                        directModelSearchUnits,
+                        job.getWorkspaceId()),
                 slot,
                 slot == null ? null : model.dataHandlingTier(),
                 workDeadline);

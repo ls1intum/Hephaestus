@@ -76,8 +76,9 @@ hephaestus:
     # SCM + SLACK + OUTLINE INTEGRATION (Production)
     #
     # Slack: per-workspace bot tokens are issued via OAuth and encrypted at rest in the
-    # `connection` table — there is no global bot token. Events API and interactivity are
-    # verified with HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET on the webhook-server.
+    # `connection` table — there is no global bot token. HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET
+    # verifies Events API deliveries on the webhook-server and interactivity on the application-server,
+    # which commits a button's consent change before Slack is acknowledged.
     #
     # Outline: per-workspace API key, pasted by a workspace admin and encrypted at rest in the
     # same `connection` table (Outline keys are session-scoped and cannot self-rotate, so there
@@ -130,6 +131,11 @@ hephaestus:
         # Traefik strips /api before the request reaches the app (see docker/compose.app.yaml), and
         # native forward-headers can't restore the prefix — re-add it to the browser-facing OAuth URLs.
         api-base-path: /api
+        passkeys:
+            rp-id: ${HEPHAESTUS_AUTH_PASSKEYS_RP_ID:}
+            allowed-origins: ${HEPHAESTUS_AUTH_PASSKEYS_ALLOWED_ORIGINS:}
+            instance-admin-required: ${HEPHAESTUS_AUTH_PASSKEYS_INSTANCE_ADMIN_REQUIRED:true}
+            workspace-admin-required: ${HEPHAESTUS_AUTH_PASSKEYS_WORKSPACE_ADMIN_REQUIRED:false}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # GITLAB INTEGRATION (Production)
@@ -145,9 +151,3 @@ hephaestus:
     agent:
         image:
             require-digest: true
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # SENTRY ERROR TRACKING (Production)
-    # ═══════════════════════════════════════════════════════════════════════════
-    sentry:
-        dsn: ${SENTRY_DSN}

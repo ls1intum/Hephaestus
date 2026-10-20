@@ -1,6 +1,5 @@
 import path from "node:path";
 
-import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import Terminal from "vite-plugin-terminal";
 import { configDefaults, defineConfig } from "vite-plus";
@@ -23,17 +22,6 @@ const fmt = {
 
 const lint = loadLintConfig(new URL(".oxlintrc.json", import.meta.url));
 
-const sentryUploadValues = [
-	process.env.SENTRY_AUTH_TOKEN,
-	process.env.SENTRY_ORG,
-	process.env.SENTRY_PROJECT,
-];
-const sentryUploadConfigured = sentryUploadValues.every(Boolean);
-if (sentryUploadValues.some(Boolean) && !sentryUploadConfigured) {
-	throw new Error(
-		"Sentry source-map upload requires SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT",
-	);
-}
 const viteConfig = defineConfig({
 	root: import.meta.dirname,
 	fmt,
@@ -41,19 +29,11 @@ const viteConfig = defineConfig({
 	plugins: [
 		tanstackRouter({ autoCodeSplitting: true }),
 		...appSourcePlugins(),
-		sentryVitePlugin({
-			org: process.env.SENTRY_ORG,
-			project: process.env.SENTRY_PROJECT,
-			authToken: process.env.SENTRY_AUTH_TOKEN,
-			disable: !sentryUploadConfigured,
-			telemetry: false,
-		}),
 		...Terminal({ output: ["terminal", "console"] }).map((plugin) =>
 			plugin === false ? false : { ...plugin, apply: "serve" as const },
 		),
 	],
 	build: {
-		sourcemap: "hidden" as const,
 		rolldownOptions: {
 			// The generated zod schemas carry no pure annotations. Without this, a chunk that imports one schema ships all of them.
 			// It marks every `z.*` call pure, so a call kept only for its side effect, such as `z.config(...)`, would be dropped.

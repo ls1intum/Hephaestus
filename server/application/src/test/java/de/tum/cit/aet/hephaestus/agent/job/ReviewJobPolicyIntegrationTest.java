@@ -68,6 +68,9 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
     private ReviewJobRepository jobs;
 
     @Autowired
+    private ReviewAttemptUsageRepository attemptUsageRows;
+
+    @Autowired
     private WorkspaceRepository workspaces;
 
     @Autowired
@@ -132,7 +135,7 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
                 mapper,
                 metrics,
                 new ReviewJobTelemetry(metrics, Tracer.NOOP),
-                mock(LlmUsageRecorder.class),
+                new ReviewAttemptUsageService(jobs, attemptUsageRows, mock(LlmUsageRecorder.class)),
                 mock(PracticeScriptRunRecorder.class),
                 admission,
                 Optional.empty(),
@@ -150,7 +153,12 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
                         new ReviewJobTelemetry(metrics, Tracer.NOOP),
                         Optional.empty()),
                 new ReviewJobRecovery(
-                        jobs, properties, mapper, mock(LlmUsageRecorder.class), Optional.empty(), Optional.empty()));
+                        jobs,
+                        properties,
+                        mapper,
+                        new ReviewAttemptUsageService(jobs, attemptUsageRows, mock(LlmUsageRecorder.class)),
+                        Optional.empty(),
+                        Optional.empty()));
     }
 
     @Test

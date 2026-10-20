@@ -201,7 +201,7 @@ public class GitLabTeamSyncService {
                     log.warn(
                             "Failed to sync members for team: teamSlug={}, error={}",
                             entry.getValue().getSlug(),
-                            e.getMessage());
+                            e.getClass().getSimpleName());
                 }
             } else {
                 membersComplete = false;
@@ -221,7 +221,7 @@ public class GitLabTeamSyncService {
                     log.warn(
                             "Failed to sync repo permissions for team: teamSlug={}, error={}",
                             entry.getValue().getSlug(),
-                            e.getMessage());
+                            e.getClass().getSimpleName());
                 }
             }
         }
@@ -242,7 +242,10 @@ public class GitLabTeamSyncService {
                 teamMembershipListener.onTeamMembershipsSynced(
                         new TeamsSyncedEvent(scopeId, groupFullPath, providerId, complete));
             } catch (Exception e) {
-                log.warn("Team membership listener failed for groupPath={}: error={}", groupFullPath, e.getMessage());
+                log.warn(
+                        "Team membership listener failed for groupPath={}: error={}",
+                        groupFullPath,
+                        e.getClass().getSimpleName());
             }
         }
 
@@ -304,7 +307,10 @@ public class GitLabTeamSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
         } catch (Exception e) {
-            log.warn("Failed to fetch root group: groupPath={}, error={}", groupFullPath, e.getMessage());
+            log.warn(
+                    "Failed to fetch root group: groupPath={}, error={}",
+                    groupFullPath,
+                    e.getClass().getSimpleName());
             return null;
         }
 

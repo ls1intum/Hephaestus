@@ -15,17 +15,41 @@ import {
 } from "./lib/release-upgrade-fingerprint.ts";
 import { researchConsentFields } from "./lib/research-consent.ts";
 
-const [previousImage = "", candidateImage = "", postgresImage = "", upgradePath = "latest"] =
-	process.argv.slice(2);
+const [
+	previousImage = "",
+	candidateImage = "",
+	postgresImage = "",
+	upgradePath = "latest",
+	...options
+] = process.argv.slice(2);
+
+const USAGE =
+	"Usage: node scripts/release-upgrade-test.ts <previous-app-image> <candidate-app-image> <postgres-image> [latest|baseline|refusal] [--require-seed=heph-chat]";
 
 if (previousImage === "" || candidateImage === "" || postgresImage === "") {
-	throw new Error(
-		"Usage: node scripts/release-upgrade-test.ts <previous-app-image> <candidate-app-image> <postgres-image> [latest|baseline|refusal]",
-	);
+	throw new Error(USAGE);
 }
 
 if (!["latest", "baseline", "refusal"].includes(upgradePath)) {
 	throw new Error(`Unknown upgrade path: ${upgradePath}`);
+}
+
+/**
+ * Seeds that a run can require. A seed runs only when the previous release keeps the data it seeds, so a later
+ * release that no longer has that data still upgrades without it. A qualification run that must prove one data
+ * upgrade requires its seed: the run then fails when the previous release cannot take it.
+ */
+const REQUIRABLE_SEEDS: ReadonlySet<string> = new Set(["heph-chat"]);
+const requiredSeeds = new Set<string>();
+for (const option of options) {
+	const seed = /^--require-seed=(?<seed>.+)$/u.exec(option)?.groups?.seed;
+	if (seed === undefined || !REQUIRABLE_SEEDS.has(seed)) {
+		throw new Error(`Unknown option: ${option}\n${USAGE}`);
+	}
+	requiredSeeds.add(seed);
+}
+if (requiredSeeds.size > 0 && upgradePath !== "latest") {
+	throw new Error("--require-seed applies only to the latest upgrade path");
 }
 
 const CUT_POINT_MESSAGE =
@@ -727,6 +751,10 @@ try {
 	const hephChatSource = upgradePath === "latest" && keepsHephChatHistory();
 	if (hephChatSource) {
 		executeFixture("released-seed.sql", "heph-upgrade");
+	} else if (requiredSeeds.has("heph-chat")) {
+		throw new Error(
+			"The required heph-chat seed was not admitted: the previous release keeps no Heph chat history",
+		);
 	}
 	const preserved = preservedPeople(layout);
 	// Legacy stays unfiltered so a refused start that adds people is still detected.

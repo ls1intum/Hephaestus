@@ -119,7 +119,9 @@ public class SecurityConfig {
                     .orElse(Stream.empty())
                     .map(SimpleGrantedAuthority::new)
                     .map(GrantedAuthority.class::cast);
-            return Stream.concat(granted, signInFactor(claims.get("auth_time")).stream())
+            return Stream.concat(
+                            Stream.concat(granted, signInFactor(claims.get("auth_time")).stream()),
+                            passkeyFactor(claims.get("passkey_time")).stream())
                     .toList();
         };
     }
@@ -127,8 +129,8 @@ public class SecurityConfig {
     /**
      * The session's {@code auth_time} as Spring Security's authorization-code factor, so a freshness
      * requirement can be declared with the framework's own {@code requireFactor(…).validDuration(…)}
-     * rather than compared by hand. GitHub and GitLab authorization-code logins are the only factor this
-     * instance has; a token minted without {@code auth_time} carries no factor and is treated as stale.
+     * rather than compared by hand. A token minted without {@code auth_time} carries no sign-in factor.
+     * A verified passkey supplies its own separate factor.
      */
     private static Optional<GrantedAuthority> signInFactor(@Nullable Object authTime) {
         Instant issuedAt =
@@ -141,6 +143,14 @@ public class SecurityConfig {
                 .map(at -> FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY)
                         .issuedAt(at)
                         .build());
+    }
+
+    private static Optional<GrantedAuthority> passkeyFactor(@Nullable Object time) {
+        return time instanceof Number seconds
+                ? Optional.of(FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.WEBAUTHN_AUTHORITY)
+                        .issuedAt(Instant.ofEpochSecond(seconds.longValue()))
+                        .build())
+                : Optional.empty();
     }
 
     @Bean

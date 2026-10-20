@@ -9,9 +9,10 @@ import test from "node:test";
 
 import { isRecord, type PartialMessage } from "../../../main/resources/agent/heph-host-protocol.ts";
 import {
-	LeaseLostError,
 	httpTurnApi,
+	isLeaseLost,
 	isTooLarge,
+	WorkerStatusError,
 } from "../../../main/resources/agent/heph-host.ts";
 
 function contract(name: string): unknown {
@@ -143,11 +144,12 @@ void test("the host sends its partial answer, searches, sandbox calls and end in
 		);
 		assert.deepEqual(await worker.api.load({ path: load.path }, signal), LOAD_ANSWER);
 		await worker.api.end({ outcome: "DONE", entries: end.entries, reason: null, detail: null });
+		assert.equal(deadline.detail, "deadline");
 		await worker.api.end({
 			outcome: "FAILED",
 			entries: [],
 			reason: "DEADLINE",
-			detail: String(deadline.detail),
+			detail: "deadline",
 		});
 
 		assert.deepEqual(
@@ -187,13 +189,15 @@ void test("a 409 means the attempt lost its lease, on every call", async () => {
 	try {
 		await assert.rejects(
 			worker.api.partial({ activity: "thinking", tool: null, stage: "Thinking…", messages: [] }),
-			LeaseLostError,
+			isLeaseLost,
 		);
 		await assert.rejects(
 			worker.api.end({ outcome: "DONE", entries: [], reason: null, detail: null }),
-			LeaseLostError,
+			isLeaseLost,
 		);
-		await assert.rejects(worker.api.context(), LeaseLostError);
+		await assert.rejects(worker.api.context(), isLeaseLost);
+		// Not repeated, as an unanswered call would be.
+		assert.equal(worker.received.length, 3);
 	} finally {
 		worker.close();
 	}
@@ -297,9 +301,13 @@ void test("a command the worker did not answer is not run again", async () => {
 	const worker = await fakeWorker([{ status: 503 }, { status: 409 }]);
 	try {
 		const { signal } = new AbortController();
-		await assert.rejects(worker.api.exec({ command: "git log -n 1" }, signal));
+		// A 503 is the worker's status, not a lost lease; only the 409 after it is.
+		await assert.rejects(
+			worker.api.exec({ command: "git log -n 1" }, signal),
+			(error) => error instanceof WorkerStatusError && error.status === 503 && !isLeaseLost(error),
+		);
 		assert.equal(worker.received.length, 1);
-		await assert.rejects(worker.api.read({ path: "INDEX.md" }, signal), LeaseLostError);
+		await assert.rejects(worker.api.read({ path: "INDEX.md" }, signal), isLeaseLost);
 	} finally {
 		worker.close();
 	}

@@ -221,16 +221,6 @@ public final class ConfigurationReadinessEvaluator {
                         : "\"" + legacySandboxKey
                                 + "\" moved under hephaestus.sandbox.docker.*. The server no longer reads it.",
                 "docker-configuration");
-        add(
-                facts,
-                "observability.sentry",
-                "hephaestus.sentry.dsn",
-                roles(RuntimeRole.SERVER),
-                ConfigurationRequirement.OPTIONAL,
-                server,
-                this::validOptionalHttpsUri,
-                "Sentry is optional, but a configured DSN must be an HTTPS URI.",
-                "optional-observability");
         // Email is on exactly when a relay host is set; the sender address is then the one thing that
         // can still be missing, and its absence leaves every notification withheld as NOT_CONFIGURED.
         boolean relayConfigured = notBlank(property("spring.mail.host"));
@@ -336,7 +326,13 @@ public final class ConfigurationReadinessEvaluator {
      * look identical afterwards, and only this message separates them.
      */
     private void unreadable(String key, PlaceholderResolutionException unresolved) {
-        log.warn("Could not read {} while checking configuration: {}", key, unresolved.getMessage());
+        // The message quotes the value around the placeholder, which can hold a credential, so only
+        // the kind of failure it names reaches the log.
+        String message = unresolved.getMessage();
+        String reason = message != null && message.contains("Circular placeholder reference")
+                ? "circularReference"
+                : "unresolvedPlaceholder";
+        log.warn("Could not read {} while checking configuration: reason={}", key, reason);
     }
 
     private BooleanSetting booleanSetting(String key, boolean fallback) {
@@ -434,16 +430,6 @@ public final class ConfigurationReadinessEvaluator {
     private boolean validAgentImage(@Nullable String value) {
         BooleanSetting requireDigest = booleanSetting("hephaestus.agent.image.require-digest", false);
         return requireDigest.valid() && requireDigest.value() && value != null && ImageReference.isDigestPinned(value);
-    }
-
-    private boolean validOptionalHttpsUri(@Nullable String value) {
-        if (!notBlank(value)) return true;
-        try {
-            URI uri = URI.create(value);
-            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null;
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
     }
 
     private static boolean notBlank(@Nullable String value) {

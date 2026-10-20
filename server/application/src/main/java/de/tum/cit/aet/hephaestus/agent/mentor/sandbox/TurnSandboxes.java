@@ -305,7 +305,8 @@ public class TurnSandboxes implements AutoCloseable {
         try {
             listed = sandboxes.list();
         } catch (SandboxException e) {
-            log.warn("Could not list the turn sandboxes: {}", e.getMessage());
+            // The class only, as below: a Docker failure can quote the daemon's response body.
+            log.warn("Could not list the turn sandboxes: {}", e.getClass().getSimpleName());
             return;
         }
         for (ExecSandboxes.Listed sandbox : listed) {
@@ -340,7 +341,8 @@ public class TurnSandboxes implements AutoCloseable {
                     }
                 }
             } catch (SandboxException e) {
-                log.warn("Could not fill the turn sandbox pool: {}", e.getMessage());
+                log.warn(
+                        "Could not fill the turn sandbox pool: {}", e.getClass().getSimpleName());
             } finally {
                 refilling.set(false);
             }

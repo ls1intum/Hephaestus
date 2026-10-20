@@ -2,13 +2,6 @@ name: Docker
 
 on:
   workflow_call:
-    secrets:
-      SENTRY_AUTH_TOKEN:
-        required: false
-      SENTRY_ORG:
-        required: false
-      SENTRY_PROJECT:
-        required: false
     inputs:
       database-artifact:
         description: "Immutable advisory database artifact ID selected by this CI run"
@@ -71,10 +64,6 @@ jobs:
       id-token: write
       attestations: write
       artifact-metadata: write
-    secrets:
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
     with:
       database-artifact: ${{ inputs.database-artifact }}
       image-name: "hephaestus-build/webapp"

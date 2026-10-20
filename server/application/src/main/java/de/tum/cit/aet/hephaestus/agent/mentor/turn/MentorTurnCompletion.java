@@ -1,18 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.turn;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder.LlmUsageSample;
-import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
-import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
-import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.TransactionCallbacks;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.mentor.MentorLedgerEvents;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurn;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurnService;
-import de.tum.cit.aet.hephaestus.mentor.MentorTurnUsage;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationClaims;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationCopyOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationCopyReceipt;
@@ -21,14 +14,12 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +36,8 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Ends a turn's attempts: bills each attempt once, when it ends or its lease expires, from the LLM proxy's per-call
- * record on the turn row, and settles the conversational feedback Heph's answer showed
+ * Ends a turn's attempts: bills each attempt when it ends or its lease expires, from the attempt's usage measurement
+ * ({@link MentorAttemptUsageService}), and settles the conversational feedback Heph's answer showed
  * ({@code docs/contributor/unified-pi-runtime.mdx} § Delivery of shown feedback).
  */
 @Service
@@ -67,7 +58,7 @@ public class MentorTurnCompletion {
     private final MentorTurnService turns;
     private final FeedbackStore feedback;
     private final ConversationClaims conversationClaims;
-    private final LlmUsageRecorder usageRecorder;
+    private final MentorAttemptUsageService attemptUsage;
     private final MeterRegistry meters;
     private final Clock clock;
     private final ApplicationEventPublisher events;
@@ -93,8 +84,9 @@ public class MentorTurnCompletion {
      *
      * @param entries every Pi entry the attempt appended; none when the worker ends it
      * @param error what the developer reads about a failed turn
-     * @param cause what the operator reads about it in the worker log: the host's reason and detail, or why the worker
-     *     ended the attempt itself
+     * @param cause what the operator reads about it in the worker log: the host's reason and kind of failure, or why the
+     *     worker ended the attempt itself. It is logged as given, so it names closed kinds and classes, never a host's,
+     *     a provider's or an exception's text.
      */
     public record Ending(
             MentorTurn.Status outcome,
@@ -118,7 +110,7 @@ public class MentorTurnCompletion {
             TransactionCallbacks.afterCommit(
                     () -> log.warn("Heph turn {} attempt {} failed: {}", turnId, attempt, cause));
         }
-        bill(turn, attempt, turn.getAdmission(), ended.proxyUsage(), true);
+        bill(turn, attempt, true);
         if (turn.getSurface() == MentorTurn.Surface.APP || turn.getStatus() != MentorTurn.Status.DONE) {
             // The app shows what a DONE answer showed; a stopped or failed answer may have shown what it called.
             receiptsDue(
@@ -218,12 +210,7 @@ public class MentorTurnCompletion {
                 ConversationCopyOutcome.UNCONFIRMED,
                 LEASE_LOST,
                 NOT_SHOWN));
-        bill(
-                turn,
-                lost.attempt(),
-                lost.admission(),
-                lost.proxyUsage(),
-                turn.getStatus().isTerminal());
+        bill(turn, lost.attempt(), turn.getStatus().isTerminal());
         if (turn.getStatus() == MentorTurn.Status.QUEUED) {
             meters.counter(AgentMetrics.MENTOR_TURN_RETRIED).increment();
         }
@@ -303,11 +290,15 @@ public class MentorTurnCompletion {
             try {
                 feedback.recordConversationReceipt(workspaceId, claim, receipt);
             } catch (ResponseStatusException | IllegalArgumentException refused) {
+                // The status or the class: the refusal's text can quote the feedback.
                 log.warn(
-                        "Conversation copy receipt refused: workspaceId={}, turnId={}, reason={}",
+                        "Conversation copy receipt refused: workspaceId={}, turnId={}, feedbackId={}, refusal={}",
                         workspaceId,
                         turnId,
-                        refused.getMessage());
+                        claim.feedbackId(),
+                        refused instanceof ResponseStatusException status
+                                ? status.getStatusCode()
+                                : refused.getClass().getSimpleName());
             } catch (RuntimeException failure) {
                 log.warn(
                         "Conversation copy receipt could not be stored; it is tried again: workspaceId={}, turnId={},"
@@ -323,51 +314,17 @@ public class MentorTurnCompletion {
         }
     }
 
-    /** Appends the attempt's spend to the usage ledger. An attempt that made no call is not billed. */
-    private void bill(
-            MentorTurn turn, int attempt, @Nullable JsonNode admission, MentorTurnUsage usage, boolean recordOnTurn) {
-        if (admission == null || (usage.calls() == 0 && usage.isEmpty())) {
-            return;
-        }
-        // Calls with no token on record: the row names no source rather than crediting one that saw nothing, and its
-        // measurement is unverifiable.
-        UsageProvenance provenance = usage.isEmpty() ? UsageProvenance.NONE : UsageProvenance.PROXY;
-        Optional<MentorTurnAdmission> admitted = MentorTurnAdmission.read(admission);
-        LlmPriceSnapshot price = admitted.map(MentorTurnAdmission::price).orElseGet(LlmPriceSnapshot::unpricedInstance);
-        String model = admitted.map(MentorTurnAdmission::model).orElse("");
-        LlmUsageSample sample = new LlmUsageSample(
-                null,
-                UsageSourceType.MENTOR_TURN.name(),
-                UsageSourceType.MENTOR_TURN,
-                turn.getId(),
-                attempt,
-                model,
-                usage.inputTokens(),
-                usage.outputTokens(),
-                usage.cacheReadTokens(),
-                usage.cacheWriteTokens(),
-                usage.reasoningTokens(),
-                0L,
-                Math.max(1, usage.calls()),
-                price,
-                provenance,
-                usage.isEmpty() ? MeasurementVerification.UNVERIFIABLE : MeasurementVerification.VERIFIED,
-                clock.instant());
-        usageRecorder.record(turn.getWorkspaceId(), sample);
-        if (usage.isEmpty()) {
-            return;
-        }
-        BigDecimal cost = price.calculateCost(
-                        usage.inputTokens(), usage.outputTokens(), usage.cacheReadTokens(), usage.cacheWriteTokens())
-                .usd();
-        if (recordOnTurn) {
-            turns.recordCost(turn.getId(), attempt, cost);
-        }
-        if (cost != null) {
-            DistributionSummary.builder(AgentMetrics.MENTOR_TURN_COST)
-                    .baseUnit("usd")
-                    .register(meters)
-                    .record(cost.doubleValue());
-        }
+    /**
+     * Settles the attempt's spend from its usage measurement ({@link MentorAttemptUsageService#settle}), which every
+     * proxied call of the attempt reached, also one that returned after this. An attempt that made no call is not
+     * billed.
+     */
+    private void bill(MentorTurn turn, int attempt, boolean recordOnTurn) {
+        attemptUsage
+                .settle(turn.getId(), attempt, recordOnTurn)
+                .ifPresent(cost -> DistributionSummary.builder(AgentMetrics.MENTOR_TURN_COST)
+                        .baseUnit("usd")
+                        .register(meters)
+                        .record(cost.doubleValue()));
     }
 }

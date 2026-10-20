@@ -17,34 +17,59 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface ThreadPanelProps {
 	/** The panel's `id`, which the summary button that opened it controls. */
 	id: string;
 	/** Moves focus to the heading on open, for a thread opened to read rather than to reply in. */
 	focusHeading?: boolean;
+	/**
+	 * The width in `rem` of the region the conversation and the thread share, as the page measures
+	 * it; undefined until it has. It already leaves out the sidebar and every other part of the page.
+	 * In `rem`, the unit the column and the conversation are sized in, so larger text in the browser
+	 * needs a wider region for the same column beside the same readable conversation.
+	 */
+	availableRem: number | undefined;
 	onClose: () => void;
 	/** The thread: its parent message, replies and composer, or the state that stands in for them. */
 	children: ReactNode;
 }
 
+/** The side column's `w-[26rem]`, and the narrowest conversation that stays readable beside it. */
+const COLUMN_REM = 26;
+const CONVERSATION_MIN_REM = 24;
+
 /**
- * One thread beside the conversation. From `md` it is a side column, not a dialog: the
- * conversation stays readable and usable next to it, so the thread has its own log and Escape or
- * Close hands focus back to the control that opened it. Below `md` there is no room beside, so it
- * is a drawer over the conversation.
+ * The CSS pixels of one `rem`: the root font size, which the reader's text-size setting in the
+ * browser changes. NaN where it cannot be read, which leaves a thread in the drawer.
  */
-export function ThreadPanel({ id, focusHeading = false, onClose, children }: ThreadPanelProps) {
-	const isMobile = useIsMobile();
-	return isMobile ? (
-		<ThreadDrawer id={id} onClose={onClose}>
-			{children}
-		</ThreadDrawer>
-	) : (
+export function pixelsPerRem(): number {
+	return Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+}
+
+/**
+ * One thread beside the conversation. Where the region leaves the conversation at least
+ * {@link CONVERSATION_MIN_REM} beside the column, it is a side column, not a dialog: the
+ * conversation stays readable and usable next to it, so the thread has its own log and Escape or
+ * Close hands focus back to the control that opened it. With less room, or before the region is
+ * measured, it is a drawer over the conversation.
+ */
+export function ThreadPanel({
+	id,
+	focusHeading = false,
+	availableRem,
+	onClose,
+	children,
+}: ThreadPanelProps) {
+	const beside = availableRem !== undefined && availableRem >= COLUMN_REM + CONVERSATION_MIN_REM;
+	return beside ? (
 		<ThreadAside id={id} focusHeading={focusHeading} onClose={onClose}>
 			{children}
 		</ThreadAside>
+	) : (
+		<ThreadDrawer id={id} onClose={onClose}>
+			{children}
+		</ThreadDrawer>
 	);
 }
 
@@ -56,7 +81,12 @@ function CloseButton({ onClick }: { onClick?: () => void }) {
 	);
 }
 
-function ThreadAside({ id, focusHeading, onClose, children }: ThreadPanelProps) {
+function ThreadAside({
+	id,
+	focusHeading,
+	onClose,
+	children,
+}: Omit<ThreadPanelProps, "availableRem">) {
 	const headingId = useId();
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	// The control that opened the thread, read once when the panel mounts.
@@ -106,7 +136,11 @@ function ThreadAside({ id, focusHeading, onClose, children }: ThreadPanelProps) 
 	);
 }
 
-function ThreadDrawer({ id, onClose, children }: Omit<ThreadPanelProps, "focusHeading">) {
+function ThreadDrawer({
+	id,
+	onClose,
+	children,
+}: Omit<ThreadPanelProps, "focusHeading" | "availableRem">) {
 	const arrived = useArrived();
 	return (
 		<Drawer
@@ -132,7 +166,10 @@ function ThreadDrawer({ id, onClose, children }: Omit<ThreadPanelProps, "focusHe
 	);
 }
 
-/** Stands in for a thread whose parent message was deleted, or never was the developer's. */
+/**
+ * Stands in for a thread the server does not know as the developer's, such as one from a wrong
+ * link. A thread whose message was deleted is not this: it still opens, with its replies.
+ */
 export function ThreadGone() {
 	return (
 		<Empty>
@@ -140,8 +177,8 @@ export function ThreadGone() {
 				<EmptyMedia variant="icon">
 					<MessageSquareOffIcon />
 				</EmptyMedia>
-				<EmptyTitle>This thread is gone</EmptyTitle>
-				<EmptyDescription>The message it replied to was deleted.</EmptyDescription>
+				<EmptyTitle>We could not find this thread</EmptyTitle>
+				<EmptyDescription>The link may be wrong, or the thread is not yours.</EmptyDescription>
 			</EmptyHeader>
 		</Empty>
 	);

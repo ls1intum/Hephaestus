@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.account.userview;
 
+import de.tum.cit.aet.hephaestus.core.RequireInstanceAdmin;
 import de.tum.cit.aet.hephaestus.core.UserViewRead;
 import de.tum.cit.aet.hephaestus.core.auth.validation.AccountId;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -14,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 @WorkspaceScopedController
 @ConditionalOnServerRole
 @RequestMapping("/user-view/users")
-@PreAuthorize("hasAuthority('app_admin')")
+@RequireInstanceAdmin
 @Tag(name = "User view", description = "Instance-admin-only read-only access to users")
 @RequiredArgsConstructor
 @Validated

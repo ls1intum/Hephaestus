@@ -39,6 +39,7 @@ import {
 	hephThreadOptions,
 	patchShownEntry,
 } from "@/hooks/heph-cache";
+import { usePageVisible } from "@/hooks/use-page-visible";
 
 import { type PendingMessage, readAtOf, turnRequestOf } from "@/lib/mentor-entry";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
@@ -74,7 +75,8 @@ function earlierOf<TData, TError>(
 /**
  * The messages the developer sent in this scope that the server has not stored yet, read from the
  * mutation cache, so the Heph panel and the mentor page show the same ones. A send the server stored
- * leaves this list as its stored message arrives in the pages.
+ * leaves this list as its stored message arrives in the pages, not when its request ends: the stored
+ * copy is written in order and can wait behind a read, and the question must not vanish meanwhile.
  */
 function usePendingMessages(
 	workspaceSlug: string,
@@ -97,7 +99,7 @@ function usePendingMessages(
 			continue;
 		}
 		const { requestId, text } = request;
-		if (status === "success" || status === "idle" || storedRequests.has(requestId)) {
+		if (status === "idle" || storedRequests.has(requestId)) {
 			latest.delete(requestId);
 			continue;
 		}
@@ -187,8 +189,10 @@ export function useHephThread(
 	if (conversation.isError && conversation.data === undefined) {
 		return { status: "error", onRetry: retry };
 	}
-	if (parent === undefined || parent.deleted || conversation.data === undefined) {
-		return parent?.deleted === true ? { status: "missing" } : { status: "loading" };
+	// A deleted parent still leads its thread, as "This message was deleted.": deleting it removes
+	// only its words, so the replies stay readable and each keeps its own Delete.
+	if (parent === undefined || conversation.data === undefined) {
+		return { status: "loading" };
 	}
 	return {
 		status: "ready",
@@ -245,16 +249,31 @@ function useVote(workspaceSlug: string) {
 /** Every write the developer can make to their conversation. A user view renders none of them. */
 export function useHephActions(workspaceSlug: string): HephActions {
 	const queryClient = useQueryClient();
+	/** Removes every attempt to send one message from the unsent ones. */
+	const forgetSend = (requestId: string) => {
+		const sends = queryClient.getMutationCache();
+		for (const mutation of sends.findAll({ mutationKey: submitKey(workspaceSlug) })) {
+			if (turnRequestOf(mutation.state.variables)?.requestId === requestId) {
+				sends.remove(mutation);
+			}
+		}
+	};
 	const submit = useMutation({
 		...submitMentorTurnMutation(),
 		mutationKey: submitKey(workspaceSlug),
 		// A message the server did not store, unreachable or refused, stays on screen with Retry until
-		// the page reloads.
+		// the developer deletes it or the page reloads.
 		gcTime: Infinity,
-		onSuccess: (submission) => {
-			inOrder(queryClient, workspaceSlug, () =>
-				applySubmission(queryClient, workspaceSlug, submission),
-			);
+		onSuccess: (submission, variables) => {
+			const requestId = turnRequestOf(variables)?.requestId;
+			inOrder(queryClient, workspaceSlug, () => {
+				applySubmission(queryClient, workspaceSlug, submission);
+				// The stored copy is in the pages now, so the send is not kept for a later read to miss.
+				// A write that throws leaves it, so the accepted question stays on screen.
+				if (requestId !== undefined) {
+					forgetSend(requestId);
+				}
+			});
 		},
 	});
 	const stop = useMutation({
@@ -280,17 +299,20 @@ export function useHephActions(workspaceSlug: string): HephActions {
 
 	return {
 		send,
-		onTryAgain: (question) => send(question.text, { parentEntryId: question.parentEntryId }),
-		onRetrySend: (requestId) => {
-			const request = queryClient
-				.getMutationCache()
-				.findAll({ mutationKey: submitKey(workspaceSlug) })
-				.map(({ state }) => turnRequestOf(state.variables))
-				.find((candidate) => candidate?.requestId === requestId);
-			if (request !== undefined) {
-				submitRequest(request);
-			}
+		ask: {
+			onTryAgain: (question) => send(question.text, { parentEntryId: question.parentEntryId }),
+			onRetrySend: (requestId) => {
+				const request = queryClient
+					.getMutationCache()
+					.findAll({ mutationKey: submitKey(workspaceSlug) })
+					.map(({ state }) => turnRequestOf(state.variables))
+					.find((candidate) => candidate?.requestId === requestId);
+				if (request !== undefined) {
+					submitRequest(request);
+				}
+			},
 		},
+		onDiscardSend: forgetSend,
 		onStop: (turnId) => {
 			stop.mutate({ path: { workspaceSlug, turnId }, body: { status: "STOPPED" } });
 		},
@@ -343,12 +365,14 @@ export function useHephUnread(workspaceSlug: string): boolean {
 }
 
 /**
- * Marks the conversation read up to its newest answer while a view of it is open, and again for each
- * answer that lands then. The server keeps the later of two times, so a late request never lowers it,
- * and every device of the developer reads the same marker.
+ * Marks the conversation read up to its newest answer while a view of it is open and the page is
+ * visible, and again for each answer that lands then. A view in a background tab marks nothing, so
+ * an answer that lands there stays unread on every device until the page shows. The server keeps the
+ * later of two times, so a late request never lowers it, and every device reads the same marker.
  */
 export function useMarkHephRead(workspaceSlug: string, enabled: boolean) {
 	const queryClient = useQueryClient();
+	const visible = usePageVisible();
 	const conversation = useQuery({
 		...hephConversationOptions(workspaceSlug),
 		enabled,
@@ -372,8 +396,8 @@ export function useMarkHephRead(workspaceSlug: string, enabled: boolean) {
 	// A read that failed every attempt is not sent again for the same answer; the next answer tries.
 	const failed = isError && variables.body.at.getTime() === answeredAt?.getTime();
 	useEffect(() => {
-		if (enabled && unread && answeredAt !== undefined && !failed) {
+		if (enabled && visible && unread && answeredAt !== undefined && !failed) {
 			mutate({ path: { workspaceSlug }, body: { at: answeredAt } });
 		}
-	}, [enabled, unread, answeredAt, failed, workspaceSlug, mutate]);
+	}, [enabled, visible, unread, answeredAt, failed, workspaceSlug, mutate]);
 }

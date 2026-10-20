@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
 import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpRequiredException;
+import de.tum.cit.aet.hephaestus.core.auth.webauthn.PasskeyRequiredException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -119,6 +120,9 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             Long linkingAccountId;
             try {
                 linkingAccountId = identityLinkAuthentication.resolveAuthenticatedAccountId(request);
+            } catch (PasskeyRequiredException e) {
+                redirectToApp(request, response, "/settings#passkeys");
+                return;
             } catch (StepUpRequiredException e) {
                 // The intent is already cleared: recovery signs in again and starts a new, explicit
                 // link.
@@ -141,7 +145,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         try {
             provisioned = provisioningService.resolveOrProvision(registrationId, subject, principal, intent);
         } catch (LinkOnlyProviderLoginException e) {
-            log.warn("auth.success: refused link-only provider login: {}", e.getMessage());
+            log.warn("auth.success: refused link-only provider login: registrationId={}", registrationId);
             refuse(request, response, client, "link_requires_auth");
             return;
         } catch (AccountLinkConflictException e) {

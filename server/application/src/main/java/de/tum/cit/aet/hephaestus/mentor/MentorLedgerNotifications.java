@@ -114,7 +114,7 @@ public class MentorLedgerNotifications implements DisposableBean {
                 log.warn(
                         "Heph ledger notifications lost their connection; reconnecting in {}: {}",
                         backoff,
-                        e.getMessage());
+                        e.getClass().getSimpleName());
                 try {
                     Thread.sleep(backoff.toMillis());
                 } catch (InterruptedException interrupted) {
@@ -131,7 +131,10 @@ public class MentorLedgerNotifications implements DisposableBean {
         try {
             change = mapper.readValue(payload, MentorLedgerEvents.LedgerChanged.class);
         } catch (JacksonException malformed) {
-            log.warn("Ignoring a malformed Heph ledger notification: {}", malformed.getMessage());
+            // The class only: a parser message can quote the notification's payload.
+            log.warn(
+                    "Ignoring a malformed Heph ledger notification: {}",
+                    malformed.getClass().getSimpleName());
             return;
         }
         for (Listener listener : listeners) {

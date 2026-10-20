@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
 import de.tum.cit.aet.hephaestus.core.auth.stepup.RecentSignInPolicy;
+import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpRequiredException;
+import de.tum.cit.aet.hephaestus.core.auth.webauthn.PasskeyAssurancePolicy;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.Nullable;
@@ -29,24 +31,27 @@ public class IdentityAuthentication {
     private final JwtDecoder jwtDecoder;
     private final Converter<Jwt, AbstractAuthenticationToken> authenticationConverter;
     private final RecentSignInPolicy recentSignInPolicy;
+    private final PasskeyAssurancePolicy passkeys;
 
     public IdentityAuthentication(
             CookieBearerTokenResolver bearerTokenResolver,
             RevocationAwareJwtDecoder jwtDecoder,
             Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
-            RecentSignInPolicy recentSignInPolicy) {
+            RecentSignInPolicy recentSignInPolicy,
+            PasskeyAssurancePolicy passkeys) {
         this.bearerTokenResolver = bearerTokenResolver;
         this.jwtDecoder = jwtDecoder;
         this.authenticationConverter = authenticationConverter;
         this.recentSignInPolicy = recentSignInPolicy;
+        this.passkeys = passkeys;
     }
 
     /**
      * The account id from the access cookie, or {@code null} when there is no token or the token is
      * invalid or revoked.
      *
-     * @throws de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpRequiredException when the session
-     *     is valid but the sign-in behind it is no longer recent.
+     * @throws StepUpRequiredException when the session is valid but the sign-in behind it is no
+     *     longer recent.
      */
     @Nullable
     public Long resolveAuthenticatedAccountId(HttpServletRequest request) {
@@ -60,9 +65,10 @@ public class IdentityAuthentication {
             jwt = jwtDecoder.decode(token);
             accountId = Long.parseLong(jwt.getSubject());
         } catch (JwtException | NumberFormatException ex) {
-            log.warn("auth.link: token rejected: {}", ex.getMessage());
+            log.warn("auth.link: token rejected: errorType={}", ex.getClass().getName());
             return null;
         }
+        passkeys.requirePersonal(authenticationConverter.convert(jwt));
         recentSignInPolicy.require(
                 authenticationConverter.convert(jwt), AuthEvent.EventType.IDENTITY_LINKED, accountId);
         return accountId;

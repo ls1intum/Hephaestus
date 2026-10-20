@@ -74,10 +74,11 @@ function stateOfOutcome(outcome: TurnOutcome, actions: TimelineActions | undefin
 	// The line sits under the turn's last message, which is Heph's when it wrote part of an answer
 	// before it failed; Try again asks the question again either way.
 	const { question } = outcome;
+	const ask = actions?.ask;
 	return {
 		kind: "failed",
 		reason: outcome.error ?? "Heph could not answer this message.",
-		onTryAgain: actions && !question.deleted ? () => actions.onTryAgain(question) : undefined,
+		onTryAgain: ask && !question.deleted ? () => ask.onTryAgain(question) : undefined,
 	};
 }
 
@@ -102,7 +103,7 @@ function messageActions(
 					: undefined
 			}
 			onReply={
-				actions && threads && topLevel ? () => threads.onOpen(entry.id, "composer") : undefined
+				actions?.ask && threads && topLevel ? () => threads.onOpen(entry.id, "composer") : undefined
 			}
 			onDelete={actions && entry.kind === "USER" ? () => onDelete(entry) : undefined}
 		/>
@@ -154,13 +155,13 @@ export function HephTimelineRow({
 	props: RowProps;
 	onDelete: (entry: MentorEntry) => void;
 }) {
-	const { developer, actions, threads, workspaceSlug } = props;
+	const { developer, actions, threads, workspaceSlug, onCopy } = props;
 	switch (row.kind) {
 		case "entry": {
 			const { entry, queued, outcome, notFullyInSlack } = row;
 			const summary = entry.thread;
 			const canReply =
-				actions !== undefined && threads !== undefined && entry.parentEntryId === undefined;
+				actions?.ask !== undefined && threads !== undefined && entry.parentEntryId === undefined;
 			return (
 				<ClosesDay nextDay={nextDay}>
 					<HephMessage
@@ -208,6 +209,17 @@ export function HephTimelineRow({
 		}
 		case "pending": {
 			const { message } = row;
+			const ask = actions?.ask;
+			// A message the server did not store keeps its words: Copy them, or Delete it from this device.
+			const failedActions =
+				message.status === "failed" ? (
+					<MessageActions
+						subject={subject}
+						text={message.text}
+						onCopy={onCopy}
+						onDelete={actions ? () => actions.onDiscardSend(message.requestId) : undefined}
+					/>
+				) : undefined;
 			return (
 				<ClosesDay nextDay={nextDay}>
 					<HephMessage
@@ -221,6 +233,7 @@ export function HephTimelineRow({
 						}}
 						developer={developer}
 						grouped={row.grouped}
+						actions={failedActions}
 					>
 						{message.status === "failed" && (
 							<MessageStatus
@@ -228,7 +241,7 @@ export function HephTimelineRow({
 								state={{
 									kind: "notSent",
 									reason: message.reason,
-									onRetry: actions ? () => actions.onRetrySend(message.requestId) : undefined,
+									onRetry: ask ? () => ask.onRetrySend(message.requestId) : undefined,
 								}}
 							/>
 						)}

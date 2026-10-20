@@ -22,7 +22,6 @@ interface RuntimeEnvVars {
 	HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN?: string;
 	XSRF_COOKIE_NAME?: string;
 	DEPLOYMENT_ENVIRONMENT?: string;
-	SENTRY_DSN?: string;
 	LEGAL_PROFILE?: string;
 	TANSTACK_DEVTOOLS_ENABLED?: string;
 	GIT_BRANCH?: string;
@@ -33,10 +32,9 @@ interface RuntimeEnvVars {
 /**
  * The name the server gives the CSRF double-submit cookie when `hephaestus.auth.cookie-secure` is
  * on, which the `prod` profile requires of itself and every deployment runs under. A blank name
- * matches no cookie, so it is a variable that was never set rather than a choice — unlike
- * `SENTRY_DSN`, where blank deliberately turns reporting off. The entrypoint writes every key of
- * `RuntimeEnvVars` into `window.__ENV__` whether the container has it or not, so an unset variable
- * arrives as `""`, which no default beside it can rescue.
+ * matches no cookie, so it is a variable that was never set rather than a choice. The entrypoint
+ * writes every key of `RuntimeEnvVars` into `window.__ENV__` whether the container has it or not,
+ * so an unset variable arrives as `""`, which no default beside it can rescue.
  */
 const SECURE_XSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
 
@@ -47,7 +45,6 @@ const defaults: RuntimeEnvVars = {
 	APPLICATION_SERVER_URL: "http://localhost:8080",
 	XSRF_COOKIE_NAME: SECURE_XSRF_COOKIE_NAME,
 	DEPLOYMENT_ENVIRONMENT: "local",
-	SENTRY_DSN: "https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3",
 	LEGAL_PROFILE: "",
 	TANSTACK_DEVTOOLS_ENABLED: "true",
 	GIT_BRANCH: "",
@@ -113,10 +110,6 @@ const environment = {
 		branch: env("GIT_BRANCH"),
 		commit: env("GIT_COMMIT"),
 		deployedAt: env("DEPLOYED_AT"),
-	},
-
-	sentry: {
-		dsn: env("SENTRY_DSN"),
 	},
 
 	legal: {

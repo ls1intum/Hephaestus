@@ -46,13 +46,16 @@ public record ProxyRouting(
      * @param sourceId the {@code review_job} id, or the {@code mentor_turn} id
      * @param number the row's {@code attempt} when the token was validated. Orphan recovery and the Heph turn lease
      *     reaper can requeue a row — zeroing its per-attempt accumulators — while a call this credential
-     *     authenticated is still out, so a late write must be dropped rather than billed to whoever owns the row now.
+     *     authenticated is still out, so a late call is settled on this attempt's own measurement, never on whoever
+     *     owns the row now.
      * @param workerId worker owning the authenticated job attempt or Heph turn attempt
      * @param spentUsd priced with the rates frozen onto the execution at admission
      * @param directModelTokens the tokens that the attempt's direct model calls used on every slot, read with
      *     {@code spentUsd}; 0 for every other call
      * @param directModelSearchUnits the search units that the attempt's direct reranking calls billed, read with
      *     {@code spentUsd}; 0 for every other call
+     * @param workspaceId the job's workspace when the call was authenticated; a review call is settled only in it.
+     *     {@code null} for a mentor turn
      */
     public record BilledAttempt(
             UsageSourceType sourceType,
@@ -61,11 +64,23 @@ public record ProxyRouting(
             BigDecimal spentUsd,
             @Nullable String workerId,
             long directModelTokens,
-            long directModelSearchUnits) {
+            long directModelSearchUnits,
+            @Nullable Long workspaceId) {
 
         public BilledAttempt(
                 UsageSourceType sourceType, UUID sourceId, int number, BigDecimal spentUsd, @Nullable String workerId) {
-            this(sourceType, sourceId, number, spentUsd, workerId, 0L, 0L);
+            this(sourceType, sourceId, number, spentUsd, workerId, 0L, 0L, null);
+        }
+
+        public BilledAttempt(
+                UsageSourceType sourceType,
+                UUID sourceId,
+                int number,
+                BigDecimal spentUsd,
+                @Nullable String workerId,
+                long directModelTokens,
+                long directModelSearchUnits) {
+            this(sourceType, sourceId, number, spentUsd, workerId, directModelTokens, directModelSearchUnits, null);
         }
     }
 

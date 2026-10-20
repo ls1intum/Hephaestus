@@ -16,6 +16,7 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -189,7 +190,28 @@ public class HephTurnController {
     }
 
     /**
-     * @param detail why a failed attempt failed, for the operator's log; never shown to the developer
+     * The kinds of failure a host names in {@link EndRequest#detail}, as {@code heph-host-protocol.ts}
+     * {@code FAILURE_DETAILS} lists them. The worker log takes no other detail: free text from a host can quote the
+     * model provider, a tool or the developer.
+     */
+    static final Set<String> FAILURE_DETAILS = Set.of(
+            "deadline",
+            "upstream_stalled",
+            "upstream_paused",
+            "provider_unavailable",
+            "model_error",
+            "model_aborted",
+            "no_answer",
+            "empty_answer",
+            "output_limit",
+            "context_overflow",
+            "worker_refused",
+            "worker_unavailable",
+            "host_error");
+
+    /**
+     * @param detail the kind of failure of a failed attempt, for the operator's log; never shown to the developer.
+     *     Text outside {@link #FAILURE_DETAILS} is logged as unrecognized, not quoted.
      */
     public record EndRequest(
             @NotNull Outcome outcome,
@@ -216,9 +238,11 @@ public class HephTurnController {
                     case STALLED -> HephTurnDispatcher.MODEL_STOPPED_ANSWERING;
                     case ERROR -> HephTurnDispatcher.COULD_NOT_FINISH;
                 };
+        String detail = request.detail();
         String cause = outcome != MentorTurn.Status.FAILED
                 ? null
-                : "its Heph host reported " + reason + (request.detail() == null ? "" : ": " + request.detail());
+                : "its Heph host reported " + reason
+                        + (detail == null ? "" : ": " + (FAILURE_DETAILS.contains(detail) ? detail : "unrecognized"));
         // A host that gave up on its model call cannot wait for it: a silent provider would hold the end.
         if (!callsInFlight.settle(turn.turnId(), turn.attempt(), outcome != MentorTurn.Status.DONE)) {
             log.warn(

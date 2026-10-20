@@ -215,8 +215,8 @@ Product feedback and surveys are first-party processing. Submissions stay in the
 
 Browser avatar requests go directly to the source image host, including for unsigned visitors on
 public pages. Record `[actual image hosts, roles, lawful basis, transfer safeguards and host retention]`.
-They receive visitor IP/network metadata and the requested image URL. Optional browser/backend Sentry
-and trace collectors also need recipient entries when configured. See the processor checklist.
+They receive visitor IP/network metadata and the requested image URL. Optional log stores and trace
+collectors also need recipient entries when configured. See the processor checklist.
 
 ## Third-country transfers (Art. 30(1)(e))
 
@@ -777,11 +777,15 @@ Metrics retention and scrape access are operator decisions. Tracing export is of
 
 If enabled, spans can carry workspace/run identifiers. Before enabling it, approve its recipient and retention.
 
-Browser Sentry requires a configured endpoint and the person's error-monitoring consent. Server Sentry initializes when its DSN is nonblank (except the specs profile) and does not consult browser consent. It disables default PII, strips user/request/breadcrumb fields and can retain a trace-correlation tag. The operator must establish a separate lawful basis for server diagnostics. The operator must disclose that basis.
+The browser app and the server send no error reports. Server diagnostics are container log lines on
+the host, bounded by size per container ([Collecting logs](../observability.mdx#collecting-logs)). They
+carry workspace and job identifiers, trace IDs and stack traces. Library exception text can still
+contain incidental personal data. The operator must establish a lawful basis for server diagnostics
+and disclose it.
 
-The client removes request, user and breadcrumb fields and disables content collection. Error text and
-stack traces can still contain incidental personal data. Record the actual Sentry operator, region,
-retention and contract before enabling it. Consent withdrawal stops new reports, not stored reports.
+Before collecting the lines into a log store, record its operator, region, retention
+and contract. Reports that an earlier release sent to Sentry stay with that recipient under its own
+retention.
 
 1. Regularly review access control, encryption-key custody and rotation, restore tests, cleanup failures and incident handling.
 2. Establish the Art. 33 authority-notification procedure where required (within 72 hours of awareness).

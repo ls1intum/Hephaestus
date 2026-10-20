@@ -287,7 +287,7 @@ It can take a few minutes.
 4. Read **Configuration readiness**.
 
    Each item under **Action required** needs a change and links to its section in [Configuration readiness](./configuration-readiness).
-   **Not configured** lists optional settings you have not set, such as email or error monitoring.
+   **Not configured** lists optional settings you have not set, such as email.
    The page never shows a setting's value.
 
 5. Leave optional settings until you want them.
@@ -454,7 +454,7 @@ Set `DEPLOYMENT_ENVIRONMENT` in `.env` to the name of the deployment, such as `p
 Use lowercase letters, digits, `.`, `_` or `-`, at most 64 characters.
 Hephaestus refuses to start with another value.
 When it is unset, the instance reports `local`.
-The webapp, the **Release** card, error reports and exported traces all use this name.
+The webapp, the **Release** card, log lines and exported traces all use this name.
 
 The **Release** card also says when this instance first started the release that it runs.
 **Show release history** lists the last ten releases that the server started, newest first.

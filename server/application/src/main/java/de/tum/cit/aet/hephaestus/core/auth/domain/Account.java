@@ -74,6 +74,18 @@ public class Account {
     @Nullable
     private Instant deletedAt;
 
+    @Column(name = "passkey_user_handle", length = 64, unique = true)
+    @Nullable
+    private String passkeyUserHandle;
+
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean passkeyProtectionEnabled;
+
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean passkeyRecoveryRequired;
+
     @Column(name = "public_activity_visible", nullable = false)
     @ColumnDefault("true")
     private boolean publicActivityVisible = true;

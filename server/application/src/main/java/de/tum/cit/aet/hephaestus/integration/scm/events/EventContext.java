@@ -49,7 +49,7 @@ public record EventContext(
                 log.debug(
                         "Could not resolve provider type from detached proxy, correlationId={}: {}",
                         ctx.correlationId(),
-                        e.getMessage());
+                        e.getClass().getSimpleName());
             }
         }
         return new EventContext(

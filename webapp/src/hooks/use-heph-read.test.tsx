@@ -124,6 +124,29 @@ it("shows the answer unread again when every attempt failed, and does not send t
 	expect(puts).toHaveLength(4);
 });
 
+it("leaves an answer unread while the page is hidden, and reads it once the page shows", async () => {
+	seed();
+	serveRead([]);
+	const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+	try {
+		const { result } = renderRead();
+		await settle(10_000);
+		// A background tab has shown nobody the answer, so every device keeps the dot.
+		expect(puts).toStrictEqual([]);
+		expect(result.current).toBe(true);
+
+		visibility.mockReturnValue("visible");
+		act(() => {
+			document.dispatchEvent(new Event("visibilitychange"));
+		});
+		await settle(1000);
+		expect(puts).toStrictEqual([ANSWERED]);
+		expect(result.current).toBe(false);
+	} finally {
+		visibility.mockRestore();
+	}
+});
+
 it("stays read when another device confirmed the read while this one's attempts failed", async () => {
 	seed();
 	serveRead([503, 503, 503, 503]);

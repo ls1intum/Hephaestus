@@ -27,7 +27,6 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -149,7 +148,7 @@ public class ReviewJobExecutor {
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
-    private final LlmUsageRecorder usageRecorder;
+    private final ReviewAttemptUsageService attemptUsage;
     private final PracticeScriptRunRecorder practiceScriptRuns;
     private final @Nullable LlmAdmissionService llmAdmissionService;
 
@@ -189,7 +188,7 @@ public class ReviewJobExecutor {
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
             ReviewJobTelemetry jobTelemetry,
-            LlmUsageRecorder usageRecorder,
+            ReviewAttemptUsageService attemptUsage,
             PracticeScriptRunRecorder practiceScriptRuns,
             @Nullable LlmAdmissionService llmAdmissionService,
             Optional<WorkerCapacityState> capacityState,
@@ -209,7 +208,7 @@ public class ReviewJobExecutor {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.jobTelemetry = jobTelemetry;
-        this.usageRecorder = usageRecorder;
+        this.attemptUsage = attemptUsage;
         this.practiceScriptRuns = practiceScriptRuns;
         this.llmAdmissionService = llmAdmissionService;
         this.capacityState = capacityState;
@@ -423,7 +422,10 @@ public class ReviewJobExecutor {
                     sleepPollInterval();
                 }
             } catch (Exception e) {
-                log.warn("Poll loop error, retrying in {}: {}", agentProperties.pollInterval(), e.getMessage());
+                log.warn(
+                        "Poll loop error, retrying in {}: {}",
+                        agentProperties.pollInterval(),
+                        e.getClass().getName());
                 sleepPollInterval();
             }
         }
@@ -470,7 +472,10 @@ public class ReviewJobExecutor {
             log.debug("Lock timeout during claim for job {}, will retry on next poll", jobId);
             return StartOutcome.SKIPPED;
         } catch (Exception e) {
-            log.warn("Claim failed for job {}, will retry on next poll: {}", jobId, e.getMessage());
+            log.warn(
+                    "Claim failed for job {}, will retry on next poll: {}",
+                    jobId,
+                    e.getClass().getName());
             return StartOutcome.SKIPPED;
         }
         if (attempt instanceof ReviewJobClaimService.TerminalClaim terminal) {
@@ -996,19 +1001,19 @@ public class ReviewJobExecutor {
                 job, reason, jobRepository.findLlmUsageById(job.getId()).orElse(null));
     }
 
-    // Read usage before requeue clears accumulators, or this attempt would be billed as zero.
+    // The counters only start an attempt measurement that no proxied call registered.
     private void billTerminatedJob(ReviewJob job, String reason, @Nullable ReviewJobLlmUsage counts) {
         ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         LlmPriceSnapshot price = terminalPriceOrUnpriced(snapshot);
         // No runner report exists on this path by definition — the job never reached a clean finish.
-        TerminalUsage usage = TerminalUsage.fromProxy(counts);
-        boolean billed = usage.appendTo(usageRecorder, jobRepository, job.getWorkspaceId(), job, snapshot, price);
-        if (billed) {
+        ReviewAttemptUsageService.Settled settled =
+                attemptUsage.settleAttempt(job, FrozenCharge.admitted(snapshot, price), null, counts);
+        if (settled.billed()) {
             log.info(
                     "Settled usage for terminated job ({}): jobId={}, calls={}",
                     reason,
                     job.getId(),
-                    usage.totalCalls());
+                    settled.usage().totalCalls());
         } else {
             log.info("Recorded UNPRICED usage ledger entry ({}): jobId={}", reason, job.getId());
         }
@@ -1228,8 +1233,8 @@ public class ReviewJobExecutor {
             }
 
             ReviewJob freshJob = jobRepository.findById(jobId).orElseThrow();
-            // Read the proxy's committed per-call accumulations BEFORE the runner-reported totals are
-            // written over them below — they are the fallback when the runner reported nothing.
+            // Read the counters BEFORE the selected totals are written over them below: they start the attempt's
+            // measurement when no proxied call registered one.
             ReviewJobLlmUsage proxyCounts =
                     jobRepository.findLlmUsageById(jobId).orElse(null);
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(freshJob.getConfigSnapshot(), objectMapper);
@@ -1245,13 +1250,11 @@ public class ReviewJobExecutor {
             }
 
             var runnerUsage = agentResult.usage();
-            // TerminalUsage retains one coherent observed token vector, including a proxy-only fallback
-            // when the runner never wrote usage.json.
-            TerminalUsage usage = TerminalUsage.resolve(
-                    runnerUsage,
-                    proxyCounts,
-                    jobRepository.sumPracticeScriptUsageByKind(
-                            freshJob.getWorkspaceId(), jobId, freshJob.getAttempt()));
+            // The attempt's measurement keeps the runner's report and projects one coherent observed token vector,
+            // including a proxy-only fallback when the runner never wrote usage.json.
+            TerminalUsage usage = attemptUsage
+                    .settleAttempt(freshJob, FrozenCharge.admitted(snapshot, price), runnerUsage, proxyCounts)
+                    .usage();
 
             // Use the ledger totals: the runner may omit usage details counted by the proxy.
             if (runnerUsage != null && runnerUsage.totalCalls() > 0) {
@@ -1266,7 +1269,6 @@ public class ReviewJobExecutor {
 
             jobRepository.saveAndFlush(freshJob);
 
-            usage.appendTo(usageRecorder, jobRepository, freshJob.getWorkspaceId(), freshJob, snapshot, price);
             practiceScriptRuns.record(
                     freshJob,
                     sandboxResult.outputFiles().get(SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE),

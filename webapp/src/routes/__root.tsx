@@ -1,4 +1,3 @@
-import { ErrorBoundary } from "@sentry/react";
 import {
 	notifyManager,
 	type QueryCache,
@@ -7,6 +6,7 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import {
+	CatchBoundary,
 	createRootRouteWithContext,
 	redirect,
 	HeadContent,
@@ -40,7 +40,6 @@ import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { NotFoundPage } from "@/components/common/NotFoundPage";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { CookieConsentBanner } from "@/components/layout/CookieConsentBanner";
 import Footer from "@/components/layout/Footer";
 import Header from "@/components/layout/Header";
 import { RouteAnnouncer } from "@/components/layout/RouteAnnouncer";
@@ -104,7 +103,6 @@ declare module "@tanstack/react-router" {
 }
 
 function RootLayout() {
-	const { login: loginOpen } = Route.useSearch();
 	const { pathname } = useLocation();
 	const surface = useMatches({
 		select: (matches) => {
@@ -138,7 +136,6 @@ function RootLayout() {
 		<>
 			<HeadContent />
 			<SkipToContent />
-			{loginOpen !== true && <CookieConsentBanner />}
 			<ProviderColors />
 			<WorkProviderScope>
 				<SidebarProvider>
@@ -188,15 +185,20 @@ function RootLayout() {
 			<PublicLoginOverlay />
 			{userView && <UserViewConfirmAccess />}
 			{showHephPanel && (
-				<ErrorBoundary handled>
+				<CatchBoundary getResetKey={() => 0} errorComponent={HephPanelUnavailable}>
 					<Suspense fallback={null}>
 						<GlobalHephPanel />
 					</Suspense>
-				</ErrorBoundary>
+				</CatchBoundary>
 			)}
 			{!userView && <FeatureFlagDevTools />}
 		</>
 	);
+}
+
+/** The page works without Heph, so a failed Heph panel renders nothing until the next load. */
+function HephPanelUnavailable() {
+	return null;
 }
 
 /** The announcer sits above the layout, whose auth and app branches each remount what they hold. */

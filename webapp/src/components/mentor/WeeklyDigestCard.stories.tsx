@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
 
 import {
-	ALL_HIDDEN_DIGEST,
+	NOTHING_TO_SHOW_DIGEST,
 	WAITING_ONLY_DIGEST,
 	WEEKLY_DIGEST,
 	WITHDRAWN_DIGEST,
@@ -27,7 +27,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Feedback that reached the developer in every place, what changed on the profile, and the cards that wait. */
+/** Feedback that reached the developer on their work and in conversation, what changed on the profile, and the cards that wait. */
 export const Default: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await expect(canvas.getByText("5–11 October 2026")).toBeVisible();
@@ -47,9 +47,11 @@ export const Default: Story = {
 		).toHaveAttribute("href", "/w/aet/feedback/421");
 		await expect(
 			canvas.getByRole("link", {
-				name: /Link the issue the change resolves.*On the practice page/u,
+				name: /Link the issue the change resolves.*Pull request #433 · Retry failed deliveries/u,
 			}),
-		).toBeVisible();
+		).toHaveAttribute("href", "/w/aet/feedback/433");
+		// Practice page cards are counted below, never listed.
+		await expect(canvas.queryByText("On the practice page")).toBeNull();
 		await expect(canvas.getByRole("link", { name: /In conversation/u })).toBeVisible();
 		await expect(
 			canvas.getByText("Two pieces of feedback are new on your", { exact: false }),
@@ -72,11 +74,17 @@ export const WaitingOnly: Story = {
 	},
 };
 
-/** Empty: everything the week held was taken back since. The digest stays, saying so. */
-export const AllHidden: Story = {
-	args: { digest: ALL_HIDDEN_DIGEST },
+/**
+ * Empty: the developer read the week's Practice page cards since, or its feedback no longer shows.
+ * The digest stays and says only that nothing is left to show, never that feedback was taken back.
+ */
+export const NothingToShow: Story = {
+	args: { digest: NOTHING_TO_SHOW_DIGEST },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Everything from this week was taken back since.")).toBeVisible();
+		await expect(
+			canvas.getByText("There is no feedback or profile change to show here now."),
+		).toBeVisible();
+		await expect(canvas.queryByText(/taken back/u)).toBeNull();
 	},
 };
 
@@ -88,7 +96,8 @@ export const WithdrawnItem: Story = {
 	args: { digest: WITHDRAWN_DIGEST },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Withdrawn")).toBeVisible();
-		await expect(canvas.queryByText("On the practice page")).toBeNull();
+		// Only the replaced row names where it landed; the withdrawn one names its practice alone.
+		await expect(canvas.getAllByText("On the work")).toHaveLength(1);
 		await expect(canvas.getAllByRole("link")).toHaveLength(1);
 		await expect(canvas.getByText(/Newer feedback replaced it/u)).toBeVisible();
 	},

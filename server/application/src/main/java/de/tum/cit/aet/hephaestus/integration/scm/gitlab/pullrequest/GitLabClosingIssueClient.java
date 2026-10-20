@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest;
 
-import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import java.time.Duration;
@@ -64,7 +62,7 @@ public class GitLabClosingIssueClient {
                     "Could not read the issues a merge request closes: projectId={}, iid={}, reason={}",
                     projectId,
                     mrIid,
-                    sanitizeForLog(e.getMessage()));
+                    e.getClass().getSimpleName());
             return null;
         }
     }

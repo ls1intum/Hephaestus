@@ -207,7 +207,11 @@ public class DockerExecSandboxes implements ExecSandboxes, AutoCloseable {
         } catch (NotFoundException e) {
             log.debug("Turn sandbox {} was already removed", sandbox);
         } catch (DockerException | IllegalStateException e) {
-            log.warn("Could not remove turn sandbox {}: {}", sandbox, e.getMessage());
+            // The class only: a Docker client exception can quote the daemon's response body.
+            log.warn(
+                    "Could not remove turn sandbox {}: {}",
+                    sandbox,
+                    e.getClass().getSimpleName());
         }
     }
 

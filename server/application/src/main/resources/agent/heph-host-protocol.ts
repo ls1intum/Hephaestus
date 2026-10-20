@@ -247,8 +247,28 @@ export interface PartialSnapshot {
 	messages: PartialMessage[];
 }
 
-/** The most characters of a failure's detail an end carries. */
-export const MAX_DETAIL_CHARS = 500;
+/**
+ * What kind of failure ended a failed attempt, for the operator. The set is closed, so an end never carries the words
+ * of the model provider, a tool or the worker into a log; the worker logs no other detail
+ * (`HephTurnController.FAILURE_DETAILS`). The two proxy codes are those of `PROVIDER_UNAVAILABLE`.
+ */
+export const FAILURE_DETAILS = [
+	"deadline",
+	"upstream_stalled",
+	"upstream_paused",
+	"provider_unavailable",
+	"model_error",
+	"model_aborted",
+	"no_answer",
+	"empty_answer",
+	"output_limit",
+	"context_overflow",
+	"worker_refused",
+	"worker_unavailable",
+	"host_error",
+] as const;
+
+export type FailureDetail = (typeof FAILURE_DETAILS)[number];
 
 /**
  * `POST turn/<id>/end`, the only write of the turn's entries. A failed attempt's reason is worded for the developer by
@@ -263,6 +283,6 @@ export interface TurnEnd {
 	entries: unknown[];
 	/** `STALLED`: the worker's LLM proxy found the model provider silent or paused (`LlmProxyService`). */
 	reason: "ERROR" | "DEADLINE" | "STALLED" | null;
-	/** For the operator: why a failed attempt failed, as the host's or the model provider's error text. */
-	detail: string | null;
+	/** For the operator: the kind of failure of a failed attempt. */
+	detail: FailureDetail | null;
 }

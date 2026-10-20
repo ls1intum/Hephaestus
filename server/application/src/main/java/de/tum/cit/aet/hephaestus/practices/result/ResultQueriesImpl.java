@@ -139,6 +139,18 @@ public class ResultQueriesImpl implements ResultQueries {
     }
 
     @Override
+    public List<Long> developersSince(long workspaceId, Instant since) {
+        return session()
+                .createNativeQuery(
+                        "SELECT DISTINCT r.developer_id FROM result r WHERE r.workspace_id=:ws"
+                                + " AND r.developer_id IS NOT NULL AND r.recorded_at>=:since",
+                        Long.class)
+                .setParameter("ws", workspaceId)
+                .setParameter("since", since)
+                .getResultList();
+    }
+
+    @Override
     public List<Result> ordered(long workspaceId, List<UUID> ids) {
         if (ids.isEmpty()) return List.of();
         var loaded = session()

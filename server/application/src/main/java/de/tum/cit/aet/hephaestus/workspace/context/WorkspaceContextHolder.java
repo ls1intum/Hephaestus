@@ -15,7 +15,7 @@ public final class WorkspaceContextHolder {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceContextHolder.class);
 
     private static final String MDC_WORKSPACE_ID = StructuredLogKeys.WORKSPACE_ID;
-    private static final String MDC_WORKSPACE_SLUG = "workspace_slug";
+    // The id, not the slug: a slug is chosen text and can be a person's login, and it would ride on every line.
     private static final String MDC_INSTALLATION_ID = "installation_id";
 
     private static final ThreadLocal<WorkspaceContext> contextHolder = new ThreadLocal<>();
@@ -35,9 +35,9 @@ public final class WorkspaceContextHolder {
         WorkspaceContext existing = contextHolder.get();
         if (existing != null && !existing.equals(context)) {
             log.warn(
-                    "Detected context overwrite: existingSlug={}, newSlug={}",
-                    existing.slug(),
-                    context != null ? context.slug() : "null");
+                    "Detected context overwrite: existingWorkspaceId={}, newWorkspaceId={}",
+                    existing.id(),
+                    context != null ? context.id() : "null");
         }
 
         contextHolder.set(context);
@@ -74,7 +74,6 @@ public final class WorkspaceContextHolder {
      */
     private static void enrichMDC(WorkspaceContext context) {
         MDC.put(MDC_WORKSPACE_ID, String.valueOf(context.id()));
-        MDC.put(MDC_WORKSPACE_SLUG, context.slug());
 
         if (context.installationId() != null) {
             MDC.put(MDC_INSTALLATION_ID, String.valueOf(context.installationId()));
@@ -88,7 +87,6 @@ public final class WorkspaceContextHolder {
      */
     private static void clearMDC() {
         MDC.remove(MDC_WORKSPACE_ID);
-        MDC.remove(MDC_WORKSPACE_SLUG);
         MDC.remove(MDC_INSTALLATION_ID);
     }
 }

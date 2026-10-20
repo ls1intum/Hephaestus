@@ -24,6 +24,7 @@ function standing(slug: string, value: PracticeGroupStanding["standing"]): Pract
 		guidance: null,
 		guidanceSource: null,
 		trendSupport: null,
+		basis: null,
 	};
 }
 

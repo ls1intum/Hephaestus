@@ -6,7 +6,12 @@
 
 import { HttpResponse, http, type PathParams } from "msw";
 
-import type { AccountAiChoice, AccountAiChoiceRequest } from "@/api/types.gen";
+import type {
+	AccountAiChoice,
+	AccountAiChoiceRequest,
+	PasskeyStatus,
+	WorkspacePasskeyPolicy,
+} from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 
 import { workspaceOnboarding } from "./fixtures/onboarding";
@@ -39,6 +44,22 @@ function notFound() {
 }
 
 export const handlers = [
+	http.get("*/user/passkeys", () =>
+		HttpResponse.json({
+			protectionEnabled: false,
+			recoveryRequired: false,
+			instanceAdminRequired: true,
+			workspaceAdminRequired: false,
+			verified: false,
+			credentials: [],
+		} satisfies Wire<PasskeyStatus>),
+	),
+	http.get("*/workspaces/:workspaceSlug/passkey-policy", () =>
+		HttpResponse.json({
+			required: false,
+			instanceRequired: false,
+		} satisfies Wire<WorkspacePasskeyPolicy>),
+	),
 	http.get("*/workspaces/:workspaceSlug/onboarding/me", () =>
 		HttpResponse.json(workspaceOnboarding()),
 	),

@@ -390,7 +390,7 @@ public class GitLabMilestoneSyncService {
                                 "Failed to persist group milestone: iid={}, repo={}, error={}",
                                 dto.iid(),
                                 sanitizeForLog(repo.getNameWithOwner()),
-                                e.getMessage());
+                                e.getClass().getSimpleName());
                     }
                 }
             }

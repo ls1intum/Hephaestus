@@ -10,6 +10,7 @@ import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { FakeEventSource } from "@/test/fake-event-source";
 import { MentorFake } from "@/test/mentor-server";
+import { ObserverStub } from "@/test/observers";
 import { renderRouteAtWithRouter, ROUTE_RENDER_WAIT } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -37,7 +38,73 @@ function serve(...fakes: MentorFake[]) {
 
 afterEach(() => {
 	server.events.removeAllListeners();
+	vi.stubGlobal("ResizeObserver", ObserverStub);
+	document.documentElement.style.removeProperty("font-size");
 });
+
+/** What a browser reports for an element `width` CSS pixels wide. */
+function sizeEntry(target: Element, width: number): ResizeObserverEntry {
+	const height = 800;
+	const box = [{ inlineSize: width, blockSize: height }];
+	return {
+		target,
+		contentRect: {
+			x: 0,
+			y: 0,
+			width,
+			height,
+			top: 0,
+			left: 0,
+			right: width,
+			bottom: height,
+			toJSON: () => ({ width, height }),
+		},
+		contentBoxSize: box,
+		borderBoxSize: box,
+		devicePixelContentBoxSize: box,
+	};
+}
+
+/**
+ * jsdom lays nothing out, so the page cannot measure the region its conversation and thread share,
+ * and a thread shows as a drawer. This gives the region `width` CSS pixels at a root text size of
+ * `textPx`, the browser's default unless the reader changed it: every element observed reports the
+ * width once observing starts, as in a browser. The returned function reports a new width, as a
+ * window resize or a sidebar toggle does.
+ */
+function giveRoom(width: number, textPx = 16): (next: number) => void {
+	document.documentElement.style.fontSize = `${textPx}px`;
+	let current = width;
+	const observed: {
+		onResize: ResizeObserverCallback;
+		observer: ResizeObserver;
+		target: Element;
+	}[] = [];
+	class ReportingResizeObserver implements ResizeObserver {
+		readonly #onResize: ResizeObserverCallback;
+		constructor(onResize: ResizeObserverCallback) {
+			this.#onResize = onResize;
+		}
+		observe(target: Element) {
+			observed.push({ onResize: this.#onResize, observer: this, target });
+			this.#onResize([sizeEntry(target, current)], this);
+		}
+		unobserve = vi.fn();
+		disconnect = vi.fn();
+	}
+	vi.stubGlobal("ResizeObserver", ReportingResizeObserver);
+	return (next) => {
+		current = next;
+		act(() => {
+			for (const { onResize, observer, target } of observed) {
+				onResize([sizeEntry(target, next)], observer);
+			}
+		});
+	};
+}
+
+/** Room for the thread's 26rem column beside a 24rem conversation, at the default 16px text. */
+const ROOMY = 1024;
 
 /** The live stream the page opened, once it has opened one. */
 async function liveStream(): Promise<FakeEventSource> {
@@ -135,6 +202,7 @@ it("says when a linked message is not in the conversation, after reading every o
 });
 
 it("brings a linked reply into view inside its thread, reading older replies until it arrives", async () => {
+	giveRoom(ROOMY);
 	const fake = new MentorFake("acme", { pageSize: 1 });
 	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
 	const linked = fake.add({
@@ -194,6 +262,148 @@ it("shows a sent message at once and keeps its request id when a failed send is 
 	expect(fake.submissions[0]?.requestId).toBe(attempts[0]?.requestId);
 	await waitFor(() => expect(screen.queryByText(/Not sent/u)).toBeNull());
 	expect(screen.getAllByText("Is my description clear?")).toHaveLength(1);
+});
+
+it("keeps a successful send visible until an in-flight read lets its stored copy land", async () => {
+	const fake = new MentorFake();
+	fake.add({ kind: "USER", text: "Before the reconnect" });
+	serve(fake);
+	const postStarted = deferred();
+	const postAnswer = deferred();
+	const pagesStarted = deferred();
+	const pagesAnswer = deferred();
+	server.use(
+		http.post<PathParams, MentorTurnRequest>(
+			"*/workspaces/acme/mentor/turns",
+			async ({ request }) => {
+				const body = await request.json();
+				fake.submissions.push(body);
+				const turn = fake.addTurn({ status: "QUEUED", requestId: body.requestId });
+				const question = fake.add({
+					kind: "USER",
+					text: body.text,
+					requestId: body.requestId,
+					turnId: turn.id,
+				});
+				postStarted.resolve();
+				await postAnswer.promise;
+				return HttpResponse.json({ turn, question });
+			},
+			{ once: true },
+		),
+	);
+
+	const { queryClient } = renderRouteAtWithRouter("/w/acme/mentor");
+	try {
+		await screen.findByText("Before the reconnect", {}, ROUTE_RENDER_WAIT);
+		const stream = await liveStream();
+		act(() => stream.open());
+		const composer = screen.getByRole("textbox", { name: "Message Heph" });
+		await userEvent.type(composer, "A question that must stay visible{Enter}");
+		await postStarted.promise;
+
+		// A read already underway must land before the stored send patches the page.
+		server.use(
+			http.get(
+				"*/workspaces/acme/mentor/entries",
+				async () => {
+					const page = { entries: [...fake.entries] };
+					pagesStarted.resolve();
+					await pagesAnswer.promise;
+					return HttpResponse.json(page);
+				},
+				{ once: true },
+			),
+		);
+		act(() => stream.emit("snapshot", fake.conversation()));
+		await pagesStarted.promise;
+		postAnswer.resolve();
+		await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+
+		// The developer can keep writing after the POST has succeeded, while the read still waits.
+		await userEvent.type(composer, "The next question is still a draft");
+		expect(screen.getAllByText("A question that must stay visible")).toHaveLength(1);
+		expect(screen.queryByRole("button", { name: /^Retry \(/u })).toBeNull();
+
+		pagesAnswer.resolve();
+		// No turn runs before it, so its own status line waits for Heph, as S1 words it. The line
+		// shows once the turn stays queued past a second, and both the line and its status say it.
+		await screen.findAllByText("Waiting for Heph to start…", {}, ROUTE_RENDER_WAIT);
+		await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+		expect(screen.getAllByText("A question that must stay visible")).toHaveLength(1);
+		expect(fake.submissions.map(({ text }) => text)).toStrictEqual([
+			"A question that must stay visible",
+		]);
+		expect(composer).toHaveProperty("value", "The next question is still a draft");
+	} finally {
+		postAnswer.resolve();
+		pagesAnswer.resolve();
+	}
+});
+
+it("copies and discards only one failed send without deleting stored messages or another draft", async () => {
+	const user = userEvent.setup();
+	const fake = new MentorFake();
+	fake.add({ kind: "USER", text: "A message the server already stored" });
+	serve(fake);
+	const attempts: MentorTurnRequest[] = [];
+	const deletes: string[] = [];
+	server.use(
+		// Records every message deletion the app asks for, then lets the fake answer it: a resolver that
+		// returns nothing passes the request on to the next handler.
+		http.delete("*/workspaces/acme/mentor/entries/:entryId", ({ request }) => {
+			deletes.push(request.url);
+		}),
+		http.post<PathParams, MentorTurnRequest>(
+			"*/workspaces/acme/mentor/turns",
+			async ({ request }) => {
+				attempts.push(await request.json());
+				return HttpResponse.json(
+					{ status: 503, detail: "The server could not store this message." },
+					{ status: 503 },
+				);
+			},
+		),
+	);
+
+	const { queryClient } = renderRouteAtWithRouter("/w/acme/mentor");
+	const composer = await screen.findByRole("textbox", { name: "Message Heph" }, ROUTE_RENDER_WAIT);
+	await user.type(composer, "The failed question to copy and discard{Enter}");
+	await screen.findByText("Not sent. The server could not store this message.");
+	await user.type(composer, "Another failed question to keep{Enter}");
+	await waitFor(() =>
+		expect(screen.getAllByText("Not sent. The server could not store this message.")).toHaveLength(
+			2,
+		),
+	);
+	await user.type(composer, "An unrelated draft still being written");
+
+	const failed = screen
+		.getByText("The failed question to copy and discard")
+		.closest<HTMLElement>("[data-slot=message]");
+	assert.isNotNull(failed);
+	await user.click(within(failed).getByRole("button", { name: /^Copy message \(/u }));
+	await expect(navigator.clipboard.readText()).resolves.toBe(
+		"The failed question to copy and discard",
+	);
+	await user.click(within(failed).getByRole("button", { name: /^Delete message \(/u }));
+
+	await waitFor(() =>
+		expect(screen.queryByText("The failed question to copy and discard")).toBeNull(),
+	);
+	await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+	expect(screen.queryByRole("alertdialog")).toBeNull();
+	screen.getByText("A message the server already stored");
+	screen.getByText("Another failed question to keep");
+	expect(screen.getAllByText("Not sent. The server could not store this message.")).toHaveLength(1);
+	expect(screen.getAllByRole("button", { name: /^Retry \(/u })).toHaveLength(1);
+	expect(composer).toHaveProperty("value", "An unrelated draft still being written");
+	expect(attempts.map(({ text }) => text)).toStrictEqual([
+		"The failed question to copy and discard",
+		"Another failed question to keep",
+	]);
+	expect(deletes).toStrictEqual([]);
+	expect(fake.deletes).toStrictEqual([]);
 });
 
 it("sends a follow-up while Heph answers, and stops the running turn", async () => {
@@ -287,6 +497,7 @@ it("deletes the developer's own message once they confirm", async () => {
 });
 
 it("opens the thread named in the address and answers in it", async () => {
+	giveRoom(ROOMY);
 	const fake = new MentorFake();
 	const parent = fake.add({ kind: "HEPH", text: "Three pull requests left the reason out." });
 	fake.add({ kind: "USER", text: "Which ones?", parentEntryId: parent.id });
@@ -315,7 +526,130 @@ it("opens the thread named in the address and answers in it", async () => {
 	await waitFor(() => expect(screen.queryByRole("complementary", { name: "Thread" })).toBeNull());
 });
 
+it("keeps a deleted message's thread to read and delete in, but offers no reply the server would refuse", async () => {
+	giveRoom(ROOMY);
+	const fake = new MentorFake();
+	// As the server keeps it: the message's words are gone, its thread stays.
+	const parent = fake.add({ kind: "USER", text: "", deleted: true });
+	fake.add({ kind: "HEPH", text: "Here is what I would change.", parentEntryId: parent.id });
+	const own = fake.add({
+		kind: "USER",
+		text: "A reply I want gone too.",
+		parentEntryId: parent.id,
+	});
+	fake.add({
+		kind: "USER",
+		text: "A reply Heph could not answer.",
+		parentEntryId: parent.id,
+		turnId: "a9000000-0000-4000-8000-000000000001",
+		turnStatus: "FAILED",
+		turnError: "Heph took too long to answer.",
+	});
+	serve(fake);
+
+	renderRouteAtWithRouter(`/w/acme/mentor?thread=${parent.id}`);
+	const panel = await screen.findByRole("complementary", { name: "Thread" }, ROUTE_RENDER_WAIT);
+	await within(panel).findByText("A reply I want gone too.");
+	within(panel).getByText("Here is what I would change.");
+	within(panel).getByText("This message was deleted.");
+	within(panel).getByText("Heph took too long to answer.");
+	// A deleted message's thread is not a thread the server does not know.
+	expect(within(panel).queryByText("We could not find this thread")).toBeNull();
+	// The server refuses every new reply to a deleted message, so nothing here asks for one.
+	expect(within(panel).queryByRole("textbox", { name: "Reply in thread" })).toBeNull();
+	expect(within(panel).queryByRole("button", { name: /^Try again \(/u })).toBeNull();
+	expect(within(panel).queryByRole("button", { name: /^Reply in thread/u })).toBeNull();
+
+	const deleteOwn = within(panel)
+		.getAllByRole("button", { name: /^Delete message \(/u })
+		.find(
+			(button) => button.closest<HTMLElement>("[data-message-id]")?.dataset.messageId === own.id,
+		);
+	assert(deleteOwn);
+	await userEvent.click(deleteOwn);
+	await userEvent.click(await screen.findByRole("button", { name: "Delete message" }));
+	await waitFor(() => expect(fake.deletes).toStrictEqual([own.id]));
+	expect(fake.submissions).toStrictEqual([]);
+});
+
+it("says a thread is not found only when the server knows no such message", async () => {
+	giveRoom(ROOMY);
+	const fake = new MentorFake();
+	serve(fake);
+
+	renderRouteAtWithRouter("/w/acme/mentor?thread=e9999999-0000-4000-8000-000000000000");
+	const panel = await screen.findByRole("complementary", { name: "Thread" }, ROUTE_RENDER_WAIT);
+	await within(panel).findByText("We could not find this thread");
+	expect(within(panel).queryByRole("textbox")).toBeNull();
+});
+
+it("shows a thread as a drawer until the page has measured room for it beside the conversation", async () => {
+	const fake = new MentorFake();
+	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
+	fake.add({ kind: "HEPH", text: "Share blockers earlier.", parentEntryId: parent.id });
+	serve(fake);
+
+	// No measurement arrives, as before the browser lays the page out.
+	renderRouteAtWithRouter(`/w/acme/mentor?thread=${parent.id}`);
+	const drawer = await screen.findByRole("dialog", { name: "Thread" }, ROUTE_RENDER_WAIT);
+	await within(drawer).findByText("Share blockers earlier.");
+	expect(screen.queryByRole("complementary", { name: "Thread" })).toBeNull();
+});
+
+it("needs a wider region for the thread's column when the reader's browser shows larger text", async () => {
+	// The same 952px region that holds both at 16px: at 20px the 26rem column is 520px, and the
+	// 432px left over is less than the conversation's 24rem, 480px.
+	const resize = giveRoom(952, 20);
+	const fake = new MentorFake();
+	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
+	fake.add({ kind: "HEPH", text: "Share blockers earlier.", parentEntryId: parent.id });
+	serve(fake);
+
+	renderRouteAtWithRouter(`/w/acme/mentor?thread=${parent.id}`);
+	const drawer = await screen.findByRole("dialog", { name: "Thread" }, ROUTE_RENDER_WAIT);
+	await within(drawer).findByText("Share blockers earlier.");
+	expect(screen.queryByRole("complementary", { name: "Thread" })).toBeNull();
+
+	// 50rem at 20px is 1000px: a region that wide holds both again.
+	resize(1000);
+	await screen.findByRole("complementary", { name: "Thread" });
+});
+
+it("chooses the thread's column or drawer by the room the page measures, and keeps the reply being written", async () => {
+	// 1000px windows: the open sidebar leaves this region 744px wide, the collapsed one 952px. A
+	// 26rem column beside it would leave the conversation 328px, below its 24rem; 536px is enough.
+	const resize = giveRoom(744);
+	const fake = new MentorFake();
+	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
+	fake.add({ kind: "HEPH", text: "Share blockers earlier.", parentEntryId: parent.id });
+	serve(fake);
+
+	renderRouteAtWithRouter(`/w/acme/mentor?thread=${parent.id}`);
+	const drawer = await screen.findByRole("dialog", { name: "Thread" }, ROUTE_RENDER_WAIT);
+	await userEvent.type(
+		await within(drawer).findByRole("textbox", { name: "Reply in thread" }),
+		"Half a reply",
+	);
+	expect(screen.queryByRole("complementary", { name: "Thread" })).toBeNull();
+
+	resize(952);
+	const column = await screen.findByRole("complementary", { name: "Thread" });
+	expect(within(column).getByRole("textbox", { name: "Reply in thread" })).toHaveProperty(
+		"value",
+		"Half a reply",
+	);
+	await waitFor(() => expect(screen.queryByRole("dialog", { name: "Thread" })).toBeNull());
+
+	resize(744);
+	const again = await screen.findByRole("dialog", { name: "Thread" });
+	await expect(
+		within(again).findByRole("textbox", { name: "Reply in thread" }),
+	).resolves.toHaveProperty("value", "Half a reply");
+	expect(fake.submissions).toStrictEqual([]);
+});
+
 it("counts every reply above the open thread and on its message, from Slack and from the panel", async () => {
+	giveRoom(ROOMY);
 	const fake = new MentorFake();
 	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
 	fake.add({ kind: "HEPH", text: "Share blockers earlier.", parentEntryId: parent.id });
@@ -349,6 +683,45 @@ it("counts every reply above the open thread and on its message, from Slack and 
 	screen.getByRole("button", { name: /^3 replies/u });
 });
 
+it("closes the live stream while the page is hidden, and reads back what landed meanwhile when it shows", async () => {
+	const fake = new MentorFake();
+	fake.add({ kind: "USER", text: "Anything new?" });
+	serve(fake);
+
+	renderRouteAtWithRouter("/w/acme/mentor");
+	await screen.findByText("Anything new?", {}, ROUTE_RENDER_WAIT);
+	const first = await liveStream();
+	act(() => {
+		first.open();
+		first.emit("snapshot", fake.conversation());
+	});
+
+	const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+	try {
+		act(() => {
+			document.dispatchEvent(new Event("visibilitychange"));
+		});
+		// A background tab holds no connection of its own.
+		await waitFor(() => expect(first.closed).toBe(true));
+		expect(FakeEventSource.latest()).toBeUndefined();
+
+		fake.add({ kind: "HEPH", text: "An answer that landed while the tab was hidden." });
+		visibility.mockReturnValue("visible");
+		act(() => {
+			document.dispatchEvent(new Event("visibilitychange"));
+		});
+		const second = await liveStream();
+		expect(second).not.toBe(first);
+		act(() => {
+			second.open();
+			second.emit("snapshot", fake.conversation());
+		});
+		await screen.findByText("An answer that landed while the tab was hidden.");
+	} finally {
+		visibility.mockRestore();
+	}
+});
+
 /** The open thread's reply field, once the thread shows. */
 async function threadReplyField(): Promise<HTMLElement> {
 	const panel = await screen.findByRole("complementary", { name: "Thread" }, ROUTE_RENDER_WAIT);
@@ -356,6 +729,7 @@ async function threadReplyField(): Promise<HTMLElement> {
 }
 
 it("starts each thread fresh, and gives a thread back the reply the developer was writing there", async () => {
+	giveRoom(ROOMY);
 	const fake = new MentorFake();
 	const first = fake.add({ kind: "USER", text: "First question" });
 	fake.add({ kind: "HEPH", text: "First answer", parentEntryId: first.id });
@@ -541,6 +915,7 @@ it("keeps every loaded message when a reconnect rereads the conversation after o
 });
 
 it("keeps every loaded reply when a reconnect rereads a thread after older replies were read", async () => {
+	giveRoom(ROOMY);
 	const fake = new MentorFake("acme", { pageSize: 2 });
 	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
 	fake.add({ kind: "HEPH", text: "Share blockers earlier next time.", parentEntryId: parent.id });
@@ -726,6 +1101,7 @@ it("says live updates are paused while the browser's own reconnects keep failing
 });
 
 it("offers Retry in a linked thread when the conversation's state cannot be read, and shows the thread after it", async () => {
+	giveRoom(ROOMY);
 	const fake = new MentorFake();
 	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
 	fake.add({ kind: "HEPH", text: "Share blockers earlier.", parentEntryId: parent.id });
@@ -806,7 +1182,10 @@ it("links a problem and feedback Heph showed to the developer's feedback on thei
 
 it("nests Heph's headings and a digest's sections under the page's headings without skipping a level", async () => {
 	const fake = new MentorFake();
-	fake.add({ kind: "HEPH", text: "## Why\n\nThe reviewer could not see the reason." });
+	const answer = fake.add({
+		kind: "HEPH",
+		text: "## Why\n\nThe reviewer could not see the reason.",
+	});
 	fake.add({
 		kind: "DIGEST",
 		surface: "SYSTEM",
@@ -821,7 +1200,8 @@ it("nests Heph's headings and a digest's sections under the page's headings with
 					feedbackId: "f8000000-0000-4000-8000-000000000004",
 					practiceSlug: "share-blockers",
 					practiceName: "Share blockers early",
-					destination: "PRACTICE_PAGE",
+					destination: "CONVERSATION",
+					mentorEntryId: answer.id,
 					deliveredAt: "2026-10-08T10:00:00Z",
 					withdrawn: false,
 					replaced: false,
@@ -848,6 +1228,7 @@ it("nests Heph's headings and a digest's sections under the page's headings with
 });
 
 it("links a weekly digest's feedback to its place in the conversation, and replies in the digest's thread", async () => {
+	giveRoom(ROOMY);
 	const fake = new MentorFake();
 	const digest = fake.add({
 		kind: "DIGEST",

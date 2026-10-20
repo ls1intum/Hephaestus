@@ -106,7 +106,10 @@ public class SandboxContainerManager {
             try {
                 containerOps.stopContainer(containerId, properties.containerStopTimeoutSeconds());
             } catch (Exception stopEx) {
-                log.error("Failed to stop timed-out container {}: {}", containerId, stopEx.getMessage());
+                log.error(
+                        "Failed to stop timed-out container {}: errorType={}",
+                        containerId,
+                        stopEx.getClass().getName());
             }
             // Wait for the stop to take effect
             try {
@@ -143,7 +146,10 @@ public class SandboxContainerManager {
         try {
             return containerOps.getLogs(containerId, tailLines);
         } catch (Exception e) {
-            log.warn("Failed to get logs for container {}: {}", containerId, e.getMessage());
+            log.warn(
+                    "Failed to get logs for container {}: errorType={}",
+                    containerId,
+                    e.getClass().getName());
             return "";
         }
     }

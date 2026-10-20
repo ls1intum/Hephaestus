@@ -3,46 +3,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 
-import { getJwksOptions } from "@/api/@tanstack/react-query.gen";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { USER_VIEW_STORAGE_KEY, type UserViewSession } from "@/runtime/user-view/session";
 
 import { getContext } from "./root-provider";
 import { useQueryReadRefusal } from "./use-query-read-refusal";
 
-const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
-
-vi.mock("@/runtime/sentry", () => ({ captureException }));
-
 beforeEach(() => {
-	vi.clearAllMocks();
 	getContext().queryClient.clear();
-});
-
-it("reports rejected queries and mutations without changing their rejection contract", async () => {
-	const queryError = new Error("query failed");
-	await expect(
-		getContext().queryClient.query({
-			...getJwksOptions({}),
-			queryFn: async () => {
-				throw queryError;
-			},
-			// As every imperative read does: it rejects at its first failure.
-			retry: false,
-		}),
-	).rejects.toBe(queryError);
-	expect(captureException).toHaveBeenNthCalledWith(1, queryError);
-
-	const mutationError = new Error("mutation failed");
-	const mutation = getContext()
-		.queryClient.getMutationCache()
-		.build(getContext().queryClient, {
-			mutationFn: async () => {
-				throw mutationError;
-			},
-		});
-	await expect(mutation.execute(undefined)).rejects.toBe(mutationError);
-	expect(captureException).toHaveBeenNthCalledWith(2, mutationError);
 });
 
 type Answer = { data: string } | { error: Error };

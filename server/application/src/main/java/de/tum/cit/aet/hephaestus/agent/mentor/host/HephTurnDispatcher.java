@@ -232,7 +232,10 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
                     stop(turn, "developer");
                 }
             } catch (RuntimeException e) {
-                log.debug("Could not read Heph turn {} after reconnecting: {}", turn.turnId, e.getMessage());
+                log.debug(
+                        "Could not read Heph turn {} after reconnecting: {}",
+                        turn.turnId,
+                        e.getClass().getSimpleName());
             }
         }
     }
@@ -302,7 +305,7 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
                     started = starter.startNext(workerId, lease);
                 } catch (RuntimeException e) {
                     claimFailures.increment();
-                    log.warn("Could not claim a Heph turn: {}", e.getMessage(), e);
+                    log.warn("Could not claim a Heph turn: {}", e.getClass().getSimpleName(), e);
                     break;
                 }
                 if (started.isEmpty()) {
@@ -315,15 +318,16 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
                     log.warn(
                             "Could not start Heph turn {}: {}",
                             started.get().turn().getId(),
-                            e.getMessage(),
+                            e.getClass().getSimpleName(),
                             e);
                     Running claimed = running.get(started.get().turn().getId());
                     if (claimed != null) {
+                        // The class only: the cause is logged at WARN when the end commits.
                         finishQuietly(
                                 claimed,
                                 MentorTurn.Status.FAILED,
                                 COULD_NOT_START,
-                                "starting it failed: " + e.getMessage());
+                                "starting it failed: " + e.getClass().getSimpleName());
                     }
                 }
             }
@@ -399,7 +403,10 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
             host.send(mapper.writeValueAsString(frame));
         } catch (IOException e) {
             // The host is gone; the turn's lease expires and the reaper takes the turn back.
-            log.warn("Could not reach the Heph host for turn {}: {}", turn.turnId, e.getMessage());
+            log.warn(
+                    "Could not reach the Heph host for turn {}: {}",
+                    turn.turnId,
+                    e.getClass().getSimpleName());
             forget(turn);
         }
     }
@@ -434,7 +441,10 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
             } catch (MentorLeaseLostException leaseLost) {
                 lost(turn);
             } catch (RuntimeException e) {
-                log.warn("Could not keep Heph turn {} alive: {}", turn.turnId, e.getMessage());
+                log.warn(
+                        "Could not keep Heph turn {} alive: {}",
+                        turn.turnId,
+                        e.getClass().getSimpleName());
             }
         }
     }
@@ -483,7 +493,10 @@ public class HephTurnDispatcher implements MentorLedgerNotifications.Listener, S
         try {
             finish(turn, outcome, error, cause);
         } catch (RuntimeException e) {
-            log.warn("Could not end Heph turn {}; its lease is left to expire: {}", turn.turnId, e.getMessage());
+            log.warn(
+                    "Could not end Heph turn {}; its lease is left to expire: {}",
+                    turn.turnId,
+                    e.getClass().getSimpleName());
         }
     }
 

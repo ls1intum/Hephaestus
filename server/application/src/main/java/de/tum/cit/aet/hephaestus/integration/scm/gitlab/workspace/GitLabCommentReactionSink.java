@@ -76,7 +76,7 @@ public class GitLabCommentReactionSink implements ScmCommentReactionSink {
                     reactionName,
                     commentNativeId,
                     scopeId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
         }
     }
 }

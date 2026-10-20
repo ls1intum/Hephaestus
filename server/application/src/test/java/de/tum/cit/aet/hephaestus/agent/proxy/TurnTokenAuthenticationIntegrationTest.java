@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorTurnStarts;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
@@ -49,6 +50,9 @@ class TurnTokenAuthenticationIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Autowired
     private ReviewJobRepository jobRepository;
+
+    @Autowired
+    private ReviewAttemptUsageService reviewAttemptUsage;
 
     @Autowired
     private MentorTurnRepository turnRepository;
@@ -138,7 +142,7 @@ class TurnTokenAuthenticationIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(result.status()).isEqualTo(200);
         Authentication authentication = Objects.requireNonNull(result.authentication());
         ProxyIdentity identity = (ProxyIdentity) Objects.requireNonNull(authentication.getPrincipal());
-        ProxyRouting routing = new ProxyRoutingService(jobRepository, turnRepository, objectMapper)
+        ProxyRouting routing = new ProxyRoutingService(jobRepository, turnRepository, objectMapper, reviewAttemptUsage)
                 .resolve(identity, new MockHttpServletRequest("POST", "/internal/llm/responses"));
         ProxyRouting.BilledAttempt attempt = routing.attempt();
         assertThat(routing.workspaceId()).isEqualTo(workspace.getId());

@@ -174,3 +174,27 @@ This page stays out of both.
 Standings and practices never sort people.
 They never appear on a public page.
 Nothing above changes.
+
+## Update — 2026-10-20 (one reader after the result cutover)
+
+The result cutover replaced the bars with result counts over 90 days.
+This update restores the decision above. It changes no rule about who and what is counted.
+
+- `PracticeStandingService` reads the standings of all counted developers at once.
+  It uses the same selection, visibility and classification as the Practice profile.
+  Each developer counts once, at the standing that their profile shows.
+- A requested or backfilled review takes over the current result of its work.
+  The live review before it still sets the standing and the trend.
+  A newer live review, a work change, a repair or a removal ends it.
+  The quoted results stay the current ones.
+- Results that the cutover carried over from the earlier model have no current proof.
+  A practice that no current review decided uses them, marked *earlier reviews*, without quotes and without a trend.
+  They are recorded historical assessments, not checks against the current criteria.
+  A carried-over result that names no practice version is marked *earlier reviews, criteria unknown*.
+  A version that it names must belong to the same practice in the same workspace.
+  The Practice profile, a group and this page carry the weakest mark of what they read.
+- `ResultSourceAuthorization.permitsHumanStanding` applies every source, erasure, suppression, account and custody check of delivery, except the AI choice.
+  Only the standing reader uses it.
+  Quotes, delivery, Heph and every model input keep the full check, so **No AI** still refuses them.
+- Feedback mode **Off** stops delivery only. A practice that is off still has a standing.
+  **Reviewed by People** or **Nobody** has no review and no standing.

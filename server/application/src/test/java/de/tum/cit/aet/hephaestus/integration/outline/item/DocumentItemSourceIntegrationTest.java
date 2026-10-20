@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.core.privacy.IdentityRestriction;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
@@ -23,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
@@ -36,6 +38,8 @@ import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
@@ -78,6 +82,9 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private IdentityRepository identities;
 
+    @PersistenceContext
+    private @Nullable EntityManager entities;
+
     @Autowired
     private IdentityProviderRepository providers;
 
@@ -114,6 +121,69 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
                 .containsEntry(
                         DocumentContentSource.SOURCE,
                         new SourceCaptureState.Redacted(SourceAbsenceReason.ACCESS_NOT_PERMITTED));
+    }
+
+    @Test
+    void aContextualCollaboratorsNoAiChoiceStillLetsAHumanStandingCountTheDocument() {
+        var fixture = readableDocument("https://wiki.example.com");
+        var human = SourceReadAudience.HUMAN_RECORDED_STANDING;
+        var pinned = resolver.pin(fixture.item(), null);
+        var collaborator = accounts.findById(fixture.collaboratorId()).orElseThrow();
+        collaborator.setAiChoice(AiChoice.NO_AI);
+        collaborator.setAiChoiceAt(Instant.now());
+        accounts.saveAndFlush(collaborator);
+
+        for (var purpose : SourceUsePurpose.values()) {
+            assertThat(resolver.permits(fixture.item(), purpose)).isFalse();
+            assertThat(resolver.permits(fixture.item(), purpose, SourceReadAudience.PROCESSING))
+                    .isFalse();
+        }
+        assertThat(resolver.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isTrue();
+        // The human read opens no capture: the document body stays withheld.
+        assertThat(resolver.capture(pinned, request()).files()).isEmpty();
+
+        long foreignWorkspace = workspaces
+                .save(WorkspaceTestFixtures.activeWorkspace("doc-human-" + UUID.randomUUID()))
+                .getId();
+        assertThat(resolver.permits(
+                        new ItemRef(
+                                foreignWorkspace,
+                                fixture.item().itemId(),
+                                DocumentEvents.DOCUMENT,
+                                fixture.item().sourceId(),
+                                null,
+                                null),
+                        SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY,
+                        human))
+                .isFalse();
+        var unapproved = readableDocument("https://unapproved.example.com");
+        assertThat(resolver.permits(unapproved.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
+    }
+
+    @Test
+    void aPermanentErasureFenceStillRefusesTheHumanStandingOfANoAiCollaborator() {
+        var fixture = readableDocument("https://wiki.example.com");
+        var collaborator = accounts.findById(fixture.collaboratorId()).orElseThrow();
+        collaborator.setAiChoice(AiChoice.NO_AI);
+        collaborator.setAiChoiceAt(Instant.now());
+        accounts.saveAndFlush(collaborator);
+        var human = SourceReadAudience.HUMAN_RECORDED_STANDING;
+        assertThat(resolver.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isTrue();
+
+        var erased = new IdentityRestriction();
+        erased.setProviderId(fixture.providerId());
+        erased.setProviderUserKey("collaborator");
+        erased.setTeamKey(fixture.teamId());
+        erased.setKind(IdentityRestriction.Kind.ERASED);
+        var entityManager = Objects.requireNonNull(entities);
+        entityManager.persist(erased);
+        entityManager.flush();
+
+        assertThat(resolver.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
     }
 
     @Test

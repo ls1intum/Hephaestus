@@ -319,19 +319,17 @@ public class GitHubGraphQlConfig {
                         .doBeforeRetry(signal -> {
                             Throwable failure = signal.failure();
                             log.warn(
-                                    "Retrying GitHub GraphQL request after transport error: errorType={}, message={}, attempt={}, maxRetries={}",
+                                    "Retrying GitHub GraphQL request after transport error: errorType={}, attempt={}, maxRetries={}",
                                     failure.getClass().getSimpleName(),
-                                    failure.getMessage(),
                                     signal.totalRetries() + 1,
                                     TRANSPORT_MAX_RETRIES);
                         })
                         .onRetryExhaustedThrow((spec, signal) -> {
                             Throwable failure = signal.failure();
                             log.error(
-                                    "Failed GitHub GraphQL request after transport retries exhausted: retryCount={}, errorType={}, message={}",
+                                    "Failed GitHub GraphQL request after transport retries exhausted: retryCount={}, errorType={}",
                                     TRANSPORT_MAX_RETRIES,
-                                    failure.getClass().getSimpleName(),
-                                    failure.getMessage());
+                                    failure.getClass().getSimpleName());
                             return new TransportException(
                                     "GitHub GraphQL request failed after " + TRANSPORT_MAX_RETRIES
                                             + " retries due to transport error: "

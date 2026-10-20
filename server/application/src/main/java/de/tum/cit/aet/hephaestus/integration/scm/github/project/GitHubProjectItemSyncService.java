@@ -192,7 +192,7 @@ public class GitHubProjectItemSyncService {
                                         issueNodeId,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -322,7 +322,7 @@ public class GitHubProjectItemSyncService {
                     "Failed to process embedded project item: projectId={}, itemNodeId={}, error={}",
                     project.getId(),
                     embeddedItem.item().nodeId(),
-                    e.getMessage(),
+                    e.getClass().getSimpleName(),
                     e);
             return false;
         }

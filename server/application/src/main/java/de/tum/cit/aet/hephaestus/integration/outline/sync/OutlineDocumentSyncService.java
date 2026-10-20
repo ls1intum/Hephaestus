@@ -510,11 +510,12 @@ public class OutlineDocumentSyncService {
         } catch (OutlineApiException e) {
             String message = e.getMessage() == null ? "Outline API call failed" : e.getMessage();
             // A real gap in the mirror — log for ops in addition to the lastSyncError the admin surface reads.
+            // The admin surface reads the message from lastSyncError; the shared log keeps the failure class.
             log.warn(
                     "outline.sync: collection sync failed for workspaceId={}, collectionId={}: {}",
                     ctx.workspaceId(),
                     collection.getCollectionId(),
-                    message);
+                    e.getClass().getSimpleName());
             recordCollectionError(ctx, collection, message);
             return false;
         }

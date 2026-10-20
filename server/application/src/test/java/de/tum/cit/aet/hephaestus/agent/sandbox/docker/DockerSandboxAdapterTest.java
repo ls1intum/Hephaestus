@@ -4,6 +4,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -18,6 +19,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
@@ -62,6 +67,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.slf4j.LoggerFactory;
 
 class DockerSandboxAdapterTest extends BaseUnitTest {
 
@@ -789,11 +795,54 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     .isInstanceOf(SandboxException.class)
                     .hasMessageContaining("Docker daemon lost");
 
-            // 500 mirrors DockerSandboxAdapter.ERROR_ECHO_TAIL_LINES: this echo only reaches the log, cut
-            // to 32 KB, so it reads a tail rather than the whole stream.
+            // 500 mirrors DockerSandboxAdapter.ERROR_ECHO_TAIL_LINES: the error path measures a tail, not the
+            // whole stream, and logs only its size.
             InOrder inOrder = inOrder(containerManager);
             inOrder.verify(containerManager).getLogs(CONTAINER_ID, 500);
             inOrder.verify(containerManager).forceRemove(CONTAINER_ID);
+        }
+
+        @Test
+        void shouldReportTheTranscriptSizeWithoutItsContentAtAnyLevelWhenExecutionFails() throws Exception {
+            when(networkManager.createJobNetwork(eq(JOB_ID), eq(false), any())).thenReturn(NETWORK_ID);
+            when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
+            when(securityPolicy.buildHostConfig(any(), any(), any())).thenReturn(DEFAULT_HOST_CONFIG);
+            when(securityPolicy.buildLabels(JOB_ID)).thenReturn(Map.of());
+            stubContainers();
+            when(containerManager.waitForCompletion(eq(CONTAINER_ID), any()))
+                    .thenThrow(new SandboxException("Docker daemon lost"));
+            String transcript = "task: private-prompt-canary\nread: private-source-canary\n";
+            when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn(transcript);
+
+            Logger logger = (Logger) LoggerFactory.getLogger(DockerSandboxAdapter.class);
+            Level previous = logger.getLevel();
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            logger.addAppender(appender);
+            // TRACE: no level of this logger may carry the transcript.
+            logger.setLevel(Level.TRACE);
+            try {
+                assertThatThrownBy(() -> sandboxAdapter.execute(createSpec())).isInstanceOf(SandboxException.class);
+            } finally {
+                logger.setLevel(previous);
+                logger.detachAppender(appender);
+                appender.stop();
+            }
+
+            assertThat(appender.list).isNotEmpty().allSatisfy(event -> {
+                assertThat(event.getFormattedMessage()).doesNotContain("canary");
+                assertThat(String.valueOf(event.getKeyValuePairs())).doesNotContain("canary");
+            });
+            ILoggingEvent withheld = appender.list.stream()
+                    .filter(event -> Level.WARN.equals(event.getLevel())
+                            && event.getFormattedMessage().contains("withheld"))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(withheld.getKeyValuePairs())
+                    .extracting(pair -> pair.key, pair -> pair.value)
+                    .contains(
+                            tuple("sandbox.transcript.characters", transcript.length()),
+                            tuple("sandbox.transcript.lines", 2L));
         }
 
         @Test

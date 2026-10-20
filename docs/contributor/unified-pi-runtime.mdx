@@ -151,7 +151,13 @@ Its question stays in the path with a marker ([The path](#the-path)), and the de
 An attempt that loses its lease does not fail by itself.
 The host stops it without a call to the worker, and the reaper decides (see [Leases and retries](#leases-and-retries)).
 
-The worker logs each attempt that fails on it at `WARN`, with the reason and the host's detail.
+The worker logs each attempt that fails on it at `WARN`, with the reason and the host's `detail`.
+The `detail` is a kind of failure from a closed set, for example `model_error`, `context_overflow` or `worker_refused` (`FAILURE_DETAILS` in `heph-host-protocol.ts` and in `HephTurnController`).
+It is never the text of the model provider, a tool, or the worker.
+The worker logs a `detail` outside the set as `unrecognized`.
+The host writes the same kind to its own output (`failureSummary`), with the worker's HTTP status when the worker answered.
+It never writes a failure's message, name, or stack, because any of them can carry the words of the worker's answer.
+The worker does not read the host's output ([The Heph host](#the-heph-host)).
 It logs an admission refusal at `INFO`.
 The reaper on the server role logs a lost second attempt at `INFO`.
 [Observability](/admin/observability#heph-turn-metrics) names the log lines.
@@ -385,8 +391,10 @@ The worker removes a gone host and leaves its turns to their leases.
 The next turn starts a new host.
 `SandboxReconciler` removes a host whose worker is gone.
 
-Before the worker removes a host, it writes the end of the host's output to its own log at `WARN`.
-The host writes its diagnostics to that output, for example why it could not start.
+The worker never reads the host's output, and it does not copy it into its own log (`DockerHostSandbox.remove`).
+Pi, Node, and the host itself can all write to that output, so it can hold the conversation, a provider's answer, or a credential.
+The worker logs the removal with the host's id, and the class of a removal step that fails.
+For a host that cannot start, the worker logs the cause that it knows itself, for example the hostname rule or the exit code of the workspace setup.
 
 On drain, the worker stops claiming turns.
 It waits up to `HephTurnDispatcher.DRAIN_TIMEOUT` for running turns, then removes the host.
@@ -417,7 +425,7 @@ All paths start with `/internal/llm/turn/{turnId}/`.
 | `POST search` | Full-text search in the conversation tree. |
 | `POST sandbox/read`, `sandbox/exec`, `sandbox/load` | The `read`, `bash` and `load_context` calls in the attempt's turn sandbox ([Context folder](#context-folder)). |
 | `PUT partial` | The partial answer and the stage. The partial answer has the text and the `link_result`, `link_problem`, and `show_feedback` calls of each assistant message of the turn so far. The last message can be unfinished. The gateway rate limit does not apply. A lost snapshot is not sent again. |
-| `POST end` | Ends the turn with `DONE`, `STOPPED`, or `FAILED`, with the Pi entries that the turn appended ([Limits](#limits)). A failed end carries a `detail` for the worker log. The end first waits up to 10 seconds for the proxy to record the attempt's model calls (`ProxyCallsInFlight`). An end without an answer cancels them first. |
+| `POST end` | Ends the turn with `DONE`, `STOPPED`, or `FAILED`, with the Pi entries that the turn appended ([Limits](#limits)). A failed end carries a `detail`, a kind of failure for the worker log ([How a turn fails](#how-a-turn-fails)). The end first waits up to 10 seconds for the proxy to record the attempt's model calls (`ProxyCallsInFlight`). An end without an answer cancels them first. |
 
 An end larger than the gateway's request bound gets `413`.
 The host then sends the end again, with each `read`, `bash` and `load_context` result replaced by its note (see [Tool results](#tool-results)).

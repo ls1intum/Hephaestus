@@ -134,7 +134,10 @@ public class OutlineRateLimitTracker {
             limit = limitStr == null ? null : Integer.valueOf(limitStr.trim());
             remaining = remainingStr == null ? null : Integer.valueOf(remainingStr.trim());
         } catch (NumberFormatException e) {
-            log.debug("outline.ratelimit: could not parse rate-limit headers for scope {}: {}", scope, e.getMessage());
+            log.debug(
+                    "outline.ratelimit: could not parse rate-limit headers for scope {}: {}",
+                    scope,
+                    e.getClass().getSimpleName());
             return;
         }
         Instant observedAt = Instant.now();

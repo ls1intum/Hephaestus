@@ -49,7 +49,7 @@ To keep a side topic apart, [reply in a thread](#reply-in-a-thread).
 
 Shift+Enter starts a new line.
 While Heph answers, it shows what it is doing, such as *Thinking…* or *Reading your practice feedback…*.
-When Heph is busy with other people's questions, yours waits its turn, and the line says *Heph is answering other questions first…*.
+If Heph has not started on your question after a second, the line says *Waiting for Heph to start…*.
 Your question moves near the top, and the answer appears below it as Heph writes it.
 The view stays where you are while Heph writes.
 If you scroll up, select **Jump to latest** to go back to the newest message.
@@ -58,10 +58,16 @@ After 10 seconds, the line also counts the time and says *You can leave. The ans
 Heph keeps working when you go to another page or close the tab.
 If Heph answers while the Heph panel is closed, in the conversation or in a thread, a dot on the Heph button shows it.
 The dot stays until you open the panel or the **Heph** page on any of your devices.
+A page in a background tab does not clear it.
 A message that you write, in the app or in Slack, never sets it.
 
 If Heph could not answer, the message says why.
 Select **Try again** to ask the same question again.
+
+If Heph did not get your message, it shows *Not sent.* and the reason.
+Select **Retry** to send it again.
+To keep the text, select **Copy message**.
+To remove the message, select **Delete message**.
 
 ### Results, problems, and feedback in an answer
 
@@ -97,8 +103,9 @@ This includes your messages, Heph's answers, and weekly digests.
 2. Enter your reply.
 3. Press Enter to send it.
 
-On a wide screen, the thread opens beside the conversation.
-On a small screen, it opens over the conversation.
+When the page has room beside the conversation, the thread opens beside it.
+When it does not, such as on a phone or a tablet, the thread opens over the conversation.
+In the Heph panel, the thread replaces the conversation, and **Back to the conversation** returns to it.
 A message with a thread shows its replies, such as *3 replies*.
 Select it to open the thread.
 
@@ -125,7 +132,10 @@ To delete one of your messages:
 Heph forgets the message.
 If Heph has not answered it yet, Heph does not answer it.
 The conversation shows *This message was deleted.* in its place.
-If the message had a thread, the thread shows *This thread is gone*.
+If the message had a thread, the replies stay.
+The thread shows *This message was deleted.* above them, and you can delete your own replies one at a time.
+You cannot reply in that thread.
+If you wrote the message in Slack, the message and Heph's answer stay in Slack.
 
 Ratings are the **Helpful** and **Not helpful** buttons.
 Hephaestus does not read your emoji reactions in Slack.
@@ -250,6 +260,8 @@ A digest lists:
 - How many pieces of feedback from that week wait unread on your Practice profile.
 
 Feedback on your Practice profile is not in the list, because it reaches you only when you open it there.
+A piece of that feedback leaves the count when you read it there.
+If nothing is left to show, the digest says *There is no feedback or profile change to show here now.*
 
 It shows no scores, ranks, or streaks.
 If a workspace admin withdrew feedback, the digest says so.

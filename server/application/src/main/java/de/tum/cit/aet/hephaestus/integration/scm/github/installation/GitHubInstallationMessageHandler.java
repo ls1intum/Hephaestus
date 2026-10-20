@@ -147,7 +147,7 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                 log.warn(
                         "Could not verify installation status for created event, proceeding with activation: installationId={}, error={}",
                         installationId,
-                        e.getMessage());
+                        e.getClass().getSimpleName());
             }
         }
 
@@ -200,7 +200,7 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
             log.warn(
                     "Failed to verify installation status via API, skipping status update: installationId={}, error={}",
                     installationId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
         }
     }
 }

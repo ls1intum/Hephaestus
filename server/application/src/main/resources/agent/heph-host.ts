@@ -34,12 +34,12 @@ import {
 	asLoadAnswer,
 	asReadAnswer,
 	CONTEXT_FOLDER_TOOL_NAMES,
+	type FailureDetail,
 	HEPH_TOOL_NAMES,
 	isLinkTool,
 	isRecord,
 	LINK_TOOLS,
 	type LinkToolName,
-	MAX_DETAIL_CHARS,
 	parseCommand,
 	type PartialMessage,
 	type PartialSnapshot,
@@ -159,14 +159,24 @@ export function turnStage(toolName: string, args: unknown): string {
 	return documentStage(text) ?? (namesRepository(text) ? REPOSITORY_STAGE : THINKING_STAGE);
 }
 
+/** Writes one line to stderr; a failure among the parts is written as its `failureSummary`. */
 function log(...parts: unknown[]) {
-	const line = parts.map((part) => (typeof part === "string" ? part : errorText(part))).join(" ");
+	const line = parts
+		.map((part) => (typeof part === "string" ? part : failureSummary(part)))
+		.join(" ");
 	process.stderr.write(`[heph-host ${new Date().toISOString()}] ${line}\n`);
 }
 
-/** The worker answered that this attempt no longer holds its lease: stop working on it, say nothing more. */
-export class LeaseLostError extends Error {
-	override name = "LeaseLostError";
+/** The cause of a failure because the worker answered that this attempt no longer holds its lease (`409`). */
+const LEASE_LOST = Symbol("lease lost");
+
+/** The attempt lost its lease: stop working on it, say nothing more. */
+export function leaseLost(message: string): Error {
+	return new Error(message, { cause: LEASE_LOST });
+}
+
+export function isLeaseLost(error: unknown): boolean {
+	return error instanceof Error && error.cause === LEASE_LOST;
 }
 
 /** The cause of a failure because the worker refused a request body over its size bound (`413`). */
@@ -199,10 +209,24 @@ export interface TurnApi {
 	end: (end: TurnEnd) => Promise<void>;
 }
 
+/** The worker answered a turn request with this status. The message stays what a tool tells the model. */
+export class WorkerStatusError extends Error {
+	override name = "WorkerStatusError";
+	readonly status: number;
+
+	constructor(message: string, status: number, options?: ErrorOptions) {
+		super(message, options);
+		this.status = status;
+	}
+}
+
 async function ok(response: Response, what: string): Promise<void> {
 	if (!response.ok) {
 		const detail = await response.text();
-		throw new Error(`${what} failed with ${response.status}: ${detail.slice(0, 300)}`);
+		throw new WorkerStatusError(
+			`${what} failed with ${response.status}: ${detail.slice(0, 300)}`,
+			response.status,
+		);
 	}
 	await response.body?.cancel();
 }
@@ -220,6 +244,39 @@ const TRANSIENT = Symbol("transient");
 
 function transient(message: string): Error {
 	return new Error(message, { cause: TRANSIENT });
+}
+
+/** The cause of a failure because the conversation does not fit the model's window, even after it was shortened. */
+const CONTEXT_OVERFLOW = Symbol("context overflow");
+
+function contextOverflow(message: string): Error {
+	return new Error(message, { cause: CONTEXT_OVERFLOW });
+}
+
+/** The closed kind of a failure (`FAILURE_DETAILS`), never its words. */
+function failureKind(failure: unknown): FailureDetail {
+	if (failure instanceof Error && failure.cause === CONTEXT_OVERFLOW) {
+		return "context_overflow";
+	}
+	if (failure instanceof WorkerStatusError) {
+		return failure.status >= 500 ? "worker_unavailable" : "worker_refused";
+	}
+	if (failure instanceof Error && failure.cause === TRANSIENT) {
+		return "worker_unavailable";
+	}
+	return isTooLarge(failure) ? "worker_refused" : "host_error";
+}
+
+/**
+ * What the log says of a failure: its closed kind, and the worker's HTTP status when the worker answered. Its message,
+ * name and stack are left out: each is text that a multi-line message, such as the worker's answer, can write into.
+ */
+export function failureSummary(failure: unknown): string {
+	const status =
+		failure instanceof WorkerStatusError && Number.isInteger(failure.status)
+			? ` status=${failure.status}`
+			: "";
+	return `${failureKind(failure)}${status}`;
 }
 
 export function httpTurnApi(
@@ -252,7 +309,7 @@ export function httpTurnApi(
 		}
 		if (response.status === 409) {
 			await response.body?.cancel();
-			throw new LeaseLostError(`turn ${turnId} lost its lease`);
+			throw leaseLost(`turn ${turnId} lost its lease`);
 		}
 		if (response.status === 413) {
 			await response.body?.cancel();
@@ -260,7 +317,11 @@ export function httpTurnApi(
 		}
 		if (response.status >= 500) {
 			const detail = await response.text();
-			throw transient(`${path} failed with ${response.status}: ${detail.slice(0, 300)}`);
+			throw new WorkerStatusError(
+				`${path} failed with ${response.status}: ${detail.slice(0, 300)}`,
+				response.status,
+				{ cause: TRANSIENT },
+			);
 		}
 		return response;
 	}
@@ -545,10 +606,7 @@ async function compactBeforePrompt(
 		// the model's window the prompt goes out and the next turn compacts again; failing it would fail every later
 		// question of the conversation the same way. Past the window, Pi would read the answer as an overflow and
 		// drop it.
-		log(
-			UNSHORTENABLE.test(errorText(error)) ? "compaction skipped:" : "compaction failed:",
-			errorText(error),
-		);
+		log(UNSHORTENABLE.test(errorText(error)) ? "compaction skipped:" : "compaction failed:", error);
 		return null;
 	});
 	// A stop cancels the summary; the caller ends the turn stopped.
@@ -558,7 +616,7 @@ async function compactBeforePrompt(
 	if (result === null) {
 		const tokens = contextTokens(session);
 		if (!leavesRoomToAnswer(tokens, model)) {
-			throw new Error(
+			throw contextOverflow(
 				`This conversation does not fit the model's context window (${tokens} of ${model.contextWindow} tokens) and cannot get shorter.`,
 			);
 		}
@@ -572,7 +630,7 @@ async function compactBeforePrompt(
 			? undefined
 			: result.estimatedTokensAfter + Math.ceil(session.systemPrompt.length / 4);
 	if (estimated !== undefined && !leavesRoomToAnswer(estimated, model)) {
-		throw new Error(
+		throw contextOverflow(
 			`This conversation is still too long after shortening it (${estimated} estimated tokens).`,
 		);
 	}
@@ -1220,22 +1278,23 @@ interface TurnState {
 	readonly attempt: number;
 	readonly controller: AbortController;
 	stopReason: HaltReason | null;
-	/** What the proxy said about an unavailable provider, for the worker log. */
-	stallDetail: string | null;
+	/** The proxy's code for an unavailable provider, for the worker log. */
+	stallDetail: (typeof PROVIDER_UNAVAILABLE)[number] | null;
 	session: AgentSession | null;
 }
 
-/** The proxy's message when a failed model call failed because its provider was unavailable, else `null`. */
-function providerUnavailable(event: AgentSessionEvent): string | null {
+/** The proxy's code when a failed model call failed because its provider was unavailable, else `null`. */
+function providerUnavailable(
+	event: AgentSessionEvent,
+): (typeof PROVIDER_UNAVAILABLE)[number] | null {
 	if (event.type !== "message_end" || event.message.role !== "assistant") {
 		return null;
 	}
 	const { stopReason, errorMessage } = event.message;
-	return stopReason === "error" &&
-		errorMessage !== undefined &&
-		PROVIDER_UNAVAILABLE.some((code) => errorMessage.includes(code))
-		? errorMessage
-		: null;
+	if (stopReason !== "error" || errorMessage === undefined) {
+		return null;
+	}
+	return PROVIDER_UNAVAILABLE.find((code) => errorMessage.includes(code)) ?? null;
 }
 
 export interface HostOptions {
@@ -1319,21 +1378,19 @@ export function createHephHost(options: HostOptions): HephHost {
 		// Once the session exists: its entries, the first `stored` of which the ledger already holds.
 		let appended: { manager: SessionManager; stored: number } | null = null;
 		// The only write of the turn's entries (MentorTurnService.end).
-		const end: Ending = async (outcome, reason, detail = null) => {
+		const end: Ending = async (outcome, reason, detail, failure) => {
 			const turnEntries =
 				appended === null
 					? []
 					: withoutOmitted(appended.manager.getEntries().slice(appended.stored));
 			const entries = outcome === "FAILED" ? summariesOf(turnEntries) : turnEntries;
 			if (outcome === "FAILED") {
-				log(`turn ${turnId} attempt ${state.attempt} failed (${reason ?? "ERROR"}):`, detail ?? "");
+				// A thrown failure's summary is its kind, which is `detail`, with the worker's status when it answered.
+				const said = failure === undefined ? (detail ?? "host_error") : failureSummary(failure);
+				log(`turn ${turnId} attempt ${state.attempt} failed (${reason ?? "ERROR"}): ${said}`);
 			}
-			const ending: TurnEnd = {
-				outcome,
-				entries,
-				reason,
-				detail: detail === null ? null : detail.slice(0, MAX_DETAIL_CHARS),
-			};
+			// An end without a detail sends `null`, as the worker reads it.
+			const ending: TurnEnd = { outcome, entries, reason, detail: detail ?? null };
 			try {
 				await api.end(ending);
 			} catch (error) {
@@ -1446,13 +1503,13 @@ export function createHephHost(options: HostOptions): HephHost {
 				agent.dispose();
 			}
 		} catch (error) {
-			if (error instanceof LeaseLostError || state.stopReason === "lease") {
+			if (isLeaseLost(error) || state.stopReason === "lease") {
 				// Also the answer to a repeated end whose earlier try the worker stored.
 				log(`turn ${turnId} is no longer this attempt's to end; abandoning it`);
 				return;
 			}
 			await endQuietly(turnId, async () =>
-				stopped(state) ? endStopped(state, end) : end("FAILED", "ERROR", errorText(error)),
+				stopped(state) ? endStopped(state, end) : end("FAILED", "ERROR", failureKind(error), error),
 			);
 		}
 	}
@@ -1493,10 +1550,15 @@ async function endQuietly(turnId: string, ending: () => Promise<void>): Promise<
 	}
 }
 
+/**
+ * `failure`, when a thrown failure ended the turn, goes to the host's log as its `failureSummary` (kind and worker
+ * status), not to the worker.
+ */
 type Ending = (
 	outcome: TurnEnd["outcome"],
 	reason: TurnEnd["reason"],
-	detail?: string | null,
+	detail?: FailureDetail | null,
+	failure?: unknown,
 ) => Promise<void>;
 
 /**
@@ -1507,13 +1569,9 @@ async function endStopped(state: TurnState, end: Ending): Promise<void> {
 	if (state.stopReason === "developer") {
 		await end("STOPPED", null);
 	} else if (state.stopReason === "deadline") {
-		await end("FAILED", "DEADLINE", "the worker stopped the turn at its deadline");
+		await end("FAILED", "DEADLINE", "deadline");
 	} else if (state.stopReason === "stalled") {
-		await end(
-			"FAILED",
-			"STALLED",
-			state.stallDetail ?? "the worker's LLM proxy found the model provider unavailable",
-		);
+		await end("FAILED", "STALLED", state.stallDetail ?? "provider_unavailable");
 	}
 }
 
@@ -1524,16 +1582,20 @@ async function endStopped(state: TurnState, end: Ending): Promise<void> {
  */
 const CONTROL_TOKENS = /<\|[^|<>]*\|>/gu;
 
-function unanswered(entries: readonly SessionEntry[]): string | null {
+function unanswered(entries: readonly SessionEntry[]): FailureDetail | null {
 	const last = entries.findLast(
 		(entry) => entry.type === "message" && entry.message.role === "assistant",
 	);
 	if (last?.type !== "message" || last.message.role !== "assistant") {
-		return "the model wrote no answer";
+		return "no_answer";
 	}
-	const { stopReason, errorMessage, content } = last.message;
-	if (stopReason === "error" || stopReason === "aborted") {
-		return errorMessage ?? `the model's answer ended with ${stopReason}`;
+	// The provider's error message stays out: it can quote the request. The worker's proxy logs the call's status.
+	const { stopReason, content } = last.message;
+	if (stopReason === "error") {
+		return "model_error";
+	}
+	if (stopReason === "aborted") {
+		return "model_aborted";
 	}
 	// An answer with no words would end the turn done and show the developer nothing. Chat-template control tokens
 	// (`<|channel|>`) a model leaks are not words either.
@@ -1542,9 +1604,7 @@ function unanswered(entries: readonly SessionEntry[]): string | null {
 			(part) => part.type === "text" && part.text.replace(CONTROL_TOKENS, "").trim() !== "",
 		)
 	) {
-		return stopReason === "length"
-			? "the model reached its output limit before it wrote an answer"
-			: "the model wrote an empty answer";
+		return stopReason === "length" ? "output_limit" : "empty_answer";
 	}
 	return null;
 }
@@ -1611,6 +1671,11 @@ async function main() {
 
 if (import.meta.main) {
 	process.on("unhandledRejection", (error) => log("unhandled rejection:", error));
+	// Node's own report would print the message; the worker copies this output into its log (DockerHostSandbox).
+	process.on("uncaughtException", (error) => {
+		log("uncaught exception:", error);
+		process.exit(1);
+	});
 	for (const signal of ["SIGTERM", "SIGINT"] as const) {
 		process.on(signal, () => process.exit(0));
 	}

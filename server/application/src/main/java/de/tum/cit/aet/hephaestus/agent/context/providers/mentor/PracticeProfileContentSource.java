@@ -61,8 +61,9 @@ public class PracticeProfileContentSource implements ContentSource {
         ObjectNode root = objectMapper.createObjectNode();
         root.put(
                 "about",
-                "The developer's own standings as their Practice profile shows them, from the newest decided pieces "
-                        + "of work in each practice. Not scores: never rank practices or people with them.");
+                "The developer's standings from current, verifiable reviews whose supporting work is permitted "
+                        + "for conversational use. Human-only historical assessments are excluded. "
+                        + "Not scores: never rank practices or people with them.");
         Map<String, ArrayNode> groups = new LinkedHashMap<>();
         ArrayNode groupArray = root.putArray("groups");
         standings.standings(workspaceId, accountId).stream()

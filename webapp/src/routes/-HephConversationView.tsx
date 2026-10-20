@@ -12,8 +12,10 @@ import { HephTimelineSkeleton } from "@/components/mentor/HephTimelineSkeleton";
 import { ThreadGone } from "@/components/mentor/ThreadPanel";
 import { liveTurnOf } from "@/components/mentor/timeline-rows";
 import { WeeklyDigestCard } from "@/components/mentor/WeeklyDigestCard";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Marker, MarkerContent } from "@/components/ui/marker";
 import {
+	type HephActions,
 	useHephActions,
 	useHephThread,
 	useHephTimeline,
@@ -40,6 +42,28 @@ function useDeveloper(): MessageAuthor {
 		name: firstNonBlank(userProfile?.name, username) ?? "You",
 		avatarUrl: getUserProfilePictureUrl(),
 	};
+}
+
+/**
+ * The writes the conversation offers: none in a user view, and no asking again — Reply in thread,
+ * Try again, Retry — while the developer cannot ask Heph.
+ */
+function offeredActions(actions: HephActions, { readOnly, canAsk }: ConversationAccess) {
+	if (readOnly) {
+		return;
+	}
+	return canAsk ? actions : { ...actions, ask: undefined };
+}
+
+/** Stands in for a conversation with no message, where nobody can ask in it from here. */
+function NoMessages() {
+	return (
+		<Empty>
+			<EmptyHeader>
+				<EmptyTitle>No messages yet</EmptyTitle>
+			</EmptyHeader>
+		</Empty>
+	);
 }
 
 /** The turn the composer's Stop ends: the live one. */
@@ -93,8 +117,8 @@ export function MainConversation({
 			threads={threads}
 			livePaused={livePaused}
 			jumpTo={jumpTo}
-			actions={readOnly ? undefined : actions}
-			empty={canAsk ? <Greeting /> : undefined}
+			actions={offeredActions(actions, { readOnly, canAsk })}
+			empty={canAsk ? <Greeting /> : <NoMessages />}
 			composer={
 				canAsk ? (
 					<HephComposer
@@ -157,6 +181,9 @@ export function ThreadConversation({
 			const { parent, timeline } = thread;
 			const stoppable = stoppableTurn(timeline);
 			const replies = parent.thread?.replyCount ?? 0;
+			// The server refuses a reply to a deleted message. Its thread stays to read, rate and delete
+			// in, and a running answer keeps Stop on its own line.
+			const canAskHere = canAsk && !parent.deleted;
 			return (
 				<HephTimeline
 					label="Thread"
@@ -179,9 +206,9 @@ export function ThreadConversation({
 							)}
 						</div>
 					}
-					actions={readOnly ? undefined : actions}
+					actions={offeredActions(actions, { readOnly, canAsk: canAskHere })}
 					composer={
-						canAsk ? (
+						canAskHere ? (
 							<HephComposer
 								label="Reply in thread"
 								placeholder="Reply in thread"

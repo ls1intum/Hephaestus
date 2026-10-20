@@ -216,7 +216,10 @@ public class SlackMessageService {
             log.debug("Slack auth.test not ok for workspaceId={}: error={}", workspaceId, r.getError());
             return Optional.empty();
         } catch (SlackApiException | IOException e) {
-            log.debug("Slack auth.test failed for workspaceId={}: {}", workspaceId, e.getMessage());
+            log.debug(
+                    "Slack auth.test failed for workspaceId={}: {}",
+                    workspaceId,
+                    e.getClass().getSimpleName());
             return Optional.empty();
         }
     }
@@ -504,7 +507,7 @@ public class SlackMessageService {
                     "Slack conversations.list transport failure: workspaceId={}, collected={}, error={}",
                     workspaceId,
                     channels.size(),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return channels;
         }
     }
@@ -531,7 +534,7 @@ public class SlackMessageService {
                     "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
                     workspaceId,
                     channelId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return Optional.empty();
         }
     }
@@ -565,7 +568,7 @@ public class SlackMessageService {
                     "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
                     workspaceId,
                     channelId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return new ConversationLookup.Unavailable("transport_failure");
         }
     }

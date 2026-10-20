@@ -11,15 +11,24 @@ import {
 	rereadConversation,
 	rereadInOrder,
 } from "@/hooks/heph-cache";
+import { usePageVisible } from "@/hooks/use-page-visible";
 import { openEventStream } from "@/lib/event-stream";
 import { parseLiveEvent } from "@/lib/mentor-entry";
 
+/**
+ * Keeps the conversation live while `enabled` and the page is visible. A hidden tab closes its
+ * stream, so tabs left open in the background do not each hold a connection. When the page shows
+ * again, the stream opens again and its first event, a snapshot, reads back what changed meanwhile.
+ * Returns whether the stream keeps failing and is reconnecting.
+ */
 export function useHephLive(workspaceSlug: string, enabled: boolean): boolean {
 	const queryClient = useQueryClient();
 	const [paused, setPaused] = useState(false);
+	const visible = usePageVisible();
+	const streaming = enabled && visible;
 
 	useEffect(() => {
-		if (!enabled) {
+		if (!streaming) {
 			return;
 		}
 		const handle = (event: MessageEvent<string>) => {
@@ -73,7 +82,7 @@ export function useHephLive(workspaceSlug: string, enabled: boolean): boolean {
 			close();
 			setPaused(false);
 		};
-	}, [enabled, workspaceSlug, queryClient]);
+	}, [streaming, workspaceSlug, queryClient]);
 
-	return enabled && paused;
+	return streaming && paused;
 }

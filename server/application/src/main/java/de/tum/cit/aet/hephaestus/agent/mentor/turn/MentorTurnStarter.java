@@ -37,11 +37,15 @@ public class MentorTurnStarter {
     static final String PROVIDER_PAUSED =
             "Heph's AI model is not responding right now, so Heph did not start this reply. Try again in a few minutes.";
 
+    /** The existing generic refusal, also for a turn whose account an erasure suppressed while it was admitted. */
+    static final String PERSON_DATA_HELD = "Heph cannot run now.";
+
     static final String MODEL_TOO_SMALL =
             "Heph's AI model in this workspace is too small to hold a conversation. Ask a workspace owner to choose a larger model for Heph.";
 
     private final MentorTurnService turns;
     private final MentorAdmission admission;
+    private final MentorAttemptUsageService attemptUsage;
     private final MeterRegistry meters;
     private final LlmConnectionHealth connections;
 
@@ -77,7 +81,7 @@ public class MentorTurnStarter {
         } catch (MentorRefusedException refused) {
             return decline(turn, workerId, refused.reason().userMessage());
         } catch (LlmBudgetExhaustedException | LlmUnpricedUsageBlockedException blocked) {
-            return decline(turn, workerId, Objects.requireNonNullElse(blocked.getMessage(), "Heph cannot run now."));
+            return decline(turn, workerId, Objects.requireNonNullElse(blocked.getMessage(), PERSON_DATA_HELD));
         }
         if (connections.isOpen(llm.connectionScope(), llm.connectionId())) {
             log.info("Heph turn {} was not started: its provider connection is paused after failures", turn.getId());
@@ -88,13 +92,17 @@ public class MentorTurnStarter {
             log.warn("Heph turn {} cannot run on its model: {}", turn.getId(), tooSmall.get());
             return decline(turn, workerId, MODEL_TOO_SMALL);
         }
-        turns.admit(
+        // With the admission, the attempt's usage measurement: no call of the attempt is routed before both exist. An
+        // erasure that suppressed the account after the eligibility read above refuses both.
+        boolean admitted = attemptUsage.admit(
                 turn.getId(),
                 turn.getAttempt(),
                 workerId,
                 MentorTurnAdmission.of(
-                                llm, Objects.requireNonNull(llm.priceSnapshot(), "A Heph turn needs an admitted price"))
-                        .toJson());
+                        llm, Objects.requireNonNull(llm.priceSnapshot(), "A Heph turn needs an admitted price")));
+        if (!admitted) {
+            return decline(turn, workerId, PERSON_DATA_HELD);
+        }
         return Optional.of(new StartedTurn(turn, accountId, llm));
     }
 

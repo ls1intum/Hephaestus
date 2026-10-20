@@ -111,7 +111,10 @@ public class GitLabTokenService {
         try {
             token = getAccessToken(scopeId);
         } catch (IllegalStateException e) {
-            log.warn("Cannot validate token for scope {}: {}", scopeId, e.getMessage());
+            log.warn(
+                    "Cannot validate token for scope {}: {}",
+                    scopeId,
+                    e.getClass().getSimpleName());
             return null;
         }
 
@@ -142,14 +145,14 @@ public class GitLabTokenService {
             if (status.value() == 401 || status.value() == 403) {
                 log.warn("GitLab token invalid for scope {}: status={}", scopeId, status.value());
             } else {
-                log.error(
-                        "GitLab token validation failed for scope {}: status={}, message={}",
-                        scopeId,
-                        status.value(),
-                        e.getMessage());
+                // The status classifies the failure; the response message carries the request URI.
+                log.error("GitLab token validation failed for scope {}: status={}", scopeId, status.value());
             }
         } catch (Exception e) {
-            log.error("GitLab token validation error for scope {}: {}", scopeId, e.getMessage());
+            log.error(
+                    "GitLab token validation error for scope {}: {}",
+                    scopeId,
+                    e.getClass().getSimpleName());
         }
 
         return null;

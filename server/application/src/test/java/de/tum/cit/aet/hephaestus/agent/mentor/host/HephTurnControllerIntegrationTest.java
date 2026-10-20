@@ -60,9 +60,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
@@ -492,14 +497,57 @@ class HephTurnControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     @Test
-    void shouldTellTheDeveloperThatTheModelStoppedRespondingWhenTheHostEndsAStalledTurn() throws Exception {
+    @ExtendWith(OutputCaptureExtension.class)
+    void shouldTellTheDeveloperThatTheModelStoppedRespondingWhenTheHostEndsAStalledTurn(CapturedOutput output)
+            throws Exception {
         call("POST", "end", turn.getAttempt(), """
-                        {"outcome":"FAILED","entries":[],"reason":"STALLED",\
-                        "detail":"a model call sent nothing for the host's idle bound"}""").andExpect(status().isNoContent());
+                        {"outcome":"FAILED","entries":[],"reason":"STALLED","detail":"upstream_stalled"}""").andExpect(status().isNoContent());
 
         MentorTurn ended = reloaded();
         assertThat(ended.getStatus()).isEqualTo(MentorTurn.Status.FAILED);
         assertThat(ended.getError()).isEqualTo(HephTurnDispatcher.MODEL_STOPPED_ANSWERING);
+        assertThat(output.getAll()).contains("failed: its Heph host reported STALLED: upstream_stalled");
+    }
+
+    /**
+     * An end in the shape a host of the previous release sends, whose detail is the provider's error text. The worker
+     * log names the reason and that the detail is unrecognized; neither the key nor the question it quotes reach it.
+     */
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void shouldLogNoneOfTheHostsWordsWhenAFailedEndCarriesFreeText(CapturedOutput output) throws Exception {
+        String key = "sk-canary-7Qx9";
+        String quoted = "my private question about the outage";
+
+        call("POST", "end", turn.getAttempt(), """
+                        {"outcome":"FAILED","entries":[],"reason":"ERROR",\
+                        "detail":"Incorrect API key provided: %s for \\"%s\\""}""".formatted(key, quoted)).andExpect(status().isNoContent());
+
+        MentorTurn ended = reloaded();
+        assertThat(ended.getStatus()).isEqualTo(MentorTurn.Status.FAILED);
+        assertThat(ended.getError()).isEqualTo(HephTurnDispatcher.COULD_NOT_FINISH);
+        assertThat(output.getAll())
+                .contains("Heph turn " + turn.getId() + " attempt " + turn.getAttempt()
+                        + " failed: its Heph host reported ERROR: unrecognized")
+                .doesNotContain(key)
+                .doesNotContain(quoted);
+    }
+
+    /** The worker logs exactly the kinds of failure the host names; a kind only one side knows is lost. */
+    @Test
+    void shouldKnowEveryKindOfFailureWhenTheHostNamesIt() throws Exception {
+        String protocol =
+                new ClassPathResource("agent/heph-host-protocol.ts").getContentAsString(StandardCharsets.UTF_8);
+        int start = protocol.indexOf("FAILURE_DETAILS = [");
+        assertThat(start).as("heph-host-protocol.ts declares FAILURE_DETAILS").isNotNegative();
+        String list = protocol.substring(start, protocol.indexOf("] as const", start));
+        Set<String> named = new TreeSet<>();
+        Matcher kind = Pattern.compile("\"([a-z_]+)\"").matcher(list);
+        while (kind.find()) {
+            named.add(kind.group(1));
+        }
+
+        assertThat(named).isEqualTo(new TreeSet<>(HephTurnController.FAILURE_DETAILS));
     }
 
     @Test

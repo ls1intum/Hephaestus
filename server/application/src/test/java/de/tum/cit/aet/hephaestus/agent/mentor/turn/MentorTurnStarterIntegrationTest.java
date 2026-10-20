@@ -21,12 +21,14 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Admission runs when a worker starts a turn, because a follow-up can wait while the member's choice changes. */
 class MentorTurnStarterIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -44,6 +46,12 @@ class MentorTurnStarterIntegrationTest extends AbstractWorkspaceIntegrationTest 
 
     @Autowired
     private MeterRegistry metrics;
+
+    @Autowired
+    private MentorAttemptUsageService attemptUsage;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private final MentorAdmission admission = mock(MentorAdmission.class);
     private final LlmConnectionHealth connections = new LlmConnectionHealth(CircuitBreakerRegistry.ofDefaults());
@@ -63,7 +71,7 @@ class MentorTurnStarterIntegrationTest extends AbstractWorkspaceIntegrationTest 
                 main.getId(),
                 new MentorTurnService.Question(
                         MentorTurn.Surface.APP, "Question", UUID.randomUUID().toString(), null, null));
-        starter = new MentorTurnStarter(turns, admission, metrics, connections);
+        starter = new MentorTurnStarter(turns, admission, attemptUsage, metrics, connections);
     }
 
     @Test
@@ -82,6 +90,20 @@ class MentorTurnStarterIntegrationTest extends AbstractWorkspaceIntegrationTest 
                     .isEqualTo(Objects.requireNonNull(
                             LlmCatalogTestFixtures.admittedMentorConfig().priceSnapshot()));
         });
+        // The attempt's usage measurement exists before any call, with the same model and rates and no call.
+        assertThat(jdbc.queryForMap(
+                        "SELECT model, pricing_state, applied_price_id, applied_per_1m_input_usd, calls, occurred_at"
+                                + " FROM mentor_turn_attempt_usage WHERE turn_id = ? AND attempt = ?",
+                        row.getId(),
+                        row.getAttempt()))
+                .containsEntry("model", "test-model")
+                .containsEntry("pricing_state", "PRICED")
+                .containsEntry("applied_price_id", 12L)
+                .containsEntry("calls", 0)
+                .containsEntry("occurred_at", null)
+                .hasEntrySatisfying(
+                        "applied_per_1m_input_usd",
+                        rate -> assertThat((BigDecimal) rate).isEqualByComparingTo("10"));
     }
 
     @Test
@@ -128,7 +150,8 @@ class MentorTurnStarterIntegrationTest extends AbstractWorkspaceIntegrationTest 
         when(admission.admit(workspace.getId(), accountId)).thenReturn(LlmCatalogTestFixtures.admittedMentorConfig());
         SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
-        new MentorTurnStarter(turns, admission, meters, connections).startNext(WORKER, Duration.ofMinutes(5));
+        new MentorTurnStarter(turns, admission, attemptUsage, meters, connections)
+                .startNext(WORKER, Duration.ofMinutes(5));
 
         assertThat(meters.get(AgentMetrics.MENTOR_TURN_QUEUE_WAIT).timer().count())
                 .isEqualTo(1);

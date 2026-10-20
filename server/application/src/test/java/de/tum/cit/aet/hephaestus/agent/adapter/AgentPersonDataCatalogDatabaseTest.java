@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
+import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
@@ -44,7 +45,8 @@ class AgentPersonDataCatalogDatabaseTest {
         PostgreSQLTestContainer.migrateDatabase(database, "prod");
         var mapper = JsonMapper.builder().findAndAddModules().build();
         var lifecycle = mock(ReviewJobLifecycleService.class);
-        var noAcknowledgement = new AgentPersonDataCatalog(jdbc, mapper, List.of(), lifecycle);
+        var noAcknowledgement =
+                new AgentPersonDataCatalog(jdbc, mapper, List.of(), lifecycle, mock(ReviewAttemptUsageService.class));
         var person = new PersonScope(992106L, List.of(), List.of(992103L));
         var job = UUID.fromString("00000000-0000-0000-0000-000000992111");
         plain.update("UPDATE review_job SET capture='{}'::jsonb WHERE id=?", job);
@@ -65,7 +67,12 @@ class AgentPersonDataCatalogDatabaseTest {
         assertThat(plain.queryForObject("SELECT id FROM review_job WHERE id=?", UUID.class, job))
                 .isEqualTo(job);
 
-        var runtime = new AgentPersonDataCatalog(jdbc, mapper, List.of(mock(PersonEvidenceErasure.class)), lifecycle);
+        var runtime = new AgentPersonDataCatalog(
+                jdbc,
+                mapper,
+                List.of(mock(PersonEvidenceErasure.class)),
+                lifecycle,
+                mock(ReviewAttemptUsageService.class));
         var products = new PracticesPersonDataCatalog(
                 jdbc,
                 mapper,

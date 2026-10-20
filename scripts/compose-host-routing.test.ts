@@ -105,6 +105,48 @@ await test("the canonical redirect takes the browser and leaves the API and the 
 	}
 });
 
+await test("Slack interactivity reaches the server role, every other webhook the webhook role", () => {
+	// A button's consent change commits on application-server before Slack is answered, and the
+	// webhook role has no route for it. Both rules match the path, so Traefik's priority decides.
+	for (const scheme of ["http", "https"]) {
+		assert.ok(
+			Number(priorities.get(`app/${scheme}-slack-interactivity`)) >
+				Number(priorities.get(`core/${scheme}-webhook-server`)),
+			`app/${scheme}-slack-interactivity must outrank the webhook-server's /webhooks router`,
+		);
+	}
+	const rule = rules.find(({ router }) => router === "app/https-slack-interactivity")?.value;
+	assert.match(String(rule), /\) && Path\(`\/webhooks\/slack\/interactivity`\)$/u);
+
+	const file = readFileSync(new URL("../docker/compose.app.yaml", import.meta.url), "utf8");
+	assert.match(file, /routers\.https-slack-interactivity\.service=https-application-server"/u);
+	const middlewares =
+		/routers\.https-slack-interactivity\.middlewares=(?<middlewares>[^"\n]*)/u.exec(file)?.groups
+			?.middlewares ?? "";
+	// The controller owns the full path, so the /api router's stripprefix would 404 every press.
+	assert.doesNotMatch(middlewares, /stripprefix/u);
+	assert.ok(middlewares.split(",").includes("slack-interactivity-body-limit"));
+
+	// The server verifies the press itself, so it is given the signing secret too.
+	for (const [stack, role] of [
+		["app", "application-server"],
+		["core", "webhook-server"],
+	] as const) {
+		const document = parseDocument(
+			readFileSync(new URL(`../docker/compose.${stack}.yaml`, import.meta.url), "utf8"),
+		);
+		assert.ok(
+			document.hasIn([
+				"services",
+				role,
+				"environment",
+				"HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET",
+			]),
+			`${role} is not given the Slack signing secret`,
+		);
+	}
+});
+
 await test("what an operator is told to copy is one host per Host()", () => {
 	// Traefik v3 takes one host per Host(): Host(`a`,`b`) is rejected and the router never loads, so
 	// an example in that shape would take an instance down. The docs carry exactly that as a

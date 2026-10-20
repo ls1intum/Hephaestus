@@ -2,22 +2,23 @@ package de.tum.cit.aet.hephaestus.observability;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.joran.JoranConfigurator;
-import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import ch.qos.logback.classic.spi.ThrowableProxy;
-import ch.qos.logback.core.ConsoleAppender;
-import ch.qos.logback.core.joran.spi.JoranException;
+import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -25,22 +26,40 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.KeyValuePair;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.boot.logging.logback.StructuredLogEncoder;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.mock.http.client.MockClientHttpRequest;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * Encodes events with Boot's own ECS encoder, configured from the shipped {@code application*.yml}. The masks cover
+ * the credential formats listed here and exception messages are left out; a message that a call site writes itself
+ * is not redacted, as the last test pins.
+ */
 @Tag("unit")
 class RedactionContractTest {
 
+    private static final String EMAIL = "ada@example.test";
+
     @Test
-    void shouldRedactKnownCredentialFormatsFromConfiguredEncoder() throws JoranException {
+    void shouldRedactKnownCredentialFormatsFromTheShippedConfiguration() throws IOException {
         String line = encode(event -> {
-            event.setMDCPropertyMap(Map.of("workspace.id", "42", "token", "structured-secret", "level", "FORGED"));
+            event.setMDCPropertyMap(Map.of("workspace.id", "42", "token", "structured-secret"));
             event.setThrowableProxy(new ThrowableProxy(new IllegalStateException("Bearer exception-secret")));
             event.setMessage("credentials: Bearer eyJhbGciOi.test glpat-secret_123 "
                     + "https://example.test/cb?token=url-secret&x=1 github_pat_secret_123");
         });
         JsonNode json = new ObjectMapper().readTree(line);
-        String message = json.get("message").asString();
+        String message = text(json, "message");
         assertTrue(message.contains("Bearer ***"), line);
         assertTrue(message.contains("glpat-***"));
         assertTrue(message.contains("?token=***&x=1"));
@@ -49,16 +68,124 @@ class RedactionContractTest {
         assertFalse(line.contains("secret_123"));
         assertFalse(line.contains("structured-secret"));
         assertFalse(line.contains("exception-secret"));
-        assertTrue(json.has("timestamp"));
-        assertTrue(json.has("logger"));
-        assertTrue(json.has("stacktrace"));
-        assertEquals("INFO", json.get("level").asString());
-        assertEquals("42", json.get("mdc").get("workspace.id").asString());
-        assertEquals("***", json.get("mdc").get("token").asString());
-        assertEquals("FORGED", json.get("mdc").get("level").asString());
-        assertTrue(line.endsWith(System.lineSeparator()));
-        assertFalse(line.substring(0, line.length() - System.lineSeparator().length())
-                .contains(System.lineSeparator()));
+        assertEquals("42", text(json, "context.workspace.id"));
+        assertEquals("***", text(json, "context.token"));
+        assertEquals(IllegalStateException.class.getName(), text(json, "error.type"));
+        assertTrue(text(json, "error.stack_trace").contains(RedactionContractTest.class.getName()), line);
+    }
+
+    @Test
+    void shouldReportWrappedDriverAndHttpFailuresByClassAndFramesOnly() throws Exception {
+        SQLException driver =
+                postgresUniqueViolation("ERROR: duplicate key value violates unique constraint \"uk_account_email\"\n"
+                        + "  Detail: Key (email)=(" + EMAIL + ") already exists.");
+        var database = new DataIntegrityViolationException(
+                "could not execute statement [" + driver.getMessage() + "] [insert into account (email) values (?)]",
+                driver);
+        var provider = WebClientResponseException.create(
+                404,
+                "Not Found",
+                new HttpHeaders(),
+                "{\"title\":\"private-body-canary\"}".getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8,
+                new MockClientHttpRequest(
+                        HttpMethod.GET, URI.create("https://api.example.test/repos/acme/private-repo-canary")));
+        database.addSuppressed(provider);
+
+        String line = encode(event -> {
+            event.setMDCPropertyMap(Map.of("traceId", "0123456789abcdef0123456789abcdef", "job.id", "7"));
+            event.setMessage("Request conflicts with database constraints");
+            event.setThrowableProxy(new ThrowableProxy(database));
+        });
+
+        for (String privateText :
+                List.of(EMAIL, "Key (email)", "private-body-canary", "private-repo-canary", "Not Found")) {
+            assertFalse(line.contains(privateText), privateText + " leaked: " + line);
+        }
+        JsonNode json = new ObjectMapper().readTree(line);
+        assertEquals(DataIntegrityViolationException.class.getName(), text(json, "error.type"));
+        assertNull(node(json, "error.message"), line);
+        String trace = text(json, "error.stack_trace");
+        assertTrue(trace.contains("Caused by: "), trace);
+        assertTrue(trace.contains(driver.getClass().getName()), trace);
+        assertTrue(trace.contains("Suppressed: "), trace);
+        assertTrue(trace.contains(WebClientResponseException.class.getName()), trace);
+        assertTrue(trace.contains("at " + RedactionContractTest.class.getName()), trace);
+        assertTrue(trace.contains("<#"), "frame hashes group repeated failures: " + trace);
+        assertEquals("0123456789abcdef0123456789abcdef", text(json, "context.traceId"));
+        assertEquals("7", text(json, "context.job.id"));
+    }
+
+    /**
+     * Docker splits a log line at 16 KiB, and the journald driver stores the pieces as separate entries that no
+     * collector can parse or correlate. A deep failure must stay one record, with its trace id, below that.
+     */
+    @Test
+    void shouldKeepADeepFailureInOneParseableRecordBelowTheJournalSplit() throws IOException {
+        Throwable failure = deepFailure(300);
+        String line = encode(event -> {
+            event.setMDCPropertyMap(Map.of("traceId", "0123456789abcdef0123456789abcdef", "workspace.id", "42"));
+            event.setMessage("Sync job failed");
+            event.setThrowableProxy(new ThrowableProxy(failure));
+        });
+
+        assertTrue(line.getBytes(StandardCharsets.UTF_8).length < 16 * 1024, "record is " + line.length());
+        JsonNode json = new ObjectMapper().readTree(line);
+        assertEquals("0123456789abcdef0123456789abcdef", text(json, "context.traceId"));
+        assertEquals("42", text(json, "context.workspace.id"));
+        assertEquals(RuntimeException.class.getName(), text(json, "error.type"));
+        String trace = text(json, "error.stack_trace");
+        assertTrue(trace.length() <= 8192, "stack trace is " + trace.length());
+        assertTrue(trace.startsWith("<#"), "the first frame line keeps its hash: " + trace.substring(0, 80));
+        assertTrue(trace.contains("filtered"), "frames beyond the depth bound are elided");
+        assertFalse(trace.contains("wrap 0"), "messages stay out of a bounded trace too");
+    }
+
+    private static Throwable deepFailure(int depth) {
+        if (depth > 0) return deepFailure(depth - 1);
+        Throwable failure = new IllegalStateException("root");
+        for (int wrap = 0; wrap < 6; wrap++) {
+            failure = new RuntimeException("wrap " + wrap, failure);
+        }
+        failure.addSuppressed(new IllegalArgumentException("suppressed"));
+        return failure;
+    }
+
+    /** Before the context prefix, either pair beside these members made the encoder throw and drop the event. */
+    @Test
+    void shouldKeepContextPairsThatShareANameWithRecordMembers() throws IOException {
+        String line = encode(event -> {
+            event.setMDCPropertyMap(Map.of("job.id", "7"));
+            event.addKeyValuePair(new KeyValuePair("job.type", "review"));
+            event.addKeyValuePair(new KeyValuePair("runtime.worker.enabled", true));
+            event.addKeyValuePair(new KeyValuePair("error.type", "caller-supplied"));
+            event.setThrowableProxy(new ThrowableProxy(new IllegalStateException("x")));
+        });
+        JsonNode json = new ObjectMapper().readTree(line);
+        assertEquals("server", text(json, "runtime.role"));
+        assertTrue(node(json, "context.runtime.worker.enabled") != null, line);
+        assertEquals("caller-supplied", text(json, "context.error.type"));
+        assertEquals(IllegalStateException.class.getName(), text(json, "error.type"));
+        assertEquals("7", text(json, "context.job.id"));
+        assertEquals("review", text(json, "context.job.type"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "application.yml, -1, server",
+        "application.yml, 1, all",
+        "application-worker.yml, 0, worker",
+        "application-webhook.yml, 0, webhook"
+    })
+    void shouldNameTheRuntimeRoleOfEveryProfile(String file, int document, String role) throws IOException {
+        JsonNode json = new ObjectMapper()
+                .readTree(encode(shippedEnvironment(file, document), event -> event.setMessage("ready")));
+        assertEquals(role, text(json, "runtime.role"));
+        assertEquals("Hephaestus", text(json, "service.name"));
+        assertFalse(text(json, "service.version").isBlank());
+        assertFalse(text(json, "service.environment").isBlank());
+        assertEquals("INFO", text(json, "log.level"));
+        assertEquals(RedactionContractTest.class.getName(), text(json, "log.logger"));
     }
 
     @ParameterizedTest
@@ -74,6 +201,10 @@ class RedactionContractTest {
         "ghr_synthetic_private, ghr_***",
         "xoxb-synthetic-private, xoxb-***",
         "xoxp-synthetic-private, xoxp-***",
+        "xoxe-1-synthetic-private, xoxe-***",
+        "xapp-1-synthetic-private, xapp-***",
+        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMifQ.c3ludGhldGljLXNpZ25hdHVyZQ, ***",
+        "https://bot:synthetic-private@git.example.test/repo.git, https://***@git.example.test/repo.git",
         "https://example.test?access_token=synthetic-private&keep=1, https://example.test?access_token=***&keep=1",
         "https://example.test?refresh_token=synthetic-private, https://example.test?refresh_token=***",
         "https://example.test?client_secret=synthetic-private, https://example.test?client_secret=***",
@@ -82,19 +213,18 @@ class RedactionContractTest {
         "https://example.test?X-Amz-Signature=synthetic-private, https://example.test?X-Amz-Signature=***",
         "https://example.test?X-Amz-Security-Token=synthetic-private, https://example.test?X-Amz-Security-Token=***"
     })
-    void shouldRedactCredentialValuesInMessagesFieldsAndExceptionCauses(String credential, String masked)
-            throws JoranException {
+    void shouldRedactCredentialValuesInMessagesAndFieldsAndOmitThemFromExceptions(String credential, String masked)
+            throws IOException {
         String line = encode(event -> {
             event.setMessage(credential);
-            event.setMDCPropertyMap(Map.of());
             event.addKeyValuePair(new KeyValuePair("diagnostic", credential));
             event.setThrowableProxy(
                     new ThrowableProxy(new IllegalStateException("outer", new IllegalArgumentException(credential))));
         });
         JsonNode json = new ObjectMapper().readTree(line);
-        assertEquals(masked, json.get("message").asString());
-        assertEquals(masked, json.get("diagnostic").asString());
-        assertTrue(json.get("stacktrace").asString().contains(masked));
+        assertEquals(masked, text(json, "message"));
+        assertEquals(masked, text(json, "context.diagnostic"));
+        assertTrue(text(json, "error.stack_trace").contains(IllegalArgumentException.class.getName()), line);
         assertFalse(line.contains(credential));
     }
 
@@ -119,48 +249,52 @@ class RedactionContractTest {
                 "set-cookie",
                 "Set-Cookie",
                 "x-api-key",
-                "X-Api-Key"
+                "X-Api-Key",
+                "PRIVATE-TOKEN",
+                "private-token",
+                "X-Gitlab-Token",
+                "privateKey",
+                "private_key"
             })
-    void shouldMaskOpaqueSecretsByFieldNameWithoutGuessingTheirFormat(String field) throws JoranException {
-        String line = encode(event -> {
+    void shouldMaskOpaqueSecretsByFieldNameWithoutGuessingTheirFormat(String field) throws IOException {
+        String mdc = encode(event -> {
             event.setMessage("Credential excluded");
             event.setMDCPropertyMap(Map.of(field, "synthetic-private-mdc"));
+        });
+        String pair = encode(event -> {
+            event.setMessage("Credential excluded");
             event.addKeyValuePair(new KeyValuePair(field, "synthetic-private-field"));
         });
-        JsonNode json = new ObjectMapper().readTree(line);
-        assertEquals("***", json.get(field).asString());
-        assertEquals("***", json.get("mdc").get(field).asString());
-        assertFalse(line.contains("synthetic-private"));
+        assertEquals("***", text(new ObjectMapper().readTree(mdc), "context." + field));
+        assertEquals("***", text(new ObjectMapper().readTree(pair), "context." + field));
+        assertFalse(mdc.contains("synthetic-private"));
+        assertFalse(pair.contains("synthetic-private"));
     }
 
     @Test
-    void shouldPreserveTypedFieldsCorrelationAndOneJsonRecordPerEvent() throws JoranException {
-        String message = "untrusted\r\n{\"level\":\"FORGED\"}\t\u001b[31m";
+    void shouldPreserveTypedFieldsCorrelationAndOneJsonRecordPerEvent() throws IOException {
+        String message = "untrusted\r\n{\"log.level\":\"FORGED\"}\t\u001b[31m";
         String line = encode(event -> {
             event.setLevel(Level.ERROR);
             event.setMessage(message);
-            event.setMDCPropertyMap(Map.of(
-                    "traceId", "0123456789abcdef0123456789abcdef", "spanId", "0123456789abcdef", "level", "FORGED"));
+            event.setMDCPropertyMap(
+                    Map.of("traceId", "0123456789abcdef0123456789abcdef", "spanId", "0123456789abcdef"));
             event.addKeyValuePair(new KeyValuePair("event.name", "logging.contract"));
             event.addKeyValuePair(new KeyValuePair("duration.ms", 123L));
             event.addKeyValuePair(new KeyValuePair("runtime.worker.enabled", true));
         });
         JsonNode json = new ObjectMapper().readTree(line);
-        assertEquals(message, json.get("message").asString());
-        assertEquals("ERROR", json.get("level").asString());
-        assertEquals("2026-09-10T10:11:12.123Z", json.get("timestamp").asString());
-        assertEquals("logging.contract", json.get("event.name").asString());
-        assertTrue(json.get("duration.ms").isNumber());
-        assertEquals(123L, json.get("duration.ms").asLong());
-        assertTrue(json.get("runtime.worker.enabled").isBoolean());
-        assertTrue(json.get("runtime.worker.enabled").asBoolean());
-        assertEquals(
-                "0123456789abcdef0123456789abcdef",
-                json.get("mdc").get("traceId").asString());
-        assertEquals("0123456789abcdef", json.get("mdc").get("spanId").asString());
-        assertEquals(1, line.lines().count());
-        assertTrue(line.endsWith(System.lineSeparator()));
-        String record = line.substring(0, line.length() - System.lineSeparator().length());
+        assertEquals(message, text(json, "message"));
+        assertEquals("ERROR", text(json, "log.level"));
+        assertEquals("logging.contract", text(json, "context.event.name"));
+        JsonNode duration = node(json, "context.duration.ms");
+        assertTrue(duration != null && duration.isNumber(), line);
+        JsonNode enabled = node(json, "context.runtime.worker.enabled");
+        assertTrue(enabled != null && enabled.isBoolean() && enabled.asBoolean(), line);
+        assertEquals("0123456789abcdef0123456789abcdef", text(json, "context.traceId"));
+        assertEquals("0123456789abcdef", text(json, "context.spanId"));
+        assertEquals(1, line.strip().lines().count());
+        String record = line.strip();
         assertFalse(record.contains("\r"));
         assertFalse(record.contains("\n"));
         assertFalse(record.contains("\u001b"));
@@ -170,36 +304,84 @@ class RedactionContractTest {
     @ValueSource(
             strings = {"Bearer ghp_synthetic_private", "bearer xoxb-synthetic-private", "Bearer glpat-synthetic-private"
             })
-    void shouldKeepOverlappingCredentialPatternsSafeRegardlessOfMaskOrdering(String credential) throws JoranException {
-        String line = encode(event -> {
-            event.setMessage(credential);
-            event.setMDCPropertyMap(Map.of());
-        });
+    void shouldKeepOverlappingCredentialPatternsSafeRegardlessOfMaskOrdering(String credential) throws IOException {
+        String line = encode(event -> event.setMessage(credential));
         assertFalse(line.contains("synthetic"));
-        String message = new ObjectMapper().readTree(line).get("message").asString();
-        assertTrue(message.matches("(?i)Bearer \\*+"));
+        assertTrue(text(new ObjectMapper().readTree(line), "message").matches("(?i)Bearer \\*+"));
     }
 
-    private static String encode(Consumer<LoggingEvent> configure) throws JoranException {
+    @Test
+    void shouldLeaveContentWithoutACredentialFormatToTheCallSite() throws IOException {
+        // The masks are not redaction: a call site that writes a person's address or text into its message leaks it.
+        String line = encode(event -> event.setMessage("reviewer " + EMAIL + " wrote a private comment"));
+        assertTrue(text(new ObjectMapper().readTree(line), "message").contains(EMAIL));
+    }
+
+    /** pgJDBC is a runtime-only dependency, so its exception is built reflectively from its public API. */
+    private static SQLException postgresUniqueViolation(String message) throws ReflectiveOperationException {
+        Class<?> state = Class.forName("org.postgresql.util.PSQLState");
+        Object uniqueViolation = state.getField("UNIQUE_VIOLATION").get(null);
+        return Class.forName("org.postgresql.util.PSQLException")
+                .asSubclass(SQLException.class)
+                .getConstructor(String.class, state)
+                .newInstance(message, uniqueViolation);
+    }
+
+    private static String encode(Consumer<LoggingEvent> configure) throws IOException {
+        return encode(shippedEnvironment("application.yml", -1), configure);
+    }
+
+    private static String encode(Environment environment, Consumer<LoggingEvent> configure) {
         LoggerContext context = new LoggerContext();
         context.setMDCAdapter(((LoggerContext) LoggerFactory.getILoggerFactory()).getMDCAdapter());
+        context.putObject(Environment.class.getName(), environment);
+        StructuredLogEncoder encoder = new StructuredLogEncoder();
+        encoder.setContext(context);
+        encoder.setFormat("ecs");
+        encoder.start();
         try {
-            JoranConfigurator configurator = new JoranConfigurator();
-            configurator.setContext(context);
-            configurator.doConfigure(
-                    Objects.requireNonNull(RedactionContractTest.class.getResource("/logback-spring.xml")));
-            Logger root = context.getLogger(Logger.ROOT_LOGGER_NAME);
-            assertEquals(Level.INFO, root.getLevel());
-            ConsoleAppender<ILoggingEvent> appender = (ConsoleAppender<ILoggingEvent>) root.getAppender("CONSOLE");
             LoggingEvent event = new LoggingEvent();
             event.setLoggerName(RedactionContractTest.class.getName());
             event.setLoggerContext(context);
             event.setInstant(Instant.parse("2026-09-10T10:11:12.123Z"));
             configure.accept(event);
             if (event.getLevel() == null) event.setLevel(Level.INFO);
-            return new String(appender.getEncoder().encode(event), StandardCharsets.UTF_8);
+            return new String(encoder.encode(event), StandardCharsets.UTF_8);
         } finally {
+            encoder.stop();
             context.stop();
         }
+    }
+
+    /**
+     * The base document of application.yml, with one more document on top: {@code -1} adds none, any other index adds
+     * that document of {@code file}, as its profile would.
+     */
+    private static Environment shippedEnvironment(String file, int document) throws IOException {
+        YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
+        List<PropertySource<?>> sources =
+                new ArrayList<>(loader.load("application.yml", new ClassPathResource("application.yml")));
+        StandardEnvironment environment = new StandardEnvironment();
+        environment.getPropertySources().addFirst(sources.getFirst());
+        if (document >= 0) {
+            environment
+                    .getPropertySources()
+                    .addFirst(loader.load(file, new ClassPathResource(file)).get(document));
+        }
+        return environment;
+    }
+
+    /** Boot's ECS writer nests dotted names; read either shape. */
+    private static @Nullable JsonNode node(JsonNode json, String dottedName) {
+        JsonNode flat = json.get(dottedName);
+        if (flat != null) return flat;
+        JsonNode nested = json.at("/" + dottedName.replace('.', '/'));
+        return nested.isMissingNode() ? null : nested;
+    }
+
+    private static String text(JsonNode json, String dottedName) {
+        JsonNode value = node(json, dottedName);
+        if (value == null) throw new AssertionError(dottedName + " missing from " + json);
+        return value.asString();
     }
 }

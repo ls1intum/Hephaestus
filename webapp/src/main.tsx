@@ -1,13 +1,12 @@
-import * as Sentry from "@sentry/react";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { StrictMode, useEffect } from "react";
+import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 
 import { client } from "@/api/client.gen";
 import environment from "@/environment";
 import { ROUTER_SEARCH } from "@/lib/router-search";
 import { csrfFetch } from "@/runtime/auth/csrf";
-import { RouteError } from "@/runtime/sentry/RouteError";
+import { RouteError } from "@/runtime/errors/RouteError";
 import {
 	installWorkspaceNavigation,
 	workspaceAddressConfig,
@@ -18,11 +17,10 @@ import "./styles.css";
 
 import { applyStateChangingHeaders } from "@/runtime/auth/auth-client";
 import { AuthProvider, useAuth } from "@/runtime/auth/AuthContext";
+import { handlePasskeyChallenge } from "@/runtime/auth/passkey-challenge";
 import { handlePossibleSessionExpiry } from "@/runtime/auth/session-expiry";
 import { SessionKeepAlive } from "@/runtime/auth/use-session-keep-alive";
-import { useCookieConsent } from "@/runtime/consent";
 import { TanstackDevtools } from "@/runtime/devtools/TanstackDevtools";
-import { disableSentry, initSentry } from "@/runtime/sentry";
 import { ThemeProvider } from "@/runtime/theme/ThemeContext";
 import { applyUserViewHeaders } from "@/runtime/user-view/session";
 
@@ -50,11 +48,6 @@ client.interceptors.request.use((request) =>
 	applyUserViewHeaders(applyStateChangingHeaders(request)),
 );
 
-client.interceptors.response.use((response) => {
-	handlePossibleSessionExpiry(response, TanstackQuery.getContext().queryClient);
-	return response;
-});
-
 const router = createRouter({
 	...ROUTER_SEARCH,
 	rewrite: workspaceRewrite(workspaceAddressConfig, window.location.origin),
@@ -73,6 +66,14 @@ const router = createRouter({
 	defaultErrorComponent: RouteError,
 });
 
+client.interceptors.response.use(async (response) => {
+	await handlePasskeyChallenge(response, async () =>
+		router.navigate({ to: "/settings", hash: "passkeys" }),
+	);
+	handlePossibleSessionExpiry(response, TanstackQuery.getContext().queryClient);
+	return response;
+});
+
 installWorkspaceNavigation(router, workspaceAddressConfig);
 
 declare module "@tanstack/react-router" {
@@ -87,17 +88,6 @@ function WrappedRouterProvider() {
 }
 
 function Root() {
-	const consent = useCookieConsent();
-	const errorMonitoring = consent?.errorMonitoring === true;
-
-	useEffect(() => {
-		if (errorMonitoring) {
-			initSentry();
-		} else {
-			disableSentry();
-		}
-	}, [errorMonitoring]);
-
 	return (
 		<TanstackQuery.Provider>
 			<AuthProvider>
@@ -114,11 +104,10 @@ function Root() {
 const rootElement = document.querySelector("#app");
 if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement, {
-		onUncaughtError: Sentry.reactErrorHandler((uncaught, errorInfo) => {
+		onUncaughtError: (uncaught, errorInfo) => {
 			// oxlint-disable-next-line no-console -- The custom handler replaces React's console report.
 			console.warn("Uncaught error", uncaught, errorInfo.componentStack);
-		}),
-		onRecoverableError: Sentry.reactErrorHandler(),
+		},
 	});
 	root.render(
 		<StrictMode>

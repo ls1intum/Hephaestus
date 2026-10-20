@@ -34,8 +34,9 @@ import {
 import {
 	breakpointBeforeSituation,
 	createHephHost,
+	failureSummary,
 	httpTurnApi,
-	LeaseLostError,
+	leaseLost,
 	type LinkAnswer,
 	type ModelFactory,
 	partialStream,
@@ -45,6 +46,7 @@ import {
 	tooLarge,
 	turnStage,
 	type TurnApi,
+	WorkerStatusError,
 } from "../../../main/resources/agent/heph-host.ts";
 
 // The faux provider ships in pi-ai, which the root package reaches only through pi-coding-agent.
@@ -209,7 +211,7 @@ function fakeWorker(
 	// Like the worker, which answers 409 once the attempt ended.
 	const check = () => {
 		if (!open) {
-			throw new LeaseLostError("the turn ended");
+			throw leaseLost("the turn ended");
 		}
 	};
 	return {
@@ -350,8 +352,52 @@ void test("a turn whose model fails ends failed, sends none of its entries, and 
 		outcome: "FAILED",
 		entries: [],
 		reason: "ERROR",
-		detail: "the model's answer ended with error",
+		detail: "model_error",
 	});
+});
+
+void test("a failed turn names its kind of failure to the worker and in its log, never the provider's words", async (t) => {
+	const canary = "sk-canary-7Qx9";
+	const quoted = "my private question about the outage";
+	const written: string[] = [];
+	t.mock.method(process.stderr, "write", (chunk: unknown) => {
+		written.push(String(chunk));
+		return true;
+	});
+	const worker = fakeWorker(contextOf([], quoted));
+
+	const end = await runTurn(
+		worker,
+		fauxModels([
+			() =>
+				faux.fauxAssistantMessage("", {
+					stopReason: "error",
+					errorMessage: `Incorrect API key provided: ${canary} for "${quoted}"`,
+				}),
+		]),
+	);
+	t.mock.restoreAll();
+
+	assert.deepEqual(end, { outcome: "FAILED", entries: [], reason: "ERROR", detail: "model_error" });
+	const log = written.join("");
+	assert.match(log, /failed \(ERROR\): model_error/u);
+	assert.ok(!log.includes(canary) && !log.includes(quoted), log);
+});
+
+void test("a failure in the host's log is its kind and the worker's status, whatever its message writes", () => {
+	// A multi-line message puts a line that reads as a stack frame ahead of the real frames.
+	const forged = "search failed with 500:\n    at sk-canary-7Qx9 private question";
+	const answered = failureSummary(new WorkerStatusError(forged, 500));
+	const refused = failureSummary(new WorkerStatusError(forged, 422));
+	const thrown = failureSummary(new Error(forged));
+
+	assert.equal(answered, "worker_unavailable status=500");
+	assert.equal(refused, "worker_refused status=422");
+	assert.equal(thrown, "host_error");
+	for (const summary of [answered, refused, thrown]) {
+		assert.ok(!summary.includes("sk-canary") && !summary.includes("private question"), summary);
+	}
+	assert.equal(failureSummary("text"), "host_error");
 });
 
 void test("a model call that Pi retries leaves its cut-off text out of the end and the partial answer", async () => {
@@ -1393,7 +1439,7 @@ void test("a conversation past the model's window that cannot get shorter fails 
 	);
 
 	assert.equal(end.outcome, "FAILED");
-	assert.match(end.detail ?? "", /does not fit the model's context window/u);
+	assert.equal(end.detail, "context_overflow");
 	assert.equal(answered.length, 0);
 });
 
@@ -1846,10 +1892,10 @@ void test("a turn fails as stalled at once when the proxy ends its stream with a
 		assert.equal(end.reason, "STALLED");
 		assert.deepEqual(end.entries, []);
 		assert.equal(calls, 1, "a stall is not retried");
-		assert.match(
-			end.detail ?? "",
-			/sent nothing for 120 seconds/u,
-			"the proxy's words reach the worker log",
+		assert.equal(
+			end.detail,
+			"upstream_stalled",
+			"the proxy's code, not its words, reaches the worker log",
 		);
 	} finally {
 		proxy.close();
@@ -1970,7 +2016,7 @@ void test("a stop at the deadline ends the turn failed and sends none of its ent
 		outcome: "FAILED",
 		entries: [],
 		reason: "DEADLINE",
-		detail: "the worker stopped the turn at its deadline",
+		detail: "deadline",
 	});
 });
 

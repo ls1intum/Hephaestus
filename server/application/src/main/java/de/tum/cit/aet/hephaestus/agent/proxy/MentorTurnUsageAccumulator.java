@@ -1,9 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorAttemptUsageService;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorAttemptUsageService.CallSettlement;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
-import de.tum.cit.aet.hephaestus.mentor.MentorTurnRepository;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurnUsage;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
@@ -16,15 +17,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Adds one proxied call's token usage to the Heph turn attempt that made it — the mentor's counterpart to
- * {@link ProxyUsageAccumulator}, writing to the {@code mentor_turn} row instead of an
- * {@code review_job} one. Runs in its own {@code REQUIRES_NEW} transaction: the proxy servlet thread
- * has no ambient transaction, and the accounting write must commit independently of the passthrough.
+ * {@link ProxyUsageAccumulator}. Runs in its own {@code REQUIRES_NEW} transaction: the proxy servlet thread has no
+ * ambient transaction, and the accounting write must commit independently of the passthrough.
  *
- * <p>The row is both the record and the budget gate's read model: the turn credential reads the attempt's spend
- * from it on every call, so a worker that dies still bills what the proxy recorded.
+ * <p>The call lands on the attempt's usage measurement ({@link MentorAttemptUsageService#settleCall}), also when it
+ * returns after the attempt ended or the turn started its next attempt; that attempt's ledger row is then projected
+ * again. While the attempt holds its lease, the turn row takes the call too, because the turn credential reads the
+ * attempt's spend from it on every call. {@link LlmProxyService} settles a forwarded call at most once.
  *
- * <p>A dropped write is money lost, not a no-op — these columns are the only record of a crashed
- * turn's calls, so a non-zero rate on {@code llm.proxy.usage.mentor.superseded} or
+ * <p>A dropped call is money lost: the turn is gone, or the attempt has no measurement because it was admitted before
+ * the measurement existed or an erasure removed it. A non-zero rate on {@code llm.proxy.usage.mentor.superseded} or
  * {@code llm.proxy.usage.mentor.failure} means the ledger is under-billing.
  */
 @Service
@@ -33,11 +35,11 @@ public class MentorTurnUsageAccumulator {
 
     private static final Logger log = LoggerFactory.getLogger(MentorTurnUsageAccumulator.class);
 
-    private final MentorTurnRepository turnRepository;
+    private final MentorAttemptUsageService attemptUsage;
     private final MeterRegistry meterRegistry;
 
-    MentorTurnUsageAccumulator(MentorTurnRepository turnRepository, MeterRegistry meterRegistry) {
-        this.turnRepository = turnRepository;
+    MentorTurnUsageAccumulator(MentorAttemptUsageService attemptUsage, MeterRegistry meterRegistry) {
+        this.attemptUsage = attemptUsage;
         this.meterRegistry = meterRegistry;
     }
 
@@ -49,7 +51,7 @@ public class MentorTurnUsageAccumulator {
         }
         UUID turnId = attempt.sourceId();
         try {
-            int rows = turnRepository.accumulateUsage(
+            CallSettlement settled = attemptUsage.settleCall(
                     turnId,
                     attempt.number(),
                     new MentorTurnUsage(
@@ -59,8 +61,8 @@ public class MentorTurnUsageAccumulator {
                             usage.cacheWriteTokens(),
                             usage.reasoningTokens(),
                             1));
-            if (rows == 0) {
-                recordSuperseded(turnId);
+            if (settled == CallSettlement.OWNER_GONE || settled == CallSettlement.UNREGISTERED) {
+                recordDropped(turnId, settled);
             }
         } catch (RuntimeException e) {
             log.warn("Lost proxy usage accounting for Heph turn {} — this call may go unbilled", turnId, e);
@@ -68,15 +70,13 @@ public class MentorTurnUsageAccumulator {
         }
     }
 
-    /**
-     * The attempt ended after this call was authenticated, so its totals have already been billed.
-     * Adding now would double-bill; dropping under-bills by one call, the lesser error.
-     */
-    private void recordSuperseded(UUID turnId) {
+    /** The call has no attempt to land on; creating one for it would bring back what an erasure removed. */
+    private void recordDropped(UUID turnId, CallSettlement reason) {
         log.warn(
-                "Dropping proxy usage from a finished Heph turn attempt — turn {} no longer runs that attempt; "
-                        + "this call goes unbilled rather than being added to an attempt that has already been billed",
-                turnId);
+                "Dropping proxy usage of Heph turn {} with no attempt measurement to settle on ({}); this call goes"
+                        + " unbilled",
+                turnId,
+                reason);
         meterRegistry.counter(AgentMetrics.LLM_PROXY_USAGE_MENTOR_SUPERSEDED).increment();
     }
 }

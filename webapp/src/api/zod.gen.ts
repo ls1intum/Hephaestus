@@ -2404,6 +2404,35 @@ export const zParticipationCounts = z.object({
     responded: z.int()
 });
 
+export const zPasskeyCredential = z.object({
+    createdAt: z.iso.datetime({ offset: true }).pipe(z.coerce.date()).optional(),
+    id: z.string(),
+    label: z.string(),
+    lastUsedAt: z.iso.datetime({ offset: true }).pipe(z.coerce.date()).optional()
+});
+
+export const zPasskeyOptions = z.object({
+    challengeId: z.uuid(),
+    optionsJson: z.string()
+});
+
+export const zPasskeyProtectionRequest = z.object({
+    enabled: z.boolean()
+});
+
+export const zPasskeyRecoveryCodes = z.object({
+    codes: z.array(z.string())
+});
+
+export const zPasskeyStatus = z.object({
+    credentials: z.array(zPasskeyCredential),
+    instanceAdminRequired: z.boolean(),
+    protectionEnabled: z.boolean(),
+    recoveryRequired: z.boolean(),
+    verified: z.boolean(),
+    workspaceAdminRequired: z.boolean()
+});
+
 export const zPersonDataProvider = z.object({
     id: z.int(),
     serverUrl: z.string(),
@@ -2672,19 +2701,6 @@ export const zPracticeGuidanceDto = z.object({
     guide: zPracticeGuide.nullable(),
     practiceSlug: z.string(),
     visual: zPracticeVisual.nullable()
-});
-
-export const zPracticeWorkspaceTile = z.object({
-    developers: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    group: zGroupRef.nullable(),
-    outcomes: zOutcomeVector,
-    practiceName: z.string(),
-    practiceSlug: z.string()
-});
-
-export const zPracticeWorkspaceOverview = z.object({
-    developers: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    practices: z.array(zPracticeWorkspaceTile)
 });
 
 export const zPrepareFeedbackResponse = z.object({
@@ -3182,11 +3198,21 @@ export const zReasonCount = z.object({
     reason: z.string()
 });
 
+export const zRecoverPasskeyRequest = z.object({
+    code: z.string().min(0).max(256)
+});
+
 /**
  * Register an Outline collection for mirroring (lands ENABLED + PENDING)
  */
 export const zRegisterOutlineCollectionRequest = z.object({
     collectionId: z.string().min(0).max(64)
+});
+
+export const zRegisterPasskeyRequest = z.object({
+    challengeId: z.uuid(),
+    credentialJson: z.string().min(0).max(65536),
+    label: z.string().min(0).max(100)
 });
 
 /**
@@ -5739,6 +5765,11 @@ export const zTrendSupport = z.object({
 });
 
 export const zPracticeGroupStanding = z.object({
+    basis: z.enum([
+        'CURRENT_REVIEWS',
+        'EARLIER_REVIEWS',
+        'EARLIER_REVIEWS_CRITERIA_UNKNOWN'
+    ]).nullable(),
     direction: z.enum([
         'IMPROVING',
         'DECLINING',
@@ -5767,6 +5798,11 @@ export const zPracticeGroupStanding = z.object({
 });
 
 export const zPracticeStanding = z.object({
+    basis: z.enum([
+        'CURRENT_REVIEWS',
+        'EARLIER_REVIEWS',
+        'EARLIER_REVIEWS_CRITERIA_UNKNOWN'
+    ]).nullable(),
     direction: z.enum([
         'IMPROVING',
         'DECLINING',
@@ -6100,6 +6136,10 @@ export const zUpdateWorkspaceLlmModelRequest = z.object({
     ]).optional()
 });
 
+export const zUpdateWorkspacePasskeyPolicy = z.object({
+    required: z.boolean()
+});
+
 export const zUpdateWorkspacePublicActivityRequest = z.object({
     allowSearchEngines: z.boolean(),
     publicActivityEnabled: z.boolean()
@@ -6262,6 +6302,11 @@ export const zPracticeItemTypeOption = z.object({
 export const zPracticeDefinitionOptions = z.object({
     itemTypes: z.array(zPracticeItemTypeOption),
     sourceContract: z.string()
+});
+
+export const zVerifyPasskeyRequest = z.object({
+    challengeId: z.uuid(),
+    credentialJson: z.string().min(0).max(65536)
 });
 
 /**
@@ -6743,6 +6788,11 @@ export const zWorkspaceOnboardingSettings = z.object({
     revision: z.int()
 });
 
+export const zWorkspacePasskeyPolicy = z.object({
+    instanceRequired: z.boolean(),
+    required: z.boolean()
+});
+
 /**
  * Available workspace creation providers and their configuration
  */
@@ -6750,6 +6800,14 @@ export const zWorkspaceProviders = z.object({
     creationPolicy: z.enum(['ADMIN_ONLY', 'SELF_SERVICE']).optional(),
     github: zGitHubProvider.optional(),
     gitlab: zGitLabProvider.optional()
+});
+
+/**
+ * The middle half of the developers counted: the 25th to the 75th percentile
+ */
+export const zWorkspaceRange = z.object({
+    high: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    low: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 export const zWorkspaceReviewScope = z.object({
@@ -6808,6 +6866,72 @@ export const zUpdatePracticeReviewSettingsRequest = z.object({
 });
 
 /**
+ * The developers at one verdict in a split
+ */
+export const zWorkspaceSplitPart = z.object({
+    developers: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    standing: z.enum([
+        'DEVELOPING',
+        'MIXED',
+        'STRENGTH'
+    ])
+});
+
+/**
+ * How the developers with a standing split across one practice group or one practice, counted in developers: a part per verdict, none yet, and their total
+ */
+export const zWorkspaceSplit = z.object({
+    developers: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    noneYet: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    parts: z.array(zWorkspaceSplitPart)
+});
+
+/**
+ * One practice of a group: how the developers with a standing split, and where the reader is
+ */
+export const zWorkspacePracticeSplit = z.object({
+    practiceName: z.string(),
+    practiceSlug: z.string(),
+    split: zWorkspaceSplit,
+    yourBasis: z.enum([
+        'CURRENT_REVIEWS',
+        'EARLIER_REVIEWS',
+        'EARLIER_REVIEWS_CRITERIA_UNKNOWN'
+    ]).nullable(),
+    yourStanding: z.enum([
+        'DEVELOPING',
+        'STRENGTH',
+        'MIXED',
+        'NOT_OBSERVED',
+        'NO_OPPORTUNITY'
+    ]).nullable()
+});
+
+/**
+ * One practice group: how the developers with a standing split across it, and where the reader is
+ */
+export const zWorkspaceGroupSplit = z.object({
+    groupColor: z.string().nullable(),
+    groupIcon: z.string().nullable(),
+    groupName: z.string(),
+    groupSlug: z.string(),
+    practices: z.array(zWorkspacePracticeSplit),
+    split: zWorkspaceSplit,
+    yourBasis: z.enum([
+        'CURRENT_REVIEWS',
+        'EARLIER_REVIEWS',
+        'EARLIER_REVIEWS_CRITERIA_UNKNOWN'
+    ]).nullable(),
+    yourStanding: z.enum([
+        'DEVELOPING',
+        'STRENGTH',
+        'MIXED',
+        'NOT_OBSERVED',
+        'NO_OPPORTUNITY'
+    ]).nullable()
+});
+
+/**
  * Repository contribution visibility settings for a specific team within a workspace
  */
 export const zWorkspaceTeamRepositorySettings = z.object({
@@ -6824,6 +6948,40 @@ export const zWorkspaceTeamSettings = z.object({
     hidden: z.boolean(),
     teamId: z.int(),
     workspaceId: z.int()
+});
+
+/**
+ * One figure: the reader's own value, then the middle half of the developers counted
+ */
+export const zWorkspaceTile = z.object({
+    middle: zWorkspaceRange.nullable(),
+    yours: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * How the workspace's developers with a current standing split across the practice groups, counted in developers and never naming one, and the open feedback beside the reader's own. Nothing here reads a window; the tiles that do are read on their own
+ */
+export const zPracticesAcrossWorkspace = z.object({
+    groups: z.array(zWorkspaceGroupSplit),
+    includesEarlierReviews: z.boolean(),
+    openFeedback: zWorkspaceTile
+});
+
+/**
+ * The reader's figures over one window beside the middle half of the developers with a standing in it
+ */
+export const zPracticesAcrossWorkspaceTiles = z.object({
+    developersWithAStandingInWindow: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    includesEarlierReviews: z.boolean(),
+    practicesGoingWell: zWorkspaceTile,
+    practicesNeedingAttention: zWorkspaceTile,
+    reviewedWork: zWorkspaceTile,
+    window: z.enum([
+        'ALL_TIME',
+        'DAYS_30',
+        'DAYS_90'
+    ]),
+    yourPractices: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 export const zWorsenedBasis = zClaimBasis.and(z.object({

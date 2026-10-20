@@ -215,7 +215,12 @@ public class SlackMentorService {
             timeline.requireOwnedEntry(workspaceId, main.get().getAccountId(), entryId);
             entries.vote(workspaceId, entryId, feedback.get().vote());
         } catch (EntityNotFoundException | MentorRejectedException refused) {
-            log.debug("Slack feedback on entry {} not recorded: {}", entryId, refused.getMessage());
+            log.debug(
+                    "Slack feedback on entry {} not recorded: {}",
+                    entryId,
+                    refused instanceof MentorRejectedException rejected
+                            ? rejected.reason()
+                            : refused.getClass().getSimpleName());
         }
     }
 

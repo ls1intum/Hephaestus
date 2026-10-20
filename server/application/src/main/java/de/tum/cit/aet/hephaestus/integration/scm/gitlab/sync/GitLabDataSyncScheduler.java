@@ -436,7 +436,10 @@ public class GitLabDataSyncScheduler {
                             target.id(), repo.getNativeId(), repo.getNameWithOwner());
                 }
             } catch (Exception e) {
-                log.debug("Skipped monitor identity reconcile: syncTargetId={}, error={}", target.id(), e.getMessage());
+                log.debug(
+                        "Skipped monitor identity reconcile: syncTargetId={}, error={}",
+                        target.id(),
+                        e.getClass().getSimpleName());
             }
         }
     }

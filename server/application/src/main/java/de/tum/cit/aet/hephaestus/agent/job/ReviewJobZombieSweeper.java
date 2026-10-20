@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -52,7 +51,7 @@ public class ReviewJobZombieSweeper {
     private final WorkerRegistryRepository workerRegistryRepository;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
-    private final LlmUsageRecorder usageRecorder;
+    private final ReviewAttemptUsageService attemptUsage;
     private final Counter zombieReaped;
     private final Counter orphanRequeued;
     private final Counter orphanFailed;
@@ -65,7 +64,7 @@ public class ReviewJobZombieSweeper {
             WorkerRegistryRepository workerRegistryRepository,
             ObjectMapper objectMapper,
             TransactionTemplate transactionTemplate,
-            LlmUsageRecorder usageRecorder,
+            ReviewAttemptUsageService attemptUsage,
             MeterRegistry meterRegistry,
             ReviewJobTelemetry jobTelemetry,
             ReviewJobRecovery recovery) {
@@ -74,7 +73,7 @@ public class ReviewJobZombieSweeper {
         this.workerRegistryRepository = workerRegistryRepository;
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
-        this.usageRecorder = usageRecorder;
+        this.attemptUsage = attemptUsage;
         this.zombieReaped = Counter.builder(AgentMetrics.AGENT_JOB_ZOMBIE_REAPED)
                 .description("Stale RUNNING jobs marked as TIMED_OUT")
                 .register(meterRegistry);
@@ -120,7 +119,10 @@ public class ReviewJobZombieSweeper {
                     }
                 }
             } catch (Exception e) {
-                log.warn("Failed to reap stale job: jobId={}, error={}", job.getId(), e.getMessage());
+                log.warn(
+                        "Failed to reap stale job: jobId={}, errorType={}",
+                        job.getId(),
+                        e.getClass().getName());
             }
         }
     }
@@ -177,7 +179,10 @@ public class ReviewJobZombieSweeper {
                     log.warn("Orphaned job {} failed at attempt {}", orphan.getJobId(), orphan.getAttempt());
                 }
             } catch (Exception e) {
-                log.warn("Failed to recover orphaned job {}: {}", orphan.getJobId(), e.getMessage());
+                log.warn(
+                        "Failed to recover orphaned job {}: errorType={}",
+                        orphan.getJobId(),
+                        e.getClass().getName());
             }
         }
     }
@@ -204,7 +209,10 @@ public class ReviewJobZombieSweeper {
         try {
             return ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         } catch (RuntimeException e) {
-            log.warn("Could not read config snapshot for job {}: {}", job.getId(), e.getMessage());
+            log.warn(
+                    "Could not read config snapshot for job {}: errorType={}",
+                    job.getId(),
+                    e.getClass().getName());
             return null;
         }
     }
@@ -233,7 +241,6 @@ public class ReviewJobZombieSweeper {
         LlmPriceSnapshot price = snapshot != null && snapshot.model().priceSnapshot() != null
                 ? snapshot.model().priceSnapshot()
                 : LlmPriceSnapshot.unpricedInstance();
-        TerminalUsage.fromProxy(counts)
-                .appendTo(usageRecorder, jobRepository, job.getWorkspaceId(), job, snapshot, price);
+        attemptUsage.settleAttempt(job, FrozenCharge.admitted(snapshot, price), null, counts);
     }
 }

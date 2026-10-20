@@ -171,10 +171,11 @@ public class TurnContextFolder {
                                     : line);
                 }
             } catch (RuntimeException e) {
+                // The class only, as in every sandbox log here: a message can quote an item or the daemon's answer.
                 log.warn(
-                        "A context loader could not name what it loads: loader={}, reason={}",
+                        "A context loader could not name what it loads: loader={}, failure={}",
                         loader.prefix(),
-                        e.getMessage());
+                        e.getClass().getSimpleName());
             }
         });
         return String.join("\n", lines);
@@ -363,7 +364,10 @@ public class TurnContextFolder {
             return refusal(
                     "CONTEXT_CHANGED", "The context folder changed. Read it again; repositories must be loaded again.");
         } catch (SandboxException | IOException failed) {
-            log.warn("Could not prepare a turn sandbox: turnId={}, reason={}", turn.turnId(), failed.getMessage());
+            log.warn(
+                    "Could not prepare a turn sandbox: turnId={}, failure={}",
+                    turn.turnId(),
+                    failed.getClass().getSimpleName());
             return refusal("UNAVAILABLE", "This worker cannot run the context folder now. Do not retry.");
         }
         try {
@@ -371,13 +375,22 @@ public class TurnContextFolder {
         } catch (Late late) {
             return refusal("TIMEOUT", "The answer ended before the context folder was free.");
         } catch (Staging failed) {
-            log.warn("Staging into a turn sandbox failed: turnId={}, reason={}", turn.turnId(), failed.getMessage());
+            Throwable cause = failed.getCause();
+            log.warn(
+                    "Staging into a turn sandbox failed: turnId={}, failure={}",
+                    turn.turnId(),
+                    cause == null
+                            ? failed.getClass().getSimpleName()
+                            : cause.getClass().getSimpleName());
             return refusal("UNAVAILABLE", "The context folder could not be prepared. Try again once.");
         } catch (SandboxException | IOException failed) {
             if (sandbox.removed()) {
                 return refusal("TIMEOUT", "The answer ended while the sandbox ran.");
             }
-            log.warn("A turn sandbox call failed: turnId={}, reason={}", turn.turnId(), failed.getMessage());
+            log.warn(
+                    "A turn sandbox call failed: turnId={}, failure={}",
+                    turn.turnId(),
+                    failed.getClass().getSimpleName());
             return refusal("UNAVAILABLE", "The sandbox failed. Try again once.");
         }
     }
@@ -470,9 +483,9 @@ public class TurnContextFolder {
             return loader.index(turn.workspaceId(), turn.accountId());
         } catch (RuntimeException e) {
             log.warn(
-                    "A context loader could not list what it loads: loader={}, reason={}",
+                    "A context loader could not list what it loads: loader={}, failure={}",
                     loader.prefix(),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return "";
         }
     }
@@ -578,7 +591,7 @@ public class TurnContextFolder {
                     .runtime()
                     .exec(sandbox.containerId(), new ExecSandboxes.Command(argv, false, null, time, SUMMARY_LIMIT));
         } catch (SandboxException failed) {
-            log.debug("A load's summary failed: {}", failed.getMessage());
+            log.debug("A load's summary failed: {}", failed.getClass().getSimpleName());
             return "";
         }
         if (run.timedOut()) {
@@ -592,8 +605,9 @@ public class TurnContextFolder {
     private static void staged(ExecSandboxes.Execution run) {
         Integer exit = run.exitCode();
         if (exit == null || exit != 0) {
-            throw new SandboxException("Staging into the turn sandbox failed: exit " + exit + ": "
-                    + new String(run.stderr(), StandardCharsets.UTF_8).strip());
+            // The exit is the classification; the sandbox's stderr can name the staged files and stays out.
+            log.warn("Staging into a turn sandbox exited with {}", exit);
+            throw new SandboxException("Staging into the turn sandbox failed: exit " + exit);
         }
     }
 
@@ -610,7 +624,9 @@ public class TurnContextFolder {
                             new ExecSandboxes.Command(
                                     List.of("sh", "-c", "kill -KILL -1"), false, null, Duration.ofSeconds(5), 1024));
         } catch (SandboxException e) {
-            log.debug("Could not kill the commands of a turn sandbox: {}", e.getMessage());
+            log.debug(
+                    "Could not kill the commands of a turn sandbox: {}",
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -766,7 +782,7 @@ public class TurnContextFolder {
         private static final long serialVersionUID = 1L;
 
         Staging(Exception cause) {
-            super("Staging into the turn sandbox failed: " + cause.getMessage(), cause);
+            super("Staging into the turn sandbox failed", cause);
         }
     }
 

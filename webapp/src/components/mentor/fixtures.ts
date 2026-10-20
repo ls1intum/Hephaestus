@@ -171,15 +171,41 @@ const ON_THE_WORK: WeeklyDigestFeedback = {
 	replaced: false,
 };
 
-const ON_THE_PROFILE: WeeklyDigestFeedback = {
+// The server never lists Practice page feedback in a digest; its waiting count covers those cards.
+const ON_OTHER_WORK: WeeklyDigestFeedback = {
 	feedbackId: "f1000000-0000-4000-8000-000000000002",
 	practiceSlug: "link-issues",
 	practiceName: "Link the issue the change resolves",
 	groupSlug: "pull-requests",
 	groupName: "Pull requests",
-	destination: "PRACTICE_PAGE",
+	destination: "ON_WORK",
+	item: {
+		id: "433",
+		kind: "scm.pull_request",
+		provider: "GITHUB",
+		label: "#433",
+		title: "Retry failed deliveries",
+		container: "ls1intum/Hephaestus",
+		parentId: null,
+		path: null,
+		removedAt: null,
+		url: "https://github.com/ls1intum/Hephaestus/pull/433",
+	},
 	deliveredAt: new Date("2026-10-07T14:30:00Z"),
 	withdrawn: false,
+	replaced: false,
+};
+
+/** Withdrawn feedback names no work: the server sends neither its item nor its message. */
+const WITHDRAWN_ON_WORK: WeeklyDigestFeedback = {
+	feedbackId: "f1000000-0000-4000-8000-000000000004",
+	practiceSlug: "link-issues",
+	practiceName: "Link the issue the change resolves",
+	groupSlug: "pull-requests",
+	groupName: "Pull requests",
+	destination: "ON_WORK",
+	deliveredAt: new Date("2026-10-07T14:30:00Z"),
+	withdrawn: true,
 	replaced: false,
 };
 
@@ -194,10 +220,10 @@ const IN_THE_CONVERSATION: WeeklyDigestFeedback = {
 	replaced: false,
 };
 
-/** A week in which feedback reached the developer in every place, their profile moved, and cards wait. */
+/** A week in which feedback reached the developer on their work and in conversation, their profile moved, and cards wait. */
 export const WEEKLY_DIGEST: WeeklyDigest = {
 	...WEEK,
-	feedback: [ON_THE_WORK, ON_THE_PROFILE, IN_THE_CONVERSATION],
+	feedback: [ON_THE_WORK, ON_OTHER_WORK, IN_THE_CONVERSATION],
 	changes: [
 		{
 			type: "STANDING_MOVED",
@@ -221,16 +247,21 @@ export const WEEKLY_DIGEST: WeeklyDigest = {
 /** A week whose only news is unread cards on the Practice profile. */
 export const WAITING_ONLY_DIGEST: WeeklyDigest = { ...WEEK, feedback: [], changes: [], waiting: 1 };
 
-/** Everything the week held was taken back since: withdrawn or no longer shown. */
-export const ALL_HIDDEN_DIGEST: WeeklyDigest = { ...WEEK, feedback: [], changes: [], waiting: 0 };
+/**
+ * Nothing left to show: the developer has read the week's Practice page cards since, or its
+ * feedback no longer shows. A withdrawal does not empty a digest; it stays as a withdrawn row.
+ */
+export const NOTHING_TO_SHOW_DIGEST: WeeklyDigest = {
+	...WEEK,
+	feedback: [],
+	changes: [],
+	waiting: 0,
+};
 
-/** A workspace admin withdrew one card, and newer feedback replaced a comment. */
+/** A workspace admin withdrew one piece of feedback, and newer feedback replaced a comment. */
 export const WITHDRAWN_DIGEST: WeeklyDigest = {
 	...WEEK,
-	feedback: [
-		{ ...ON_THE_WORK, replaced: true },
-		{ ...ON_THE_PROFILE, withdrawn: true },
-	],
+	feedback: [{ ...ON_THE_WORK, replaced: true }, WITHDRAWN_ON_WORK],
 	changes: [],
 	waiting: 0,
 };

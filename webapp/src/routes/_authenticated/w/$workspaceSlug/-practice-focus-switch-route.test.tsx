@@ -14,7 +14,10 @@ import {
 	packagingGroup,
 	practiceStandings,
 } from "@/stories/practice-profile-story-mock-data";
-import { ACROSS_WORKSPACE } from "@/stories/practices-across-the-workspace-story-data";
+import {
+	ACROSS_WORKSPACE,
+	ACROSS_WORKSPACE_TILES,
+} from "@/stories/practices-across-the-workspace-story-data";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real routes pulls in the whole app shell and its lazy modules.
@@ -53,6 +56,9 @@ beforeEach(() => {
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/workspace-overview", () =>
 			HttpResponse.json(ACROSS_WORKSPACE),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/tiles", () =>
+			HttpResponse.json(ACROSS_WORKSPACE_TILES),
 		),
 		http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json(groups)),
 		http.get("*/workspaces/:workspaceSlug/practices/reviewed", () =>

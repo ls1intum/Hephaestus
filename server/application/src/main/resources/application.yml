@@ -85,6 +85,10 @@ spring:
         username: ${DB_USERNAME:root}
         password: ${DB_PASSWORD:root}
         hikari:
+            # pgJDBC then leaves PostgreSQL's DETAIL line, which quotes the rejected row values, out of every
+            # exception message. The primary message, the SQLState and the constraint name stay.
+            data-source-properties:
+                "[logServerErrorDetail]": false
             connection-timeout: 45000
             idle-timeout: 600000
             max-lifetime: 1800000
@@ -292,6 +296,11 @@ hephaestus:
         audience: ${HEPHAESTUS_AUTH_AUDIENCE:hephaestus-spa}
         access-ttl: ${HEPHAESTUS_AUTH_ACCESS_TTL:24h}
         step-up-max-age: ${HEPHAESTUS_AUTH_STEP_UP_MAX_AGE:5m}
+        passkeys:
+            instance-admin-required: ${HEPHAESTUS_AUTH_PASSKEYS_INSTANCE_ADMIN_REQUIRED:false}
+            workspace-admin-required: ${HEPHAESTUS_AUTH_PASSKEYS_WORKSPACE_ADMIN_REQUIRED:false}
+            rp-id: ${HEPHAESTUS_AUTH_PASSKEYS_RP_ID:}
+            allowed-origins: ${HEPHAESTUS_AUTH_PASSKEYS_ALLOWED_ORIGINS:http://localhost:${WEBAPP_PORT:4200}}
         # Passwordless local sign-in, which the practices demo seed uses. The prod profile refuses it.
         dev-login-enabled: ${HEPHAESTUS_AUTH_DEV_LOGIN_ENABLED:false}
         cookie-name: ${HEPHAESTUS_AUTH_COOKIE_NAME:__Host-HEPHAESTUS_AT}
@@ -881,9 +890,6 @@ hephaestus:
             # How long a document that has vanished upstream is kept as a tombstone before its row is dropped.
             staleness: ${HEPHAESTUS_INTEGRATION_OUTLINE_STALENESS:30d}
 
-    sentry:
-        dsn: ${SENTRY_DSN:}
-
 # Protects against cascading failures when GitHub API is unavailable; defaults in ResilienceConfig.java.
 resilience4j:
     circuitbreaker:
@@ -908,7 +914,45 @@ resilience4j:
 # WARN is reserved for genuinely actionable situations; per-event/per-changeset chatter is
 # silenced here (3rd-party loggers) or downgraded to DEBUG at the source (our own packages).
 logging:
+    # One ECS JSON object per line on stdout, written by Boot's own formatter. docs/admin/observability.mdx
+    # owns the field list and what a collector may index. The customizer masks credential formats only;
+    # what a call site passes to a log statement is otherwise written as given.
+    structured:
+        format:
+            console: ecs
+        ecs:
+            service:
+                # service.name stays spring.application.name, the name traces carry too.
+                version: ${spring.application.version}
+                environment: ${hephaestus.release.environment}
+                # The container id under Docker, as ReplicaIdentityFilter reports it.
+                node-name: ${HOSTNAME:}
+        json:
+            add:
+                # The worker and webhook profiles and the all-roles local profile override this.
+                "[runtime.role]": server
+            # ECS writes dotted names as nested objects and refuses a name written twice, so MDC and
+            # key-value pairs share one object of their own. Without it `runtime.*` pairs or an
+            # `error.*` pair beside a throwable collide with these members and the event is lost.
+            context:
+                prefix: context
+            customizer: de.tum.cit.aet.hephaestus.observability.CredentialMaskingCustomizer
+            # A throwable is reported by class and frames; its message stays out of every record.
+            exclude: error.message
+            stacktrace:
+                printer: de.tum.cit.aet.hephaestus.observability.ExceptionClassStackTracePrinter
+                # Docker splits a log line at 16 KiB, and the pieces are not JSON. 8192 characters, before JSON
+                # escaping, keeps a whole record below that; the hash still groups repeats of a failure.
+                max-length: 8192
+                max-throwable-depth: 32
+                include-hashes: true
     level:
+        # Hibernate logs the driver's message for every failed statement, and PostgreSQL's message
+        # quotes rejected row values. The exception still reaches the caller, which logs its class.
+        org.hibernate.orm.jdbc.error: "OFF"
+        # Tomcat logs an unparseable request with its raw target, query string included, once at INFO
+        # and then at DEBUG. An unsubscribe or OAuth link carries its token in that query.
+        org.apache.coyote.http11.Http11Processor: WARN
         # Spring's generic web DEBUG logger includes decoded request/response bodies. Vendor OAuth and
         # installation-token responses can contain credentials, so keep the body logger closed even when
         # a broader org.springframework.web package is raised to DEBUG for local troubleshooting.
@@ -942,6 +986,12 @@ spring:
             "[mail.smtp.auth]": false
             "[mail.smtp.starttls.enable]": false
             "[mail.smtp.starttls.required]": false
+
+logging:
+    structured:
+        json:
+            add:
+                "[runtime.role]": all
 
 hephaestus:
     email:

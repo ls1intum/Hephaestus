@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -1346,7 +1347,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
             assertThat(streamingCalls.settle(ATTEMPT.sourceId(), ATTEMPT.number(), false))
                     .isTrue();
 
-            verify(usageAccumulator).accumulate(eq(ATTEMPT), any());
+            verify(usageAccumulator).accumulate(eq(ATTEMPT), isNull(), any());
             call.get(5, TimeUnit.SECONDS);
         }
 
@@ -1439,7 +1440,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                     .contains("\"content\":\"hi\"")
                     .contains("[DONE]");
             ArgumentCaptor<ProxyTokenUsage> usage = ArgumentCaptor.forClass(ProxyTokenUsage.class);
-            verify(usageAccumulator).accumulate(eq(ATTEMPT), usage.capture());
+            verify(usageAccumulator).accumulate(eq(ATTEMPT), isNull(), usage.capture());
             assertThat(usage.getValue().billableInputTokens()).isEqualTo(75);
             assertThat(usage.getValue().outputTokens()).isEqualTo(40);
             assertThat(usage.getValue().cacheReadTokens()).isEqualTo(25);
@@ -1580,7 +1581,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
             String sentBody = Objects.requireNonNull(sent.getBody()).utf8();
             assertThat(sentBody).contains("reasoning.encrypted_content").doesNotContain("stream_options");
             ArgumentCaptor<ProxyTokenUsage> usage = ArgumentCaptor.forClass(ProxyTokenUsage.class);
-            verify(usageAccumulator).accumulate(eq(ATTEMPT), usage.capture());
+            verify(usageAccumulator).accumulate(eq(ATTEMPT), isNull(), usage.capture());
             assertThat(usage.getValue().billableInputTokens()).isEqualTo(75);
             assertThat(usage.getValue().outputTokens()).isEqualTo(40);
             assertThat(usage.getValue().reasoningTokens()).isEqualTo(30);
@@ -1613,7 +1614,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         private void assertBilledOnceForTheUsageFrame() {
             ArgumentCaptor<ProxyTokenUsage> usage = ArgumentCaptor.forClass(ProxyTokenUsage.class);
-            verify(usageAccumulator).accumulate(eq(ATTEMPT), usage.capture());
+            verify(usageAccumulator).accumulate(eq(ATTEMPT), isNull(), usage.capture());
             assertThat(usage.getValue().billableInputTokens()).isEqualTo(100);
             assertThat(usage.getValue().outputTokens()).isEqualTo(40);
             assertThat(missingUsage()).isZero();
@@ -1992,7 +1993,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                     verify(mentorTurnUsageAccumulator).accumulate(eq(billed), usage.capture());
                     verifyNoInteractions(usageAccumulator);
                 } else {
-                    verify(usageAccumulator).accumulate(eq(billed), usage.capture());
+                    verify(usageAccumulator).accumulate(eq(billed), isNull(), usage.capture());
                     verifyNoInteractions(mentorTurnUsageAccumulator);
                 }
                 assertThat(usage.getValue().billableInputTokens()).isEqualTo(100);

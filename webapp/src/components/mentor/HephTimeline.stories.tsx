@@ -144,8 +144,8 @@ const meta = {
 			onVote: fn(),
 			onDelete: fn(),
 			onStop: fn(),
-			onRetrySend: fn(),
-			onTryAgain: fn(),
+			onDiscardSend: fn(),
+			ask: { onRetrySend: fn(), onTryAgain: fn() },
 		},
 		threads: { panelId: "thread-panel", onOpen: fn() },
 		empty: <Greeting />,
@@ -703,7 +703,28 @@ export const Failed: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await expect(canvas.getByText("Heph took too long to answer.")).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: /^Try again \(/u }));
-		await expect(args.actions?.onTryAgain).toHaveBeenCalledWith(FAILED_FOLLOW_UP);
+		await expect(args.actions?.ask?.onTryAgain).toHaveBeenCalledWith(FAILED_FOLLOW_UP);
+	},
+};
+
+/**
+ * The developer cannot ask Heph now, such as when their AI choice keeps Heph from answering. They
+ * still read, vote and delete, but no message offers Reply in thread or Try again, which would
+ * only be refused, and the composer is gone.
+ */
+export const CannotAsk: Story = {
+	args: {
+		state: ready({ entries: [...BEFORE_FOLLOW_UP, FAILED_FOLLOW_UP] }),
+		actions: { onVote: fn(), onDelete: fn(), onStop: fn(), onDiscardSend: fn() },
+		composer: undefined,
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Heph took too long to answer.")).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: /^Try again \(/u })).toBeNull();
+		await expect(canvas.queryByRole("button", { name: /^Reply in thread \(/u })).toBeNull();
+		await expect(
+			canvas.getAllByRole("button", { name: /^Delete message \(/u }).length,
+		).toBeGreaterThan(0);
 	},
 };
 
@@ -724,7 +745,7 @@ export const FailedAfterPartOfAnAnswer: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await expect(canvas.getByText("The AI model stopped responding. Try again.")).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: /^Try again \(/u }));
-		await expect(args.actions?.onTryAgain).toHaveBeenCalledWith(
+		await expect(args.actions?.ask?.onTryAgain).toHaveBeenCalledWith(
 			expect.objectContaining({ id: FAILED_FOLLOW_UP.id }),
 		);
 	},
@@ -773,7 +794,13 @@ export const NotSent: Story = {
 	},
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /^Retry \(/u }));
-		await expect(args.actions?.onRetrySend).toHaveBeenCalledWith("r-unsent");
+		await expect(args.actions?.ask?.onRetrySend).toHaveBeenCalledWith("r-unsent");
+		// The composer was cleared on send, so the words stay reachable here: Copy them, or delete the
+		// message from this device instead of retrying.
+		await userEvent.click(canvas.getByRole("button", { name: /^Copy message \(/u }));
+		await expect(args.onCopy).toHaveBeenCalledWith("Can you check my newest one?");
+		await userEvent.click(canvas.getByRole("button", { name: /^Delete message \(/u }));
+		await expect(args.actions?.onDiscardSend).toHaveBeenCalledWith("r-unsent");
 	},
 };
 

@@ -239,10 +239,9 @@ public class WorkspaceActivationService {
             log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());
         } catch (Exception e) {
             log.error(
-                    "Failed monitoring on startup: workspaceId={}, accountLogin={}, error={}",
+                    "Failed monitoring on startup: workspaceId={}, errorType={}",
                     workspace.getId(),
-                    workspace.getAccountLogin(),
-                    e.getMessage(),
+                    e.getClass().getName(),
                     e);
         } finally {
             WorkspaceContextHolder.clearContext();

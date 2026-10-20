@@ -80,6 +80,13 @@ describe("legal content layout", () => {
 		expect(tumaetPrivacy).toContain("85748 Garching");
 	});
 
+	// The release has no browser error reporting and no optional-cookie banner; the profile must not
+	// name a processor or a consent control that the product does not have.
+	it("tumaet profile names no error-reporting vendor or cookie-consent control", () => {
+		expect(tumaetPrivacy).not.toMatch(/sentry/iu);
+		expect(tumaetPrivacy).not.toContain("Cookie preferences");
+	});
+
 	it("disclaimer points operators at the admin docs", () => {
 		for (const [file, body] of Object.entries(DISCLAIMER)) {
 			expect({ file, linked: body.includes("docs/admin/legal-pages") }).toStrictEqual({

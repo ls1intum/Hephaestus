@@ -40,17 +40,6 @@ const satisfied = [
 	}),
 ];
 
-const sentryNotConfigured = fact(
-	"observability.sentry",
-	"hephaestus.sentry.dsn",
-	"optional-observability",
-	{
-		requirement: "OPTIONAL",
-		status: "NOT_CONFIGURED",
-		explanation: "Sentry is optional, but a configured DSN must be an HTTPS URI.",
-	},
-);
-
 const emailNotConfigured = fact("notification.email", "spring.mail.host", "email", {
 	requirement: "OPTIONAL",
 	status: "NOT_CONFIGURED",
@@ -93,14 +82,7 @@ const meta = {
 	args: {
 		state: {
 			status: "ready",
-			facts: [
-				...satisfied,
-				workerRuntime,
-				noLoginProvider,
-				sentryNotConfigured,
-				emailNotConfigured,
-				notApplicable,
-			],
+			facts: [...satisfied, workerRuntime, noLoginProvider, emailNotConfigured, notApplicable],
 		},
 	},
 } satisfies Meta<typeof InstanceConfigurationReadinessCard>;
@@ -112,7 +94,7 @@ type Story = StoryObj<typeof meta>;
 export const ActionRequired: Story = {
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByText("2 settings need action. 2 settings not configured."),
+			canvas.getByText("2 settings need action. 1 setting not configured."),
 		).toBeVisible();
 		const [first, second] = canvas.getAllByRole("code");
 		await expect(first).toHaveTextContent("login-provider capability");
@@ -144,17 +126,17 @@ export const AllSatisfied: Story = {
 /** An absent optional setting is optional, never a failure. */
 export const OptionalNotConfigured: Story = {
 	args: {
-		state: { status: "ready", facts: [...satisfied, sentryNotConfigured, emailNotConfigured] },
+		state: { status: "ready", facts: [...satisfied, emailNotConfigured] },
 	},
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByText(
-				"Every check that applies to this instance passes. 2 settings not configured.",
+				"Every check that applies to this instance passes. 1 setting not configured.",
 			),
 		).toBeVisible();
 		await expect(canvas.queryByText("Action required")).toBeNull();
-		await expect(canvas.getAllByText("Optional")).toHaveLength(2);
-		await expect(canvas.getByText("hephaestus.sentry.dsn")).toBeVisible();
+		await expect(canvas.getAllByText("Optional")).toHaveLength(1);
+		await expect(canvas.getByText("spring.mail.host")).toBeVisible();
 	},
 };
 

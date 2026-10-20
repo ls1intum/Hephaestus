@@ -74,7 +74,6 @@ services:
       # for the canonical AET deployment. See docs/admin/legal-pages.mdx.
       LEGAL_PROFILE: ${LEGAL_PROFILE:-}
       DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
-      SENTRY_DSN: ${SENTRY_DSN}
       TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-false}
     depends_on:
       # Gate on app-server readiness so the SPA isn't served before the API answers.
@@ -229,6 +228,10 @@ services:
       HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED: ${HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED:-false}
       HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN: ${HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN:-}
       HEPHAESTUS_AUTH_ISSUER: https://${APP_HOSTNAME}
+      HEPHAESTUS_AUTH_PASSKEYS_INSTANCE_ADMIN_REQUIRED:
+      HEPHAESTUS_AUTH_PASSKEYS_WORKSPACE_ADMIN_REQUIRED:
+      HEPHAESTUS_AUTH_PASSKEYS_RP_ID:
+      HEPHAESTUS_AUTH_PASSKEYS_ALLOWED_ORIGINS:
       HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?Set HEPHAESTUS_AUTH_STATE_COOKIE_KEY to a Base64-encoded 32-byte key}
       # First instance super-admin bootstrap (auth-cutover runbook). The admin UI is admin-gated, so
       # the first APP_ADMIN must come from operator config — comma-separated <provider>:@user or
@@ -262,7 +265,6 @@ services:
       MONITORING_BACKFILL_BATCH_SIZE: ${MONITORING_BACKFILL_BATCH_SIZE:-50}
       MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD: ${MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD:-500}
       MONITORING_BACKFILL_INTERVAL_SECONDS: ${MONITORING_BACKFILL_INTERVAL_SECONDS:-60}
-      SENTRY_DSN: ${SENTRY_DSN}
       # Email: off until SPRING_MAIL_HOST is set. Server role only — notifications are sent here.
       # Boot's own property names, forwarded as-is (docs/admin/production-setup.mdx § Email).
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
@@ -293,11 +295,15 @@ services:
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
       HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}
       HEPHAESTUS_SECURITY_CREDENTIAL_ROTATION_ENABLED: ${HEPHAESTUS_SECURITY_CREDENTIAL_ROTATION_ENABLED:-false}
-      # Slack OAuth/admin and mentor replies run here. Inbound Events API + interactivity are verified on webhook-server.
+      # Slack OAuth/admin, mentor replies and interactivity run here. Interactivity
+      # (/webhooks/slack/interactivity, routed to this pod below) commits consent before Slack is
+      # acknowledged, so it is verified here with the signing secret, which a blank value fails at
+      # boot while Slack is enabled. Events API deliveries are verified on webhook-server.
       HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
       HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:-}
       HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:-}
       HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI: ${HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI:-}
+      HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:-}
       # Outline (documentation content source). Every Outline bean is @ConditionalOnProperty with
       # matchIfMissing=false, so an unset flag means no admin surface, no sync, no content projection.
       # Inbound change notifications are verified on webhook-server, which needs the same flag — but
@@ -383,6 +389,24 @@ services:
       - "traefik.http.services.https-application-server.loadbalancer.server.port=8080"
       - "traefik.http.routers.http-application-server.priority=5"
       - "traefik.http.routers.https-application-server.priority=10"
+      # Slack interactivity is the one /webhooks path this pod answers: a button's consent change
+      # commits here before Slack is acknowledged. It outranks the webhook-server's /webhooks router
+      # (100) and keeps the full path, no stripprefix. The body bound matches that router's, kept
+      # with this one so this stack does not depend on the core stack's middleware.
+      - traefik.http.middlewares.slack-interactivity-body-limit.buffering.maxRequestBodyBytes=26214400
+      - traefik.http.middlewares.slack-interactivity-body-limit.buffering.memRequestBodyBytes=1048576
+      - "traefik.http.routers.http-slack-interactivity.entryPoints=http"
+      - "traefik.http.routers.http-slack-interactivity.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-slack-interactivity.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && Path(`/webhooks/slack/interactivity`)"
+      - "traefik.http.routers.http-slack-interactivity.service=http-application-server"
+      - "traefik.http.routers.https-slack-interactivity.entryPoints=https"
+      - "traefik.http.routers.https-slack-interactivity.middlewares=app-hsts,slack-interactivity-body-limit"
+      - "traefik.http.routers.https-slack-interactivity.rule=(${APP_HOST_MATCH:-Host(`${APP_HOSTNAME}`)}) && Path(`/webhooks/slack/interactivity`)"
+      - "traefik.http.routers.https-slack-interactivity.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-slack-interactivity.tls=true"
+      - "traefik.http.routers.https-slack-interactivity.service=https-application-server"
+      - "traefik.http.routers.http-slack-interactivity.priority=110"
+      - "traefik.http.routers.https-slack-interactivity.priority=110"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.path=/readyz"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.timeout=3s"
@@ -457,7 +481,6 @@ services:
       # docs/admin/runtime-roles.mdx § Tunables.
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}
       HEPHAESTUS_WORKER_DRAIN_TIMEOUT: ${HEPHAESTUS_WORKER_DRAIN_TIMEOUT:-5m}
-      SENTRY_DSN: ${SENTRY_DSN}
       # Persistence for the JPA layer the worker shares (connection credentials,
       # workspace/agent context). The auth web layer is gated off this role, so no auth env is needed.
       # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert

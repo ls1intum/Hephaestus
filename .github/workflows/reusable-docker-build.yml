@@ -2,13 +2,6 @@ name: Docker Build (Cached)
 
 on:
   workflow_call:
-    secrets:
-      SENTRY_AUTH_TOKEN:
-        required: false
-      SENTRY_ORG:
-        required: false
-      SENTRY_PROJECT:
-        required: false
     inputs:
       database-artifact:
         description: "Immutable advisory database artifact ID selected by this CI run"
@@ -160,10 +153,6 @@ jobs:
           file: ${{ inputs.docker-file }}
           platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build-args }}
-          secrets: |
-            ${{ github.event_name == 'push' && matrix.platform == 'linux/amd64' && secrets.SENTRY_AUTH_TOKEN != '' && format('sentry_auth_token={0}', secrets.SENTRY_AUTH_TOKEN) || '' }}
-            ${{ github.event_name == 'push' && matrix.platform == 'linux/amd64' && secrets.SENTRY_ORG != '' && format('sentry_org={0}', secrets.SENTRY_ORG) || '' }}
-            ${{ github.event_name == 'push' && matrix.platform == 'linux/amd64' && secrets.SENTRY_PROJECT != '' && format('sentry_project={0}', secrets.SENTRY_PROJECT) || '' }}
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ !inputs.publish && inputs.single-arch && steps.meta.outputs.tags || '' }}
           push: ${{ inputs.publish }}

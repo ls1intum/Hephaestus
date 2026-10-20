@@ -63,6 +63,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     /** Identifies which configured limit (if any) applies to a request, and how to key it. */
     private enum Endpoint {
+        PASSKEY("passkey", true, false),
         OAUTH_AUTHORIZATION("oauth-authz", false, true),
         REFRESH("refresh", true, true),
         // Installed-client token, refresh and logout: body-authenticated by design, so keyed by IP.
@@ -108,7 +109,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         String key = resolveBucketKey(endpoint, request);
         ConsumptionProbe probe = bucketResolver.tryConsume(key, limit.bucketConfiguration(), e -> {
             metrics.recordRateLimitBackendError();
-            log.warn("Rate limit backend error: endpoint={} key={}", endpoint, key, e);
+            log.warn("Rate limit backend error: endpoint={}", endpoint, e);
         });
         if (probe == null) {
             if (endpoint.failOpen) {
@@ -125,8 +126,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         }
 
         long retryAfterSeconds = RateLimitResponse.retryAfterSeconds(probe);
-        // key is namespaced (no raw account-id PII beyond what already exists in auth logs); safe at WARN.
-        log.warn("Rate limit exceeded: endpoint={} key={} retryAfterSeconds={}", endpoint, key, retryAfterSeconds);
+        // The bucket key names the account or client IP, so the log carries only the endpoint.
+        log.warn("Rate limit exceeded: endpoint={} retryAfterSeconds={}", endpoint, retryAfterSeconds);
         // Tag by bucket namespace — bounded, no PII.
         metrics.recordRateLimitBlocked(endpoint.namespace);
         RateLimitResponse.writeTooManyRequests(request, response, retryAfterSeconds, objectMapper);
@@ -146,6 +147,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             return null;
         }
         String method = request.getMethod();
+        if (!"GET".equals(method) && path.startsWith("/user/passkeys")) {
+            return Endpoint.PASSKEY;
+        }
         if (PublicActivityReadRequestMatcher.MATCHER.matches(request)) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null
@@ -193,6 +197,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private AuthRateLimitProperties.Limit limitFor(Endpoint endpoint) {
         return switch (endpoint) {
+            case PASSKEY -> properties.oauthAuthorization();
             case OAUTH_AUTHORIZATION -> properties.oauthAuthorization();
             case REFRESH -> properties.refresh();
             case CLIENT_SESSION -> properties.clientSession();

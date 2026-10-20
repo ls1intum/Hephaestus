@@ -29,6 +29,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,6 +103,24 @@ class DeveloperPracticeStandingsAdapterTest {
             assertThat(standing.decidedWork())
                     .as("the support of the standing, not the live runs it has none of")
                     .isEqualTo(3);
+        });
+    }
+
+    @Test
+    void shouldNotSendAHumanOnlyStandingToTheModel() {
+        data.add(view(1, ReviewOrigin.EVENT));
+        lenient()
+                .when(visibility.permitsStandingAt(eq(1L), anyCollection(), any()))
+                .thenAnswer(i -> ids(i.getArgument(1)));
+        when(visibility.permitsAt(eq(1L), anyCollection(), any(), any())).thenReturn(Set.of());
+
+        assertThat(adapter.standings(1L, 7L)).singleElement().satisfies(standing -> {
+            assertThat(standing.verdict()).isFalse();
+            assertThat(standing.standing()).isEqualTo("Not reviewed");
+            assertThat(standing.decidedWork()).isZero();
+            assertThat(standing.toWorkOn()).isZero();
+            assertThat(standing.strengths()).isZero();
+            assertThat(standing.direction()).isNull();
         });
     }
 

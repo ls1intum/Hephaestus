@@ -129,7 +129,7 @@ Do not round the asset before upload.
 | `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID`              | Slack app client ID used by the OAuth flow                                                                                                                                                      |
 | `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET`          | Slack app client secret used by the OAuth flow                                                                                                                                                  |
 | `HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI`           | Required whenever Slack is enabled. Use the public application-server callback URL, including any proxy path prefix — e.g. `https://<host>/api/oauth/callback/slack`.                           |
-| `HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET`         | Required when Slack is enabled: verifies Slack Events API and interactivity POSTs on the webhook server                                                                                         |
+| `HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET`         | Required when Slack is enabled, on both the webhook server (Events API) and the application server (interactivity). A blank value fails the boot of either while Slack is enabled.               |
 
 OAuth issues per-workspace bot tokens.
 The `connection` table stores them encrypted at rest.
@@ -149,10 +149,23 @@ Slack opens Home when someone selects the app.
 Hephaestus uses Home for account linking and privacy controls.
 Heph uses the Messages tab, which is the DM with the app.
 
-If the webhook receiver has a separate public host, route only these paths to the webhook role:
+Events and interactivity go to different roles.
+Events are published to the event stream, and the webhook role receives them.
+A button press changes consent or erasure state, and that change is committed before Slack gets its acknowledgement.
+Only the application-server role can commit it, so interactivity goes there.
+The webhook role does not answer `/webhooks/slack/interactivity`.
+
+Route this path to the webhook role:
 
 - `/webhooks/slack`.
+
+Route this exact path to the application-server role, without stripping its prefix:
+
 - `/webhooks/slack/interactivity`.
+
+Its rule must outrank the webhook role's `/webhooks` prefix rule.
+The production compose stack routes it this way on the public host.
+If the webhook receiver has a separate public host, point the **Interactivity request URL** at a host that reaches the application server.
 
 Route OAuth and account-linking paths to the application-server role:
 
@@ -550,7 +563,7 @@ Use the private endpoint and example rules in [Scrape metrics](./observability.m
 - `llm.budget.blocked`: tagged by admission-point `surface`, including `review_job` and `mentor`.
   The agent-job tag also has `cap`, which names the purse that refused work.
 
-Each EXHAUSTED transition logs a WARN, visible in Sentry if configured.
+Each EXHAUSTED transition logs a WARN.
 Compatible endpoint reasoning tokens remain in telemetry when reported.
 They have no separate price.
 OpenAI-compatible usage includes them in billable output tokens.

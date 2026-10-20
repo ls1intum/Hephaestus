@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackSignatureVerifier;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,11 +25,14 @@ import tools.jackson.databind.ObjectMapper;
  * Slack Interactivity Request URL. Consent state changes and erasure complete before Slack is acknowledged; the
  * remote follow-ups (confirmation message, App Home refresh) run asynchronously so the 3-second ack budget never
  * depends on Slack API latency.
+ *
+ * <p>Server role only: the consent and vote handling it commits synchronously lives there. The edge routes this one
+ * path to the server, while every other {@code /webhooks/**} delivery, Slack Events included, stays on the webhook
+ * role and its durable NATS publication.
  */
 @Hidden // inbound Slack webhook receiver — not part of the webapp API surface; excluded from the OpenAPI client
 @RestController
 @ConditionalOnServerRole
-@ConditionalOnWebhookRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 @WorkspaceAgnostic("Slack interactivity; the workspace is resolved from the payload's team_id, not the URL")
 public class SlackInteractivityController {
@@ -88,7 +90,11 @@ public class SlackInteractivityController {
         try {
             dispatch(type, payload);
         } catch (RuntimeException e) {
-            log.warn("slack.interactivity: failed to handle payload type {}: {}", type, e.toString());
+            // The class only: the message of a failure here can quote the member's payload or a provider response.
+            log.warn(
+                    "slack.interactivity: failed to handle payload type {}: {}",
+                    type,
+                    e.getClass().getSimpleName());
             return ResponseEntity.status(500).build();
         }
         return ResponseEntity.ok().build();

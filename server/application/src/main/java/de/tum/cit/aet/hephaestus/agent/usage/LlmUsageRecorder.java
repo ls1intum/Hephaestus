@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -59,6 +61,35 @@ public class LlmUsageRecorder {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(Long workspaceId, LlmUsageSample sample) {
+        append(workspaceId, sample);
+    }
+
+    /**
+     * Writes one ledger row of a review job attempt or a Heph turn attempt as the attempt's measurement owner
+     * ({@code ReviewAttemptUsageService} or {@code MentorAttemptUsageService}) measures it now. The first
+     * projection appends the row like {@link #record}. A later one, after a call of the attempt returned late,
+     * replaces only the measurement: tokens, calls, provenance, verification, and the cost and pricing state that
+     * follow from them. The source, the model, the funding source, the rates and the date stay as the row froze
+     * them, and a row the repricing pass priced keeps that price. The budget alert sees only the cost a projection
+     * adds, and only for a row of the current month, the month the cap compares. The caller holds the attempt's
+     * measurement, so two projections of one row never run at once.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void project(Long workspaceId, LlmUsageSample sample) {
+        LlmUsageEvent row = usageRepository
+                .lockBySource(workspaceId, sample.sourceType(), sample.sourceId(), Math.max(0, sample.sourceAttempt()))
+                .orElse(null);
+        if (row == null) {
+            append(workspaceId, sample);
+            return;
+        }
+        if (sample.measurementVerification() == MeasurementVerification.UNKNOWN) {
+            throw new IllegalArgumentException("New LLM usage requires a measurement verification decision");
+        }
+        remeasure(workspaceId, row, sample);
+    }
+
+    private void append(Long workspaceId, LlmUsageSample sample) {
         if (sample.measurementVerification() == MeasurementVerification.UNKNOWN) {
             throw new IllegalArgumentException("New LLM usage requires a measurement verification decision");
         }
@@ -66,6 +97,74 @@ public class LlmUsageRecorder {
         if (persist(workspaceId, sample, unverifiable ? asUnpriced(sample.price()) : sample.price()) && unverifiable) {
             meterRegistry.counter(AgentMetrics.LLM_USAGE_UNVERIFIABLE).increment();
         }
+    }
+
+    private void remeasure(Long workspaceId, LlmUsageEvent row, LlmUsageSample sample) {
+        int sourceAttempt = Math.max(0, sample.sourceAttempt());
+        long unreportedCalls = usageRepository.sumUnreportedPracticeScriptCalls(
+                workspaceId,
+                sample.sourceId(),
+                sourceAttempt,
+                sample.sourceType().name());
+        // The row's own rates: frozen at the first projection, or the price the repricing pass found since. An
+        // UNPRICED row takes the state of the attempt's charge, which keeps a resolved price after the measurement
+        // became unverifiable, so a measurement verified again uses the accepted price. Nothing is inferred from
+        // the rates themselves.
+        LlmPriceSnapshot basis = new LlmPriceSnapshot(
+                row.getFundingSource(),
+                row.getPricingState() == UsagePricingState.UNPRICED
+                        ? sample.price().pricingState()
+                        : row.getPricingState(),
+                row.getAppliedPriceId(),
+                row.getAppliedWorkspaceModelId(),
+                row.getAppliedPer1mInputUsd(),
+                row.getAppliedPer1mOutputUsd(),
+                row.getAppliedPer1mCacheReadUsd(),
+                row.getAppliedPer1mCacheWriteUsd());
+        boolean unverifiable = sample.measurementVerification() == MeasurementVerification.UNVERIFIABLE;
+        LlmPriceSnapshot quoted = unverifiable ? asUnpriced(basis) : basis;
+        LlmPriceSnapshot price = isPricedWithARateMissing(sample, quoted) ? asUnpriced(quoted) : quoted;
+        LlmPriceSnapshot.Cost computed = price.calculateCost(
+                sample.inputTokens(), sample.outputTokens(), sample.cacheReadTokens(), sample.cacheWriteTokens());
+        reportClamp(sample, computed);
+        usageRepository.remeasure(new LlmUsageRemeasurement(
+                row.getId(),
+                workspaceId,
+                Math.max(0, sample.inputTokens()),
+                Math.max(0, sample.outputTokens()),
+                Math.max(0, sample.cacheReadTokens()),
+                Math.max(0, sample.cacheWriteTokens()),
+                Math.max(0, sample.reasoningTokens()),
+                Math.max(0, sample.searchUnits()),
+                Math.max(1, sample.totalCalls()),
+                Math.toIntExact(unreportedCalls),
+                sample.provenance().name(),
+                sample.measurementVerification().name(),
+                price.pricingState().name(),
+                computed.usd()));
+        if (unverifiable && row.getMeasurementVerification() != MeasurementVerification.UNVERIFIABLE) {
+            meterRegistry.counter(AgentMetrics.LLM_USAGE_UNVERIFIABLE).increment();
+        }
+        BigDecimal before = countedCost(row.getFundingSource(), row.getPricingState(), row.getCostUsd());
+        BigDecimal after = countedCost(price.fundingSource(), price.pricingState(), computed.usd());
+        if (after.compareTo(before) > 0) {
+            registerBudgetAlert(workspaceId, price, after.subtract(before), row.getOccurredAt());
+        }
+    }
+
+    /** Whether any review or practice-script ledger row exists for the attempt, whatever its measurement. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean isReviewAttemptRecorded(Long workspaceId, UUID sourceId, int sourceAttempt) {
+        return usageRepository.existsByWorkspaceIdAndSourceTypeNotAndSourceIdAndSourceAttempt(
+                workspaceId, UsageSourceType.MENTOR_TURN, sourceId, Math.max(0, sourceAttempt));
+    }
+
+    /** The part of a row's cost that the instance cap counts. */
+    private static BigDecimal countedCost(
+            UsageFundingSource fundingSource, UsagePricingState pricingState, @Nullable BigDecimal cost) {
+        return fundingSource == UsageFundingSource.INSTANCE && pricingState == UsagePricingState.PRICED && cost != null
+                ? cost
+                : BigDecimal.ZERO;
     }
 
     // Missing rates leave the whole event unpriced; search units require their own rate.
@@ -146,7 +245,7 @@ public class LlmUsageRecorder {
         if (price.pricingState() == UsagePricingState.UNPRICED) {
             meterRegistry.counter(AgentMetrics.LLM_USAGE_UNCOSTED).increment();
         }
-        registerBudgetAlert(workspaceId, price, cost);
+        registerBudgetAlert(workspaceId, price, cost, sample.occurredAt());
         return true;
     }
 
@@ -175,7 +274,8 @@ public class LlmUsageRecorder {
         return clamp == LlmPriceSnapshot.CostClamp.ROUNDED_UP_TO_MINIMUM ? "up_to_minimum" : "down_to_maximum";
     }
 
-    private void registerBudgetAlert(Long workspaceId, LlmPriceSnapshot price, @Nullable BigDecimal cost) {
+    private void registerBudgetAlert(
+            Long workspaceId, LlmPriceSnapshot price, @Nullable BigDecimal cost, Instant occurredAt) {
         if (price.fundingSource() != UsageFundingSource.INSTANCE
                 || price.pricingState() != UsagePricingState.PRICED
                 || cost == null
@@ -185,6 +285,8 @@ public class LlmUsageRecorder {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             throw new IllegalStateException("LLM usage must be recorded in the source result transaction");
         }
+        // The cap compares the current UTC month; a late insert or correction in an earlier month cannot cross it.
+        if (!YearMonth.from(occurredAt.atZone(ZoneOffset.UTC)).equals(YearMonth.now(ZoneOffset.UTC))) return;
         TransactionCallbacks.afterCommit(() -> {
             try {
                 alertIfBudgetCrossed(workspaceId, cost);

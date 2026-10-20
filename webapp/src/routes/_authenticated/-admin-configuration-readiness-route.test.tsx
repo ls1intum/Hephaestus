@@ -24,13 +24,14 @@ const facts = [
 		documentationUrl: `${GUIDE}#database`,
 	},
 	{
-		id: "observability.sentry",
-		subject: "hephaestus.sentry.dsn",
+		id: "notification.email",
+		subject: "spring.mail.host",
 		roles: ["SERVER"],
 		requirement: "OPTIONAL",
 		status: "NOT_CONFIGURED",
-		explanation: "Sentry is optional, but a configured DSN must be an HTTPS URI.",
-		documentationUrl: `${GUIDE}#optional-observability`,
+		explanation:
+			"Email is optional. If you set a relay host, hephaestus.email.from must name the sender address.",
+		documentationUrl: `${GUIDE}#email`,
 	},
 	{
 		id: "auth.login-provider",
@@ -93,11 +94,9 @@ describe("instance overview configuration readiness", () => {
 
 		expect(requests).toBe(1);
 		const subjects = screen.getAllByRole("code").map((node) => node.textContent);
-		expect(subjects).toStrictEqual(["login-provider capability", "hephaestus.sentry.dsn"]);
+		expect(subjects).toStrictEqual(["login-provider capability", "spring.mail.host"]);
 
-		expect(screen.getByText("Optional").closest("li")?.textContent).toContain(
-			"hephaestus.sentry.dsn",
-		);
+		expect(screen.getByText("Optional").closest("li")?.textContent).toContain("spring.mail.host");
 		expect(screen.getAllByText("Action required")).toHaveLength(1);
 
 		expect(

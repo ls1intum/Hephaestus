@@ -102,7 +102,7 @@ The table records risks and available controls, not measured residual-risk ratin
   The Traefik ingress runs without `--accesslog`.
   Both nginx containers disable the access log at the server level.
   The shipped production stack has no general access-log copy. Authentication and diagnostic events are separate. Enabling it at any layer is a material change.
-- **Error telemetry needs a deployment decision.** Browser Sentry is optional and consent-controlled. Server Sentry is configured separately by DSN and does not read browser consent. Verify the actual endpoint, enabled state, recipient, retention and scrubbing before activation. Code alone does not prove that production has disabled it.
+- **No bundled error telemetry.** Neither the browser app nor the server sends error reports. Server logs stay in size-bounded container logs on the host. Log collection to a log store is an operator choice. Record its recipient, retention and access rules before collection starts. A deployment that ran an earlier release with error reporting keeps the reports that its recipient already holds.
 - **Research consent gate.** Research use of a participant's data requires the latest `RESEARCH_PARTICIPATION` decision to be a grant.
   The grant must be for the current notice version and research organization.
   An earlier yes to narrower wording does not carry over. Removing this gate is a material change.
@@ -137,7 +137,8 @@ As a deployment governance requirement, reassess the DPIA and amend it where the
 - An external model provider is added, changed to a consumer tier, or its recorded training terms change.
 - Practice-review sandbox gains outbound connectivity beyond the governed worker gateway.
 - Practice results begin to drive any automated decision within Hephaestus (grading, recognition caps, feature access).
-- The bundled Sentry integration is activated against a SaaS tenant.
+- Container logs start to be collected into a log store.
+  Reassess also when a store gains a new recipient or longer retention.
 - The processing population starts to include data subjects in a category covered by the BayLfD vulnerable-data-subjects criterion.
 - Repository ingestion expands beyond administrator-selected repositories into systematic or large-scale monitoring of public sources.
 - Research or evaluation reuse starts or widens.

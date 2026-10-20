@@ -165,7 +165,10 @@ public class GitLabRateLimitTracker {
                         state.resetAt.get());
             }
         } catch (NumberFormatException e) {
-            log.debug("Could not parse GitLab rate limit headers for scope {}: {}", scopeId, e.getMessage());
+            log.debug(
+                    "Could not parse GitLab rate limit headers for scope {}: {}",
+                    scopeId,
+                    e.getClass().getSimpleName());
         }
     }
 

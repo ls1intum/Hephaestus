@@ -25,6 +25,7 @@ import {
 	useMessageScrollerVisibility,
 } from "@/components/ui/message-scroller";
 import type { PendingMessage } from "@/lib/mentor-entry";
+import { hasText } from "@/lib/text";
 
 import { type MessageAuthor, messageSubject } from "./HephMessage";
 import { DayMarker, HephTimelineRow } from "./HephTimelineRow";
@@ -58,7 +59,10 @@ export type HephTimelineState =
 	| { status: "error"; onRetry: () => void }
 	| ReadyTimeline;
 
-/** A thread: `missing` when the message it replies to was deleted or never existed. */
+/**
+ * A thread: `missing` when the server has no such message of the developer's. A deleted message
+ * still leads its thread, which keeps its replies.
+ */
 export type HephThreadState =
 	| { status: "loading" }
 	| { status: "error"; onRetry: () => void }
@@ -72,9 +76,17 @@ export interface TimelineActions {
 	onVote: (entry: MentorEntry, vote: MessageVote | null) => void;
 	onDelete: (entry: MentorEntry) => void;
 	onStop: (turnId: string) => void;
-	onRetrySend: (requestId: string) => void;
-	/** Asks a question again whose turn failed. */
-	onTryAgain: (question: MentorEntry) => void;
+	/** Removes a message that the server did not store from this device. */
+	onDiscardSend: (requestId: string) => void;
+	/**
+	 * Asking Heph again. Absent while the developer cannot ask, such as when their AI choice keeps
+	 * Heph from answering: then no message offers Reply in thread, Try again or Retry.
+	 */
+	ask?: {
+		onRetrySend: (requestId: string) => void;
+		/** Asks a question again whose turn failed. */
+		onTryAgain: (question: MentorEntry) => void;
+	};
 }
 
 export interface TimelineThreads {
@@ -338,6 +350,20 @@ function useAnchorKeys(rows: TimelineRow[], ready: boolean): AnchorKeys {
 	return current ?? NO_ANCHORS;
 }
 
+/**
+ * What deleting a message does, and what it leaves: the replies in its thread, each with its own
+ * Delete, and the copy in Slack of a message asked there.
+ */
+function deleteDescription(entry: MentorEntry): string {
+	return [
+		"Heph forgets it. If Heph has not answered it yet, Heph does not answer it.",
+		(entry.thread?.replyCount ?? 0) > 0 ? "The replies in its thread stay." : undefined,
+		entry.surface === "SLACK" ? "It and Heph's answer stay in Slack." : undefined,
+	]
+		.filter(hasText)
+		.join(" ");
+}
+
 function TimelineError({ onRetry }: { onRetry: () => void }) {
 	return (
 		<Empty>
@@ -480,7 +506,7 @@ export function HephTimeline(props: HephTimelineProps) {
 			<ConfirmDialog
 				subject={deleting}
 				title={() => "Delete this message?"}
-				description="Heph forgets it. If Heph has not answered it yet, Heph does not answer it."
+				description={deleteDescription}
 				confirmLabel="Delete message"
 				onConfirm={(entry) => props.actions?.onDelete(entry)}
 				onClose={() => setDeleting(null)}

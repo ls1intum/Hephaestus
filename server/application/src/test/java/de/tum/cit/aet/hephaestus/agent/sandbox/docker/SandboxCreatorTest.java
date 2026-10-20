@@ -6,6 +6,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.agent.sandbox.docker.SandboxCreator.Liveness;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -17,6 +20,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
+import org.slf4j.LoggerFactory;
 
 class SandboxCreatorTest extends BaseUnitTest {
 
@@ -73,6 +77,30 @@ class SandboxCreatorTest extends BaseUnitTest {
 
         assertThat(creator.labels()).isEmpty();
         assertThat(creator.labels()).isEqualTo(CREATED_IN_T1);
+    }
+
+    @Test
+    void shouldKeepDaemonFailureDetailsOutOfCreatorWarnings() {
+        var detail = "PRIVATE_DAEMON_RESPONSE_CANARY";
+        when(containers.inspectContainerIdentity(SHORT_ID)).thenThrow(new SandboxInfrastructureException(detail));
+        var logger = (Logger) LoggerFactory.getLogger(SandboxCreator.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            var creator = new SandboxCreator(containers, () -> SHORT_ID);
+            assertThat(creator.labels()).isEmpty();
+            assertThat(creator.labels()).isEmpty();
+            assertThat(appender.list).singleElement().satisfies(event -> {
+                assertThat(event.getFormattedMessage())
+                        .contains(SHORT_ID, SandboxInfrastructureException.class.getName())
+                        .doesNotContain(detail);
+                assertThat(event.getThrowableProxy()).isNull();
+            });
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
     }
 
     @Test

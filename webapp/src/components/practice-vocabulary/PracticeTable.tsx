@@ -33,7 +33,9 @@ import { FeedbackText } from "./FeedbackText";
 import type { SortDirection } from "./practice-group-list-order";
 import type { StandingScope } from "./practice-group-standing-defs";
 import type { TrendDirection } from "./practice-trend-defs";
+import type { StandingBasis } from "./standing-basis-defs";
 import { StandingBadge, TrendNote } from "./StandingBadge";
+import { StandingBasisNote } from "./StandingBasisNote";
 
 /** Skeleton rows while the first load is in flight, about a small workspace's worth. */
 const LOADING_ROWS = 4;
@@ -389,15 +391,18 @@ export interface StandingCellProps {
 	direction?: TrendDirection;
 	support?: TrendSupport;
 	scope: StandingScope;
+	/** What the standing was read from; earlier reviews are said under the badge. */
+	basis?: StandingBasis | null;
 }
 
-/** The standing badge with the trend under it. */
-export function StandingCell({ standing, direction, support, scope }: StandingCellProps) {
+/** The standing badge with the trend under it, and under both whether it rests on earlier reviews. */
+export function StandingCell({ standing, direction, support, scope, basis }: StandingCellProps) {
 	return (
 		<TableCell className={cn(OPEN_ROW_BAR, "whitespace-normal")}>
 			<div className="flex min-w-0 flex-col items-start gap-1.5">
 				<StandingBadge standing={standing} scope={scope} support={support} />
 				<TrendNote direction={direction} support={support} scope={scope} />
+				<StandingBasisNote basis={basis} />
 			</div>
 		</TableCell>
 	);

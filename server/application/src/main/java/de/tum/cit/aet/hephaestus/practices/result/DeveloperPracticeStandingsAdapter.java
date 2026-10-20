@@ -12,7 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** The Practice profile's standings of one developer, in the profile's own words. */
+/** Processing-qualified standings of one developer, using the Practice profile's selection and words. */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
@@ -26,7 +26,7 @@ class DeveloperPracticeStandingsAdapter implements DeveloperPracticeStandings {
     public List<Standing> standings(long workspaceId, long accountId) {
         int window = standings.standingWindow();
         return standings
-                .getStandingSnapshots(workspaceId, accountId, List.of(clock.instant()))
+                .getProcessingStandingSnapshots(workspaceId, accountId, List.of(clock.instant()))
                 .getFirst()
                 .practices()
                 .values()
