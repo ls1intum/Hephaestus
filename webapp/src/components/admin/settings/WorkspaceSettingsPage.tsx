@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { WorkspaceCapabilitiesSettings } from "./WorkspaceCapabilitiesSettings";
 import { WorkspaceDangerZoneSettings } from "./WorkspaceDangerZoneSettings";
 import {
@@ -6,12 +7,14 @@ import {
 } from "./WorkspacePublicActivitySettings";
 
 export interface WorkspaceSettingsPageProps {
+	security?: ReactNode;
 	workspaceSlug: string;
 	practicesEnabled: boolean;
 	publicActivity: WorkspacePublicActivitySettingsProps;
 }
 
 export function WorkspaceSettingsPage({
+	security,
 	workspaceSlug,
 	practicesEnabled,
 	publicActivity,
@@ -23,6 +26,7 @@ export function WorkspaceSettingsPage({
 				practicesEnabled={practicesEnabled}
 			/>
 			<WorkspacePublicActivitySettings {...publicActivity} />
+			{security}
 			<WorkspaceDangerZoneSettings workspaceSlug={workspaceSlug} />
 		</div>
 	);

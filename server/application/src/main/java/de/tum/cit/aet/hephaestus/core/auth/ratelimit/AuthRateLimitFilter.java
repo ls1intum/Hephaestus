@@ -63,6 +63,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     /** Identifies which configured limit (if any) applies to a request, and how to key it. */
     private enum Endpoint {
+        PASSKEY("passkey", true, false),
         OAUTH_AUTHORIZATION("oauth-authz", false, true),
         REFRESH("refresh", true, true),
         // Installed-client token, refresh and logout: body-authenticated by design, so keyed by IP.
@@ -146,6 +147,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             return null;
         }
         String method = request.getMethod();
+        if (!"GET".equals(method) && path.startsWith("/user/passkeys")) {
+            return Endpoint.PASSKEY;
+        }
         if (PublicActivityReadRequestMatcher.MATCHER.matches(request)) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null
@@ -193,6 +197,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private AuthRateLimitProperties.Limit limitFor(Endpoint endpoint) {
         return switch (endpoint) {
+            case PASSKEY -> properties.oauthAuthorization();
             case OAUTH_AUTHORIZATION -> properties.oauthAuthorization();
             case REFRESH -> properties.refresh();
             case CLIENT_SESSION -> properties.clientSession();

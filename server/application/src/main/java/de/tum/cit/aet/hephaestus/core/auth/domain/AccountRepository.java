@@ -19,6 +19,7 @@ import org.springframework.stereotype.Repository;
 @WorkspaceAgnostic(
         "Account is the Hephaestus-native principal; it spans workspaces (membership lives on" + " Membership)")
 public interface AccountRepository extends JpaRepository<Account, Long> {
+    Optional<Account> findByPasskeyUserHandle(String handle);
 
     @Modifying
     @Query(value = """

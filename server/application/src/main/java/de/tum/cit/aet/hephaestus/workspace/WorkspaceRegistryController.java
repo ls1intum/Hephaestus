@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AdminPasskeyAccess;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
@@ -31,12 +33,14 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
+@ConditionalOnServerRole
 @RequestMapping("/workspaces")
 @RequiredArgsConstructor
 @Validated
 @PreAuthorize("isAuthenticated()")
 public class WorkspaceRegistryController {
 
+    private final AdminPasskeyAccess passkeyAccess;
     private final WorkspaceService workspaceService;
     private final WorkspaceQueryService workspaceQueryService;
     private final FeatureFlagService featureFlagService;
@@ -67,6 +71,9 @@ public class WorkspaceRegistryController {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN, "An instance admin must create workspaces on this deployment.");
         }
+
+        passkeyAccess.requireWorkspaceAdmin(
+                false, workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY, true);
 
         if (createWorkspaceRequest.kind() == IntegrationKind.GITLAB
                 && !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)) {

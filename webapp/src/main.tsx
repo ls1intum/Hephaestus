@@ -18,6 +18,7 @@ import "./styles.css";
 
 import { applyStateChangingHeaders } from "@/runtime/auth/auth-client";
 import { AuthProvider, useAuth } from "@/runtime/auth/AuthContext";
+import { handlePasskeyChallenge } from "@/runtime/auth/passkey-challenge";
 import { handlePossibleSessionExpiry } from "@/runtime/auth/session-expiry";
 import { SessionKeepAlive } from "@/runtime/auth/use-session-keep-alive";
 import { useCookieConsent } from "@/runtime/consent";
@@ -50,11 +51,6 @@ client.interceptors.request.use((request) =>
 	applyUserViewHeaders(applyStateChangingHeaders(request)),
 );
 
-client.interceptors.response.use((response) => {
-	handlePossibleSessionExpiry(response, TanstackQuery.getContext().queryClient);
-	return response;
-});
-
 const router = createRouter({
 	...ROUTER_SEARCH,
 	rewrite: workspaceRewrite(workspaceAddressConfig, window.location.origin),
@@ -71,6 +67,14 @@ const router = createRouter({
 	defaultStructuralSharing: true,
 	defaultPreloadStaleTime: 0,
 	defaultErrorComponent: RouteError,
+});
+
+client.interceptors.response.use(async (response) => {
+	await handlePasskeyChallenge(response, async () =>
+		router.navigate({ to: "/settings", hash: "passkeys" }),
+	);
+	handlePossibleSessionExpiry(response, TanstackQuery.getContext().queryClient);
+	return response;
 });
 
 installWorkspaceNavigation(router, workspaceAddressConfig);
