@@ -15,8 +15,13 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
+import java.util.logging.Handler;
+import java.util.logging.LogManager;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.ConnectionCallback;
@@ -32,6 +37,8 @@ class ServerLogPrivacyIntegrationTest extends BaseIntegrationTest {
 
     @LocalServerPort
     private int port;
+
+    private Handler[] inheritedRootHandlers = new Handler[0];
 
     private record Rejection(String sqlState, String message) {}
 
@@ -61,9 +68,41 @@ class ServerLogPrivacyIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldKeepTheRawTargetOfAnUnparseableRequestOutOfTheLog() throws IOException {
+        assertTomcatParserKeepsTheTargetOutOfTheLog();
+    }
+
+    /**
+     * The parser privacy boundary remains testable when an earlier context left the JVM logging bridge absent.
+     */
+    @Test
+    void shouldKeepTheRawTargetOutOfTheLogAfterTheTestRemovedTheLoggingBridge() throws IOException {
+        SLF4JBridgeHandler.uninstall();
+        assertThat(SLF4JBridgeHandler.isInstalled()).isFalse();
+        assertTomcatParserKeepsTheTargetOutOfTheLog();
+    }
+
+    // Tomcat logs through java.util.logging. Its records reach Logback only through a bridge, which is one handler of
+    // the JVM-wide root logger. Spring Boot installs that bridge when it initializes the shared Logback context, which
+    // a later context in this JVM can find already initialized, and a closing application can remove it. Thus, the
+    // check installs exactly one bridge for itself, and each test puts back the root handlers that it found.
+    @BeforeEach
+    void rememberTheRootLogHandlers() {
+        inheritedRootHandlers = LogManager.getLogManager().getLogger("").getHandlers();
+    }
+
+    @AfterEach
+    void restoreTheRootLogHandlers() {
+        var root = LogManager.getLogManager().getLogger("");
+        for (Handler handler : root.getHandlers()) root.removeHandler(handler);
+        for (Handler handler : inheritedRootHandlers) root.addHandler(handler);
+    }
+
+    private void assertTomcatParserKeepsTheTargetOutOfTheLog() throws IOException {
         Logger parser = (Logger) LoggerFactory.getLogger(TOMCAT_PARSER);
         Level shipped = parser.getLevel();
         assertThat(shipped).as("application.yml pins " + TOMCAT_PARSER).isEqualTo(Level.WARN);
+        SLF4JBridgeHandler.uninstall();
+        SLF4JBridgeHandler.install();
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         parser.addAppender(appender);
@@ -73,6 +112,10 @@ class ServerLogPrivacyIntegrationTest extends BaseIntegrationTest {
 
             // Unbounded, the same logger receives the target: the pinned name is the one Tomcat uses.
             parser.setLevel(Level.DEBUG);
+            assertThat(Objects.requireNonNull(LogManager.getLogManager().getLogger(TOMCAT_PARSER))
+                            .isLoggable(java.util.logging.Level.FINE))
+                    .as("Tomcat's java.util.logging logger follows the Logback level")
+                    .isTrue();
             assertThat(sendUnparseableRequest()).startsWith("HTTP/1.1 400");
             assertThat(appender.list)
                     .anySatisfy(event -> assertThat(event.getThrowableProxy())
