@@ -1,9 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, stripSearchParams } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { getPracticeWorkspaceOverviewOptions } from "@/api/@tanstack/react-query.gen";
-import type { PracticeWorkspaceOverview } from "@/api/types.gen";
+import {
+	getPracticeWorkspaceOverviewOptions,
+	getPracticeWorkspaceTilesOptions,
+} from "@/api/@tanstack/react-query.gen";
+import type {
+	PracticesAcrossWorkspace,
+	PracticesAcrossWorkspaceTiles,
+	WorkspaceGroupSplit,
+} from "@/api/types.gen";
 import { type PanelState, panelState, queryLoadState } from "@/components/common/panel-state";
 import {
 	detailStackSchema,
@@ -22,24 +29,24 @@ import { usePracticeFocusSwitch } from "@/components/practice-focus/use-practice
 import {
 	ACROSS_THE_WORKSPACE,
 	ACROSS_WORKSPACE_STALE_MS,
+	DEFAULT_WINDOW,
+	WINDOW_VALUES,
 } from "@/components/practices-across-the-workspace/across-workspace-copy";
 import { PracticesAcrossTheWorkspacePage } from "@/components/practices-across-the-workspace/PracticesAcrossTheWorkspacePage";
-import {
-	groupsOf,
-	type WorkspaceGroup,
-} from "@/components/practices-across-the-workspace/workspace-groups";
 import {
 	WorkspaceGroupLevel,
 	type WorkspaceGroupLevelState,
 } from "@/components/practices-across-the-workspace/WorkspaceGroupLevel";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { pageHead } from "@/lib/page-title";
+import { keepSameSubject } from "@/runtime/tanstack-query/keep-same-subject";
 
 /** The reader's own group and practice levels live in their Practice profile, which this level links to. */
 const LEVEL_KINDS = ["practice-group"] as const;
 
 const searchSchema = z
 	.object({
+		window: z.enum(WINDOW_VALUES).default(DEFAULT_WINDOW).catch(DEFAULT_WINDOW),
 		// The practice row the group level marks, written by a switch from the reader's profile.
 		practice: z.string().min(1).max(200).optional().catch(undefined),
 	})
@@ -51,16 +58,28 @@ export const Route = createFileRoute(
 	component: PracticesAcrossTheWorkspace,
 	head: pageHead("Practices across the workspace"),
 	validateSearch: searchSchema,
+	search: {
+		middlewares: [stripSearchParams({ window: DEFAULT_WINDOW })],
+	},
 });
 
 function PracticesAcrossTheWorkspace() {
 	const { workspaceSlug } = Route.useParams();
-	const { detail, practice } = Route.useSearch();
+	const { window, detail, practice } = Route.useSearch();
 	const featureState = useWorkspaceFeatures(workspaceSlug);
 	const enabled = featureState.practicesEnabled === true;
+	// The splits and the open feedback read no window, so a window change never reads them again.
 	const query = useQuery({
 		...getPracticeWorkspaceOverviewOptions({ path: { workspaceSlug } }),
 		enabled,
+		staleTime: ACROSS_WORKSPACE_STALE_MS,
+	});
+	// One request per window. Another window of this workspace stands in, marked stale; another
+	// workspace's never does.
+	const tilesQuery = useQuery({
+		...getPracticeWorkspaceTilesOptions({ path: { workspaceSlug }, query: { window } }),
+		enabled,
+		placeholderData: keepSameSubject({ workspaceSlug }),
 		staleTime: ACROSS_WORKSPACE_STALE_MS,
 	});
 	const stack = parseDetailStack(detail, LEVEL_KINDS);
@@ -69,6 +88,8 @@ function PracticesAcrossTheWorkspace() {
 		levelParams: ["practice"],
 		replaceOnClose: isFocusSwitchStep,
 	});
+	// Typed by this page's search, so a misspelt key does not compile.
+	const setView = (view: Partial<z.infer<typeof searchSchema>>) => stackControls.setView(view);
 	const openGroupSlug = stack[0]?.id;
 	const focusSwitch = usePracticeFocusSwitch(workspaceSlug);
 
@@ -76,17 +97,26 @@ function PracticesAcrossTheWorkspace() {
 		return <Navigate to="/w/$workspaceSlug" params={{ workspaceSlug }} replace />;
 	}
 
+	// Both queries wait on the feature read, so its failure is theirs.
 	const featureLoad = queryLoadState({ ...featureState, isPending: featureState.isLoading });
-	const state: PanelState<{ overview: PracticeWorkspaceOverview }> =
+	const state: PanelState<{ overview: PracticesAcrossWorkspace }> =
 		featureLoad.status === "error"
 			? featureLoad
 			: panelState(query, (overview) => ({ status: "ready" as const, overview }));
-	const groups = state.status === "ready" ? groupsOf(state.overview.practices) : [];
+	const tiles: PanelState<{ tiles: PracticesAcrossWorkspaceTiles; stale: boolean }> =
+		featureLoad.status === "error"
+			? featureLoad
+			: panelState(tilesQuery, (data) => ({
+					status: "ready" as const,
+					tiles: data,
+					stale: tilesQuery.isPlaceholderData,
+				}));
+	const overview = state.status === "ready" ? state.overview : undefined;
 	// Each level reads its own group: a hand-edited address can stack two.
-	const groupOf = (slug: string) => groups.find((each) => each.slug === slug);
+	const groupOf = (slug: string) => overview?.groups.find((each) => each.groupSlug === slug);
 	const pathAt = levelPathAt(stack, {
 		pageLabel: ACROSS_THE_WORKSPACE,
-		labelOf: (entry) => groupOf(entry.id)?.name ?? "Group",
+		labelOf: (entry) => groupOf(entry.id)?.groupName ?? "Group",
 		onClose: stackControls.close,
 	});
 
@@ -94,6 +124,9 @@ function PracticesAcrossTheWorkspace() {
 		<>
 			<PracticesAcrossTheWorkspacePage
 				state={state}
+				tiles={tiles}
+				window={window}
+				onWindowChange={(next) => setView({ window: next })}
 				openGroupSlug={openGroupSlug}
 				onOpenGroup={(groupSlug) => stackControls.open({ kind: "practice-group", id: groupSlug })}
 				focusFooter={
@@ -105,6 +138,7 @@ function PracticesAcrossTheWorkspace() {
 					/>
 				}
 			/>
+			{/* Only the overview feeds the level, so a failed tiles read leaves it open. */}
 			<DetailDrawerStack
 				stack={stack}
 				onClose={stackControls.close}
@@ -113,7 +147,7 @@ function PracticesAcrossTheWorkspace() {
 						{...FOCUS_FOOTER_COPY.workspaceGroup}
 						accessibleLabel={focusSwitchName(
 							FOCUS_FOOTER_COPY.workspaceGroup.label,
-							groupOf(entry.id)?.name,
+							groupOf(entry.id)?.groupName,
 						)}
 						onSwitch={() => focusSwitch.toProfile({ groupSlug: entry.id })}
 					/>
@@ -136,8 +170,8 @@ function PracticesAcrossTheWorkspace() {
 }
 
 function levelState(
-	state: PanelState<{ overview: PracticeWorkspaceOverview }>,
-	group: WorkspaceGroup | undefined,
+	state: PanelState<{ overview: PracticesAcrossWorkspace }>,
+	group: WorkspaceGroupSplit | undefined,
 ): WorkspaceGroupLevelState {
 	if (state.status !== "ready") {
 		return state;

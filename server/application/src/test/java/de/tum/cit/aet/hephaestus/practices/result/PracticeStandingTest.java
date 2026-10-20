@@ -64,7 +64,7 @@ class PracticeStandingTest {
 
     private static PracticeStandingSnapshot standing(PracticeStanding standing, PracticeTrend trend) {
         PracticeStandingDTO dto = new PracticeStandingDTO(
-                SLUG, "Testing", null, null, null, null, standing, List.of(), List.of(), null, null, false);
+                SLUG, "Testing", null, null, null, null, standing, List.of(), List.of(), null, null, false, null);
         return new PracticeStandingSnapshot(dto, List.of(), List.of(), trend, null);
     }
 

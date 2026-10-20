@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
@@ -77,9 +78,23 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
     @Override
     @Transactional(readOnly = true)
     public boolean permits(ItemRef item, SourceUsePurpose purpose) {
+        return permitted(item, SourceReadAudience.PROCESSING);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean permits(ItemRef item, SourceUsePurpose purpose, SourceReadAudience audience) {
+        return permitted(item, Objects.requireNonNull(audience));
+    }
+
+    private boolean permitted(ItemRef item, SourceReadAudience audience) {
         if (!supports(item)) return false;
         Long sourceId = item.sourceId();
-        return sourceId != null && permission.permits(item.workspaceId(), sourceId);
+        if (sourceId == null) return false;
+        // Processing keeps the check capture and context use; only the human read asks the typed one.
+        return audience == SourceReadAudience.PROCESSING
+                ? permission.permits(item.workspaceId(), sourceId)
+                : permission.permits(item.workspaceId(), sourceId, audience);
     }
 
     @Override

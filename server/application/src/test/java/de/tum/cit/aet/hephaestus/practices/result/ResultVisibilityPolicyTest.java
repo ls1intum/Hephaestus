@@ -37,7 +37,9 @@ class ResultVisibilityPolicyTest {
     private final ResultMarkRepository marks = mock(ResultMarkRepository.class);
     private final PracticeRepository practices = mock(PracticeRepository.class);
     private final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);
-    private final ResultVisibilityPolicy policy = new ResultVisibilityPolicy(authorization, marks, practices, versions);
+    private final ResultSourceAuthorization sources = mock(ResultSourceAuthorization.class);
+    private final ResultVisibilityPolicy policy =
+            new ResultVisibilityPolicy(authorization, marks, practices, versions, sources);
     private final Practice practice = ReviewTestData.practice(1, 1, "test-practice");
 
     @BeforeEach

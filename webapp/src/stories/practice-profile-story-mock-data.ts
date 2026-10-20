@@ -8,6 +8,7 @@ import type {
 	ProfileReviewRef,
 	TrendSupport,
 } from "@/api/types.gen";
+import { isSettledStanding } from "@/components/practice-vocabulary/practice-group-standing-defs";
 import { ITEM_KIND } from "@/lib/item-kinds";
 
 import { inStoryYear } from "./story-clock";
@@ -130,6 +131,7 @@ const groupStanding = (
 		feedbackSpanDays: standing === "NOT_OBSERVED" ? null : 42,
 		guidance: null,
 		guidanceSource: null,
+		basis: isSettledStanding(standing) ? "CURRENT_REVIEWS" : null,
 	};
 };
 
@@ -156,6 +158,8 @@ export const practiceStandingOf = (
 	whatGoodLooksLike: null,
 	strengths: [],
 	toWorkOn: [],
+	// A verdict reads from current reviews unless the story says otherwise.
+	basis: isSettledStanding(fields.standing) ? "CURRENT_REVIEWS" : null,
 	...fields,
 });
 

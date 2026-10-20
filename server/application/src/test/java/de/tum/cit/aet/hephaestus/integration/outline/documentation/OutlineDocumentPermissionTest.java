@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -111,6 +112,57 @@ class OutlineDocumentPermissionTest extends BaseUnitTest {
                 .thenReturn(Optional.of(new AccountDirectory.AccountView(
                         51L, Account.Status.ACTIVE, "Person", AiChoice.NO_AI, null, true)));
         assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID)).isFalse();
+    }
+
+    @Test
+    void permitsOnlyTheHumanRecordedStandingPastAContributorWhoChoseNoAi() {
+        readableHeader(connection(SERVER_URL));
+        when(identities.accountFor(new PersonIdentity(PROVIDER_ID, "editor", TEAM)))
+                .thenReturn(Optional.of(51L));
+        when(accounts.find(51L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        51L, Account.Status.ACTIVE, "Person", AiChoice.NO_AI, null, true)));
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID)).isFalse();
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, SourceReadAudience.PROCESSING))
+                .isFalse();
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, SourceReadAudience.HUMAN_RECORDED_STANDING))
+                .isTrue();
+    }
+
+    @Test
+    void keepsEveryOtherDocumentControlForTheHumanRecordedStanding() {
+        var human = SourceReadAudience.HUMAN_RECORDED_STANDING;
+        readableHeader(connection(SERVER_URL));
+        when(identities.accountFor(new PersonIdentity(PROVIDER_ID, "editor", TEAM)))
+                .thenReturn(Optional.of(51L));
+        when(accounts.find(51L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        51L, Account.Status.SUSPENDED, "Person", AiChoice.NO_AI, null, true)));
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, human)).isFalse();
+        when(accounts.find(51L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        51L, Account.Status.ACTIVE, "Person", AiChoice.NO_AI, null, true)));
+        when(suppression.isAccountSuppressed(51L)).thenReturn(true);
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, human)).isFalse();
+        when(suppression.isAccountSuppressed(51L)).thenReturn(false);
+        when(suppression.isSuppressed(PROVIDER_ID, "collaborator", TEAM)).thenReturn(true);
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, human)).isFalse();
+        when(suppression.isSuppressed(PROVIDER_ID, "collaborator", TEAM)).thenReturn(false);
+        when(identities.accountFor(new PersonIdentity(PROVIDER_ID, "creator", TEAM)))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Ambiguous ownership"));
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, human)).isFalse();
+
+        var retired = connection(SERVER_URL);
+        retired.setState(IntegrationState.UNINSTALLED);
+        when(connections.findInWorkspace(WORKSPACE_ID, CONNECTION_ID)).thenReturn(Optional.of(retired));
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, human)).isFalse();
+        when(connections.findInWorkspace(WORKSPACE_ID, CONNECTION_ID))
+                .thenReturn(Optional.of(connection("https://unapproved.example.com")));
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, human)).isFalse();
+        when(documents.findAccess(WORKSPACE_ID, DOCUMENT_ID))
+                .thenReturn(Optional.of(
+                        new OutlineDocumentAccess(8L, DOCUMENT_ID, CONNECTION_ID, "creator", null, null, null)));
+        assertThat(permission.permits(WORKSPACE_ID, DOCUMENT_ID, human)).isFalse();
     }
 
     @ParameterizedTest

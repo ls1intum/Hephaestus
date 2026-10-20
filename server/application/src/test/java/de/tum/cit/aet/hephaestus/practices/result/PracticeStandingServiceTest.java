@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -13,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.result.trend.TrendProperties;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewTestData;
@@ -22,6 +24,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.StandingBasis;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,7 +32,9 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +85,12 @@ class PracticeStandingServiceTest {
                 });
         Mockito.lenient()
                 .when(visibility.permitsAt(eq(1L), anyCollection(), any(), any()))
+                .thenAnswer(i -> {
+                    Collection<Result> rows = i.getArgument(1);
+                    return rows.stream().map(Result::getId).collect(Collectors.toSet());
+                });
+        Mockito.lenient()
+                .when(visibility.permitsStandingAt(eq(1L), anyCollection(), any()))
                 .thenAnswer(i -> {
                     Collection<Result> rows = i.getArgument(1);
                     return rows.stream().map(Result::getId).collect(Collectors.toSet());
@@ -178,6 +189,229 @@ class PracticeStandingServiceTest {
         var snapshots = service.getStandingSnapshots(1L, 7L, List.of(edge, now));
         assertThat(snapshots.getFirst().dtos().getFirst().standing()).isEqualTo(PracticeStanding.STRENGTH);
         assertThat(snapshots.getLast().dtos().getFirst().standing()).isEqualTo(PracticeStanding.MIXED);
+    }
+
+    @Test
+    void shouldKeepTheLiveStandingWhenARequestedReviewReplacesItsClaim() {
+        add(1, ResultOutcome.NOT_MET);
+        var live = data.getFirst();
+        var before = card().standing();
+        var requested = replace(live, 5, ResultOutcome.MET, ReviewOrigin.REQUEST, ResultEndReason.REPLACED);
+
+        var standing = only(service.getStandingSnapshots(1L, 7L, List.of(now)).getFirst());
+        assertThat(standing.dto().standing()).isEqualTo(before);
+        assertThat(standing.dto().basis()).isEqualTo(StandingBasis.CURRENT_REVIEWS);
+        assertThat(standing.liveRuns()).extracting(ResultView::result).containsExactly(live.result());
+        // The quote follows the current claim: the clean re-review, not the replaced problem.
+        assertThat(standing.dto().toWorkOn()).isEmpty();
+        assertThat(standing.dto().strengths())
+                .extracting(PracticeStandingResultDTO::resultId)
+                .containsExactly(requested.result().getId());
+        assertThat(live.result().getEndReason()).isEqualTo(ResultEndReason.REPLACED);
+    }
+
+    @Test
+    void shouldKeepTheLiveStandingWhenARequestedReviewReachesNoVerdict() {
+        add(1, ResultOutcome.NOT_MET);
+        var before = card().standing();
+        replace(data.getFirst(), 5, ResultOutcome.DOES_NOT_APPLY, ReviewOrigin.REQUEST, ResultEndReason.REPLACED);
+
+        assertThat(card().standing()).isEqualTo(before);
+        assertThat(card().basis()).isEqualTo(StandingBasis.CURRENT_REVIEWS);
+    }
+
+    @Test
+    void shouldNotKeepTheLiveRunWhenTheWorkChangedBeforeTheRequest() {
+        add(1, ResultOutcome.NOT_MET);
+        replace(data.getFirst(), 5, ResultOutcome.MET, ReviewOrigin.REQUEST, ResultEndReason.WORK_CHANGED);
+
+        var standing = only(service.getStandingSnapshots(1L, 7L, List.of(now)).getFirst());
+        assertThat(standing.liveRuns()).isEmpty();
+        assertThat(standing.dto().toWorkOn()).isEmpty();
+    }
+
+    @Test
+    void shouldPreferANewerLiveRunOverTheOneARequestReplaced() {
+        add(1, ResultOutcome.NOT_MET);
+        var requested = replace(data.getFirst(), 4, ResultOutcome.MET, ReviewOrigin.REQUEST, ResultEndReason.REPLACED);
+        var newer = replace(requested, 6, ResultOutcome.MET, ReviewOrigin.EVENT, ResultEndReason.REPLACED);
+
+        var standing = only(service.getStandingSnapshots(1L, 7L, List.of(now)).getFirst());
+        assertThat(standing.liveRuns()).extracting(ResultView::result).containsExactly(newer.result());
+    }
+
+    @Test
+    void shouldNotLetAnOutrankedResultHoldOrBreakTheClaim() {
+        add(2, ResultOutcome.NOT_MET);
+        var live = data.getFirst();
+        var late = ReviewTestData.view(
+                live.result().getItemId(),
+                UUID.randomUUID(),
+                now.minus(Duration.ofDays(9)),
+                new ItemKind("scm.pull_request"),
+                ResultOutcome.MET);
+        late.result().end(ResultEndReason.OUTRANKED, late.result().getRecordedAt());
+        data.add(late);
+
+        var standing = only(service.getStandingSnapshots(1L, 7L, List.of(now)).getFirst());
+        assertThat(standing.liveRuns()).extracting(ResultView::result).containsExactly(live.result());
+    }
+
+    @Test
+    void shouldReadEarlierReviewsQualifiedWhenNoCurrentReviewReachedThePractice() {
+        add(1, ResultOutcome.NOT_MET);
+        add(2, ResultOutcome.MET);
+        earlier(0);
+        earlier(1);
+
+        var card = card();
+        assertThat(StandingScale.isVerdict(card.standing())).isTrue();
+        assertThat(card.basis()).isEqualTo(StandingBasis.EARLIER_REVIEWS);
+        assertThat(card.toWorkOn()).isEmpty();
+        assertThat(card.strengths()).isEmpty();
+        assertThat(card.direction()).isNull();
+        assertThat(card.trendSupport()).isNull();
+    }
+
+    @Test
+    void shouldSayTheCriteriaAreUnknownWhenAnEarlierReviewNamesNoPracticeVersion() {
+        add(1, ResultOutcome.NOT_MET);
+        add(2, ResultOutcome.MET);
+        earlier(0);
+        var view = data.get(1);
+        data.set(
+                1,
+                new ResultView(
+                        resultBuilder(view.result())
+                                .evidenceVersion((short) 0)
+                                .practiceVersionId(null)
+                                .build(),
+                        view.practice(),
+                        null,
+                        view.review(),
+                        view.item()));
+
+        assertThat(card().basis()).isEqualTo(StandingBasis.EARLIER_REVIEWS_CRITERIA_UNKNOWN);
+        assertThat(card().toWorkOn()).isEmpty();
+    }
+
+    @Test
+    void shouldPreferCurrentReviewsOverEarlierReviewsOfThePractice() {
+        add(1, ResultOutcome.NOT_MET);
+        earlier(0);
+        add(2, ResultOutcome.MET);
+
+        assertThat(card().basis()).isEqualTo(StandingBasis.CURRENT_REVIEWS);
+        assertThat(card().toWorkOn()).isEmpty();
+    }
+
+    @Test
+    void shouldRetainEarlierLiveAssessmentWhenARequestedReviewHasNoVerdict() {
+        add(1, ResultOutcome.NOT_MET);
+        earlier(0);
+        var before = card().standing();
+        replace(data.getFirst(), 5, ResultOutcome.DOES_NOT_APPLY, ReviewOrigin.REQUEST, ResultEndReason.REPLACED);
+
+        var standing = only(service.getStandingSnapshots(1L, 7L, List.of(now)).getFirst());
+        assertThat(standing.dto().standing()).isEqualTo(before);
+        assertThat(standing.dto().basis()).isEqualTo(StandingBasis.EARLIER_REVIEWS);
+        assertThat(standing.dto().toWorkOn()).isEmpty();
+        assertThat(standing.dto().strengths()).isEmpty();
+        assertThat(standing.dto().direction()).isNull();
+        assertThat(standing.dto().trendSupport()).isNull();
+        assertThat(standing.liveRuns()).isEmpty();
+    }
+
+    @Test
+    void shouldNotResurrectAnEarlierReviewThatACurrentReviewReplaced() {
+        add(1, ResultOutcome.NOT_MET);
+        earlier(0);
+        replace(data.getFirst(), 5, ResultOutcome.DOES_NOT_APPLY, ReviewOrigin.EVENT, ResultEndReason.REPLACED);
+
+        assertThat(card().standing()).isEqualTo(PracticeStanding.NO_OPPORTUNITY);
+        assertThat(card().basis()).isNull();
+    }
+
+    @Test
+    void shouldCountAStandingWithoutQuotesWhenDeliveryControlsRefuseTheRows() {
+        add(1, ResultOutcome.NOT_MET);
+        var before = card().standing();
+        assertThat(before).isEqualTo(PracticeStanding.MIXED);
+        when(visibility.permitsAt(eq(1L), anyCollection(), any(), any())).thenReturn(Set.of());
+
+        assertThat(card().standing()).isEqualTo(before);
+        assertThat(card().toWorkOn()).isEmpty();
+    }
+
+    @Test
+    void shouldReadNoStandingWhenTheStandingFencesRefuseTheRows() {
+        add(1, ResultOutcome.NOT_MET);
+        when(visibility.permitsStandingAt(eq(1L), anyCollection(), any())).thenReturn(Set.of());
+
+        assertThat(card().standing()).isEqualTo(PracticeStanding.NOT_OBSERVED);
+    }
+
+    @Test
+    void shouldReadTheProfilesStandingForEachDeveloperWhenReadForTheWorkspace() {
+        add(1, ResultOutcome.NOT_MET);
+        add(2, ResultOutcome.MET);
+        add(3, ResultOutcome.MET);
+        replace(data.getFirst(), 5, ResultOutcome.MET, ReviewOrigin.REQUEST, ResultEndReason.REPLACED);
+
+        var workspace = service.getCurrentWorkspaceStandings(1L, List.of(7L, 8L));
+        var reader = Objects.requireNonNull(workspace.byDeveloper().get(7L));
+        var other = Objects.requireNonNull(workspace.byDeveloper().get(8L));
+        var profile = service.getStandingSnapshots(1L, 7L, List.of(now)).getFirst();
+        // Counts quote nothing; every standing, basis, trend and share equals the profile's.
+        assertThat(reader.practices().values())
+                .extracting(
+                        practice -> practice.dto().standing(),
+                        practice -> practice.dto().basis(),
+                        practice -> practice.dto().direction(),
+                        practice -> practice.share())
+                .containsExactlyElementsOf(profile.practices().values().stream()
+                        .map(practice -> tuple(
+                                practice.dto().standing(),
+                                practice.dto().basis(),
+                                practice.dto().direction(),
+                                practice.share()))
+                        .toList());
+        assertThat(reader.dtos()).allSatisfy(dto -> assertThat(dto.toWorkOn()).isEmpty());
+        assertThat(other.dtos()).extracting(PracticeStandingDTO::standing).containsOnly(PracticeStanding.NOT_OBSERVED);
+    }
+
+    private PracticeStandingService.StandingSnapshot.PracticeStandingSnapshot only(
+            PracticeStandingService.StandingSnapshot snapshot) {
+        return snapshot.practices().values().iterator().next();
+    }
+
+    // Writes what ResultClaimWriter writes when a later review claims the same work: the prior claim ends at the
+    // later recording.
+    private ResultView replace(
+            ResultView prior, long day, ResultOutcome outcome, ReviewOrigin origin, ResultEndReason reason) {
+        var next = ReviewTestData.view(
+                prior.result().getItemId(),
+                UUID.randomUUID(),
+                now.minus(Duration.ofDays(10 - day)),
+                new ItemKind("scm.pull_request"),
+                outcome);
+        next.review().setOrigin(origin);
+        prior.result().end(reason, next.result().getRecordedAt());
+        data.add(next);
+        return next;
+    }
+
+    // A result the cutover carried over from the earlier model: kept as recorded, without current proof.
+    private void earlier(int index) {
+        var view = data.get(index);
+        data.set(
+                index,
+                new ResultView(
+                        resultBuilder(view.result()).evidenceVersion((short) 0).build(),
+                        view.practice(),
+                        view.version(),
+                        view.review(),
+                        view.item()));
     }
 
     private PracticeStandingDTO card() {

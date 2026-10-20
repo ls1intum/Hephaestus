@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.scm.ScmPersonSourceIdentityContributor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -51,10 +52,18 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
     @Transactional(readOnly = true)
     public boolean permits(ItemRef item, SourceUsePurpose purpose) {
         Objects.requireNonNull(purpose);
-        return permitsItem(item);
+        return permitsItem(item, SourceReadAudience.PROCESSING);
     }
 
-    private boolean permitsItem(ItemRef item) {
+    @Override
+    @Transactional(readOnly = true)
+    public boolean permits(ItemRef item, SourceUsePurpose purpose, SourceReadAudience audience) {
+        Objects.requireNonNull(purpose);
+        return permitsItem(item, Objects.requireNonNull(audience));
+    }
+
+    // The audience reaches every parent, and changes only whether a contributor's AI choice applies.
+    private boolean permitsItem(ItemRef item, SourceReadAudience audience) {
         if (!kinds().contains(item.kind())) return false;
         try {
             items.require(item);
@@ -71,19 +80,19 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
             }
             if (item.kind().equals(ScmItemEvents.FILE)) {
                 if (source != null || item.path() == null) return false;
-                return permitsItem(items.parent(item, ScmItemEvents.REPOSITORY));
+                return permitsItem(items.parent(item, ScmItemEvents.REPOSITORY), audience);
             }
             if (source == null || item.path() != null) return false;
             if (item.kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)) {
                 var parent = items.parent(item, ScmItemEvents.PULL_REQUEST);
-                if (!permitsItem(parent)) return false;
+                if (!permitsItem(parent, audience)) return false;
                 var review = reviews.findById(source);
                 if (!review.map(row -> row.getPullRequest() != null
                                 && Objects.equals(row.getPullRequest().getId(), parent.sourceId()))
                         .orElse(false)) return false;
             } else {
                 var parent = items.parent(item, ScmItemEvents.REPOSITORY);
-                if (!permitsItem(parent)) return false;
+                if (!permitsItem(parent, audience)) return false;
                 var work = workLookup.find(item.kind(), source);
                 if (!work.map(row -> row.getDeletedAt() == null
                                 && row.getRepository() != null
@@ -100,7 +109,7 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
                     if (account.isEmpty()) return false;
                     var person = account.orElseThrow();
                     if (suppression.isAccountSuppressed(person.id())
-                            || person.aiChoice() == AiChoice.NO_AI
+                            || (audience == SourceReadAudience.PROCESSING && person.aiChoice() == AiChoice.NO_AI)
                             || (person.status() != Account.Status.ACTIVE
                                     && person.status() != Account.Status.UNCLAIMED)) return false;
                 }
