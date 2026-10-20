@@ -1,0 +1,14 @@
+package de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto;
+
+import de.tum.cit.aet.hephaestus.practices.acrossworkspace.WorkspaceSplits.Verdict;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "The developers at one verdict in a split")
+public record WorkspaceSplitPartDTO(
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "The verdict the part counts")
+        Verdict standing,
+
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "Developers at the verdict, the reader included when counted")
+        int developers) {}

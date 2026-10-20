@@ -482,6 +482,41 @@ export const NeverApplied: Story = {
 	},
 };
 
+/**
+ * The standing includes earlier assessments whose criterion version is unavailable. The level marks
+ * that basis beside the badge; those assessments provide no trend or quoted feedback.
+ */
+export const EarlierReviewsCriteriaUnknown: Story = {
+	args: {
+		practice: {
+			...focusedChanges,
+			standing: "MIXED",
+			basis: "EARLIER_REVIEWS_CRITERIA_UNKNOWN",
+			direction: null,
+			trendSupport: null,
+			toWorkOn: [],
+			strengths: [],
+		},
+	},
+	play: async () => {
+		const mark = await screen.findByRole("button", {
+			name: "Based on earlier reviews, criteria unknown",
+		});
+		await expect(mark).toHaveAccessibleDescription(
+			/They do not show whether the current criteria are met\./u,
+		);
+	},
+};
+
+/** A practice its current reviews decided carries no earlier-reviews mark. */
+export const CurrentReviewsCarryNoMark: Story = {
+	args: { practice: { ...focusedChanges, basis: "CURRENT_REVIEWS" } },
+	play: async () => {
+		await screen.findAllByRole("heading");
+		await expect(screen.queryByRole("button", { name: /^Based on earlier reviews/u })).toBeNull();
+	},
+};
+
 export const NeverAppliedDark: Story = {
 	args: { practice: describedPractice, neverApplied: true },
 	globals: { theme: "dark" },

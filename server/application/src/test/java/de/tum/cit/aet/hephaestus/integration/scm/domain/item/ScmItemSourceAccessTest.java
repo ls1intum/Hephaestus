@@ -17,8 +17,11 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.scm.ScmPersonSourceIdentityContributor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -102,6 +105,97 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         assertThat(fixture.service().permits(ref, PURPOSE)).isFalse();
     }
 
+    @Test
+    void shouldCountAHumanStandingOverANoAiContributorWhileEveryAiReadStaysRefused() {
+        var fixture = fixture();
+        var ref = issueWithNoAiCommenter(fixture);
+        for (var purpose : SourceUsePurpose.values()) {
+            assertThat(fixture.service().permits(ref, purpose)).isFalse();
+            assertThat(fixture.service().permits(ref, purpose, SourceReadAudience.PROCESSING))
+                    .isFalse();
+        }
+        assertThat(fixture.service().permits(ref, PURPOSE, SourceReadAudience.HUMAN_RECORDED_STANDING))
+                .isTrue();
+    }
+
+    @Test
+    void shouldKeepEveryOtherSourceControlWhenTheHumanStandingIsRead() {
+        var fixture = fixture();
+        var ref = issueWithNoAiCommenter(fixture);
+        var human = SourceReadAudience.HUMAN_RECORDED_STANDING;
+        when(fixture.suppression().isSuppressed(7, "author", null)).thenReturn(false);
+        when(fixture.suppression().isAccountSuppressed(8L)).thenReturn(false);
+        when(fixture.suppression().isSuppressed(7, "commenter", null)).thenReturn(true);
+        assertThat(fixture.service().permits(ref, PURPOSE, human)).isFalse();
+        when(fixture.suppression().isSuppressed(7, "commenter", null)).thenReturn(false);
+        when(fixture.suppression().isAccountSuppressed(9L)).thenReturn(true);
+        assertThat(fixture.service().permits(ref, PURPOSE, human)).isFalse();
+        when(fixture.suppression().isAccountSuppressed(9L)).thenReturn(false);
+        when(fixture.accounts().find(9L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        9, Account.Status.DELETING, "Commenter", AiChoice.NO_AI, null, true)));
+        assertThat(fixture.service().permits(ref, PURPOSE, human)).isFalse();
+        when(fixture.accounts().find(9L)).thenReturn(Optional.empty());
+        assertThat(fixture.service().permits(ref, PURPOSE, human)).isFalse();
+        when(fixture.accounts().find(9L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        9, Account.Status.ACTIVE, "Commenter", AiChoice.NO_AI, null, true)));
+        assertThat(fixture.service().permits(ref, PURPOSE, human)).isTrue();
+        doThrow(new ItemCaptureException(ItemCaptureCode.ITEM_NOT_VISIBLE, "Unmonitored"))
+                .when(fixture.access())
+                .authorize(1, fixture.repository());
+        assertThat(fixture.service().permits(ref, PURPOSE, human)).isFalse();
+    }
+
+    @Test
+    void shouldCarryTheHumanReadThroughAReviewToItsPullRequest() {
+        var fixture = fixture();
+        var pullRequestRef = new ItemRef(1, 10, ScmItemEvents.PULL_REQUEST, 11L, ROOT.itemId(), null);
+        var reviewRef = new ItemRef(1, 12, ScmItemEvents.PULL_REQUEST_REVIEW, 13L, pullRequestRef.itemId(), null);
+        when(fixture.items().parent(pullRequestRef, ScmItemEvents.REPOSITORY)).thenReturn(ROOT);
+        when(fixture.items().parent(reviewRef, ScmItemEvents.PULL_REQUEST)).thenReturn(pullRequestRef);
+        var pullRequest = new PullRequest();
+        pullRequest.setId(11L);
+        pullRequest.setRepository(fixture.repository());
+        when(fixture.workLookup().find(ScmItemEvents.PULL_REQUEST, 11L)).thenReturn(Optional.of(pullRequest));
+        var review = new PullRequestReview();
+        review.setPullRequest(pullRequest);
+        when(fixture.reviews().findById(13L)).thenReturn(Optional.of(review));
+        // Only the pull request's author chose No AI; the review itself has no other contributor.
+        when(fixture.contributors().identitiesForSource(1, "scm.pull_request", 11))
+                .thenReturn(List.of(new PersonIdentity(7, "author", null)));
+        when(fixture.identities().accountFor(new PersonIdentity(7L, "author", null)))
+                .thenReturn(Optional.of(8L));
+        when(fixture.accounts().find(8L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        8, Account.Status.ACTIVE, "Author", AiChoice.NO_AI, null, true)));
+
+        assertThat(fixture.service().permits(reviewRef, PURPOSE)).isFalse();
+        assertThat(fixture.service().permits(reviewRef, PURPOSE, SourceReadAudience.HUMAN_RECORDED_STANDING))
+                .isTrue();
+    }
+
+    private ItemRef issueWithNoAiCommenter(Fixture fixture) {
+        var ref = new ItemRef(1, 5, ScmItemEvents.ISSUE, 6L, ROOT.itemId(), null);
+        when(fixture.items().parent(ref, ScmItemEvents.REPOSITORY)).thenReturn(ROOT);
+        var issue = new Issue();
+        issue.setRepository(fixture.repository());
+        when(fixture.workLookup().find(ScmItemEvents.ISSUE, 6L)).thenReturn(Optional.of(issue));
+        when(fixture.contributors().identitiesForSource(1, "scm.issue", 6))
+                .thenReturn(List.of(new PersonIdentity(7, "author", null), new PersonIdentity(7, "commenter", null)));
+        when(fixture.identities().accountFor(new PersonIdentity(7L, "author", null)))
+                .thenReturn(Optional.of(8L));
+        when(fixture.identities().accountFor(new PersonIdentity(7L, "commenter", null)))
+                .thenReturn(Optional.of(9L));
+        when(fixture.accounts().find(8L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        8, Account.Status.ACTIVE, "Author", AiChoice.CLOUD, null, true)));
+        when(fixture.accounts().find(9L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        9, Account.Status.ACTIVE, "Commenter", AiChoice.NO_AI, null, true)));
+        return ref;
+    }
+
     private Fixture fixture() {
         var items = mock(ScmItemAccess.class);
         var repositories = mock(RepositoryRepository.class);
@@ -120,13 +214,23 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         var service = new ScmItemSourceAccess(
                 items, repositories, workLookup, reviews, access, contributors, suppression, identities, accounts);
         return new Fixture(
-                service, items, workLookup, access, contributors, suppression, identities, accounts, repository);
+                service,
+                items,
+                workLookup,
+                reviews,
+                access,
+                contributors,
+                suppression,
+                identities,
+                accounts,
+                repository);
     }
 
     private record Fixture(
             ScmItemSourceAccess service,
             ScmItemAccess items,
             ScmWorkLookup workLookup,
+            PullRequestReviewRepository reviews,
             ScmRepositoryAccess access,
             ScmPersonSourceIdentityContributor contributors,
             PersonProcessingSuppression suppression,

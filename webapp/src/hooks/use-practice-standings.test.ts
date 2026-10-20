@@ -31,6 +31,7 @@ describe("groupsOfStandings", () => {
 			feedbackSpanDays: null,
 			guidance: null,
 			guidanceSource: null,
+			basis: null,
 		} satisfies PracticeGroupStanding;
 		const standings = [
 			{ ...packagingStanding, groupDescription: "Work a reviewer can start on." },

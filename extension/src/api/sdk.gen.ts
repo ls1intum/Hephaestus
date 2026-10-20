@@ -4205,7 +4205,9 @@ export const getOwnPracticeStandings = <ThrowOnError extends boolean = false>(op
 });
 
 /**
- * List practice result totals across the workspace
+ * The reader's figures over one window beside the workspace's middle half
+ *
+ * A middle half shows whenever one or more developers are counted in the window.
  */
 export const getPracticeWorkspaceTiles = <ThrowOnError extends boolean = false>(options: Options<GetPracticeWorkspaceTilesData, ThrowOnError>): RequestResult<GetPracticeWorkspaceTilesResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetPracticeWorkspaceTilesResponses, unknown, ThrowOnError>({
     security: [{
@@ -4218,7 +4220,9 @@ export const getPracticeWorkspaceTiles = <ThrowOnError extends boolean = false>(
 });
 
 /**
- * Get practice results across the workspace
+ * How the workspace's developers split across practice groups and practices, the reader marked
+ *
+ * Counts developers, never names them. Every split shows all its parts, however few developers they count. The splits count every developer's current standing once and take no window.
  */
 export const getPracticeWorkspaceOverview = <ThrowOnError extends boolean = false>(options: Options<GetPracticeWorkspaceOverviewData, ThrowOnError>): RequestResult<GetPracticeWorkspaceOverviewResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetPracticeWorkspaceOverviewResponses, unknown, ThrowOnError>({
     security: [{

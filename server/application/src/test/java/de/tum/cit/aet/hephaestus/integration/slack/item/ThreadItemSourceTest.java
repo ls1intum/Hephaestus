@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.slack.capture.ThreadCaptureSource;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
@@ -293,6 +294,52 @@ class ThreadItemSourceTest extends BaseUnitTest {
         assertThat(source.permits(
                         new ItemRef(8L, 41L, ThreadEvents.THREAD, 19L, null, null),
                         SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isFalse();
+    }
+
+    @Test
+    void shouldCountTheHumanStandingWhenOnlyAnAuthorsAiChoiceHidesATurn() {
+        readableThread();
+        var human = SourceReadAudience.HUMAN_RECORDED_STANDING;
+        // One author chose No AI: every AI read sees one of two live turns, the human standing sees both.
+        when(messages.countReadableTurns(7L, "C1", "1700000000.000000")).thenReturn(1L);
+        when(messages.countHumanStandingReadableTurns(7L, "C1", "1700000000.000000"))
+                .thenReturn(2L);
+        for (var purpose : SourceUsePurpose.values()) {
+            assertThat(source.permits(item, purpose)).isFalse();
+            assertThat(source.permits(item, purpose, SourceReadAudience.PROCESSING))
+                    .isFalse();
+        }
+        assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isTrue();
+        verify(messages, never()).findThreadMessages(anyLong(), any(), any(), any());
+
+        // A turn that visibility hides (opt-out, tombstone, erasure, paused channel) hides the thread here too.
+        when(messages.countHumanStandingReadableTurns(7L, "C1", "1700000000.000000"))
+                .thenReturn(1L);
+        assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
+        when(messages.countHumanStandingReadableTurns(7L, "C1", "1700000000.000000"))
+                .thenReturn(2L);
+        when(messages.countLiveTurns(7L, "C1", "1700000000.000000")).thenReturn(0L);
+        when(messages.countHumanStandingReadableTurns(7L, "C1", "1700000000.000000"))
+                .thenReturn(0L);
+        assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
+        when(messages.countLiveTurns(7L, "C1", "1700000000.000000")).thenReturn(2L);
+        when(messages.countHumanStandingReadableTurns(7L, "C1", "1700000000.000000"))
+                .thenReturn(2L);
+        when(connections.findActiveConnections(7L, IntegrationKind.SLACK)).thenReturn(List.of());
+        assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
+        when(connections.findActiveConnections(7L, IntegrationKind.SLACK)).thenReturn(List.of(connection("T1", 21L)));
+        when(threads.findConsentedCandidateRow(7L, 19L)).thenReturn(Optional.empty());
+        assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, human))
+                .isFalse();
+        assertThat(source.permits(
+                        new ItemRef(8L, 41L, ThreadEvents.THREAD, 19L, null, null),
+                        SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY,
+                        human))
                 .isFalse();
     }
 

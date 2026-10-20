@@ -18,5 +18,8 @@ public interface ResultQueries {
 
     List<Result> forDevelopersSince(long workspaceId, Collection<Long> developers, Instant since, boolean currentOnly);
 
+    /** The developers with a result recorded from {@code since}, whatever its outcome or currentness. */
+    List<Long> developersSince(long workspaceId, Instant since);
+
     List<Result> ordered(long workspaceId, List<UUID> ids);
 }

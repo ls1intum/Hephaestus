@@ -14,8 +14,10 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -51,7 +53,17 @@ public class OutlineDocumentPermission {
         this.origins = origins;
     }
 
+    /** The check for every read by or for AI: capture, context and delivery. */
     public boolean permits(long workspaceId, long documentId) {
+        return permitted(workspaceId, documentId, SourceReadAudience.PROCESSING);
+    }
+
+    /** The check for one audience; only a human recorded standing reads past an author's AI choice. */
+    public boolean permits(long workspaceId, long documentId, SourceReadAudience audience) {
+        return permitted(workspaceId, documentId, Objects.requireNonNull(audience));
+    }
+
+    private boolean permitted(long workspaceId, long documentId, SourceReadAudience audience) {
         var source = context(workspaceId, documentId);
         if (source.isEmpty()) return false;
         var connection = source.get().connection();
@@ -72,7 +84,8 @@ public class OutlineDocumentPermission {
                 if (suppression.isAccountSuppressed(account.get())) return false;
                 var profile = accounts.find(account.get());
                 if (profile.isEmpty()
-                        || profile.get().aiChoice() == AiChoice.NO_AI
+                        || (audience == SourceReadAudience.PROCESSING
+                                && profile.get().aiChoice() == AiChoice.NO_AI)
                         || (profile.get().status() != Account.Status.ACTIVE
                                 && profile.get().status() != Account.Status.UNCLAIMED)) return false;
             }

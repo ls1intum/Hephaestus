@@ -1,45 +1,45 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent } from "storybook/test";
 
-import { NO_OUTCOMES, outcomes } from "@/stories/practices-across-the-workspace-story-data";
+import { split } from "@/stories/practices-across-the-workspace-story-data";
+
+import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
 
 import { type ComparisonRow, WorkspaceComparisonTable } from "./WorkspaceComparisonTable";
 
 const row = (
 	key: string,
 	name: string,
-	count: string,
-	counts: ComparisonRow["outcomes"],
+	rowSplit: ComparisonRow["split"],
+	yourStanding?: ComparisonRow["yourStanding"],
+	yourBasis?: ComparisonRow["yourBasis"],
 ): ComparisonRow => ({
 	key,
 	name,
-	subject: <span className="font-medium">{name}</span>,
-	count,
-	outcomes: counts,
+	subject: <PracticePill name={name} />,
+	yourStanding,
+	yourBasis,
+	split: rowSplit,
 });
 
-const onOpen = fn();
-
 const ROWS: ComparisonRow[] = [
-	row("acting", "Acting on review feedback", "2 practices", outcomes([25, 16, 5, 1])),
-	row("failure", "Handling failure well", "3 practices", outcomes([4, 9, 9, 0])),
-	row("craft", "Writing maintainable code", "1 practice", NO_OUTCOMES),
-	row("testing", "Testing your changes", "4 practices", outcomes([10, 17, 2, 4])),
+	row("explain", "Explain the change", split(6, 7, 9, 6), "STRENGTH", "CURRENT_REVIEWS"),
+	row("scope", "Scope the change", split(1, 0, 2, 25), "NOT_OBSERVED"),
+	row("history", "Keep the history readable", split(4, 5, 12, 7), "MIXED", "EARLIER_REVIEWS"),
 ];
 
+/** Practice groups or practices, each beside its split, the reader marked where counted. */
 const meta = {
 	component: WorkspaceComparisonTable,
 	tags: ["autodocs"],
 	parameters: { layout: "padded" },
 	args: {
-		"aria-label": "All practice groups",
-		subjectHead: "Practice group",
-		countHead: "Practices",
+		"aria-label": "Practices",
+		subjectHead: "Practice",
 		state: { status: "ready", rows: ROWS },
-		rowLink: () => ({ text: "Open group", onOpen }),
-		empty: { title: "No practices set up yet", description: "They appear once set up." },
+		rowLink: () => ({ text: "Open", onOpen: fn() }),
+		empty: { title: "No practices yet", description: "They appear once reviewed." },
 	},
-	argTypes: { rowLink: { control: false } },
 } satisfies Meta<typeof WorkspaceComparisonTable>;
 
 export default meta;
@@ -47,47 +47,39 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("table", { name: "All practice groups" })).toBeVisible();
-		await expect(canvas.getByRole("columnheader", { name: "Results" })).toBeVisible();
-		const testing = canvas
-			.getAllByRole("row")
-			.find((each) => each.textContent.startsWith("Testing"));
-		await expect(testing?.textContent).toContain("4 practices");
-		await expect(testing?.textContent).toContain("Not met 17");
-		const craft = canvas.getAllByRole("row").find((each) => each.textContent.startsWith("Writing"));
-		await expect(craft?.textContent).toContain("No current results");
-		await userEvent.click(canvas.getByRole("button", { name: "Open group Handling failure well" }));
-		await expect(onOpen).toHaveBeenCalledOnce();
+		await expect(
+			canvas.getByRole("img", {
+				name: "28 developers in this workspace: 4 Needs attention, 5 Mixed feedback, 12 Going well, 7 none yet. The You marker is on Mixed feedback.",
+			}),
+		).toBeVisible();
+		// Only the row whose own standing rests on earlier reviews says so.
+		await expect(
+			canvas.getAllByRole("button", { name: /^Based on earlier reviews/u }),
+		).toHaveLength(1);
 	},
 };
 
-export const Marked: Story = {
-	args: { markedKey: "failure" },
+const onOpenRow = fn();
+
+/** The mark on an earlier-reviews row opens its sentence without following the row's link. */
+export const EarlierReviewsMarkDoesNotOpenTheRow: Story = {
+	args: { rowLink: () => ({ text: "Open", onOpen: onOpenRow }) },
 	play: async ({ canvas }) => {
-		const marked = canvas
-			.getAllByRole("row")
-			.filter((each) => each.getAttribute("aria-current") === "true");
-		await expect(marked).toHaveLength(1);
-		await expect(marked[0]?.textContent).toContain("where you came from");
+		await userEvent.click(canvas.getByRole("button", { name: "Based on earlier reviews" }));
+		await expect(onOpenRow).not.toHaveBeenCalled();
 	},
 };
 
-/** Each loading row in the shape of the row it stands for, its link cell left empty. */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("table")).toHaveAttribute("aria-busy", "true");
-		await expect(canvas.queryAllByRole("button")).toHaveLength(0);
 	},
 };
 
 export const Empty: Story = {
 	args: { state: { status: "ready", rows: [] } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("No practices set up yet")).toBeVisible();
+		await expect(canvas.getByText("No practices yet")).toBeVisible();
 	},
-};
-
-export const Phone: Story = {
-	globals: { viewport: { value: "phone390" } },
 };

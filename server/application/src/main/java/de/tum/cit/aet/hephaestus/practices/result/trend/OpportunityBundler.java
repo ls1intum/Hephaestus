@@ -14,7 +14,14 @@ final class OpportunityBundler {
     private OpportunityBundler() {}
 
     static Bundles bundle(List<ResultView> results, Instant cutoff, int bundleSize) {
-        var all = opportunities(results, cutoff);
+        return bundle(opportunities(results, cutoff), bundleSize);
+    }
+
+    static Bundles bundleSelected(List<ResultView> selected, Instant cutoff, int bundleSize) {
+        return bundle(selectedOpportunities(selected, cutoff), bundleSize);
+    }
+
+    private static Bundles bundle(List<EvidenceOpportunity> all, int bundleSize) {
         var decided = all.stream().filter(EvidenceOpportunity::decided).toList();
         var current = tagged(decided.stream().limit(bundleSize).toList(), TrendBundle.CURRENT);
         var previous =
@@ -34,12 +41,29 @@ final class OpportunityBundler {
     }
 
     static List<EvidenceOpportunity> opportunities(List<ResultView> results, Instant cutoff, boolean selfSelected) {
+        return byItem(
+                results.stream()
+                        .filter(v ->
+                                v.result().getEndedAt() == null && v.result().getEvidenceVersion() == 1)
+                        .filter(v -> (v.review().getOrigin() == ReviewOrigin.REQUEST
+                                        || v.review().getOrigin() == ReviewOrigin.BACKFILL)
+                                == selfSelected)
+                        .toList(),
+                cutoff);
+    }
+
+    /**
+     * The opportunities of rows a standing reader already selected, without the current-claim and proof filters of
+     * {@link #opportunities}: a live run that a requested review replaced, or an outcome recorded before the current
+     * result model. Only the standing reads these. Feedback resolution keeps {@link #opportunities}.
+     */
+    static List<EvidenceOpportunity> selectedOpportunities(List<ResultView> selected, Instant cutoff) {
+        return byItem(selected, cutoff);
+    }
+
+    private static List<EvidenceOpportunity> byItem(List<ResultView> admitted, Instant cutoff) {
         Map<Long, List<ResultView>> byItem = new LinkedHashMap<>();
-        results.stream()
-                .filter(v -> v.result().getEndedAt() == null && v.result().getEvidenceVersion() == 1)
-                .filter(v -> (v.review().getOrigin() == ReviewOrigin.REQUEST
-                                || v.review().getOrigin() == ReviewOrigin.BACKFILL)
-                        == selfSelected)
+        admitted.stream()
                 .filter(v -> !v.result().getRecordedAt().isBefore(cutoff))
                 .forEach(v -> byItem.computeIfAbsent(v.result().getItemId(), id -> new ArrayList<>())
                         .add(v));

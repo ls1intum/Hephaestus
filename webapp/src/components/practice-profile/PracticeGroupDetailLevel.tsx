@@ -21,6 +21,7 @@ import {
 } from "@/components/practice-vocabulary/PracticeTable";
 import { countPracticeStandings } from "@/components/practice-vocabulary/standing-counts";
 import { StandingBadge, TrendNote } from "@/components/practice-vocabulary/StandingBadge";
+import { StandingBasisNote } from "@/components/practice-vocabulary/StandingBasisNote";
 import { StandingSummaryBox } from "@/components/practice-vocabulary/StandingSummaryBox";
 import { DrawerBody } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
@@ -159,6 +160,7 @@ export function PracticeGroupDetailLevel({
 						direction={practice.direction ?? undefined}
 						support={practice.trendSupport ?? undefined}
 						scope="practice"
+						basis={practice.basis}
 					/>
 				)}
 				<SubjectCell
@@ -286,6 +288,7 @@ export function PracticeGroupDetailLevel({
 								support={standing?.trendSupport ?? undefined}
 								scope="group"
 							/>
+							<StandingBasisNote basis={standing?.basis} />
 						</>
 					))
 				}

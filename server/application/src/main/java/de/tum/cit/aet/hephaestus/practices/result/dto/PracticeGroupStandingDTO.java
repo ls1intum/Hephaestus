@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.practices.dto.FeedbackSourceCountDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.GuidanceSource;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.StandingBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -45,7 +46,14 @@ public record PracticeGroupStandingDTO(
         Instant feedbackSince,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<PracticeStandingResultDTO> results,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<FeedbackSourceCountDTO> sources) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<FeedbackSourceCountDTO> sources,
+
+        @Schema(
+                requiredMode = Schema.RequiredMode.REQUIRED,
+                description = "The weakest basis among the practice verdicts the group standing averages. Absent"
+                        + " without a verdict")
+        @Nullable
+        StandingBasis basis) {
     public PracticeGroupStandingDTO {
         results = List.copyOf(results);
         sources = List.copyOf(sources);
