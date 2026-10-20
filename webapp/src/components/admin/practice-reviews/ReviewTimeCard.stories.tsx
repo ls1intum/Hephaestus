@@ -109,8 +109,9 @@ export const Default: Story = {
 		const info = await infoOf(canvas);
 		// One short line a term, each term first and bold.
 		await expect(info).toContain(
-			"Median of whole reviews, from what started each to its comment on the work.",
+			"Median of whole reviews, from what started each to its first comment posted on the work without waiting for approval.",
 		);
+		await expect(canvas.queryByText(/^No measured/u)).toBeNull();
 		await expect(info).toContain(
 			"Until asked from the moment on the work that started the review to its request.",
 		);
@@ -257,34 +258,33 @@ export const CommentsLostToMerge: Story = {
 	},
 };
 
+const NO_TIME = {
+	...practiceReviewTiming,
+	asked: EMPTY_STAGE,
+	queue: EMPTY_STAGE,
+	preparation: EMPTY_STAGE,
+	model: EMPTY_STAGE,
+	posted: EMPTY_STAGE,
+	total: EMPTY_STAGE,
+	totalShares: null,
+	finished: EMPTY_STAGE,
+	finishedShares: null,
+	read: EMPTY_STAGE,
+	finishedAfterMerge: 0,
+};
+
 /** No review got past the queue, so there is no time to show and nothing to warn about. */
 export const NoData: Story = {
 	args: {
-		state: {
-			status: "ready",
-			stale: false,
-			timing: {
-				...practiceReviewTiming,
-				asked: EMPTY_STAGE,
-				queue: EMPTY_STAGE,
-				preparation: EMPTY_STAGE,
-				model: EMPTY_STAGE,
-				posted: EMPTY_STAGE,
-				total: EMPTY_STAGE,
-				totalShares: null,
-				finished: EMPTY_STAGE,
-				finishedShares: null,
-				read: EMPTY_STAGE,
-				finishedAfterMerge: 0,
-			},
-		},
+		state: { status: "ready", stale: false, timing: NO_TIME },
 		finished: {
 			state: { status: "ready", total: 0, stale: false },
 			list: { list: "reviews", search: { status: ["COMPLETE", "PARTIAL", "FAILED"] } },
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("No review finished in the last 30 days.");
+		canvas.getByText("No measured review time in the last 30 days.");
+		await expect(figureOf(canvas, "finished")).toHaveTextContent("0");
 		await expect(canvas.queryByText("median, start to comment")).toBeNull();
 		await expect(canvas.queryByRole("list", { name: "Where the time went" })).toBeNull();
 		await expect(canvas.queryByRole("link")).not.toBeInTheDocument();
@@ -292,8 +292,30 @@ export const NoData: Story = {
 };
 
 /**
- * A course whose feedback goes to the practice pages: no review posts a comment on the work, so the
- * card says so and measures the reviews to their end, never "to comment".
+ * Reviews finished, but none has a measured time, such as one started by an event whose time was not
+ * recorded. The card says the time is missing and still counts and opens the reviews that finished.
+ */
+export const FinishedWithoutMeasuredTime: Story = {
+	args: {
+		state: { status: "ready", stale: false, timing: NO_TIME },
+		finished: {
+			state: { status: "ready", total: 3, stale: false },
+			list: { list: "reviews", search: { status: ["COMPLETE", "PARTIAL", "FAILED"] } },
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("No measured review time in the last 30 days.");
+		await expect(canvas.queryByText(/No review finished/u)).toBeNull();
+		await expect(canvas.getByRole("link", { name: "3 reviews finished" })).toHaveTextContent("3");
+		await expect(canvas.queryByRole("list", { name: "Where the time went" })).toBeNull();
+	},
+};
+
+/**
+ * No comment on the work has a measured time: the course's feedback goes to the practice pages, or
+ * every comment on the work waited for an admin's approval, which the time leaves out. Comments may
+ * still have been delivered, so the card says only that their time is missing, and measures the
+ * reviews to their end, never "to comment".
  */
 export const NoComment: Story = {
 	args: {
@@ -319,10 +341,14 @@ export const NoComment: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("No review posted a comment on the work in the last 30 days.");
+		canvas.getByText("No measured time to a comment on the work in the last 30 days.");
+		await expect(canvas.queryByText(/No review posted/u)).toBeNull();
 		canvas.getByText("median, start to end of review");
 		await expect(canvas.queryByText("median, start to comment")).toBeNull();
-		// Nothing was posted on the work, so there is no To developer to split off.
+		await expect(await infoOf(canvas)).toContain(
+			"Median of whole reviews, from what started each to the end of the review, as no time to a comment posted without waiting for approval was measured.",
+		);
+		// No time to a comment was measured, so there is no To developer to split off.
 		await expect(stagesOf(canvas)).toStrictEqual([
 			"Until asked1 min",
 			"Queue6 s",
