@@ -52,9 +52,11 @@ export interface ReviewTimeCardProps {
  * unsplit Run of older reviews where the range has some, each as wide as its share of the reviews'
  * total time, with a legend of that share of the median, so the parts add up to it. Then one line of
  * figures: how many reviews of the range finished, the feedback lost because the work merged first, and the
- * reviews that finished after the merge. Where no review posted a comment on the work, as in a course whose feedback goes
- * to the practice pages, the part says so and measures to the end of the review instead. What each
- * figure means is in the (i) beside the caption.
+ * reviews that finished after the merge. Where no time to a comment on the work was measured, as in a
+ * course whose feedback goes to the practice pages or waits for approval, the part says so and
+ * measures to the end of the review instead. A missing time is not a missing event: comments may
+ * still have been delivered, and reviews may still have finished. What each figure means is in the
+ * (i) beside the caption.
  */
 export function ReviewTimeCard({
 	workspaceSlug,
@@ -111,7 +113,7 @@ export function ReviewTimeCard({
 
 /**
  * The card's (i), one short line a term: what the figure is, each stage, then each figure of the
- * range. What a stage leaves out, such as an admin's approval, is in the docs, not here.
+ * range. The median names which comments it times; what a stage leaves out is in the docs, not here.
  */
 function timeInfo(timing: ReviewTiming | undefined) {
 	const byMerge = timing?.finishedAfterMergeStartedByMerge ?? 0;
@@ -123,8 +125,8 @@ function timeInfo(timing: ReviewTiming | undefined) {
 			term: "Median",
 			text:
 				typical?.until === "end"
-					? "of whole reviews, from what started each to the end of the review, as no review posted a comment on the work."
-					: "of whole reviews, from what started each to its comment on the work.",
+					? "of whole reviews, from what started each to the end of the review, as no time to a comment posted without waiting for approval was measured."
+					: "of whole reviews, from what started each to its first comment posted on the work without waiting for approval.",
 		},
 		{
 			term: "Stages",
@@ -208,12 +210,12 @@ function StageBar({ typical }: { typical: TypicalReview }) {
 function TimeFigures({ timing, during }: { timing: ReviewTiming; during: string }) {
 	const typical = typicalReview(timing);
 	if (typical === undefined) {
-		return <p className={OVERVIEW_TYPE.empty}>No review finished {during}.</p>;
+		return <p className={OVERVIEW_TYPE.empty}>No measured review time {during}.</p>;
 	}
 	return (
 		<div className="flex flex-col gap-3">
 			{typical.until === "end" && (
-				<p className={OVERVIEW_TYPE.empty}>No review posted a comment on the work {during}.</p>
+				<p className={OVERVIEW_TYPE.empty}>No measured time to a comment on the work {during}.</p>
 			)}
 			<p className="flex flex-wrap items-baseline gap-x-1.5">
 				<span className={OVERVIEW_TYPE.hero}>{durationText(typical.timing.medianSeconds)}</span>
