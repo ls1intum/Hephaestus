@@ -70,7 +70,7 @@ class ExportGenerationWorkerIntegrationTest extends BaseIntegrationTest {
             // Dirty checking defers this constraint violation until the generation transaction commits.
             repository.findByIdAndAccountId(exportId, accountId).orElseThrow().setFailureReason("x".repeat(129));
             ExportBundle.Profile profile =
-                    new ExportBundle.Profile(Long.toString(accountId), "User", null, "ACTIVE", clock.instant());
+                    new ExportBundle.Profile(Long.toString(accountId), "User", null, "ACTIVE", clock.instant(), false);
             return new ExportBundle(
                     ExportBundle.SCHEMA_VERSION,
                     clock.instant(),
@@ -81,7 +81,8 @@ class ExportGenerationWorkerIntegrationTest extends BaseIntegrationTest {
                     null,
                     List.of(),
                     null,
-                    null);
+                    null,
+                    List.of());
         });
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ExportGenerationWorker worker = new ExportGenerationWorker(

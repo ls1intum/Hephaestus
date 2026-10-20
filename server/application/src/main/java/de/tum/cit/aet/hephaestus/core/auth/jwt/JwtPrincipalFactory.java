@@ -16,8 +16,10 @@ import org.springframework.web.server.ResponseStatusException;
 @WorkspaceAgnostic("JWT principal assembly is account-scoped")
 public class JwtPrincipalFactory {
 
-    // Grantable feature flags must not confer instance-admin or workspace-admin authority.
-    private static final Set<String> RESERVED_INSTANCE_AUTHORITIES = Set.of("app_admin", "admin");
+    // Grantable feature flags must not confer instance-admin or workspace-admin authority, or claim
+    // an authentication factor.
+    private static final Set<String> RESERVED_INSTANCE_AUTHORITIES =
+            Set.of("app_admin", "admin", "FACTOR_WEBAUTHN", "FACTOR_AUTHORIZATION_CODE");
 
     private final AccountFeatureRepository accountFeatureRepository;
 

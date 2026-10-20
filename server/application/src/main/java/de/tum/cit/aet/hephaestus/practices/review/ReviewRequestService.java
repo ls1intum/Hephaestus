@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.WorkspaceAdminAssurance;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -35,6 +36,7 @@ public class ReviewRequestService {
     private final ReviewService reviews;
     private final ReviewRequestPolicy policy;
     private final MembershipRepository memberships;
+    private final WorkspaceAdminAssurance adminAssurance;
 
     public boolean mayRequest(long workspaceId, ItemSnapshot snapshot, long accountId) {
         return mayRequest(workspaceId, snapshot, accountId, access::isAdmin);
@@ -42,8 +44,8 @@ public class ReviewRequestService {
 
     private boolean mayRequest(long workspaceId, ItemSnapshot snapshot, long accountId, BooleanSupplier admin) {
         if (snapshot.item().workspaceId() != workspaceId) return false;
-        return admin.getAsBoolean()
-                || snapshot.roles().stream()
+        // Own work first: only the admin fallback carries the admin passkey policy.
+        return snapshot.roles().stream()
                         .filter(RoleHolder::human)
                         .filter(r -> r.role() == AboutRole.AUTHOR || r.role() == AboutRole.ASSIGNEE)
                         .anyMatch(r -> identities
@@ -52,12 +54,20 @@ public class ReviewRequestService {
                                         r.identity().subject(),
                                         r.identity().teamId())
                                 .filter(id -> id == accountId)
-                                .isPresent());
+                                .isPresent())
+                || admin.getAsBoolean();
     }
 
     @Transactional
     public ReviewRequestOutcomeDTO request(long workspaceId, long itemId, long accountId) {
-        return request(workspaceId, itemId, accountId, access::isAdmin, null);
+        return request(workspaceId, itemId, accountId, this::assuredAdmin, null);
+    }
+
+    // A browser request for another person's work uses admin authority, so it needs the admin passkey proof.
+    private boolean assuredAdmin() {
+        if (!access.isAdmin()) return false;
+        adminAssurance.require(true);
+        return true;
     }
 
     /**

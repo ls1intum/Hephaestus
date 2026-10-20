@@ -12,6 +12,7 @@ import {
 	findSeedPolicyGaps,
 	findStaleOmissions,
 	findViolations,
+	renderStack,
 	REQUIRED_SWITCHES,
 } from "./check-preview-stack.ts";
 
@@ -392,6 +393,38 @@ void test("flags an omission entry whose reference variable no longer exists", (
 	assert.match(stale[0] ?? "", /no longer sets it/u);
 });
 
+void describe("preview agent image interpolation", () => {
+	for (const freshReview of [false, true]) {
+		void test(`renders a usable agent image for ${freshReview ? "an owned review" : "an inert preview"}`, (context) => {
+			const stack = renderStack(freshReview);
+			if (stack === undefined) {
+				context.skip("Docker Compose is unavailable");
+				return;
+			}
+			assert.ok(isRecord(stack) && isRecord(stack.services));
+			const { appserver } = stack.services;
+			assert.ok(isRecord(appserver) && isRecord(appserver.environment));
+			const { environment } = appserver;
+			const version = environment.APP_VERSION;
+			assert.ok(typeof version === "string");
+			assert.equal(environment.HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST, String(freshReview));
+			if (freshReview) {
+				assert.equal(
+					environment.HEPHAESTUS_AGENT_IMAGE_REFERENCE,
+					`ghcr.io/hephaestus-build/agent-pi@sha256:${"b".repeat(64)}`,
+				);
+			} else {
+				assert.equal(
+					environment.HEPHAESTUS_AGENT_IMAGE_REFERENCE,
+					`ghcr.io/hephaestus-build/agent-pi:${version}`,
+				);
+				assert.equal(appserver.image, `ghcr.io/hephaestus-build/application-server:${version}`);
+			}
+			assert.deepEqual(findViolations(stack, freshReview), []);
+		});
+	}
+});
+
 void describe("owned preview reviews", () => {
 	function enabled(): Stack {
 		return mutated((stack) => {
@@ -498,6 +531,7 @@ void describe("owned preview reviews", () => {
 			{ PREVIEW_FRESH_REVIEW_ENABLED: "yes" },
 			{ PREVIEW_WORKER_BIND_HOST: "0.0.0.0" },
 			{ PREVIEW_WORKER_REGISTRATION_TOKEN: "" },
+			{ PREVIEW_AGENT_IMAGE_REFERENCE: "" },
 			{ PREVIEW_AGENT_IMAGE_REFERENCE: "ghcr.io/hephaestus-build/agent-pi:mutable" },
 			{
 				PREVIEW_AGENT_IMAGE_REFERENCE: `ghcrXio/hephaestus-build/agent-pi@sha256:${"b".repeat(64)}`,

@@ -53,6 +53,10 @@ public class WorkspaceScopedTables {
             // account-scoped like issued_jwt
             "client_session",
             "client_sign_in_handoff",
+            // Passkey credentials, challenges, and recovery hashes belong to an account across workspaces.
+            "passkey_credential",
+            "passkey_challenge",
+            "passkey_recovery_code",
             // GDPR Art. 20 self-service export — account-scoped, spans a principal's data
             // across workspaces.
             "account_export",

@@ -992,6 +992,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @Test
         void shouldForgetTheSearchEngineChoiceWhenThePageTurnsOff() {
+            ensureAdminMembership(workspace);
             patchPublicActivity(true, true);
             assertThat(page().allowSearchEngines()).isTrue();
             patchPublicActivity(false, true);
