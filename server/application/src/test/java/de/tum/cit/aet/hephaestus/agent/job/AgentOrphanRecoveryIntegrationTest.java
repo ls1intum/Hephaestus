@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -21,15 +22,21 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.DefaultReviewExecutionHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackCompositionService;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
+import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
@@ -37,6 +44,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -136,6 +144,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -1310,6 +1319,210 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(continuing.getAttempt()).isEqualTo(1);
         assertThat(continuing.getPublicReviewDigest()).isEqualTo("b".repeat(64));
         assertThat(continuing.getPracticePagePreparedAt() != null).isEqualTo(privatePiece);
+    }
+
+    @Test
+    @DisplayName(
+            "an admitted run the sandbox timed out continues its owed private feedback as the same job, ending nothing")
+    void shouldContinueATimedOutAdmittedRunThatOwesPrivateFeedbackAsANewAttemptOfTheSameJob() {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        Result observed = admitWithResult(jobId);
+        acceptPublicReview(jobId);
+        Instant expiresAt = Instant.now().plus(Duration.ofHours(1)).truncatedTo(ChronoUnit.MICROS);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", expiresAt);
+        spentBeforeItWasLost(jobId, 2);
+        ReviewJob running = jobRepository.findById(jobId).orElseThrow();
+
+        assertThat(executorOwnedBy("live-owner").executePrepared(jobId, running, mock(SandboxSpec.class)))
+                .isNull();
+
+        ReviewJob continuing = jobRepository.findById(jobId).orElseThrow();
+        assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
+        assertThat(continuing.getAttempt()).isEqualTo(1);
+        assertThat(continuing.getOutput()).isNull();
+        assertThat(continuing.getExitCode()).isNull();
+        assertThat(continuing.getErrorMessage()).isNull();
+        // The original admission, its results, the accepted public review and the retained inputs are unchanged.
+        assertThat(ResultAdmissionService.citationAttempt(continuing)).isZero();
+        assertThat(continuing.getAdmissionDigest()).isEqualTo("admitted-digest");
+        assertThat(continuing.getPublicReviewDigest()).isEqualTo("b".repeat(64));
+        assertThat(practiceResultRepository.findById(observed.getId())).isPresent();
+        ReviewCompositionBasis basis = compositionBasisRepository
+                .findByWorkspaceIdAndJobId(workspace.getId(), jobId)
+                .orElseThrow();
+        assertThat(basis.getExpiresAt()).isEqualTo(expiresAt);
+        assertThat(basis.getAdmissionAttempt()).isZero();
+        // The stopped attempt is billed once, from the proxy's counts: the sandbox left no runner report.
+        assertThat(usageCalls(jobId)).containsExactly(2);
+        assertThat(continuing.getLlmCalls()).isZero();
+    }
+
+    @ParameterizedTest(name = "all private practices decided: {0}")
+    @ValueSource(booleans = {false, true})
+    @DisplayName("a timed-out run continues only while a prepared private decision leaves a practice undecided")
+    void shouldContinueATimedOutRunOnlyForPrivatePracticesNotYetDecided(boolean allDecided) {
+        TestUserFactory.ensureAccountForUser(privateAccounts, privateIdentities, developer);
+        long providerId = requireNonNull(requireNonNull(developer.getProvider()).getId());
+        long accountId = requireNonNull(privateIdentities
+                .findActiveByProviderSubject(providerId, "100", null)
+                .orElseThrow()
+                .getAccount()
+                .getId());
+        var member = new Membership();
+        member.setWorkspace(workspace);
+        member.setId(new Membership.Id(workspace.getId(), accountId));
+        member.setReviewSelected(true);
+        privateMemberships.saveAndFlush(member);
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0, privateRecoveryWork());
+        Practice sibling = withPrivateRecoverySibling(jobId);
+        pinScriptAssignments(jobId);
+        Result decided = admitPrivateNegative(jobId, practice, accountId);
+        Result pending = admitPrivateNegative(jobId, sibling, accountId);
+        acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        ReviewJob original = jobRepository.findById(jobId).orElseThrow();
+        var pieces = allDecided
+                ? List.of(
+                        privateQuietDecision(FeedbackDestination.PRACTICE_PAGE, decided),
+                        privateQuietDecision(FeedbackDestination.PRACTICE_PAGE, pending))
+                : List.of(privateQuietDecision(FeedbackDestination.PRACTICE_PAGE, decided));
+        assertThat(reviews.start(workspace.getId(), original.getReviewId())).isTrue();
+        var accepted = requireNonNull(transactionTemplate.execute(status -> {
+            ReviewJob owned = jobRepository.lockById(jobId).orElseThrow();
+            var receipt = privateComposition.prepare(
+                    owned,
+                    new PrepareFeedbackRequestDTO(
+                            owned.getReviewId(),
+                            jobId,
+                            0,
+                            List.of(decided.getId(), pending.getId()),
+                            pieces,
+                            false,
+                            null),
+                    List.of(privateProof.snapshot(decided), privateProof.snapshot(pending)),
+                    new FeedbackCompositionService.Read(
+                            new FeedbackCompositionContext(null, null), List.of(), List.of(), null),
+                    Map.of(),
+                    false);
+            jobRepository.saveAndFlush(owned);
+            return receipt;
+        }));
+        String acceptedBefore = jdbc.queryForObject(
+                "SELECT row_to_json(f)::text FROM feedback f WHERE workspace_id=? AND id=?",
+                String.class,
+                workspace.getId(),
+                accepted.feedbackIds().getFirst());
+        ReviewJob running = jobRepository.findById(jobId).orElseThrow();
+
+        assertThat(executorOwnedBy("live-owner").executePrepared(jobId, running, mock(SandboxSpec.class)))
+                .isEqualTo(allDecided ? ReviewJobStatus.TIMED_OUT : null);
+
+        ReviewJob after = jobRepository.findById(jobId).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(allDecided ? ReviewJobStatus.TIMED_OUT : ReviewJobStatus.QUEUED);
+        assertThat(after.getAttempt()).isEqualTo(allDecided ? 0 : 1);
+        assertThat(after.getAdmissionDigest()).isEqualTo(original.getAdmissionDigest());
+        assertThat(after.getPublicReviewDigest()).isEqualTo(original.getPublicReviewDigest());
+        // A continued job keeps its retained inputs; an ended one drops them.
+        assertThat(compositionBasisRepository
+                        .findByWorkspaceIdAndJobId(workspace.getId(), jobId)
+                        .isPresent())
+                .isEqualTo(!allDecided);
+        // The accepted decision stays exactly as it was either way.
+        assertThat(jdbc.queryForObject(
+                        "SELECT row_to_json(f)::text FROM feedback f WHERE workspace_id=? AND id=?",
+                        String.class,
+                        workspace.getId(),
+                        accepted.feedbackIds().getFirst()))
+                .isEqualTo(acceptedBefore);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"not admitted", "public review not accepted", "expired inputs", "retry limit reached"})
+    @DisplayName("a timed-out run whose continuation a fence refuses ends timed out and drops its retained inputs")
+    void shouldEndATimedOutRunAsTimedOutWhenAFenceRefusesItsContinuation(String why) {
+        int attempt = why.equals("retry limit reached") ? 5 : 0;
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), attempt);
+        if (!why.equals("not admitted")) admitWithResult(jobId);
+        if (!why.equals("not admitted") && !why.equals("public review not accepted")) acceptPublicReview(jobId);
+        keepOriginalInputs(
+                jobId,
+                attempt,
+                "READY",
+                "COMPLETE",
+                why.equals("expired inputs")
+                        ? Instant.now().minusSeconds(1)
+                        : Instant.now().plus(Duration.ofHours(1)));
+        spentBeforeItWasLost(jobId, 2);
+        ReviewJob running = jobRepository.findById(jobId).orElseThrow();
+
+        assertThat(executorOwnedBy("live-owner").executePrepared(jobId, running, mock(SandboxSpec.class)))
+                .isEqualTo(ReviewJobStatus.TIMED_OUT);
+
+        ReviewJob ended = jobRepository.findById(jobId).orElseThrow();
+        assertThat(ended.getStatus()).isEqualTo(ReviewJobStatus.TIMED_OUT);
+        assertThat(ended.getAttempt()).isEqualTo(attempt);
+        assertThat(ended.getErrorMessage()).isEqualTo("The container timed out.");
+        assertThat(compositionBasisRepository.findByWorkspaceIdAndJobId(workspace.getId(), jobId))
+                .isEmpty();
+        assertThat(usageCalls(jobId)).containsExactly(2);
+    }
+
+    @Test
+    @DisplayName("a timed-out run reported by a worker that no longer owns it neither continues nor ends the job")
+    void shouldLeaveATimedOutRunAloneWhenAnotherWorkerReportsIt() {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        admitWithResult(jobId);
+        acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        spentBeforeItWasLost(jobId, 2);
+        ReviewJob running = jobRepository.findById(jobId).orElseThrow();
+
+        assertThat(executorOwnedBy("stranger").executePrepared(jobId, running, mock(SandboxSpec.class)))
+                .isNull();
+
+        ReviewJob kept = jobRepository.findById(jobId).orElseThrow();
+        assertThat(kept.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(kept.getWorkerId()).isEqualTo("live-owner");
+        assertThat(kept.getAttempt()).isZero();
+        assertThat(compositionBasisRepository.findByWorkspaceIdAndJobId(workspace.getId(), jobId))
+                .isPresent();
+        assertThat(usageCalls(jobId)).isEmpty();
+    }
+
+    /*
+     * The real executor over this database, with the real recovery, continuation, usage and script-run owners. Only
+     * the sandbox, which reports a hard timeout without any runner output, and collaborators executePrepared does not
+     * reach are stand-ins.
+     */
+    private ReviewJobExecutor executorOwnedBy(String workerId) {
+        var timedOut = new SandboxResult(124, Map.of(), "stopped", true, Duration.ofMinutes(15));
+        var sandbox = mock(SandboxManager.class);
+        when(sandbox.execute(any())).thenReturn(timedOut);
+        var agent = mock(PracticePiAdapter.class);
+        when(agent.parseResult(timedOut)).thenReturn(new AgentResult(false, Map.of()));
+        var worker = mock(WorkerProperties.class);
+        when(worker.resolvedWorkerId()).thenReturn(workerId);
+        var executor = new ReviewJobExecutor(
+                properties,
+                jobRepository,
+                mock(DefaultReviewExecutionHandler.class),
+                agent,
+                mock(WorkerJwtIssuer.class),
+                sandbox,
+                mock(AsyncTaskExecutor.class),
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
+                usageRecorder,
+                new PracticeScriptRunRecorder(scriptReports, scriptRuns, meterRegistry, objectMapper, assignments),
+                null,
+                Optional.empty(),
+                Optional.of(worker),
+                mock(ReviewJobClaimService.class),
+                recovery);
+        executor.setCompositionContinuation(continuation);
+        return executor;
     }
 
     @ParameterizedTest(name = "retained task envelope: {0}")

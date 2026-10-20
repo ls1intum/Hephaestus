@@ -742,8 +742,11 @@ public class ReviewJobExecutor {
             return null;
         }
         // An admitted run that stopped composing its feedback continues it as a new attempt when the locked job owes it
-        // and its fences hold.
-        if (result.exitCode() == SandboxLayout.EXIT_COMPOSITION_OWED && continueComposition(job, agentResult, result)) {
+        // and its fences hold. A run the sandbox stopped at its time limit had no chance to say so; the same locked
+        // job,
+        // its recorded preparation and the same fences decide.
+        if ((result.exitCode() == SandboxLayout.EXIT_COMPOSITION_OWED || result.timedOut())
+                && continueComposition(job, agentResult, result)) {
             log.warn(
                     "Requeuing job {}: feedback composition stopped before it finished (attempt {})",
                     jobId,

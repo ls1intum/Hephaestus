@@ -256,6 +256,12 @@ The server checks the job before it grants the attempt.
 For the public attempt, it also checks the returned composition report against the original admission.
 A response the runner lost does not undo the public review the server accepted.
 
+When the sandbox stops the run at its time limit, the runner cannot ask.
+The server then makes the same checks on the timed-out attempt before it ends the job.
+Without an accepted public review, the attempt continues only if its composition report says the run stopped the public review.
+A sandbox stop usually leaves no such report.
+If the attempt cannot continue, the existing ownership-fenced terminal path applies.
+
 Recovery after a lost or stopped worker is separate.
 It continues an admitted review in a new attempt in the same way, within the existing shared retry limit.
 

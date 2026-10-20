@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -256,6 +257,111 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         verify(usageRecorder).record(eq(job.getWorkspaceId()), any());
         verify(practiceScriptRuns).record(eq(job), aryEq(scriptReport()), any(), any());
         verify(kept).forget(job);
+    }
+
+    @Test
+    void shouldOfferATimedOutRunForContinuationAndNeitherEndNorForgetItWhenItContinues() {
+        var job = owedJob();
+        var kept = mock(ReviewCompositionContinuation.class);
+        recovery = mock(ReviewJobRecovery.class);
+        // The sandbox stopped the run: it wrote no feedback report, only its practice script report.
+        when(recovery.continueComposition(eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport()), isNull()))
+                .thenReturn(true);
+        var executor = runExecutor(kept, timedOutResult(true), false);
+
+        assertThat(executor.executePrepared(job.getId(), job, mock(SandboxSpec.class)))
+                .isNull();
+
+        verify(jobs, never()).lockById(any());
+        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any());
+        verify(usageRecorder, never()).record(any(), any());
+        verify(kept, never()).forget(any());
+    }
+
+    @Test
+    void shouldEndATimedOutRunWhoseContinuationIsRefusedAsTimedOutAndForgetItsInputs() {
+        var job = owedJob();
+        var kept = mock(ReviewCompositionContinuation.class);
+        recovery = mock(ReviewJobRecovery.class);
+        when(recovery.continueComposition(eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport()), isNull()))
+                .thenReturn(false);
+        terminalWriteOf(job, ReviewJobStatus.TIMED_OUT);
+        var executor = runExecutor(kept, timedOutResult(true), false);
+
+        assertThat(executor.executePrepared(job.getId(), job, mock(SandboxSpec.class)))
+                .isEqualTo(ReviewJobStatus.TIMED_OUT);
+
+        assertThat(job.getExitCode()).isEqualTo(124);
+        verify(jobs)
+                .transitionStatusOwnedBy(
+                        eq(job.getId()),
+                        eq(ReviewJobStatus.TIMED_OUT),
+                        any(),
+                        eq("The container timed out."),
+                        any(),
+                        eq("worker-1"));
+        verify(usageRecorder).record(eq(job.getWorkspaceId()), any());
+        verify(practiceScriptRuns).record(eq(job), aryEq(scriptReport()), any(), any());
+        verify(kept).forget(job);
+    }
+
+    @Test
+    void shouldNotOfferAnExitWithTheTimeoutCodeForContinuationWhenTheSandboxDidNotTimeItOut() {
+        var job = owedJob();
+        var kept = mock(ReviewCompositionContinuation.class);
+        recovery = mock(ReviewJobRecovery.class);
+        terminalWriteOf(job, ReviewJobStatus.COMPLETED);
+        var executor = runExecutor(kept, timedOutResult(false), false);
+
+        assertThat(executor.executePrepared(job.getId(), job, mock(SandboxSpec.class)))
+                .isEqualTo(ReviewJobStatus.COMPLETED);
+
+        verify(recovery, never()).continueComposition(any(), any(), any(), any(), any());
+        verify(kept).forget(job);
+    }
+
+    @Test
+    void shouldNotOfferACleanExitForContinuation() {
+        var job = owedJob();
+        var kept = mock(ReviewCompositionContinuation.class);
+        recovery = mock(ReviewJobRecovery.class);
+        terminalWriteOf(job, ReviewJobStatus.COMPLETED);
+        var executor = runExecutor(kept, new SandboxResult(0, Map.of(), "done", false, Duration.ofSeconds(1)), true);
+
+        assertThat(executor.executePrepared(job.getId(), job, mock(SandboxSpec.class)))
+                .isEqualTo(ReviewJobStatus.COMPLETED);
+
+        verify(recovery, never()).continueComposition(any(), any(), any(), any(), any());
+        verify(kept).forget(job);
+    }
+
+    private void terminalWriteOf(ReviewJob job, ReviewJobStatus status) {
+        when(jobs.lockById(job.getId())).thenReturn(Optional.of(job));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jobs.transitionStatusOwnedBy(eq(job.getId()), eq(status), any(), any(), any(), eq("worker-1")))
+                .thenReturn(1);
+    }
+
+    private ReviewJobExecutor runExecutor(ReviewCompositionContinuation kept, SandboxResult result, boolean success) {
+        var properties = mock(WorkerProperties.class);
+        when(properties.resolvedWorkerId()).thenReturn("worker-1");
+        worker = Optional.of(properties);
+        var parsed = new AgentResult(success, Map.of("rawOutput", OWED_RESULT), RETURNED_USAGE);
+        when(sandbox.execute(any())).thenReturn(result);
+        when(practiceAgent.parseResult(result)).thenReturn(parsed);
+        var executor = executor(mock(AsyncTaskExecutor.class));
+        executor.setCompositionContinuation(kept);
+        return executor;
+    }
+
+    // The exit code a killed container reports; only the sandbox's timedOut fact says the sandbox stopped it.
+    private static SandboxResult timedOutResult(boolean timedOut) {
+        return new SandboxResult(
+                124,
+                Map.of(SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE, scriptReport()),
+                "stopped",
+                timedOut,
+                Duration.ofSeconds(1));
     }
 
     private ReviewJobExecutor owedExecutor(ReviewCompositionContinuation kept) {
