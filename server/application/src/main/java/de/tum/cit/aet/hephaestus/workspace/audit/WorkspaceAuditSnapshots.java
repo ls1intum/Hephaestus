@@ -27,6 +27,8 @@ public final class WorkspaceAuditSnapshots {
         }
     }
 
+    public record PasskeyPolicySnapshot(boolean required) implements ConfigAuditSnapshot {}
+
     public record VisibilitySnapshot(@Nullable Boolean publicActivityEnabled, boolean allowSearchEngines)
             implements ConfigAuditSnapshot {}
 
