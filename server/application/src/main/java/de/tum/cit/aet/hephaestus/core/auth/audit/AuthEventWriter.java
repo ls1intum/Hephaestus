@@ -15,8 +15,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Transactional sink for {@link AuthEvent} rows. Separate bean (not a method on
- * {@link AuthEventLogger}) so the {@code REQUIRES_NEW} boundary is honoured — a
- * self-invocation from {@code AuthEventLogger.Draft} would bypass the proxy.
+ * {@link AuthEventLogger}) so the selected transaction boundary is honoured. Event construction
+ * stays the same for an independent audit and an audit that commits with its owning operation.
  */
 @ConditionalOnServerRole
 @Component
@@ -40,6 +40,16 @@ public class AuthEventWriter {
     /** @return whether persistence succeeded; the transaction proxy still has to commit before returning to the caller */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean write(AuthEventData data) {
+        return persist(data);
+    }
+
+    /** Stages the event atomically with its owning operation; the caller owns the commit. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean writeInCurrentTransaction(AuthEventData data) {
+        return persist(data);
+    }
+
+    private boolean persist(AuthEventData data) {
         try {
             AuthEvent event = AuthEvent.create(data, sequence.next(), clock.instant(), captureIp(), captureUserAgent());
             repository.save(event);

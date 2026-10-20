@@ -776,6 +776,10 @@ export type ClientTokenRequest = {
     redirectUri: string;
 };
 
+export type CloseResearchDisclosure = {
+    closure: 'DESTROYED' | 'ANONYMIZED';
+};
+
 export type ClosedPracticePageSupport = {
     readAt: string;
     refusal: string | null;
@@ -4021,6 +4025,10 @@ export type ReasonCount = {
     reason: string;
 };
 
+export type RecordResearchRemovals = {
+    participantKeys: Array<string>;
+};
+
 export type RecoverPasskeyRequest = {
     code: string;
 };
@@ -4053,6 +4061,13 @@ export type RegisterSlackChannelRequest = {
      * Slack public/private channel id (stable C… or G… id)
      */
     slackChannelId: string;
+};
+
+export type ReleaseResearchDataset = {
+    firstDay: string;
+    lastDay: string;
+    useUntil: string;
+    workspaceId: string;
 };
 
 /**
@@ -4182,6 +4197,25 @@ export type ResearchConsent = {
      * The organization this control named on screen
      */
     researchOrganization?: string;
+};
+
+export type ResearchRemovalDisclosure = {
+    createdAt: string;
+    datasetId: string;
+    removals: Array<ResearchRemovalObligation>;
+    useExpired: boolean;
+    useUntil: string;
+    workspaceId: string;
+};
+
+export type ResearchRemovalObligation = {
+    participantKey: string;
+    reason: 'CONSENT_WITHDRAWN' | 'CONSENT_SUPERSEDED' | 'QUESTION_CHANGED' | 'ACCOUNT_ERASED';
+    requiredAt: string;
+};
+
+export type ResearchRemovalReceipt = {
+    recorded: number;
 };
 
 /**
@@ -6810,7 +6844,7 @@ export type AdminListAuthEventsData = {
         size?: number;
         accountId?: number;
         actingAccountId?: number;
-        eventType?: Array<'USER_VIEW' | 'LOGIN' | 'PASSKEY_CHANGED' | 'PASSKEY_VERIFIED' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'PERSON_DATA_PREVIEWED' | 'PERSON_DATA_EXPORTED' | 'PERSON_DATA_ERASURE_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'WORKSPACE_ELEVATION' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED' | 'PUBLIC_ACTIVITY_CHANGED'>;
+        eventType?: Array<'USER_VIEW' | 'LOGIN' | 'PASSKEY_CHANGED' | 'PASSKEY_VERIFIED' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'PERSON_DATA_PREVIEWED' | 'PERSON_DATA_EXPORTED' | 'PERSON_DATA_ERASURE_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'WORKSPACE_ELEVATION' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED' | 'PUBLIC_ACTIVITY_CHANGED' | 'RESEARCH_DATASET_RELEASED' | 'RESEARCH_REMOVAL_RECORDED'>;
         result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: string;
         to?: string;
@@ -6833,7 +6867,7 @@ export type AdminExportAuthEventsData = {
     query?: {
         accountId?: number;
         actingAccountId?: number;
-        eventType?: Array<'USER_VIEW' | 'LOGIN' | 'PASSKEY_CHANGED' | 'PASSKEY_VERIFIED' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'PERSON_DATA_PREVIEWED' | 'PERSON_DATA_EXPORTED' | 'PERSON_DATA_ERASURE_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'WORKSPACE_ELEVATION' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED' | 'PUBLIC_ACTIVITY_CHANGED'>;
+        eventType?: Array<'USER_VIEW' | 'LOGIN' | 'PASSKEY_CHANGED' | 'PASSKEY_VERIFIED' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'PERSON_DATA_PREVIEWED' | 'PERSON_DATA_EXPORTED' | 'PERSON_DATA_ERASURE_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED' | 'WORKSPACE_ELEVATION' | 'LLM_CONNECTION_CREATED' | 'LLM_CONNECTION_UPDATED' | 'LLM_CONNECTION_DELETED' | 'LLM_MODEL_CREATED' | 'LLM_MODEL_UPDATED' | 'LLM_MODEL_DELETED' | 'LLM_MODEL_PRICE_CHANGED' | 'LLM_MODEL_SHARING_CHANGED' | 'LLM_SETTINGS_CHANGED' | 'LOGIN_PROVIDER_CREATED' | 'LOGIN_PROVIDER_UPDATED' | 'LOGIN_PROVIDER_DELETED' | 'SILENT_MODE_CHANGED' | 'PUBLIC_ACTIVITY_CHANGED' | 'RESEARCH_DATASET_RELEASED' | 'RESEARCH_REMOVAL_RECORDED'>;
         result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: string;
         to?: string;
@@ -8104,6 +8138,72 @@ export type AdminCheckReleaseResponses = {
 };
 
 export type AdminCheckReleaseResponse = AdminCheckReleaseResponses[keyof AdminCheckReleaseResponses];
+
+export type ReleaseResearchDatasetData = {
+    body: ReleaseResearchDataset;
+    path?: never;
+    query?: never;
+    url: '/admin/research-disclosures';
+};
+
+export type ReleaseResearchDatasetResponses = {
+    /**
+     * Research dataset JSON attachment
+     */
+    200: Blob | File;
+};
+
+export type ReleaseResearchDatasetResponse = ReleaseResearchDatasetResponses[keyof ReleaseResearchDatasetResponses];
+
+export type CheckResearchRemovalsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/research-disclosures/removal-checks';
+};
+
+export type CheckResearchRemovalsResponses = {
+    /**
+     * OK
+     */
+    200: Array<ResearchRemovalDisclosure>;
+};
+
+export type CheckResearchRemovalsResponse = CheckResearchRemovalsResponses[keyof CheckResearchRemovalsResponses];
+
+export type CloseResearchDisclosureData = {
+    body: CloseResearchDisclosure;
+    path: {
+        datasetId: string;
+    };
+    query?: never;
+    url: '/admin/research-disclosures/{datasetId}/closure';
+};
+
+export type CloseResearchDisclosureResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type RecordResearchRemovalsData = {
+    body: RecordResearchRemovals;
+    path: {
+        datasetId: string;
+    };
+    query?: never;
+    url: '/admin/research-disclosures/{datasetId}/removal-receipts';
+};
+
+export type RecordResearchRemovalsResponses = {
+    /**
+     * OK
+     */
+    200: ResearchRemovalReceipt;
+};
+
+export type RecordResearchRemovalsResponse = RecordResearchRemovalsResponses[keyof RecordResearchRemovalsResponses];
 
 export type AdminGetInstanceSettingsData = {
     body?: never;

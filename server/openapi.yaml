@@ -40,6 +40,8 @@ tags:
   name: Admin
 - description: Current user's Slack privacy preferences
   name: Slack User Preferences
+- description: Instance-admin research disclosures and downstream removal receipts
+  name: Research
 - description: Per-workspace Outline collection mirroring control plane
   name: Outline collections
 - description: Why each practice did or did not run on one piece of work. Any workspace
@@ -212,6 +214,8 @@ paths:
             - LOGIN_PROVIDER_DELETED
             - SILENT_MODE_CHANGED
             - PUBLIC_ACTIVITY_CHANGED
+            - RESEARCH_DATASET_RELEASED
+            - RESEARCH_REMOVAL_RECORDED
       - in: query
         name: result
         required: false
@@ -302,6 +306,8 @@ paths:
             - LOGIN_PROVIDER_DELETED
             - SILENT_MODE_CHANGED
             - PUBLIC_ACTIVITY_CHANGED
+            - RESEARCH_DATASET_RELEASED
+            - RESEARCH_REMOVAL_RECORDED
       - in: query
         name: result
         required: false
@@ -1796,6 +1802,99 @@ paths:
       summary: Check GitHub for a newer release now
       tags:
       - Instance Release
+  /admin/research-disclosures:
+    post:
+      description: Records a disclosure and returns its JSON file once. The file is
+        pseudonymous personal data. It is not stored for redownload. The configured
+        research question and fixed dataset purpose apply; the request cannot override
+        them.
+      operationId: releaseResearchDataset
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleaseResearchDataset"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+                format: binary
+          description: Research dataset JSON attachment
+      summary: Release and download one consented research dataset
+      tags:
+      - Research
+  /admin/research-disclosures/removal-checks:
+    post:
+      description: "Records newly detected obligations and returns every open disclosure,\
+        \ including those with no removals owed. Closed disclosures are excluded."
+      operationId: checkResearchRemovals
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResearchRemovalDisclosure"
+          description: OK
+      summary: Check and record research removal obligations
+      tags:
+      - Research
+  /admin/research-disclosures/{datasetId}/closure:
+    post:
+      description: "Closes the disclosure and deletes its protected subject mapping.\
+        \ This is an operator attestation, not a check of the research team's storage."
+      operationId: closeResearchDisclosure
+      parameters:
+      - in: path
+        name: datasetId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloseResearchDisclosure"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Attest destruction or anonymization of every retained research copy
+      tags:
+      - Research
+  /admin/research-disclosures/{datasetId}/removal-receipts:
+    post:
+      description: Records the operator's statement. Hephaestus cannot inspect or
+        revoke downloaded copies.
+      operationId: recordResearchRemovals
+      parameters:
+      - in: path
+        name: datasetId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordResearchRemovals"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchRemovalReceipt"
+          description: OK
+      summary: Attest removal of participant keys from retained research copies
+      tags:
+      - Research
   /admin/settings:
     get:
       operationId: adminGetInstanceSettings
@@ -13350,6 +13449,16 @@ components:
       - code
       - codeVerifier
       - redirectUri
+    CloseResearchDisclosure:
+      type: object
+      properties:
+        closure:
+          type: string
+          enum:
+          - DESTROYED
+          - ANONYMIZED
+      required:
+      - closure
     ClosedPracticePageSupport:
       type: object
       properties:
@@ -21051,6 +21160,17 @@ components:
       - count
       - description
       - reason
+    RecordResearchRemovals:
+      type: object
+      properties:
+        participantKeys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+      required:
+      - participantKeys
     RecoverPasskeyRequest:
       type: object
       properties:
@@ -21107,6 +21227,27 @@ components:
           pattern: "^[CG][A-Z0-9]{8,}$"
       required:
       - slackChannelId
+    ReleaseResearchDataset:
+      type: object
+      properties:
+        firstDay:
+          type: string
+          format: date
+        lastDay:
+          type: string
+          format: date
+        useUntil:
+          type: string
+          format: date-time
+        workspaceId:
+          type: string
+          minLength: 1
+          pattern: "[1-9][0-9]{0,18}"
+      required:
+      - firstDay
+      - lastDay
+      - useUntil
+      - workspaceId
     ReleaseStart:
       type: object
       description: A release the server role started on this instance.
@@ -21300,6 +21441,59 @@ components:
       required:
       - granted
       - noticeVersion
+    ResearchRemovalDisclosure:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        datasetId:
+          type: string
+        removals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResearchRemovalObligation"
+        useExpired:
+          type: boolean
+        useUntil:
+          type: string
+          format: date-time
+        workspaceId:
+          type: string
+      required:
+      - createdAt
+      - datasetId
+      - removals
+      - useExpired
+      - useUntil
+      - workspaceId
+    ResearchRemovalObligation:
+      type: object
+      properties:
+        participantKey:
+          type: string
+        reason:
+          type: string
+          enum:
+          - CONSENT_WITHDRAWN
+          - CONSENT_SUPERSEDED
+          - QUESTION_CHANGED
+          - ACCOUNT_ERASED
+        requiredAt:
+          type: string
+          format: date-time
+      required:
+      - participantKey
+      - reason
+      - requiredAt
+    ResearchRemovalReceipt:
+      type: object
+      properties:
+        recorded:
+          type: integer
+          format: int32
+      required:
+      - recorded
     ResourceCounts:
       type: object
       description: Resource-level rollup for the connection overview badge

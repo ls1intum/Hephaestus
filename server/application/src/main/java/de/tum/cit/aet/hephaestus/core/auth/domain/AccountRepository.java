@@ -129,6 +129,26 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
             nativeQuery = true)
     Optional<IssuanceAuthority> lockAuthorityForShare(@Param("id") Long id);
 
+    interface AccountStatusRow {
+        Long getId();
+
+        String getStatus();
+    }
+
+    /** Status per account as last committed, for a cohort read; takes no lock. */
+    @Query(value = "SELECT id AS \"id\", status AS \"status\" FROM account WHERE id IN (:ids)", nativeQuery = true)
+    List<AccountStatusRow> findStatuses(@Param("ids") Collection<Long> ids);
+
+    /**
+     * {@link #findStatuses} with every row share-locked in id order, so two cohort locks never wait on
+     * each other in opposite orders. Conflicts with {@link #findByIdForUpdate}, which every consent
+     * write takes first, and with {@link #lockStatusForUpdate}, which account purge takes first.
+     */
+    @Query(
+            value = "SELECT id AS \"id\", status AS \"status\" FROM account WHERE id IN (:ids) ORDER BY id FOR SHARE",
+            nativeQuery = true)
+    List<AccountStatusRow> lockStatusesForShare(@Param("ids") Collection<Long> ids);
+
     /** Share-locks the account for a token issuance; whether it may be issued one. */
     default boolean lockForIssuance(Long id) {
         return lockStatusForShare(id).map(Account.Status.ACTIVE.name()::equals).orElse(false);

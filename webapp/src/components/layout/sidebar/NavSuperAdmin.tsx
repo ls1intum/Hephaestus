@@ -4,6 +4,7 @@ import {
 	Building2,
 	CircleDollarSign,
 	ClipboardList,
+	FlaskConical,
 	Gauge,
 	Inbox,
 	KeyRound,
@@ -35,6 +36,12 @@ const ADMIN_NAV_GROUPS = [
 				label: "Person data",
 				icon: ShieldCheck,
 				tooltip: "Access and erasure requests",
+			},
+			{
+				to: "/admin/research",
+				label: "Research datasets",
+				icon: FlaskConical,
+				tooltip: "Release consented datasets and record removals",
 			},
 			{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
 			{

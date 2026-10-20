@@ -71,7 +71,17 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
 
     @Override
     public ReviewUsageSnapshot usage(long workspaceId, UUID reviewId) {
-        var attempts = runtime.usage(workspaceId, reviewId);
+        return summarizeUsage(runtime.usage(workspaceId, reviewId));
+    }
+
+    @Override
+    public Map<UUID, ReviewUsageSnapshot> usageByReview(long workspaceId, Set<UUID> reviewIds) {
+        if (reviewIds.isEmpty()) return Map.of();
+        return runtime.usageByReview(workspaceId, reviewIds).entrySet().stream()
+                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> summarizeUsage(entry.getValue())));
+    }
+
+    private static ReviewUsageSnapshot summarizeUsage(List<ReviewUsageAttempt> attempts) {
         boolean priced =
                 attempts.stream().allMatch(a -> a.costUsd() != null && a.pricingState() != UsagePricingState.UNPRICED);
         BigDecimal cost = priced
