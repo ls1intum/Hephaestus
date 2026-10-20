@@ -281,6 +281,7 @@ export function problemsQuery(
 ): NonNullable<ListReviewProblemsData["query"]> {
 	return {
 		...scopeQuery(search),
+		openOnly: false,
 		size,
 		resultId: search.resultId,
 		itemId: search.itemId,

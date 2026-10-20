@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.Map;
@@ -50,6 +52,9 @@ class PracticeReviewOutputControllerIntegrationTest extends BaseIntegrationTest 
     @Autowired
     ResultRepository results;
 
+    @Autowired
+    ResultStore resultStore;
+
     @Test
     void adminSeesResultAndProblemLedger() {
         var r = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
@@ -89,6 +94,36 @@ class PracticeReviewOutputControllerIntegrationTest extends BaseIntegrationTest 
                 .isEmpty();
         assertThat(results.findById(r.getId()).orElseThrow().getEndedAt()).isNull();
         get("/practices/reviews/problems?openOnly=true")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(0);
+        get("/practices/reviews/problems?openOnly=false&accepted=true")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(1);
+    }
+
+    @Test
+    void recordedProblemLedgerIncludesEndedResultsWhileOpenProblemsExcludeThem() {
+        var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
+        assertThat(resultStore.endCurrent(
+                        scenario.workspace().getId(),
+                        scenario.item().getId(),
+                        ResultEndReason.WORK_CHANGED,
+                        Instant.now()))
+                .isEqualTo(1);
+
+        get("/practices/reviews/problems?openOnly=false&resultId=" + result.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(1);
+        get("/practices/reviews/problems?openOnly=true&resultId=" + result.getId())
                 .expectStatus()
                 .isOk()
                 .expectBody()
