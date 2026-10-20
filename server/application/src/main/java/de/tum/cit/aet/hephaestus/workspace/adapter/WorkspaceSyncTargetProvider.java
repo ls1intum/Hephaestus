@@ -91,9 +91,9 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             // Ambiguous provider configuration must exclude only its own tenant from fleet enumeration.
             log.error(
                     "Skipping workspace from sync enumeration: reason=dualActiveProvider,"
-                            + " workspaceId={}, error={}",
+                            + " workspaceId={}, errorType={}",
                     workspace.getId(),
-                    e.getMessage());
+                    e.getClass().getName());
             return false;
         }
     }

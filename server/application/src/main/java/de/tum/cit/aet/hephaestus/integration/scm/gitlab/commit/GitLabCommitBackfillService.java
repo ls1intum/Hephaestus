@@ -151,10 +151,15 @@ public class GitLabCommitBackfillService {
                     "Commit backfill failed (git operation): repoId={}, repoName={}, error={}",
                     repoId,
                     repoName,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return SyncResult.abortedError(0);
         } catch (Exception e) {
-            log.error("Commit backfill failed: repoId={}, repoName={}, error={}", repoId, repoName, e.getMessage(), e);
+            log.error(
+                    "Commit backfill failed: repoId={}, repoName={}, error={}",
+                    repoId,
+                    repoName,
+                    e.getClass().getSimpleName(),
+                    e);
             return SyncResult.abortedError(0);
         }
     }

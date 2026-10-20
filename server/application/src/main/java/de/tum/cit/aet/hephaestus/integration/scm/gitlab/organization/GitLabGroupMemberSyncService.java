@@ -320,7 +320,10 @@ public class GitLabGroupMemberSyncService {
         try {
             nativeId = extractNumericId(memberUser.id());
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid GitLab user GID: gid={}, error={}", memberUser.id(), e.getMessage());
+            log.warn(
+                    "Invalid GitLab user GID: gid={}, error={}",
+                    memberUser.id(),
+                    e.getClass().getSimpleName());
             return null;
         }
 

@@ -448,7 +448,7 @@ public class CommitAuthorEnrichmentService {
                                         "Retrying commit enrichment after transport error: repo={}, attempt={}, error={}",
                                         nameWithOwner,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(GRAPHQL_TIMEOUT);
 
                 // Classify GraphQL errors
@@ -598,7 +598,10 @@ public class CommitAuthorEnrichmentService {
                     }
                 }
             } catch (Exception e) {
-                log.debug("Failed to extract login for commit: sha={}, error={}", sha, e.getMessage());
+                log.debug(
+                        "Failed to extract login for commit: sha={}, error={}",
+                        sha,
+                        e.getClass().getSimpleName());
             }
         }
     }
@@ -643,7 +646,7 @@ public class CommitAuthorEnrichmentService {
 
             return new UserSnapshot(login, user);
         } catch (Exception e) {
-            log.debug("Failed to extract {} login: error={}", role, e.getMessage());
+            log.debug("Failed to extract {} login: error={}", role, e.getClass().getSimpleName());
             return null;
         }
     }
@@ -665,7 +668,7 @@ public class CommitAuthorEnrichmentService {
                         "Failed to upsert user from commit enrichment: repo={}, login={}, error={}",
                         nameWithOwner,
                         dto.login(),
-                        e.getMessage());
+                        e.getClass().getSimpleName());
             }
         }
         log.debug("Upserted {} users from commit enrichment: repo={}", processed, nameWithOwner);

@@ -2,7 +2,7 @@
 
 This Hephaestus instance has been deployed without a legal profile.
 
-Hephaestus does process personal data by design (sign-in identities, mirrored project work, conversations, observations, feedback and security events; error telemetry is optional). The operator of this deployment is the **controller** within the meaning of Art. 4(7) GDPR for that processing and is legally required to provide a transparent privacy statement under Art. 13 and Art. 14 GDPR before you use the service.
+Hephaestus does process personal data by design (sign-in identities, mirrored project work, conversations, observations, feedback, security events and operational logs). The operator of this deployment is the **controller** within the meaning of Art. 4(7) GDPR for that processing and is legally required to provide a transparent privacy statement under Art. 13 and Art. 14 GDPR before you use the service.
 
 ## What this means for you
 

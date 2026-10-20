@@ -211,7 +211,7 @@ public final class GitHubGraphQlErrorUtils {
                     || lowerMessage.contains("something went wrong while executing")
                     || lowerMessage.contains("timedout")
                     || lowerMessage.contains("timed out")) {
-                return new TransientError(TransientErrorType.TIMEOUT, message);
+                return new TransientError(TransientErrorType.TIMEOUT, "GitHub could not respond in time");
             }
 
             // Rate limit errors in GraphQL
@@ -219,7 +219,7 @@ public final class GitHubGraphQlErrorUtils {
                     || lowerMessage.contains("ratelimit")
                     || lowerMessage.contains("abuse detection")
                     || lowerMessage.contains("secondary rate")) {
-                return new TransientError(TransientErrorType.RATE_LIMIT, message);
+                return new TransientError(TransientErrorType.RATE_LIMIT, "GitHub rate limit");
             }
 
             // Check extensions for error type
@@ -231,13 +231,13 @@ public final class GitHubGraphQlErrorUtils {
                     // Resource limits exceeded - new September 2025 error type
                     // GitHub caps per-query execution resources to prevent excessive load
                     if ("RESOURCE_LIMITS_EXCEEDED".equals(type) || "MAX_NODE_LIMIT_EXCEEDED".equals(type)) {
-                        return new TransientError(TransientErrorType.RESOURCE_LIMIT, message);
+                        return new TransientError(TransientErrorType.RESOURCE_LIMIT, type);
                     }
                     if ("INTERNAL_ERROR".equals(type) || "SERVICE_UNAVAILABLE".equals(type)) {
-                        return new TransientError(TransientErrorType.SERVER_ERROR, message);
+                        return new TransientError(TransientErrorType.SERVER_ERROR, type);
                     }
                     if ("FORBIDDEN".equals(type) && lowerMessage.contains("rate")) {
-                        return new TransientError(TransientErrorType.RATE_LIMIT, message);
+                        return new TransientError(TransientErrorType.RATE_LIMIT, "GitHub rate limit");
                     }
                 }
             }
@@ -264,7 +264,7 @@ public final class GitHubGraphQlErrorUtils {
      * Information about a transient error detected in a GraphQL response.
      *
      * @param type the type of transient error
-     * @param message the error message from GitHub
+     * @param message a fixed summary or GitHub's error type, never its error text, which can name private resources
      */
     public record TransientError(TransientErrorType type, String message) {
         /**

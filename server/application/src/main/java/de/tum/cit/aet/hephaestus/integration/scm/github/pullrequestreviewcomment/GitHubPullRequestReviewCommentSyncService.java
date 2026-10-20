@@ -200,7 +200,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                                         pullRequest.getNumber(),
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -472,7 +472,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                                         threadNodeId,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -1023,7 +1023,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                                         pullRequest.getNumber(),
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {

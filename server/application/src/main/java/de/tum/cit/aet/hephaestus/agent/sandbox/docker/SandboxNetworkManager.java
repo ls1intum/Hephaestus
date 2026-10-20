@@ -92,7 +92,10 @@ public class SandboxNetworkManager {
             candidates = networkOps.listNetworksByName(networkName);
         } catch (RuntimeException e) {
             // A probe that cannot answer is not a leftover, and createNetwork still refuses a duplicate name.
-            log.debug("Could not check for a leftover network {}: {}", networkName, e.getMessage());
+            log.debug(
+                    "Could not check for a leftover network {}: errorType={}",
+                    networkName,
+                    e.getClass().getName());
             return;
         }
         for (DockerOperations.NetworkInfo leftover : candidates) {
@@ -155,7 +158,10 @@ public class SandboxNetworkManager {
         try {
             disconnectAppServer(networkId);
         } catch (RuntimeException e) {
-            log.debug("Could not disconnect app-server from {}: {}", name, e.getMessage());
+            log.debug(
+                    "Could not disconnect app-server from {}: errorType={}",
+                    name,
+                    e.getClass().getName());
         }
         networkOps.removeNetwork(networkId);
         return true;

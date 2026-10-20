@@ -1,5 +1,5 @@
 import MonacoEditor, { loader, type EditorProps } from "@monaco-editor/react";
-import { ErrorBoundary } from "@sentry/react";
+import { CatchBoundary, type ErrorComponentProps } from "@tanstack/react-router";
 import { cn } from "cn";
 import * as monaco from "monaco-editor";
 /* oxlint-disable import/default -- Vite's ?worker transform supplies the default worker constructor. */
@@ -59,24 +59,13 @@ export function CodeEditor({
 	};
 	return (
 		<div className={cn("overflow-hidden rounded-md border", className)}>
-			<ErrorBoundary
-				onError={() => {
+			<CatchBoundary
+				getResetKey={() => modelPath}
+				onCatch={() => {
 					// Construction can fail after the library creates a model, before it owns an editor to dispose.
 					monaco.editor.getModel(monaco.Uri.parse(modelPath))?.dispose();
 				}}
-				fallback={(boundary) => (
-					<div className="space-y-3 p-3">
-						<Alert variant="destructive" role="alert">
-							<AlertTitle>The editor could not load</AlertTitle>
-							<AlertDescription>
-								Your script is still in the form. Try loading the editor again.
-							</AlertDescription>
-						</Alert>
-						<Button type="button" variant="outline" onClick={() => boundary.resetError()}>
-							Retry
-						</Button>
-					</div>
-				)}
+				errorComponent={CodeEditorError}
 			>
 				<MonacoEditor
 					path={modelPath}
@@ -102,7 +91,23 @@ export function CodeEditor({
 					}}
 					theme="vs-dark"
 				/>
-			</ErrorBoundary>
+			</CatchBoundary>
+		</div>
+	);
+}
+
+function CodeEditorError({ reset }: ErrorComponentProps) {
+	return (
+		<div className="space-y-3 p-3">
+			<Alert variant="destructive" role="alert">
+				<AlertTitle>The editor could not load</AlertTitle>
+				<AlertDescription>
+					Your script is still in the form. Try loading the editor again.
+				</AlertDescription>
+			</Alert>
+			<Button type="button" variant="outline" onClick={reset}>
+				Retry
+			</Button>
 		</div>
 	);
 }

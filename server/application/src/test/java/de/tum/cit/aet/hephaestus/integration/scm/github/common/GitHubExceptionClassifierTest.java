@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationSuspendedException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.Category;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -14,6 +18,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.Collections;
@@ -21,14 +26,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -455,6 +469,133 @@ class GitHubExceptionClassifierTest {
                             .counter("github.sync.errors.total", "category", "unknown")
                             .count())
                     .isEqualTo(1.0);
+        }
+    }
+
+    /** Sync services log the summary at WARN and ERROR, so it must name the failure without quoting its inputs. */
+    @Nested
+    class PrivateTextNeverReachesTheSummary {
+
+        static Stream<Arguments> failures() {
+            return Stream.of(
+                    Arguments.of(httpFailure(404), Category.NOT_FOUND, "HTTP 404"),
+                    Arguments.of(httpFailure(503), Category.RETRYABLE, "HTTP 503"),
+                    Arguments.of(httpFailure(429), Category.RATE_LIMITED, "HTTP 429"),
+                    Arguments.of(
+                            new IOException("read private-io-canary"), Category.RETRYABLE, "IO error: IOException"),
+                    Arguments.of(
+                            new FieldAccessException(
+                                    "Could not resolve to a User with the login of 'private-login-canary'."),
+                            Category.NOT_FOUND,
+                            "GraphQL resource not found"),
+                    Arguments.of(
+                            new RuntimeException(new DataIntegrityViolationException(
+                                    "Detail: Key (email)=(private-email-canary@example.test) already exists.")),
+                            Category.UNKNOWN,
+                            "Unclassified: DataIntegrityViolationException"),
+                    Arguments.of(
+                            new CannotAcquireLockException("private-sql-canary"),
+                            Category.RETRYABLE,
+                            "Database deadlock detected - will retry: CannotAcquireLockException"),
+                    Arguments.of(
+                            new WebClientRequestException(
+                                    new ConnectException("Connection refused: private-host-canary"),
+                                    HttpMethod.GET,
+                                    URI.create("https://private-host-canary/graphql"),
+                                    HttpHeaders.EMPTY),
+                            Category.RETRYABLE,
+                            "Network error: ConnectException"),
+                    Arguments.of(
+                            new TimeoutException("private-timeout-canary"),
+                            Category.RETRYABLE,
+                            "Timeout: TimeoutException"));
+        }
+
+        @ParameterizedTest
+        @MethodSource("failures")
+        void shouldSummariseByStatusOrClass(Throwable failure, Category category, String summary) {
+            List<String> logged = debugLines(() -> {
+                ClassificationResult result = classifier.classifyWithDetails(failure);
+                assertThat(result.category()).isEqualTo(category);
+                assertThat(result.message()).isEqualTo(summary);
+            });
+            assertThat(logged).isNotEmpty().noneMatch(line -> line.contains("canary"));
+        }
+
+        static Stream<Arguments> graphQlErrors() {
+            return Stream.of(
+                    Arguments.of("NOT_FOUND", Category.NOT_FOUND, "GraphQL NOT_FOUND"),
+                    Arguments.of("FORBIDDEN", Category.AUTH_ERROR, "GraphQL FORBIDDEN"),
+                    // The sync coordinator reduces the page size on this prefix.
+                    Arguments.of(
+                            "RESOURCE_LIMITS_EXCEEDED",
+                            Category.CLIENT_ERROR,
+                            "GraphQL resource limit: RESOURCE_LIMITS_EXCEEDED"),
+                    Arguments.of(
+                            "SOMETHING_NEW",
+                            Category.UNKNOWN,
+                            "Unclassified GraphQL error: type=SOMETHING_NEW, errors=1"),
+                    Arguments.of(
+                            "private type canary!",
+                            Category.UNKNOWN,
+                            "Unclassified GraphQL error: type=other, errors=1"));
+        }
+
+        @ParameterizedTest
+        @MethodSource("graphQlErrors")
+        void shouldSummariseGraphQlErrorsByType(String type, Category category, String summary) {
+            ResponseError error = mock(ResponseError.class);
+            when(error.getExtensions()).thenReturn(Map.of("type", type));
+            when(error.getMessage())
+                    .thenReturn("Could not resolve to a Repository with the name 'acme/private-repo-canary'.");
+            ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+            when(response.getErrors()).thenReturn(List.of(error));
+
+            ClassificationResult result = classifier.classifyGraphQlResponse(response);
+
+            assertNotNull(result);
+            assertThat(result.category()).isEqualTo(category);
+            assertThat(result.message()).isEqualTo(summary);
+        }
+
+        private static WebClientResponseException httpFailure(int status) {
+            return WebClientResponseException.create(
+                    status,
+                    "private-status-canary",
+                    HttpHeaders.EMPTY,
+                    "{\"message\":\"private-body-canary\"}".getBytes(UTF_8),
+                    UTF_8,
+                    new MockClientHttpRequest(
+                            HttpMethod.GET,
+                            URI.create("https://api.github.com/repos/acme/private-repo-canary/issues")));
+        }
+
+        private static List<String> debugLines(Runnable classification) {
+            Logger logger = (Logger) LoggerFactory.getLogger(GitHubExceptionClassifier.class);
+            Level previous = logger.getLevel();
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            logger.addAppender(appender);
+            logger.setLevel(Level.DEBUG);
+            try {
+                classification.run();
+            } finally {
+                logger.setLevel(previous);
+                logger.detachAppender(appender);
+                appender.stop();
+            }
+            return appender.list.stream()
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .toList();
+        }
+    }
+
+    /** The classifier matches Spring GraphQL's exception by simple name. */
+    static class FieldAccessException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        FieldAccessException(String message) {
+            super(message);
         }
     }
 

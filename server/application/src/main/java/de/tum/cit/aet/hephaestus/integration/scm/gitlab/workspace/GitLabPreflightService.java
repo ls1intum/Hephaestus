@@ -83,7 +83,10 @@ public class GitLabPreflightService {
                 return GitLabPreflightResponseDTO.failure("GitLab returned status " + status + ".");
             }
         } catch (Exception e) {
-            log.warn("GitLab /api/v4/user failed: serverUrl={}, error={}", resolvedUrl, e.getMessage());
+            log.warn(
+                    "GitLab /api/v4/user failed: serverUrl={}, error={}",
+                    resolvedUrl,
+                    e.getClass().getSimpleName());
             return GitLabPreflightResponseDTO.failure(
                     "We could not connect to the GitLab server. Try again in a moment.");
         }
@@ -127,7 +130,7 @@ public class GitLabPreflightService {
                     "GitLab group token validation failed: serverUrl={}, group={}, error={}",
                     serverUrl,
                     groupFullPath,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return GitLabPreflightResponseDTO.failure("We could not validate the group token. Try again in a moment.");
         }
 
@@ -168,7 +171,10 @@ public class GitLabPreflightService {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_CONTENT, "GitLab refused this token. Check it and validate it again.", e);
         } catch (Exception e) {
-            log.warn("Failed to list accessible GitLab groups: serverUrl={}, error={}", resolvedUrl, e.getMessage());
+            log.warn(
+                    "Failed to list accessible GitLab groups: serverUrl={}, error={}",
+                    resolvedUrl,
+                    e.getClass().getSimpleName());
             // An empty list would read as "this token sees no groups"; the caller must learn it failed.
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,

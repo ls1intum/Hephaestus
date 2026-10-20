@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.core.consumer;
 
-import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
@@ -837,7 +835,7 @@ public class IntegrationNatsConsumer {
         try {
             Optional<IntegrationMessageHandler> handler = dispatcher.dispatch(subject);
             if (handler.isEmpty()) {
-                log.debug("No handler for subject, ACK-as-no-op: subject={}", sanitizeForLog(subject));
+                log.debug("No handler for subject, ACK-as-no-op: route={}", ConsumerSubjectMath.routeLabel(subject));
                 msg.ack();
                 return;
             }
@@ -848,7 +846,10 @@ public class IntegrationNatsConsumer {
             if (admission.isEmpty()) {
                 resolvedHandler.onMessage(msg);
             } else if (!admission.get().admit(scopeId, msg, () -> resolvedHandler.onMessage(msg))) {
-                log.info("Skipped message: reason=routeNotAdmitted, subject={}", sanitizeForLog(subject));
+                log.info(
+                        "Skipped message: reason=routeNotAdmitted, route={}, scopeId={}",
+                        ConsumerSubjectMath.routeLabel(subject),
+                        scopeId);
                 msg.ack();
                 return;
             }
@@ -867,7 +868,17 @@ public class IntegrationNatsConsumer {
             }
         } catch (Exception e) {
             if (!shuttingDown.get()) {
-                log.error("Handler failed for subject={}: {}", sanitizeForLog(subject), e.getMessage(), e);
+                // The subject names the owner and repository, and the message can quote provider or row text. The
+                // stack is attached on the first delivery only, so a failure that repeats does not repeat it.
+                long delivery = IntegrationPoisonHandler.readDeliveredCount(msg);
+                var failure = log.atError()
+                        .addKeyValue("event.name", "integration.message.failed")
+                        .addKeyValue("integration.route", ConsumerSubjectMath.routeLabel(subject))
+                        .addKeyValue("integration.delivery", delivery)
+                        .addKeyValue("error.type", e.getClass().getName());
+                if (scopeId != null) failure = failure.addKeyValue("integration.scope.id", scopeId);
+                if (delivery <= 1) failure = failure.setCause(e);
+                failure.log("Handler failed");
             }
             stats.recordNak(Instant.now());
             poisonHandler.nakWithBackoff(msg);
@@ -965,10 +976,16 @@ public class IntegrationNatsConsumer {
         } catch (JetStreamApiException e) {
             // 10014 = consumer not found, expected on restart paths.
             if (e.getApiErrorCode() != 10014) {
-                log.debug("Failed to delete consumer: consumerName={}, error={}", consumerName, e.getMessage());
+                log.debug(
+                        "Failed to delete consumer: consumerName={}, apiErrorCode={}",
+                        consumerName,
+                        e.getApiErrorCode());
             }
         } catch (Exception e) {
-            log.debug("Failed to delete consumer: consumerName={}, error={}", consumerName, e.getMessage());
+            log.debug(
+                    "Failed to delete consumer: consumerName={}, error={}",
+                    consumerName,
+                    e.getClass().getSimpleName());
         }
     }
 

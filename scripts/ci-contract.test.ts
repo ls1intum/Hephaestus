@@ -1545,16 +1545,6 @@ void describe("CI contract", () => {
 
 	void test("decides an image's architectures once, for every image the run builds", async () => {
 		const source = await readFile(".github/workflows/cicd.yml", "utf8");
-		const caller = job(source, "Docker");
-		for (const secret of ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT"]) {
-			assert.match(
-				caller,
-				new RegExp(
-					`${secret}: \\$\\{\\{ github\\.event_name == 'push' && secrets\\.${secret}`,
-					"u",
-				),
-			);
-		}
 
 		const docker = await readFile(".github/workflows/ci-docker-build.yml", "utf8");
 		// The architecture set is one decision, taken in cicd.yml and handed to every image build, so
@@ -1584,8 +1574,10 @@ void describe("CI contract", () => {
 		assert.match(inherited, /pr-\$PR_NUMBER/u);
 
 		const reusable = await readFile(".github/workflows/reusable-docker-build.yml", "utf8");
-		for (const secret of ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT"]) {
-			assert.match(reusable, new RegExp(`github\\.event_name == 'push'.*secrets\\.${secret}`, "u"));
+		// The webapp image uploads no source maps anywhere, so no build is handed an upload credential.
+		const webappImage = await readFile("webapp/Dockerfile", "utf8");
+		for (const text of [source, docker, reusable, webappImage]) {
+			assert.doesNotMatch(text, /sentry/iu);
 		}
 		assert.match(
 			reusable,
@@ -4127,4 +4119,36 @@ void test("the prose gate ratchets on Linux and Windows with the base history", 
 		namedStep(workflow, ["jobs", "quality"], "Quality gates").getIn(["env", "PR_BASE_SHA"]),
 		`\${{ github.event.pull_request.base.sha }}`,
 	);
+});
+
+void test("the log collection example reads only tagged entries and indexes only static labels", async () => {
+	const alloy = await readFile("docker/observability/config.alloy", "utf8");
+	// A Docker socket is root on the host, whatever its mount mode; the journal needs none.
+	for (const forbidden of [/docker\.sock/u, /loki\.source\.docker/u, /discovery\.docker/u]) {
+		assert.doesNotMatch(alloy, forbidden);
+	}
+	assert.match(alloy, /matches\s*=\s*"CONTAINER_TAG=hephaestus-runtime"/u);
+	// The webapp's nginx error log can name a client address and a query string; it is not collected.
+	assert.doesNotMatch(alloy.replaceAll(/^\s*\/\/.*$/gmu, ""), /webapp/u);
+	const overlay = await readFile("docker/observability/compose.journald.yaml", "utf8");
+	assert.deepEqual(
+		[...overlay.matchAll(/^ {2}(?<service>[a-z-]+):$/gmu)].map((match) => match.groups?.service),
+		["application-server", "application-worker", "webhook-server"],
+	);
+	// Index labels stay bounded: a service from a fixed set and the deployment's name. Per-request
+	// and per-person values go to structured metadata or stay in the line.
+	const targets = [...alloy.matchAll(/target_label\s*=\s*"(?<label>[^"]+)"/gu)].map(
+		(match) => match.groups?.label,
+	);
+	assert.deepEqual(targets, ["service_name"]);
+	const sourceLabels = /\blabels\s*=\s*\{(?<labels>[^}]*)\}/u.exec(alloy)?.groups?.labels ?? "";
+	assert.deepEqual(
+		[...sourceLabels.matchAll(/^\s*(?<label>\w+)\s*=/gmu)].map((match) => match.groups?.label),
+		["deployment_environment"],
+	);
+	assert.match(
+		alloy,
+		/stage\.structured_metadata\s*\{\s*values\s*=\s*\{\s*trace_id\s*=\s*"",?\s*\}/u,
+	);
+	assert.doesNotMatch(alloy, /stage\.labels/u);
 });

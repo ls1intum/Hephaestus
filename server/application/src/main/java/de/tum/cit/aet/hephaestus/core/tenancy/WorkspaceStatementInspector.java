@@ -315,9 +315,8 @@ public class WorkspaceStatementInspector implements StatementInspector {
             parseFailureCounter.increment();
             if (log.isDebugEnabled()) {
                 log.debug(
-                        "Tenancy regex analysis failed ({}: {}): {}",
-                        e.getClass().getSimpleName(),
-                        e.getMessage(),
+                        "Tenancy regex analysis failed ({}): {}",
+                        e.getClass().getName(),
                         LoggingUtils.truncate(sql, 200));
             }
             return Decision.ok();

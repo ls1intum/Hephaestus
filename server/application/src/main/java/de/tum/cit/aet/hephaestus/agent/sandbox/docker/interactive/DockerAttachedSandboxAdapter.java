@@ -376,13 +376,17 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             try {
                 writer.close();
             } catch (Exception e) {
-                log.debug("writer.close() during sandbox close threw: {}", e.getMessage());
+                log.debug(
+                        "writer.close() during sandbox close threw: errorType={}",
+                        e.getClass().getName());
             }
 
             try {
                 lifecycle.stopContainer(containerId, graceSeconds);
             } catch (Exception e) {
-                log.warn("stopContainer failed during close: {}", e.getMessage());
+                log.warn(
+                        "stopContainer failed during close: errorType={}",
+                        e.getClass().getName());
             }
 
             // A lost close frame must not leave the pumps waiting after container shutdown.
@@ -399,13 +403,17 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             try {
                 lifecycle.removeContainer(containerId);
             } catch (Exception e) {
-                log.warn("forceRemove container failed during close: {}", e.getMessage());
+                log.warn(
+                        "forceRemove container failed during close: errorType={}",
+                        e.getClass().getName());
             }
             if (networkId != null) {
                 try {
                     lifecycle.disconnectAndRemoveNetwork(networkId);
                 } catch (Exception e) {
-                    log.warn("Network teardown failed during close: {}", e.getMessage());
+                    log.warn(
+                            "Network teardown failed during close: errorType={}",
+                            e.getClass().getName());
                 }
             }
 
@@ -421,7 +429,9 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             try {
                 onClosed.accept(this);
             } catch (Exception e) {
-                log.warn("Registry onClosed callback threw: {}", e.getMessage());
+                log.warn(
+                        "Registry onClosed callback threw: errorType={}",
+                        e.getClass().getName());
             }
             closed.complete(null);
             log.info(
@@ -436,7 +446,9 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             try {
                 onClosed.accept(this);
             } catch (Throwable cb) {
-                log.warn("Registry onClosed callback threw during error path: {}", cb.getMessage());
+                log.warn(
+                        "Registry onClosed callback threw during error path: errorType={}",
+                        cb.getClass().getName());
             }
             closed.completeExceptionally(t);
         } finally {

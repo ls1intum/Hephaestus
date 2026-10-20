@@ -162,7 +162,7 @@ public class GitLabMergeRequestReadinessReader {
             log.warn(
                     "Skipped merge request readiness read: context={}, reason={}",
                     context,
-                    sanitizeForLog(e.getMessage()));
+                    e.getClass().getSimpleName());
             return null;
         }
         try {
@@ -199,7 +199,7 @@ public class GitLabMergeRequestReadinessReader {
             log.warn(
                     "Could not read merge request readiness: context={}, reason={}",
                     context,
-                    sanitizeForLog(e.getMessage()));
+                    e.getClass().getSimpleName());
             return null;
         }
     }

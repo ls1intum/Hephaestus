@@ -103,7 +103,7 @@ The build-once guarantee does not apply until that path also downloads `applicat
 2. In `.github/workflows/cicd.yml`, change the `application-server-image` job from `use-buildpacks: true` to `docker-file`.
 3. Use the [production operations runbook](production-operations-runbook.mdx) for rollback.
 
-Detection uses a Sentry release-tagged error spike or a Prometheus alert.
+Detection uses an error spike in the logs of the new `service.version` or a Prometheus alert.
 The alert condition is `application_ready_time_seconds > 15` for three consecutive deploys.
 
 ## Operational checklist

@@ -468,7 +468,6 @@ services:
       MONITORING_RUN_ON_STARTUP: "false"
       MONITORING_SYNC_CRON: "-"
       MONITORING_BACKFILL_ENABLED: "false"
-      SENTRY_DSN: ""
       DEPLOYMENT_ENVIRONMENT: preview
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Set WEBHOOK_SECRET to at least 32 printable ASCII characters}
       WEBHOOK_ROUTING_SECRET: ${WEBHOOK_ROUTING_SECRET:?Set WEBHOOK_ROUTING_SECRET to at least 32 printable ASCII characters, different from WEBHOOK_SECRET}
@@ -525,7 +524,6 @@ services:
       APPLICATION_SERVER_URL: https://${SERVICE_FQDN_WEBAPP}/api
       TANSTACK_DEVTOOLS_ENABLED: "true"
       DEPLOYMENT_ENVIRONMENT: preview
-      SENTRY_DSN: ""
     depends_on:
       appserver:
         condition: service_healthy

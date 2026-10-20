@@ -23,10 +23,6 @@ async function openPublicWorkspace(page: Page) {
 	await expect(page.getByRole("heading", { name: "E2E Public Workspace activity" })).toBeVisible();
 	await expect(page.getByRole("table", { name: "People", exact: true })).toBeVisible();
 	await expect(page.getByRole("link", { name: PERSON, exact: true })).toBeVisible();
-	const notice = page.getByRole("region", { name: "Your privacy" });
-	if (await notice.isVisible()) {
-		await notice.getByRole("button", { name: /^(?:Decline|Reject all)$/u }).click();
-	}
 	return response;
 }
 

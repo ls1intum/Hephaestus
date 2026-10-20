@@ -75,7 +75,10 @@ public class ReviewJobLifecycleService {
                 try {
                     sandboxManager.cancel(jobId);
                 } catch (Exception e) {
-                    log.warn("Sandbox cancel failed for job {} (status already CANCELLED): {}", jobId, e.getMessage());
+                    log.warn(
+                            "Sandbox cancel failed for job {} (status already CANCELLED): errorType={}",
+                            jobId,
+                            e.getClass().getName());
                 }
             }
         }

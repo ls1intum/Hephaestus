@@ -23,14 +23,8 @@ COPY webapp/ /repo/webapp/
 COPY .vale/ /repo/.vale/
 COPY docs/contributor/practice-feedback-language.md /repo/docs/contributor/practice-feedback-language.md
 COPY server/application/src/main/resources/practices/default-catalog.json /repo/server/application/src/main/resources/practices/default-catalog.json
-RUN --mount=type=secret,id=sentry_auth_token,required=false \
-    --mount=type=secret,id=sentry_org,required=false \
-    --mount=type=secret,id=sentry_project,required=false \
-    export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" && \
-    export SENTRY_ORG="$(cat /run/secrets/sentry_org 2>/dev/null || true)" && \
-    export SENTRY_PROJECT="$(cat /run/secrets/sentry_project 2>/dev/null || true)" && \
-    pnpm --filter webapp run build && \
-    find webapp/dist -name '*.map' -delete && \
+# The build emits no source maps; the image fails rather than ship one that appears later.
+RUN pnpm --filter webapp run build && \
     ! find webapp/dist -name '*.map' -print -quit | grep -q .
 
 FROM nginx:1.30.5-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94 AS os-packages

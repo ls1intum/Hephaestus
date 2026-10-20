@@ -147,7 +147,7 @@ public final class GraphQlPaginationHelper {
                                     request.contextDescription(),
                                     currentPage,
                                     signal.totalRetries() + 1,
-                                    signal.failure().getMessage())))
+                                    signal.failure().getClass().getSimpleName())))
                     .block(request.timeout());
 
             if (response == null) {

@@ -142,7 +142,9 @@ public final class SandboxAttemptLauncher {
             try {
                 return containerManager.getLogs(containerId, WHOLE_TRANSCRIPT);
             } catch (RuntimeException exception) {
-                log.debug("Could not read initializer transcript: {}", exception.getMessage());
+                log.debug(
+                        "Could not read initializer transcript: errorType={}",
+                        exception.getClass().getName());
                 return "";
             }
         }

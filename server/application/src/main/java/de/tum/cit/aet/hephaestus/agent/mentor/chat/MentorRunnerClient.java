@@ -305,7 +305,7 @@ public final class MentorRunnerClient implements AutoCloseable {
         try {
             onEvent.accept(event);
         } catch (RuntimeException e) {
-            log.warn("Runner event handler threw: {}", e.getMessage(), e);
+            log.warn("Runner event handler threw: errorType={}", e.getClass().getName(), e);
         }
     }
 
@@ -345,7 +345,7 @@ public final class MentorRunnerClient implements AutoCloseable {
             resultEnvelope.set("content", result != null ? result : objectMapper.nullNode());
             sandbox.send(response);
         } catch (RuntimeException e) {
-            log.warn("fetch_context callback failed: {}", e.getMessage(), e);
+            log.warn("fetch_context callback failed: errorType={}", e.getClass().getName(), e);
             sendCallbackError(idNode, -32000, e.getMessage() != null ? e.getMessage() : "fetch_context failed");
         }
     }
@@ -384,7 +384,11 @@ public final class MentorRunnerClient implements AutoCloseable {
             response.putObject("result").put(idKey, params.get(idKey).asString());
             sandbox.send(response);
         } catch (RuntimeException e) {
-            log.warn("{} callback failed: {}", kind.method(), e.getMessage(), e);
+            log.warn(
+                    "{} callback failed: errorType={}",
+                    kind.method(),
+                    e.getClass().getName(),
+                    e);
             sendCallbackError(idNode, -32000, kind.method() + " could not be checked; nothing was shown");
         }
     }
@@ -399,7 +403,10 @@ public final class MentorRunnerClient implements AutoCloseable {
             error.put("message", message);
             sandbox.send(response);
         } catch (InteractiveSandboxException e) {
-            log.warn("Failed to send callback error response: {}", e.getMessage(), e);
+            log.warn(
+                    "Failed to send callback error response: errorType={}",
+                    e.getClass().getName(),
+                    e);
         }
     }
 

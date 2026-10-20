@@ -141,7 +141,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         try {
             provisioned = provisioningService.resolveOrProvision(registrationId, subject, principal, intent);
         } catch (LinkOnlyProviderLoginException e) {
-            log.warn("auth.success: refused link-only provider login: {}", e.getMessage());
+            log.warn("auth.success: refused link-only provider login: registrationId={}", registrationId);
             refuse(request, response, client, "link_requires_auth");
             return;
         } catch (AccountLinkConflictException e) {

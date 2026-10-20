@@ -122,7 +122,7 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
                     "GitHub installation verification failed: workspaceId={}, installationId={}, error={}",
                     ref.workspaceId(),
                     installationId.get(),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return new ConnectFinalization.Failed(
                     "GitHub could not confirm your access to this installation. Connect GitHub again.");
         }

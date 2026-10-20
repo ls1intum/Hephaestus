@@ -257,7 +257,7 @@ public class GitHubProjectSyncService {
                                         safeOrgLogin,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -735,7 +735,7 @@ public class GitHubProjectSyncService {
                                         projectId,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -1137,7 +1137,7 @@ public class GitHubProjectSyncService {
                                         "Retrying project fields sync after transport error: projectId={}, attempt={}, error={}",
                                         projectId,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -1264,7 +1264,11 @@ public class GitHubProjectSyncService {
                     completedNormally);
             return completedNormally ? PhaseResult.SUCCESS : PhaseResult.FAILED;
         } catch (Exception e) {
-            log.warn("Failed to sync project fields: projectId={}, error={}", projectId, e.getMessage(), e);
+            log.warn(
+                    "Failed to sync project fields: projectId={}, error={}",
+                    projectId,
+                    e.getClass().getSimpleName(),
+                    e);
             return PhaseResult.FAILED;
         }
     }
@@ -1346,7 +1350,7 @@ public class GitHubProjectSyncService {
                                         "Retrying status updates sync after transport error: projectId={}, attempt={}, error={}",
                                         projectId,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -1468,7 +1472,11 @@ public class GitHubProjectSyncService {
                     completedNormally);
             return completedNormally;
         } catch (Exception e) {
-            log.warn("Failed to sync project status updates: projectId={}, error={}", projectId, e.getMessage(), e);
+            log.warn(
+                    "Failed to sync project status updates: projectId={}, error={}",
+                    projectId,
+                    e.getClass().getSimpleName(),
+                    e);
             return false;
         }
     }

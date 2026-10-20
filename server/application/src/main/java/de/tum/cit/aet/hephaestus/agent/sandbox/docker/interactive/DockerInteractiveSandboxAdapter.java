@@ -328,7 +328,10 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                     networkManager.disconnectAppServer(nid);
                 } catch (RuntimeException e) {
                     // Not worth stopping for: the removal below reports what the daemon actually refuses.
-                    log.debug("Could not disconnect app-server from {}: {}", nid, e.getMessage());
+                    log.debug(
+                            "Could not disconnect app-server from {}: errorType={}",
+                            nid,
+                            e.getClass().getName());
                 }
                 networkManager.removeNetwork(nid);
             }
@@ -402,14 +405,19 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             try {
                 channel.close();
             } catch (IOException | RuntimeException e) {
-                log.warn("Partial cleanup: closing the gateway channel failed: {}", e.getMessage());
+                log.warn(
+                        "Partial cleanup: closing the gateway channel failed: errorType={}",
+                        e.getClass().getName());
             }
         }
         if (containerId != null) {
             try {
                 containerManager.forceRemove(containerId);
             } catch (Exception e) {
-                log.warn("Partial cleanup: forceRemove failed for {}: {}", containerId, e.getMessage());
+                log.warn(
+                        "Partial cleanup: forceRemove failed for {}: errorType={}",
+                        containerId,
+                        e.getClass().getName());
             }
         }
         if (networkId != null) {
@@ -417,12 +425,18 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 networkManager.disconnectAppServer(networkId);
             } catch (RuntimeException e) {
                 // Not worth stopping for: the removal below reports what the daemon actually refuses.
-                log.debug("Partial cleanup: disconnectAppServer failed for {}: {}", networkId, e.getMessage());
+                log.debug(
+                        "Partial cleanup: disconnectAppServer failed for {}: errorType={}",
+                        networkId,
+                        e.getClass().getName());
             }
             try {
                 networkManager.removeNetwork(networkId);
             } catch (Exception e) {
-                log.warn("Partial cleanup: removeNetwork failed for {}: {}", networkId, e.getMessage());
+                log.warn(
+                        "Partial cleanup: removeNetwork failed for {}: errorType={}",
+                        networkId,
+                        e.getClass().getName());
             }
         }
     }

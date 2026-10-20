@@ -56,7 +56,6 @@ const config: StorybookConfig = {
 			"@dnd-kit/modifiers",
 			"@dnd-kit/sortable",
 			"@dnd-kit/utilities",
-			"@sentry/react",
 			"@tanstack/react-query-devtools",
 			"@tanstack/react-router-devtools",
 			"ai",

@@ -258,7 +258,10 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             commitMergeRequestLinker.linkCommits(
                     scopeId, repository, OffsetDateTime.now(ZoneOffset.UTC).minusHours(1), read);
         } catch (Exception e) {
-            log.debug("Push-time commit→MR link failed: repoId={}, error={}", repository.getId(), e.getMessage());
+            log.debug(
+                    "Push-time commit→MR link failed: repoId={}, error={}",
+                    repository.getId(),
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -282,7 +285,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             log.warn(
                     "Non-default branch fetch failed: repo={}, error={}",
                     sanitizeForLog(repository.getNameWithOwner()),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -329,7 +332,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             log.error(
                     "Failed to process commits via local git, falling back to webhook: repoName={}, error={}",
                     repoName,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             failed[0]++;
         }
         if (failed[0] > 0) processCommitsViaWebhook(event, repository, true, read);
@@ -370,7 +373,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                         "Failed to upsert commit: sha={}, repoId={}, error={}",
                         commit.id(),
                         repository.getId(),
-                        e.getMessage());
+                        e.getClass().getSimpleName());
             }
         }
 

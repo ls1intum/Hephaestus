@@ -91,20 +91,24 @@ public class IntegrationPoisonHandler {
         nakCounter(msg).increment();
         try {
             log.debug(
-                    "NAKing message with backoff: subject={}, attempt={}, delayMs={}",
-                    sanitizeForLog(msg.getSubject()),
+                    "NAKing message with backoff: route={}, attempt={}, delayMs={}",
+                    ConsumerSubjectMath.routeLabel(msg.getSubject()),
                     deliveredCount,
                     delayMs);
             msg.nakWithDelay(Duration.ofMillis(delayMs));
         } catch (Exception nakWithDelayFailed) {
             // Closed connection / shutdown / etc. — fall back to immediate NAK so the
             // server-side ack-wait timeout becomes the only thing the message is waiting on.
-            log.debug("Failed to NAK with delay, using immediate NAK: error={}", nakWithDelayFailed.getMessage());
+            log.debug(
+                    "Failed to NAK with delay, using immediate NAK: error={}",
+                    nakWithDelayFailed.getClass().getSimpleName());
             try {
                 msg.nak();
             } catch (Exception immediateNakFailed) {
                 // Message will be redelivered after ack timeout — nothing more we can do.
-                log.trace("Failed to NAK message: error={}", immediateNakFailed.getMessage());
+                log.trace(
+                        "Failed to NAK message: error={}",
+                        immediateNakFailed.getClass().getSimpleName());
             }
         }
     }
@@ -134,8 +138,8 @@ public class IntegrationPoisonHandler {
         long streamSeq = readStreamSequence(msg);
         poisonCounter(msg).increment();
         log.error(
-                "Poison message detected, ACKing to break redelivery loop: subject={}, deliveredCount={}, streamSeq={}, reason={}",
-                sanitizeForLog(msg.getSubject()),
+                "Poison message detected, ACKing to break redelivery loop: route={}, deliveredCount={}, streamSeq={}, reason={}",
+                ConsumerSubjectMath.routeLabel(msg.getSubject()),
                 deliveredCount,
                 streamSeq,
                 sanitizeForLog(reason));
@@ -143,11 +147,13 @@ public class IntegrationPoisonHandler {
             msg.ack();
         } catch (Exception ackFailed) {
             // ACK failure is non-fatal; the message will redeliver and we'll get another shot.
-            log.debug("Failed to ACK poison message: error={}", ackFailed.getMessage());
+            log.debug(
+                    "Failed to ACK poison message: error={}",
+                    ackFailed.getClass().getSimpleName());
         }
     }
 
-    private long readDeliveredCount(Message msg) {
+    static long readDeliveredCount(Message msg) {
         try {
             var metadata = msg.metaData();
             return metadata != null ? metadata.deliveredCount() : 1L;

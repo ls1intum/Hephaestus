@@ -196,13 +196,15 @@ class WebhookStreamMonitor {
         if (failing.put(stream, Boolean.TRUE) == null) {
             log.warn(
                     "Webhook stream monitoring stopped for stream {}: its gauges hold their last values "
-                            + "until this recovers ({}: {})",
+                            + "until this recovers ({})",
                     stream,
-                    e.getClass().getSimpleName(),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return;
         }
-        log.debug("Stream usage poll still failing: stream={}, error={}", stream, e.getMessage());
+        log.debug(
+                "Stream usage poll still failing: stream={}, error={}",
+                stream,
+                e.getClass().getSimpleName());
     }
 
     private void recovered(String stream) {

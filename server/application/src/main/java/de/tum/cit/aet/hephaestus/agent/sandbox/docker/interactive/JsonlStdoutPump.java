@@ -75,7 +75,10 @@ final class JsonlStdoutPump {
                 try {
                     ch = source.read();
                 } catch (IOException io) {
-                    log.debug("Pump read threw — treating as EOF: sessionId={}, error={}", sessionId, io.getMessage());
+                    log.debug(
+                            "Pump read threw — treating as EOF: sessionId={}, errorType={}",
+                            sessionId,
+                            io.getClass().getName());
                     break;
                 }
                 if (ch < 0) {

@@ -119,10 +119,9 @@ public class ResilienceConfig {
                         event.getStateTransition().getFromState(),
                         event.getStateTransition().getToState()))
                 .onError(event -> log.debug(
-                        "Circuit breaker recorded error: breakerName={}, exceptionType={}, message={}",
+                        "Circuit breaker recorded error: breakerName={}, exceptionType={}",
                         event.getCircuitBreakerName(),
-                        event.getThrowable().getClass().getSimpleName(),
-                        event.getThrowable().getMessage()))
+                        event.getThrowable().getClass().getSimpleName()))
                 .onSuccess(event -> log.trace(
                         "Circuit breaker recorded success: breakerName={}, durationMs={}",
                         event.getCircuitBreakerName(),

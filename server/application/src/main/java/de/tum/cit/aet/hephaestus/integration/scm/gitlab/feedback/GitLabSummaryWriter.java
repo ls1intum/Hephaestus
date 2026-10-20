@@ -313,7 +313,7 @@ public class GitLabSummaryWriter implements SummaryWriter {
                 log.debug(
                         "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
                         scopeId,
-                        e.getMessage());
+                        e.getClass().getSimpleName());
                 return SummaryLookup.unknown();
             }
         }

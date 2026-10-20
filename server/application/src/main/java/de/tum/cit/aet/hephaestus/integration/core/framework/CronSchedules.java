@@ -28,7 +28,7 @@ public final class CronSchedules {
             LocalDateTime next = CronExpression.parse(cron).next(LocalDateTime.now(ZoneId.systemDefault()));
             return next == null ? null : next.atZone(ZoneId.systemDefault()).toInstant();
         } catch (IllegalArgumentException e) {
-            log.debug("Unparseable sync cron '{}': {}", cron, e.getMessage());
+            log.debug("Unparseable sync cron '{}': {}", cron, e.getClass().getSimpleName());
             return null;
         }
     }
@@ -59,7 +59,7 @@ public final class CronSchedules {
             }
             return Duration.between(first, second);
         } catch (IllegalArgumentException e) {
-            log.debug("Unparseable sync cron '{}': {}", cron, e.getMessage());
+            log.debug("Unparseable sync cron '{}': {}", cron, e.getClass().getSimpleName());
             return null;
         }
     }

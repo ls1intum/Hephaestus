@@ -55,7 +55,7 @@ public class GitHubScmTokenSource implements ScmTokenSource {
                         "Failed to mint GitHub App installation token: scopeId={}, installationId={}, error={}",
                         scopeId,
                         appConfig.get().installationId(),
-                        e.getMessage());
+                        e.getClass().getSimpleName());
                 return Optional.empty();
             }
         }

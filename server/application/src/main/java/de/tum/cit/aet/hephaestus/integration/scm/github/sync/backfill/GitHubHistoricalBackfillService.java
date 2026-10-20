@@ -256,10 +256,9 @@ public class GitHubHistoricalBackfillService {
                         .whenComplete((result, error) -> {
                             if (error != null) {
                                 log.error(
-                                        "Backfill session failed: scopeId={}, scopeSlug={}, error={}",
+                                        "Backfill session failed: scopeId={}, error={}",
                                         session.scopeId(),
-                                        session.slug(),
-                                        error.getMessage());
+                                        error.getClass().getSimpleName());
                             }
                         }))
                 .toArray(CompletableFuture[]::new);
@@ -750,7 +749,7 @@ public class GitHubHistoricalBackfillService {
                         sanitizeForLog(repoNameForLog),
                         pageCount,
                         totalIssuesSynced,
-                        e.getMessage());
+                        e.getClass().getSimpleName());
                 throw new BackfillTransientException(
                         "Issues backfill failed for " + repoNameForLog + " on page " + pageCount, e);
             }
@@ -952,7 +951,7 @@ public class GitHubHistoricalBackfillService {
                         pageCount,
                         totalPRsSynced,
                         consecutiveFailures.getOrDefault(syncTargetId, 0),
-                        e.getMessage());
+                        e.getClass().getSimpleName());
                 throw new BackfillTransientException(
                         "pull requests backfill failed for " + repoNameForLog + " on page " + pageCount, e);
             }
@@ -1001,7 +1000,7 @@ public class GitHubHistoricalBackfillService {
                     log.warn(
                             "Failed to fetch additional reviews for PR #{}: {}",
                             prWithCursor.pullRequest().getNumber(),
-                            e.getMessage());
+                            e.getClass().getSimpleName());
                 }
             }
         }
@@ -1528,7 +1527,7 @@ public class GitHubHistoricalBackfillService {
             log.info(
                     "Backfill failed with transient error, repository in cooldown: repo={}, error={}",
                     safeRepoName,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return;
         }
 
@@ -1598,18 +1597,16 @@ public class GitHubHistoricalBackfillService {
             // Transient infrastructure or transport error - apply cooldown
             markForCooldown(target.id(), safeRepoName);
             log.warn(
-                    "Backfill failed with transient error, repository in cooldown: repo={}, errorType={}, error={}",
+                    "Backfill failed with transient error, repository in cooldown: repo={}, errorType={}",
                     safeRepoName,
-                    e.getClass().getSimpleName(),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
         } else {
             // Other error types - log but don't apply cooldown
             // (could be auth errors, not found, etc. which won't resolve with time)
             log.error(
-                    "Backfill failed with non-transient error: repo={}, errorType={}, error={}",
+                    "Backfill failed with non-transient error: repo={}, errorType={}",
                     safeRepoName,
                     e.getClass().getSimpleName(),
-                    e.getMessage(),
                     e);
         }
     }
@@ -1637,7 +1634,7 @@ public class GitHubHistoricalBackfillService {
                         sanitizeForLog(repoName),
                         pageNumber,
                         signal.totalRetries() + 1,
-                        signal.failure().getMessage()));
+                        signal.failure().getClass().getSimpleName()));
     }
 
     /**

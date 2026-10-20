@@ -423,7 +423,10 @@ public class ReviewJobExecutor {
                     sleepPollInterval();
                 }
             } catch (Exception e) {
-                log.warn("Poll loop error, retrying in {}: {}", agentProperties.pollInterval(), e.getMessage());
+                log.warn(
+                        "Poll loop error, retrying in {}: {}",
+                        agentProperties.pollInterval(),
+                        e.getClass().getName());
                 sleepPollInterval();
             }
         }
@@ -470,7 +473,10 @@ public class ReviewJobExecutor {
             log.debug("Lock timeout during claim for job {}, will retry on next poll", jobId);
             return StartOutcome.SKIPPED;
         } catch (Exception e) {
-            log.warn("Claim failed for job {}, will retry on next poll: {}", jobId, e.getMessage());
+            log.warn(
+                    "Claim failed for job {}, will retry on next poll: {}",
+                    jobId,
+                    e.getClass().getName());
             return StartOutcome.SKIPPED;
         }
         if (attempt instanceof ReviewJobClaimService.TerminalClaim terminal) {

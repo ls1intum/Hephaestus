@@ -74,7 +74,6 @@ services:
       # for the canonical AET deployment. See docs/admin/legal-pages.mdx.
       LEGAL_PROFILE: ${LEGAL_PROFILE:-}
       DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
-      SENTRY_DSN: ${SENTRY_DSN}
       TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-false}
     depends_on:
       # Gate on app-server readiness so the SPA isn't served before the API answers.
@@ -262,7 +261,6 @@ services:
       MONITORING_BACKFILL_BATCH_SIZE: ${MONITORING_BACKFILL_BATCH_SIZE:-50}
       MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD: ${MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD:-500}
       MONITORING_BACKFILL_INTERVAL_SECONDS: ${MONITORING_BACKFILL_INTERVAL_SECONDS:-60}
-      SENTRY_DSN: ${SENTRY_DSN}
       # Email: off until SPRING_MAIL_HOST is set. Server role only — notifications are sent here.
       # Boot's own property names, forwarded as-is (docs/admin/production-setup.mdx § Email).
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
@@ -468,7 +466,6 @@ services:
       HEPHAESTUS_WORKER_CAPACITY_REVIEW_MAX: ${HEPHAESTUS_WORKER_REVIEW_MAX:-auto}
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}
       HEPHAESTUS_WORKER_DRAIN_TIMEOUT: ${HEPHAESTUS_WORKER_DRAIN_TIMEOUT:-5m}
-      SENTRY_DSN: ${SENTRY_DSN}
       # Persistence for the JPA layer the worker shares (connection credentials,
       # workspace/agent context). The auth web layer is gated off this role, so no auth env is needed.
       # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert

@@ -110,7 +110,12 @@ public class WebhookIngestPipeline {
         try {
             result = verifier.verify(request);
         } catch (RuntimeException e) {
-            log.warn("Verifier {} threw for kind={}: {}", verifier.getClass().getSimpleName(), kind, e.toString());
+            // The type only: a verifier that fails while reading the body can quote that unauthenticated body.
+            log.warn(
+                    "Verifier {} threw for kind={}: {}",
+                    verifier.getClass().getSimpleName(),
+                    kind,
+                    e.getClass().getName());
             return problem(HttpStatus.UNAUTHORIZED, "invalid");
         }
 
@@ -206,7 +211,7 @@ public class WebhookIngestPipeline {
                     "WebhookIngestPipeline: publish failed for kind={} subject={}: {}",
                     kind,
                     sanitizeForLog(subject),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return problem(HttpStatus.SERVICE_UNAVAILABLE, "publish-failed");
         }
         log.info(

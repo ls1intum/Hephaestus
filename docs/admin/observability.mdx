@@ -4,8 +4,11 @@ title: Observability
 
 # Observability contract
 
-Production logs are newline-delimited JSON records. `job.id` and `workspace.id` are fields, not
-metric labels. The console uses a Logstash-compatible application schema, not an OTLP log export.
+Every runtime role writes one JSON record per event to standard output.
+Spring Boot writes the records in its built-in [Elastic Common Schema (ECS) format](https://docs.spring.io/spring-boot/reference/features/logging.html#features.logging.structured).
+`job.id` and `workspace.id` are fields, not metric labels.
+The application exports no logs.
+The container runtime keeps them on the host until an operator collects them ([Collecting logs](#collecting-logs)).
 
 ## Scrape metrics
 
@@ -148,7 +151,7 @@ groups:
    Counters created on their first event can be absent before that event.
    An `increase` rule needs at least two samples.
    It cannot recover an event that occurred before its first sample.
-   Scraping does not replace warning logs or Sentry.
+   Scraping does not replace warning and error logs.
 
    Poison counts mean the application stopped retrying a delivery.
    They are not a durable dead-letter queue.
@@ -176,17 +179,58 @@ See the [Prometheus alerting guidance](https://prometheus.io/docs/practices/aler
 
 ## Reading log records
 
-| Field                        | Meaning                                                                                            |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| `timestamp`                  | UTC event time, in ISO-8601 format                                                                 |
-| `level`, `logger`, `message` | Severity, originating logger, and human-readable event description                                 |
-| `event.name`                 | Stable name on structured application events. Do not parse the message to identify these events    |
-| `mdc`                        | Thread-scoped context, including `traceId`, `spanId`, and workspace/job identifiers when available |
-| `stacktrace`                 | Exception details when deliberately included. Not present on every failure                         |
+| Field                                             | Meaning                                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `@timestamp`                                      | UTC event time, in ISO-8601 format                                                               |
+| `log.level`, `log.logger`, `message`              | Severity, originating logger, and human-readable event description                               |
+| `service.name`, `service.version`                 | `Hephaestus` and the running version, the same values that traces carry                          |
+| `service.environment`                             | `DEPLOYMENT_ENVIRONMENT`                                                                         |
+| `service.node.name`                               | The container ID, the same value as the `X-Hephaestus-Replica` response header                   |
+| `runtime.role`                                    | `server`, `worker` or `webhook`, or `all` for a local process that runs every role               |
+| `context.event.name`                              | Stable name on structured application events. Do not parse the message to identify these events  |
+| `context.traceId`, `context.spanId`               | The active trace scope, when there is one                                                         |
+| `context.job.id`, `context.workspace.id`          | Thread-scoped context, when available                                                            |
+| `context.installation_id`                         | The GitHub App installation of a workspace-scoped request, when it has one                      |
+| `context.integration.route`, `context.integration.delivery` | On `integration.message.failed`: provider and event (`github.push`), and the delivery count |
+| `context.*`                                       | Every other event field and thread-scoped value                                                  |
+| `error.type`, `error.stack_trace`                 | Exception class and frames when a call site includes the exception. Not present on every failure |
 
-Event-specific numbers and booleans remain JSON numbers and booleans. Context stays under `mdc` so
-it cannot overwrite the record's severity or message. A JSON string can contain escaped newlines.
+Spring Boot writes a dotted name such as `log.level` as nested JSON objects.
+Event fields and thread-scoped values sit in the `context` object, so they cannot replace a field of the record.
+This document names them without the `context.` prefix below.
+Read records with a JSON tool, not by text position.
+Event-specific numbers and booleans remain JSON numbers and booleans.
+
+A JSON string can contain escaped newlines.
 Read logs as JSON, not as extra records from their rendered text.
+
+A stack trace is at most 8192 characters and at most 32 frames for each exception.
+Docker splits a log line at 16 KiB, and the pieces are not JSON, so one record must stay below that.
+JSON escaping makes the written trace slightly longer than its limit.
+A message that a call site writes has no limit of its own.
+Each exception line carries a hash, so you can count repeated failures of one kind.
+
+A record names each exception in a stack trace, including causes and suppressed exceptions, by its class only.
+It contains no `error.message`.
+A database driver quotes rejected row values in its messages, an HTTP client the request URL, and a parser the input that it rejected.
+These boundaries have their own guard:
+
+- The PostgreSQL driver runs with `logServerErrorDetail=false`, so its messages omit the `DETAIL` line that quotes rejected row values.
+  The primary message, the SQLSTATE and the constraint name remain.
+  A primary message can still quote a value for some kinds of error.
+- Hibernate's own log of the driver message for a failed statement, the `org.hibernate.orm.jdbc.error` category, is off.
+  The application still logs the exception class and frames, and conflicts still record the SQLSTATE.
+- Tomcat's request parser, `org.apache.coyote.http11.Http11Processor`, logs at `WARN` and above only.
+  At `INFO` and `DEBUG` it writes the raw target of a request that it cannot parse, query string included.
+
+The application writes an exception's class, not its message, into its own log messages.
+Sync, provider, webhook and NATS failures log the class with the operation, the status where known, and opaque identifiers.
+A failed NATS delivery logs its route and delivery count, and attaches the stack trace on the first delivery only.
+The subject, which names an owner and a repository, stays out of the record.
+Workspaces are identified by `workspace.id`. The workspace slug is not a log field.
+
+Run production at `INFO`.
+`DEBUG` on framework, client or driver packages can write request content, provider responses and container settings that no guard above covers.
 
 The startup event `runtime.roles.configured` records `runtime.server.enabled`,
 `runtime.worker.enabled`, and `runtime.webhook.enabled` as booleans. It is informational when any
@@ -203,9 +247,20 @@ GitLab webhook registration failures expose the workspace and HTTP status in
 diagnostics use `integration.request.failed` with the API operation, host, exception type, and HTTP
 status when available. They stay at debug level and do not include raw transport/decoding messages.
 
-Credential-field masking and known-token masking are defense in depth, not a guarantee that arbitrary
-private text is safe to log. Keep raw requests, provider responses, signed URLs, and private runtime text out of logs. Restrict log access and retention as part of the instance's data-protection
-policy. Do not publish raw runtime diagnostics merely because common token patterns are masked.
+When a review sandbox fails, the log records the size of its transcript as `sandbox.transcript.withheld`, not its content.
+The transcript holds what the run was asked, what it read and the provider errors that it saw.
+No log level writes it.
+For a next-day investigation, use the worker's bounded debug session transcripts ([retention decision](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md#update--2026-10-09-debug-transcripts)).
+
+The formatter masks secret field names (for example `token`, `authorization`, `PRIVATE-TOKEN`, `X-Gitlab-Token` and `privateKey`) and known credential formats.
+These formats are bearer and basic credentials, GitHub, GitLab and Slack tokens (including `xoxe-` and `xapp-`), JWTs, credentials in a URL, and signed or token query parameters.
+This masking is defense in depth, not redaction.
+It does not detect names, email addresses or private text that a call site writes into a message.
+
+Keep raw requests, provider responses, signed URLs, and private runtime text out of logs.
+Restrict log access and retention as part of the instance's data-protection policy.
+Identifiers such as `workspace.id`, `job.id`, a trace ID or a container ID are not anonymous.
+They connect records to a workspace and its people, so they are personal data under the same policy.
 
 ## Agent-job lifecycle
 
@@ -288,8 +343,8 @@ status. Consult the server log when an export remains queued or processing after
 
 When tracing is enabled, HTTP responses carry an `X-Request-Id` header containing the request's W3C
 trace ID. It is generated by tracing or extracted from valid incoming trace context, not derived
-from user attributes. While a trace scope is active, JSON logs carry its IDs under `mdc.traceId` and
-`mdc.spanId`. With tracing disabled, the correlation filter passes through without inventing an ID.
+from user attributes. While a trace scope is active, JSON logs carry its IDs as `context.traceId` and
+`context.spanId`. With tracing disabled, the correlation filter passes through without inventing an ID.
 Access logs stay off at every layer.
 
 A queued review records its submission correlation, but an execution attempt starts its own trace.
@@ -330,14 +385,75 @@ Concrete IDs or URLs in `uri` tags indicate a tagging defect.
 2. Fix a tagging defect before considering a larger budget.
 3. Do not turn off the bound.
 
-## Error tracking
+## Collecting logs
 
-Set `SENTRY_DSN` to send errors to Sentry.
-Leave it blank to send nothing.
+Hephaestus sends no logs and no error reports to any service.
+The browser app reports nothing either.
 
-Each event carries the deployment environment and the running version.
-The environment is `DEPLOYMENT_ENVIRONMENT` ([Deployment environment and release history](./install#deployment-environment-and-release-history)).
-The version is `1.2.3` for a release, or the full commit for a host that follows commits.
+### What the host keeps by default
+
+The supported Compose stacks use Docker's `json-file` driver with a size limit for each container:
+
+| Containers                                                                   | Limit                |
+| ---------------------------------------------------------------------------- | -------------------- |
+| `application-server`, `application-worker`, `webapp`, `postgres`, `volume-init` | 5 files of 50 MB |
+| `webhook-server`, `nats-server`                                              | 3 files of 10 MB     |
+
+Docker writes these files in its default blocking mode.
+An application thread waits for the write, so no line is lost while the disk accepts writes.
+When a container reaches its limit, Docker deletes its oldest file.
+A line that no collector read before that deletion is lost.
+Sandbox containers use the host's default Docker logging configuration, which Hephaestus does not change.
+
+### Ship logs to Loki
+
+This is optional.
+[Grafana Alloy](https://grafana.com/docs/alloy/latest/) reads the host journal and sends the lines to a Loki that you operate.
+Grafana then queries that Loki.
+The repository ships an example only.
+It does not start Alloy, and it names no destination.
+
+1. Upgrade to a release with this log format first.
+   Lines written by an earlier release are not redacted after the fact, and nothing in this setup collects them.
+2. Add [`docker/observability/compose.journald.yaml`](https://github.com/hephaestus-build/Hephaestus/blob/main/docker/observability/compose.journald.yaml) after the single-host stack's compose files.
+   It needs Compose 2.24.4 or later.
+   It moves the three Java runtime roles, `application-server`, `application-worker` and `webhook-server`, to the `journald` driver and tags their entries `hephaestus-runtime`.
+   The tag is new, so journal entries written before the overlay never match it.
+   The webapp keeps its local `json-file` log: nginx error lines can name a client address and a request with its query.
+   PostgreSQL keeps `json-file`, because its error lines can quote rejected row values.
+   Sandbox containers, NATS and the proxy are not tagged.
+3. The reference deployment renders each stack as its own Compose project.
+   Give each of the three Java services the same `logging` block in that stack's override.
+4. Run Alloy with [`docker/observability/config.alloy`](https://github.com/hephaestus-build/Hephaestus/blob/main/docker/observability/config.alloy).
+   Set `LOKI_PUSH_URL` to your Loki push endpoint and `DEPLOYMENT_ENVIRONMENT` to the instance's name.
+   The label reads `unset` when the variable is empty.
+   Give Alloy read access to the journal through the `systemd-journal` group.
+   That group can read the whole host journal, including `sshd` and `sudo` entries.
+   The `matches` filter limits what Alloy ships, not what it can read, so treat the Alloy host account as privileged.
+   Do not give it the Docker socket.
+   The socket gives full control of the Docker daemon, also when you mount it read-only.
+5. Set Loki's retention to the period in your record of processing.
+
+The example reads only entries with the `hephaestus-runtime` tag.
+It sets two index labels, `service_name` and `deployment_environment`.
+Both come from a small fixed set.
+
+The trace ID goes to [structured metadata](https://grafana.com/docs/loki/latest/get-started/labels/structured-metadata/), so `| trace_id="<id>"` finds a request without a label per request.
+Workspace, job, user and repository identifiers stay in the line.
+Read them with `| json`.
+Do not make them labels: each value becomes its own stream ([Loki label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/)).
+
+Each stage has a bound, and each bound can lose lines:
+
+| Stage                       | Bound                                                    | When it is reached                     |
+| --------------------------- | -------------------------------------------------------- | -------------------------------------- |
+| Docker to journald          | 4 MiB buffer, non-blocking                               | Docker drops new lines. The app does not wait |
+| journald                    | The host's `RateLimitBurst` and `SystemMaxUse`           | journald drops or deletes old entries  |
+| Alloy start or long outage  | `max_age = "12h"`                                        | Older entries are not sent             |
+| Alloy to Loki               | 10 retries, at most 5 minutes apart                      | Alloy drops the batch                  |
+
+Hephaestus does not change `journald.conf`.
+Check its limits on the host before you rely on the journal as a buffer.
 
 ## Exporting OpenTelemetry traces
 

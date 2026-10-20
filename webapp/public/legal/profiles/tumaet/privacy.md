@@ -1,6 +1,6 @@
 Privacy Statement for Hephaestus in accordance with Art. 13 and 14 GDPR.
 
-_Last updated: 2026-10-07._
+_Last updated: 2026-10-20._
 
 The Technical University of Munich (TUM), through the Research Group for Applied Education Technologies (AET), operates Hephaestus at https://hephaestus.build, which is also reachable at https://hephaestus.aet.cit.tum.de. This statement explains what personal data the platform processes, why, on what legal basis, who receives it, how long it is kept, and the rights you have. Personal data is processed under the GDPR, the Bavarian Data Protection Act (BayDSG), the Bavarian Higher Education Innovation Act (BayHIG), and the German Telecommunications Digital Services Data Protection Act (TDDDG).
 
@@ -128,7 +128,7 @@ copies outside this instance.
 
 ## 4. Cookies and browser-side storage
 
-Hephaestus uses technically necessary browser-side storage: the session cookie (`__Host-HEPHAESTUS_AT`) and the CSRF and OAuth-state cookies that maintain your login, and a `theme` entry in local storage that remembers your light/dark mode (no personal data). Legal basis: § 25 Abs. 2 Nr. 2 TDDDG i.V.m. Art. 6(1)(e) GDPR. Beyond these, a deployment may activate optional Sentry error monitoring. Where activated, it uses cookies or browser-side storage **only after you opt in** through the cookie-consent banner (legal basis: § 25 Abs. 1 TDDDG i.V.m. Art. 6(1)(a) GDPR); you can change or withdraw that choice at any time via the "Cookie preferences" link. Where browser error monitoring is not configured, no consent banner is shown and only the technically necessary storage above is used. Product feedback and survey submissions create no browser-side storage. No advertising or cross-site tracking cookies are used in any configuration.
+Hephaestus uses technically necessary browser-side storage: the session cookie (`__Host-HEPHAESTUS_AT`) and the CSRF and OAuth-state cookies that maintain your login, and a `theme` entry in local storage that remembers your light/dark mode (no personal data). Legal basis: § 25 Abs. 2 Nr. 2 TDDDG i.V.m. Art. 6(1)(e) GDPR. Hephaestus has no error-reporting service and shows no cookie-consent banner. The web app sends no error reports from your browser. Product feedback and survey submissions create no browser-side storage. No advertising or cross-site tracking cookies are used in any configuration.
 
 ### Chrome extension
 
@@ -206,8 +206,7 @@ The **Leibniz-Rechenzentrum (LRZ) der Bayerischen Akademie der Wissenschaften** 
 
 Avatar images can load directly from the image host that the source platform names for a profile,
 including on public directory pages. Your browser then sends that host network metadata such as your
-IP address and the image address, and the host handles it under its own privacy terms. These requests
-are separate from optional browser error reporting.
+IP address and the image address, and the host handles it under its own privacy terms.
 
 ## 6. Third-country transfers
 
@@ -361,14 +360,26 @@ hidden Heph runtime memory once. Visible chats, titles and times remain, but you
 context. Settings and lifecycle times remain when old operator attribution is cleared. This upgrade
 clearing is separate from your account deletion or person request.
 
-## 14. Optional monitoring and deployment retention
+## 14. Operational logs, monitoring and deployment retention
 
 The shipped production stack has no general HTTP access log. Authentication events still record
 IP address and browser information. Metrics use a private management listener. Optional tracing is
 disabled by default; enabling it adds operational workspace and run identifiers to monitoring.
 
-No error-reporting service is currently connected to this deployment. Hephaestus supports optional
-error reporting; if it is activated, this statement will be updated before activation.
+The application server, webhook receiver, worker and web app write operational logs on the
+infrastructure described in section 6. An entry records the time, severity, component, release and
+a message. For a failure it also records the error type and technical stack trace. An entry can carry
+operational identifiers, such as a request trace identifier, a workspace or job identifier and the
+container identifier. These identifiers can relate an entry to a workspace and its members, so
+operational logs are personal data. Logs are designed to leave out request and model content,
+source content, credentials, cookies, addresses that carry access tokens, names and email
+addresses. An error message from a connected service is not filtered, so an entry can still contain
+such a detail. Operators use logs only to run and secure the service and to find
+faults. Logs stay on that infrastructure, are not sent to an external service, and rotate by size
+(section 7). If a central log store is connected, this statement will state its retention before
+activation.
+
+No error-reporting service is connected (section 4).
 
 Records without an automatic expiry, including contributor profiles, conversations, observations,
 feedback and some administrative records, are kept while they are needed to operate the workspace
