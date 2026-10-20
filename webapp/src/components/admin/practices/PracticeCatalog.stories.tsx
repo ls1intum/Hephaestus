@@ -439,20 +439,25 @@ export const MoveGroupWithoutDragging: Story = {
 	},
 };
 
+/**
+ * Space picks the first row up, Arrow Down moves it past the next row, Space drops it there. The
+ * dragged row has a long name and its drag preview has its own height; where the move lands must
+ * not depend on either. Each step waits on the exact words a screen reader hears, so the drop waits
+ * for the move to reach the second place, and real key presses let dnd-kit's keyboard sensor, which
+ * starts listening a task after the pick-up, take every key.
+ */
 export const KeyboardReordering: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ args, canvas }) => {
-		const handle = canvas.getByRole("button", {
-			name: `Reorder ${nameOf(mockPracticeLongText)}`,
-		});
-		handle.focus();
-		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
-		await screen.findByText(`Picked up ${nameOf(mockPracticeLongText)}.`);
-		handle.dispatchEvent(
-			new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }),
-		);
-		await screen.findByText(new RegExp(`Moving ${nameOf(mockPracticeLongText)}`, "u"));
-		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
+	play: async ({ args, canvas, userEvent }) => {
+		const name = nameOf(mockPracticeLongText);
+		const second = `position 2 of 2 in ${longNamedGroup.name}`;
+		canvas.getByRole("button", { name: `Reorder ${name}` }).focus();
+		await userEvent.keyboard("[Space]");
+		await screen.findByText(`Picked up ${name}.`);
+		await userEvent.keyboard("[ArrowDown]");
+		await screen.findByText(`Moving ${name}, ${second}.`);
+		await userEvent.keyboard("[Space]");
+		await screen.findByText(`Moved ${name} to ${second}.`);
 		await expect(args.onMovePractice).toHaveBeenCalledWith(
 			mockPracticeLongText.slug,
 			longNamedGroup.slug,
