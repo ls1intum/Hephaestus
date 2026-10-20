@@ -338,9 +338,29 @@ const conversationEligibilitySchemaResponseTransformer = (data: any) => {
     return data;
 };
 
+const deliveredSchemaResponseTransformer = (data: any) => {
+    data.deliveredAt = new Date(data.deliveredAt);
+    return data;
+};
+
+const queuedSchemaResponseTransformer = (data: any) => {
+    data.preparedAt = new Date(data.preparedAt);
+    return data;
+};
+
+const privateFeedbackHistorySchemaResponseTransformer = (data: any) => {
+    data.delivered = data.delivered.map((item: any) => deliveredSchemaResponseTransformer(item));
+    data.queued = data.queued.map((item: any) => queuedSchemaResponseTransformer(item));
+    data.readAt = new Date(data.readAt);
+    return data;
+};
+
 const admissionResponseSchemaResponseTransformer = (data: any) => {
     if (data.conversationEligibility) {
         data.conversationEligibility = conversationEligibilitySchemaResponseTransformer(data.conversationEligibility);
+    }
+    if (data.privateHistory) {
+        data.privateHistory = privateFeedbackHistorySchemaResponseTransformer(data.privateHistory);
     }
     return data;
 };

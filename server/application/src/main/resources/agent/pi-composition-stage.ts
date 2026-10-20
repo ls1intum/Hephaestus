@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import nodePath from "node:path";
 import {
 	DefaultResourceLoader,
@@ -36,6 +36,7 @@ import {
 	buildPublicReviewHistory,
 	buildPrimarySourceReference,
 	buildSameWorkContext,
+	captureTime,
 } from "./pi-review-brief.ts";
 import type { Work } from "./pi-review-turns.ts";
 import {
@@ -56,8 +57,10 @@ import {
 	type ReviewPractice,
 	buildReviewTurn,
 	decidedByReview,
+	deliveredBy,
 	priorAdviceWitnesses,
 	priorPublicFeedback,
+	type PriorAdviceWitness,
 	publicQualifications,
 	qualificationEvidence,
 	undeliverableFeedback,
@@ -386,7 +389,7 @@ function validateFeedback(
 	piece: ReadFeedbackPiece,
 	results: ReadonlyMap<string, AdmittedResult>,
 	preparedTargets: readonly PreparedFeedbackTarget[],
-	deliveredPractices: ReadonlySet<string>,
+	deliveredWitnesses: ReadonlyMap<string, PriorAdviceWitness>,
 ): string | null {
 	const evidenceError = validateFeedbackEvidence(piece.practiceSlug, piece.basedOn, results);
 	if (evidenceError !== null) {
@@ -404,14 +407,29 @@ function validateFeedback(
 		if (!hasText(reason)) {
 			return "WITHHOLD needs a withholdReason; skipped.";
 		}
-		// The withholding settles each NOT_MET practice in basedOn (undecidedPrivatePractices), so each needs a record here.
-		const unrecorded = notMetPractices(
+		// As on the work: ALREADY_SAID needs words recorded as said by the history read; any other reason also needs a
+		// claim still current, delivered before this work was captured.
+		const flag = reason === "ALREADY_SAID" ? "eligibleForAlreadySaid" : "eligibleForPriorAdvice";
+		const witnesses = (slug: string, id: string) =>
+			deliveredWitnesses.get(`${piece.destination}:${slug}:${id}`)?.[flag] === true;
+		const witnessedSlugs = notMetPractices(
 			piece.basedOn.flatMap((id) => named.get(id)?.result ?? []),
-		).filter((slug) => !deliveredPractices.has(`${piece.destination}:${slug}`));
+		);
+		// The withholding settles each NOT_MET practice in basedOn (undecidedPrivatePractices), so each needs a record here.
+		const unrecorded = witnessedSlugs.filter(
+			(slug) =>
+				![...deliveredWitnesses].some(
+					([key, witness]) => key.startsWith(`${piece.destination}:${slug}:`) && witness[flag],
+				),
+		);
 		if ([...PRIOR_ADVICE_REASONS].some((prior) => prior === reason) && unrecorded.length > 0) {
+			const needed =
+				reason === "ALREADY_SAID"
+					? "not withdrawn, with its words, delivered by the history read; its claim may be current or stale"
+					: "not withdrawn, with its words, its claim still current, delivered before this work was captured";
 			return (
 				`${reason} rests on feedback recorded as delivered on ${piece.destination} for ${unrecorded.join(", ")} in the ` +
-				`delivered-feedback history: current, not withdrawn, with its words, for each NOT_MET practice in basedOn. The captured history does not establish that prerequisite; prepared ` +
+				`delivered-feedback history: ${needed}, for each NOT_MET practice in basedOn. The history does not establish that prerequisite; prepared ` +
 				`feedback and other destinations do not count. Decide this destination on its own evidence: the piece it supports, ` +
 				`or WITHHOLD with BELOW_BAR. Skipped.`
 			);
@@ -419,24 +437,14 @@ function validateFeedback(
 		if (reason !== "BELOW_BAR" && (piece.witnessIds?.length ?? 0) === 0) {
 			return `${reason} needs witnessIds from the delivered-feedback file; skipped.`;
 		}
-		const witnessedSlugs = notMetPractices(
-			piece.basedOn.flatMap((id) => named.get(id)?.result ?? []),
-		);
 		const witnessIds = piece.witnessIds ?? [];
 		if (
-			witnessIds.some(
-				(id) =>
-					!witnessedSlugs.some((slug) =>
-						deliveredPractices.has(`${piece.destination}:${slug}:${id}`),
-					),
-			) ||
+			witnessIds.some((id) => !witnessedSlugs.some((slug) => witnesses(slug, id))) ||
 			witnessedSlugs.some(
-				(slug) =>
-					reason !== "BELOW_BAR" &&
-					!witnessIds.some((id) => deliveredPractices.has(`${piece.destination}:${slug}:${id}`)),
+				(slug) => reason !== "BELOW_BAR" && !witnessIds.some((id) => witnesses(slug, id)),
 			)
 		) {
-			return "Witnesses must name current delivered feedback for every supported practice on this destination; skipped.";
+			return `Witnesses must name delivered feedback that can stand for ${reason} for every supported practice on this destination; skipped.`;
 		}
 		return null;
 	}
@@ -458,7 +466,7 @@ function validateFeedback(
 					target.practiceSlug === piece.practiceSlug,
 			)
 		) {
-			return `No queued message has threadKey '${piece.supersedesThreadKey}'; it must come from the task-declared prepared-feedback file. Skipped.`;
+			return `No queued message has threadKey '${piece.supersedesThreadKey}' on this destination and practice; it must come from the prepared-feedback file. Skipped.`;
 		}
 	}
 	if (piece.destination === "CONVERSATION") {
@@ -543,7 +551,7 @@ export function buildFeedbackTool(
 	request: CompositionRequest,
 	results: readonly AdmittedResult[],
 	preparedTargets: PreparedFeedbackTarget[],
-	deliveredPractices: ReadonlySet<string>,
+	deliveredWitnesses: ReadonlyMap<string, PriorAdviceWitness>,
 	runtime: FeedbackToolRuntime,
 ) {
 	runtime.feedback.preparedTargets = preparedTargets;
@@ -582,7 +590,7 @@ export function buildFeedbackTool(
 				`${piece.destination} holds at most ${bounds.maxPieces} piece(s) and is full: this one does not fit — WITHHOLD it with BELOW_BAR or leave it out. Skipped.`,
 			);
 		}
-		const rejection = validateFeedback(piece, admitted, preparedTargets, deliveredPractices);
+		const rejection = validateFeedback(piece, admitted, preparedTargets, deliveredWitnesses);
 		if (rejection !== null) {
 			return skipped(rejection);
 		}
@@ -1223,9 +1231,59 @@ export function createReviewRecorder(
 export interface CompositionFiles {
 	requestPath: string;
 	feedbackPath: string;
+	/** Written by the runner from the admission's private history, for the private session only. */
+	deliveredPath: string;
 	preparedPath: string;
+	problemsPath: string;
 	supportPath: string;
 	criteriaPathOf: (slug: string) => string;
+}
+
+// Only the runner writes these, at the start of the private phase: a session with bash could otherwise leave files
+// that the guards would read as history. Without a server read there is none, which the turn reports as not staged.
+// capturedAt is when the reviewed work was captured, from its folder index; null fails every prior-advice witness.
+export function stagePrivateHistory(
+	history: Admission["privateHistory"],
+	files: CompositionFiles,
+	capturedAt: string | null,
+): {
+	preparedTargets: PreparedFeedbackTarget[];
+	deliveredWitnesses: Map<string, PriorAdviceWitness>;
+} {
+	rmSync(files.deliveredPath, { force: true });
+	rmSync(files.preparedPath, { force: true });
+	if (history !== null) {
+		writePrivateHistory(history, files);
+	}
+	return {
+		preparedTargets: stagedPreparedTargets(files.preparedPath),
+		deliveredWitnesses: stagedDeliveredWitnesses(files.deliveredPath, capturedAt),
+	};
+}
+
+function writePrivateHistory(
+	history: NonNullable<Admission["privateHistory"]>,
+	files: CompositionFiles,
+): void {
+	const { readAt, coverage } = history;
+	mkdirSync(nodePath.dirname(files.deliveredPath), { recursive: true });
+	mkdirSync(nodePath.dirname(files.preparedPath), { recursive: true });
+	writeFileSync(
+		files.deliveredPath,
+		JSON.stringify(
+			{ readAt, coverage, recordRole: "RECORDED_DELIVERY", feedback: history.delivered },
+			null,
+			2,
+		),
+	);
+	writeFileSync(
+		files.preparedPath,
+		JSON.stringify(
+			{ readAt, coverage, recordRole: "PREPARED_NOT_DELIVERED", prepared: history.queued },
+			null,
+			2,
+		),
+	);
 }
 
 function coordinatesOf(citation: unknown): unknown {
@@ -1380,10 +1438,15 @@ function notMetCriteria(
 		.join("\n");
 }
 
+// A history location can be named without being staged; missing and empty carry different evidence.
+function unstagedHistory(label: string, file: string): string {
+	return `### ${label} — \`${file}\` is not staged for this review; what it would record is unknown here, not empty\n`;
+}
+
 // The producer owns body eligibility; consume only bodies it staged.
 function priorFeedbackFacts(label: string, file: string, key: "feedback" | "prepared"): string {
 	if (!existsSync(file)) {
-		return "";
+		return unstagedHistory(label, file);
 	}
 	const pointer = `### ${label} — read \`${file}\` for the recorded history; its contents are not shown here\n`;
 	let history: unknown;
@@ -1416,9 +1479,13 @@ function priorFeedbackFacts(label: string, file: string, key: "feedback" | "prep
 		};
 	});
 	const text = JSON.stringify({ ...history, [key]: projected }, null, 1);
+	const heading =
+		entries.length === 0
+			? "staged with no entries"
+			: "bodies remain at their `bodyAt` in the unchanged file; read them when earlier wording matters";
 	return text.length > COMPOSITION_BLOCK_LIMIT
 		? pointer
-		: `### ${label} — bodies remain at their \`bodyAt\` in the unchanged file; read them when earlier wording matters\n\`\`\`json\n${text}\n\`\`\`\n`;
+		: `### ${label} — ${heading}\n\`\`\`json\n${text}\n\`\`\`\n`;
 }
 
 // A planned public decision proves neither delivery nor prior private advice.
@@ -1483,20 +1550,23 @@ export function buildCompositionTurn(
 		.join("; ");
 	const admitted = JSON.stringify({ results: results.map(composerView) }, null, 1);
 	const onTheWork = plannedReviewFacts(composedFeedback, FEEDBACK_PATH);
-	const historyRoot = nodePath.dirname(PREPARED_FEEDBACK_PATH);
+	const problemHistory = "What earlier reviews recorded about this person";
+	const problemHistoryPath = files.problemsPath;
 	const context = [
 		stagedBlock(
 			"The composition request (destinations, limits, copy forms)",
 			COMPOSITION_REQUEST_PATH,
 		),
-		stagedBlock("What earlier reviews recorded about this person", `${historyRoot}/problems.json`),
+		existsSync(problemHistoryPath)
+			? stagedBlock(problemHistory, problemHistoryPath)
+			: unstagedHistory(problemHistory, problemHistoryPath),
 		request.destinations.PRACTICE_PAGE === undefined
 			? ""
 			: stagedBlock(
 					"PRACTICE_PAGE support: occurrences a new card may cite at this read",
 					PRACTICE_PAGE_SUPPORT_PATH,
 				),
-		priorFeedbackFacts("Recorded delivered feedback", `${historyRoot}/feedback.json`, "feedback"),
+		priorFeedbackFacts("Recorded delivered feedback", files.deliveredPath, "feedback"),
 		priorFeedbackFacts(
 			"Prepared feedback (not delivered; supersession targets)",
 			PREPARED_FEEDBACK_PATH,
@@ -1758,12 +1828,19 @@ function stagedPreparedTargets(PREPARED_FEEDBACK_PATH: string): PreparedFeedback
 	}
 }
 
-// Prepared or unreadable feedback cannot establish prior communication. Only current delivered words count.
-function stagedDeliveredPractices(PREPARED_FEEDBACK_PATH: string): Set<string> {
-	const file = `${nodePath.dirname(PREPARED_FEEDBACK_PATH)}/feedback.json`;
+/**
+ * Each delivered piece, by `destination:practice:feedbackId`, with what it may stand for, as on the work: words said
+ * by the history read are communication whether their claim is current or stale; only a current claim delivered
+ * before this work was captured is advice it could have answered. Prepared or unreadable feedback is neither.
+ */
+function stagedDeliveredWitnesses(
+	file: string,
+	capturedAt: string | null,
+): Map<string, PriorAdviceWitness> {
+	const witnesses = new Map<string, PriorAdviceWitness>();
 	try {
 		if (!existsSync(file)) {
-			return new Set();
+			return witnesses;
 		}
 		const history: unknown = JSON.parse(readFileSync(file, "utf8"));
 		if (
@@ -1771,38 +1848,40 @@ function stagedDeliveredPractices(PREPARED_FEEDBACK_PATH: string): Set<string> {
 			history.recordRole !== "RECORDED_DELIVERY" ||
 			!Array.isArray(history.feedback)
 		) {
-			return new Set();
+			return witnesses;
 		}
-		return new Set(
-			history.feedback.flatMap((entry: unknown) => {
-				if (!isRecord(entry)) {
-					return [];
+		const readAt = typeof history.readAt === "string" ? history.readAt : null;
+		for (const entry of history.feedback) {
+			if (!isRecord(entry)) {
+				continue;
+			}
+			const { destination, recordedClaimCurrentness, withdrawn, body, deliveredAt } = entry;
+			const id = trimmedText(entry.id);
+			const recorded =
+				(destination === "PRACTICE_PAGE" || destination === "CONVERSATION") &&
+				id !== "" &&
+				(recordedClaimCurrentness === "CURRENT" || recordedClaimCurrentness === "STALE") &&
+				withdrawn === false &&
+				typeof body === "string" &&
+				body.trim() !== "";
+			if (!recorded) {
+				continue;
+			}
+			const witness = {
+				eligibleForPriorAdvice:
+					recordedClaimCurrentness === "CURRENT" && deliveredBy(deliveredAt, capturedAt),
+				eligibleForAlreadySaid: deliveredBy(deliveredAt, readAt),
+			};
+			for (const support of jsonArray(entry.basedOn)) {
+				if (isRecord(support) && support.outcome === "NOT_MET") {
+					witnesses.set(`${destination}:${trimmedText(support.practiceSlug)}:${id}`, witness);
 				}
-				const { destination, recordedClaimCurrentness, withdrawn, body, deliveredAt } = entry;
-				if (
-					(destination !== "PRACTICE_PAGE" && destination !== "CONVERSATION") ||
-					recordedClaimCurrentness !== "CURRENT" ||
-					(withdrawn !== undefined && withdrawn !== false) ||
-					typeof body !== "string" ||
-					body.trim() === "" ||
-					typeof deliveredAt !== "string" ||
-					!Number.isFinite(Date.parse(deliveredAt))
-				) {
-					return [];
-				}
-				return jsonArray(entry.basedOn).flatMap((support) =>
-					isRecord(support) && support.outcome === "NOT_MET"
-						? [
-								`${destination}:${trimmedText(support.practiceSlug)}`,
-								`${destination}:${trimmedText(support.practiceSlug)}:${trimmedText(entry.id) || trimmedText(entry.feedbackId)}`,
-							]
-						: [],
-				);
-			}),
-		);
+			}
+		}
+		return witnesses;
 	} catch (error) {
 		console.error(`[pi-runner] delivered feedback unreadable for composition: ${errorText(error)}`);
-		return new Set();
+		return new Map();
 	}
 }
 
@@ -1906,7 +1985,6 @@ export function createCompositionStage<TTrace extends CompositionTrace>(
 		budget: compositionBudget,
 		runtime,
 	} = options;
-	const PREPARED_FEEDBACK_PATH = files.preparedPath;
 	const {
 		openSession,
 		closeSession,
@@ -2254,12 +2332,13 @@ ${finishCompositionText(notMet, request, composedFeedback)}`,
 		) {
 			return;
 		}
+		const history = stagePrivateHistory(admission.privateHistory, files, captureTime(folderIndex));
 		const feedbackTool = buildFeedbackTool(
 			practiceIndex.map((practice) => practice.slug).toSorted(),
 			request,
 			admission.results,
-			stagedPreparedTargets(PREPARED_FEEDBACK_PATH),
-			stagedDeliveredPractices(PREPARED_FEEDBACK_PATH),
+			history.preparedTargets,
+			history.deliveredWitnesses,
 			{
 				feedback: composedFeedback,
 				admitted: () => true,

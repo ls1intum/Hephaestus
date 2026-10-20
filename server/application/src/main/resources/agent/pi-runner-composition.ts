@@ -965,7 +965,7 @@ function ownHistoryText(
 
 const FEEDBACK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
-function deliveredBy(deliveredAt: unknown, capturedAt: string | null): boolean {
+export function deliveredBy(deliveredAt: unknown, capturedAt: string | null): boolean {
 	if (typeof deliveredAt !== "string" || capturedAt === null) {
 		return false;
 	}

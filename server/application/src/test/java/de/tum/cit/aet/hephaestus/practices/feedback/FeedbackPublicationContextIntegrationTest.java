@@ -55,6 +55,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackHistory;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
@@ -607,6 +608,12 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
                 var entries = history.forItem(workspaceId, item, viewer, limit);
                 page.addAll(entries);
                 return entries;
+            }
+
+            @Override
+            public Optional<PrivateFeedbackHistory> forPrivateComposition(
+                    long workspaceId, long developer, Collection<PrivateFeedbackHistory.Route> routes, int limit) {
+                return history.forPrivateComposition(workspaceId, developer, routes, limit);
             }
 
             @Override

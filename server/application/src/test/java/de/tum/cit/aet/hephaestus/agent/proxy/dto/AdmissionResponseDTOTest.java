@@ -6,16 +6,22 @@ import de.tum.cit.aet.hephaestus.agent.handler.FeedbackCompositionService;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimedCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationEligibility;
+import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryEntry;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageSupport;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackHistory;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -44,7 +50,37 @@ class AdmissionResponseDTOTest {
                                 List.of(new ConversationEligibility.ResultDecision(
                                         resultId, ConversationDecision.GATE_REFUSED, FeedbackStopReason.NO_AI)))),
                 List.of(),
-                List.of());
+                List.of(),
+                new PrivateFeedbackHistory(
+                        readAt,
+                        30,
+                        false,
+                        1,
+                        List.of(
+                                said(
+                                        "50000000-0000-4000-8000-000000000001",
+                                        FeedbackDestination.CONVERSATION,
+                                        FeedbackState.DELIVERED,
+                                        "Heph said the catch drops the error.",
+                                        Instant.parse("2026-10-02T00:00:00Z"),
+                                        Currentness.CURRENT,
+                                        null),
+                                said(
+                                        "50000000-0000-4000-8000-000000000002",
+                                        FeedbackDestination.PRACTICE_PAGE,
+                                        FeedbackState.DELIVERED,
+                                        "A card whose claim no longer holds.",
+                                        Instant.parse("2026-09-02T00:00:00Z"),
+                                        Currentness.STALE,
+                                        null),
+                                said(
+                                        "50000000-0000-4000-8000-000000000003",
+                                        FeedbackDestination.CONVERSATION,
+                                        FeedbackState.READY,
+                                        "Notes queued for Heph about dropped errors.",
+                                        null,
+                                        Currentness.CURRENT,
+                                        "handles-errors"))));
         var problem = new AdmittedProblemDTO(
                 UUID.fromString("40000000-0000-4000-8000-000000000001"),
                 Severity.MAJOR,
@@ -80,10 +116,47 @@ class AdmissionResponseDTOTest {
                 List.of(new AdmissionResponseDTO.Withheld("names-things", "42", "NO_EVIDENCE")),
                 FeedbackCompositionService.page(read),
                 FeedbackCompositionService.conversation(read),
+                FeedbackCompositionService.privateHistory(read),
                 false,
                 false);
         try (var fixture = Objects.requireNonNull(getClass().getResourceAsStream("/agent/admission-response.json"))) {
             assertThat(mapper.readTree(mapper.writeValueAsString(response))).isEqualTo(mapper.readTree(fixture));
         }
+    }
+
+    private static PrivateFeedbackHistory.Entry said(
+            String id,
+            FeedbackDestination destination,
+            FeedbackState state,
+            String body,
+            @Nullable Instant deliveredAt,
+            Currentness currentness,
+            @Nullable String replaceablePracticeSlug) {
+        var earlier = UUID.fromString("60000000-0000-4000-8000-000000000001");
+        return new PrivateFeedbackHistory.Entry(
+                new FeedbackHistoryEntry(
+                        UUID.fromString(id),
+                        UUID.fromString("70000000-0000-4000-8000-000000000001"),
+                        42L,
+                        9L,
+                        destination,
+                        state,
+                        body,
+                        Instant.parse("2026-09-01T00:00:00Z"),
+                        deliveredAt,
+                        List.of(earlier),
+                        List.of(),
+                        null,
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        null,
+                        true,
+                        null),
+                List.of(new PrivateFeedbackHistory.Basis(earlier, "handles-errors", 7L, ResultOutcome.NOT_MET)),
+                currentness,
+                false,
+                replaceablePracticeSlug);
     }
 }

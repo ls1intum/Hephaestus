@@ -8,6 +8,7 @@ import {
 	compositionRequestSchema,
 	executionReportSchema,
 } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
+import { isJsonObject as isRecord } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 import { practiceIndexSchema } from "../../../../../../docker/agents/practice-scripts/lib/core/runtime-inputs.ts";
 import { AUTHENTICATION_CRITERION, PRACTICES_DIR } from "./golden-review-workspace.ts";
 import {
@@ -188,4 +189,42 @@ void test("the runner reads the server's admission envelope and recorded routing
 	assert.ok(admission.conversationEligibility?.state === "COMPLETE");
 	assert.equal(admission.practicePageSupport.practices[0]?.stopReason, "NO_AI");
 	assert.equal(admission.conversationEligibility.results[0]?.stopReason, "NO_AI");
+	// The private history the server serializes: authorized words whatever the claim's state, targets by feedback ID.
+	const history = admission.privateHistory;
+	assert.ok(history !== null);
+	assert.deepEqual(
+		history.delivered.map((row) => [row.recordedClaimCurrentness, row.bodyRole, row.body !== null]),
+		[
+			["CURRENT", "CONVERSATION_WORDS", true],
+			["STALE", "PRACTICE_PAGE_CARD", true],
+		],
+	);
+	assert.deepEqual(
+		history.queued.map((row) => row.threadKey === row.feedbackId),
+		[true],
+	);
+});
+
+void test("the runner refuses private history the server never sends", () => {
+	const response: unknown = JSON.parse(
+		readFileSync(new URL("admission-response.json", import.meta.url), "utf8"),
+	);
+	assert.ok(isRecord(response) && isRecord(response.privateHistory));
+	const history = response.privateHistory;
+	assert.ok(Array.isArray(history.delivered) && isRecord(history.delivered[0]));
+	const delivered = history.delivered[0];
+	for (const changed of [
+		{ ...history, delivered: [{ ...delivered, destination: "ON_WORK" }] },
+		{ ...history, delivered: [{ ...delivered, deliveredAt: null }] },
+		{ ...history, delivered: [{ ...delivered, withdrawn: "false" }] },
+		{ ...history, queued: [{ ...delivered }] },
+	]) {
+		assert.equal(
+			admissionResponseSchema.safeParse({ ...response, privateHistory: changed }).success,
+			false,
+		);
+	}
+	// Absent is a read not made, not an empty history.
+	const { privateHistory: _omitted, ...withoutHistory } = response;
+	assert.equal(parseAdmission(withoutHistory).privateHistory, null);
 });

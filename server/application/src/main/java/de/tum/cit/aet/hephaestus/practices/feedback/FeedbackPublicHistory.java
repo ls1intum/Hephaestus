@@ -59,12 +59,7 @@ public class FeedbackPublicHistory {
             List<FeedbackCopy> confirmed,
             boolean withdrawn,
             boolean textAllowed) {
-        var currentness = views.views(row.getWorkspaceId(), support).stream()
-                .map(presentation::currentness)
-                .toList();
-        Currentness freshness = currentness.contains(Currentness.UNVERIFIABLE)
-                ? Currentness.UNVERIFIABLE
-                : currentness.contains(Currentness.STALE) ? Currentness.STALE : Currentness.CURRENT;
+        Currentness freshness = currentness(row.getWorkspaceId(), support);
         var byId = authorized.stream().collect(Collectors.toMap(AuthorizedSupport::resultId, entry -> entry));
         @Nullable
         String summary =
@@ -111,6 +106,16 @@ public class FeedbackPublicHistory {
                                 copy.getState()))
                         .toList());
         return mapper.valueToTree(projection);
+    }
+
+    /** Whether the claim a piece of feedback rests on still holds: its least current supporting result decides. */
+    public Currentness currentness(long workspaceId, List<Result> support) {
+        var currentness = views.views(workspaceId, support).stream()
+                .map(presentation::currentness)
+                .toList();
+        return currentness.contains(Currentness.UNVERIFIABLE)
+                ? Currentness.UNVERIFIABLE
+                : currentness.contains(Currentness.STALE) ? Currentness.STALE : Currentness.CURRENT;
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)

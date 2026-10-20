@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponseRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
@@ -14,13 +15,17 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackHistory;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
+import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +53,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
     private final FeedbackPublicHistory publicHistoryReader;
     private final AccountMembershipQuery memberships;
     private final FeedbackPublicationContext publication;
+    private final FeedbackSupersession replacements;
 
     @Override
     public List<FeedbackHistoryEntry> forDeveloper(
@@ -75,6 +81,93 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
     }
 
     @Override
+    public Optional<PrivateFeedbackHistory> forPrivateComposition(
+            long workspaceId, long developerAccountId, Collection<PrivateFeedbackHistory.Route> routes, int limit) {
+        if (limit < 1) throw new IllegalArgumentException("A history read needs a positive limit.");
+        if (routes.isEmpty() || !memberships.isActiveVisibleMember(workspaceId, developerAccountId))
+            return Optional.empty();
+        // Each destination with the practices routed to it, never the product of all of either.
+        var routed = routes.stream()
+                .collect(Collectors.groupingBy(
+                        PrivateFeedbackHistory.Route::destination,
+                        Collectors.mapping(PrivateFeedbackHistory.Route::practiceId, Collectors.toSet())));
+        var conversation = routed.getOrDefault(FeedbackDestination.CONVERSATION, Set.of());
+        Specification<Feedback> selected = (row, query, cb) -> {
+            var onRoute = routed.entrySet().stream()
+                    .map(route -> {
+                        var about = Objects.requireNonNull(query).subquery(UUID.class);
+                        var edge = about.from(FeedbackBasis.class);
+                        var result = about.from(Result.class);
+                        about.select(edge.<UUID>get("feedbackId"))
+                                .where(
+                                        cb.equal(edge.get("workspaceId"), workspaceId),
+                                        cb.equal(result.get("workspaceId"), workspaceId),
+                                        cb.equal(result.get("id"), edge.get("resultId")),
+                                        result.get("practiceId").in(route.getValue()));
+                        return cb.and(
+                                cb.equal(row.get("destination"), route.getKey()),
+                                row.get("id").in(about));
+                    })
+                    .toArray(Predicate[]::new);
+            return cb.and(
+                    cb.equal(row.get("workspaceId"), workspaceId),
+                    cb.equal(row.get("developerId"), developerAccountId),
+                    cb.or(onRoute),
+                    cb.or(
+                            cb.isNotNull(row.get("deliveredAt")),
+                            cb.and(
+                                    cb.equal(row.get("destination"), FeedbackDestination.CONVERSATION),
+                                    cb.equal(row.get("state"), FeedbackState.READY))));
+        };
+        Instant readAt = Instant.now();
+        var rows = feedback.findAll(
+                        selected, PageRequest.of(0, limit + 1, Sort.by(Sort.Direction.DESC, "createdAt", "id")))
+                .getContent();
+        var entries = new ArrayList<PrivateFeedbackHistory.Entry>();
+        int withoutCopyAuthority = 0;
+        for (var row : rows.stream().limit(limit).toList()) {
+            var facts = facts(row, developerAccountId, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+            // A row whose support may not be copied for this purpose is left out whole, and counted.
+            if (!facts.entry().copyAuthorityComplete()) {
+                withoutCopyAuthority++;
+                continue;
+            }
+            var slugs = facts.authorized().stream()
+                    .collect(Collectors.toMap(
+                            FeedbackPublicHistory.AuthorizedSupport::resultId,
+                            FeedbackPublicHistory.AuthorizedSupport::practiceSlug,
+                            (first, second) -> first));
+            @Nullable String target = null;
+            Long practice = replacements.replaceablePractice(row, developerAccountId);
+            if (practice != null && conversation.contains(practice)) {
+                long replaceable = practice;
+                target = facts.support().stream()
+                        .filter(result -> result.getPracticeId() == replaceable)
+                        .map(result -> slugs.get(result.getId()))
+                        .filter(Objects::nonNull)
+                        .findFirst()
+                        .orElse(null);
+            }
+            // Queued feedback matters here only as a replacement target on an open conversation route.
+            if (row.getDeliveredAt() == null && target == null) continue;
+            entries.add(new PrivateFeedbackHistory.Entry(
+                    facts.entry(),
+                    facts.support().stream()
+                            .map(result -> new PrivateFeedbackHistory.Basis(
+                                    result.getId(),
+                                    Objects.requireNonNull(slugs.get(result.getId())),
+                                    result.getPracticeVersionId(),
+                                    result.getOutcome()))
+                            .toList(),
+                    publicHistoryReader.currentness(workspaceId, facts.support()),
+                    facts.withdrawn(),
+                    target));
+        }
+        return Optional.of(
+                new PrivateFeedbackHistory(readAt, limit, rows.size() > limit, withoutCopyAuthority, entries));
+    }
+
+    @Override
     public String publicationContext(long workspaceId, long itemId, UUID reviewId, Collection<Long> developerIds) {
         return publication.issue(workspaceId, itemId, reviewId, developerIds);
     }
@@ -92,11 +185,18 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                 .findAll(selected, PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt", "id")))
                 .getContent()
                 .stream()
-                .map(row -> entry(row, viewerAccountId, purpose))
+                .map(row -> facts(row, viewerAccountId, purpose).entry())
                 .toList();
     }
 
-    private FeedbackHistoryEntry entry(Feedback row, long viewerAccountId, SourceUsePurpose purpose) {
+    /** One history row as {@code purpose} may see it, with the support it was judged on. */
+    private record Facts(
+            FeedbackHistoryEntry entry,
+            List<Result> support,
+            List<FeedbackPublicHistory.AuthorizedSupport> authorized,
+            boolean withdrawn) {}
+
+    private Facts facts(Feedback row, long viewerAccountId, SourceUsePurpose purpose) {
         long workspaceId = row.getWorkspaceId();
         var edges = basis.findByWorkspaceIdAndFeedbackIdOrderByOrdinalAscIdAsc(workspaceId, row.getId());
         var ids = edges.stream().map(FeedbackBasis::getResultId).distinct().toList();
@@ -163,7 +263,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                         && !confirmed.isEmpty()
                 ? publicHistoryReader.render(row, support, authorized, confirmed, withdrawn, textAllowed)
                 : null;
-        return new FeedbackHistoryEntry(
+        var visible = new FeedbackHistoryEntry(
                 row.getId(),
                 row.getReviewId(),
                 row.getItemId(),
@@ -204,5 +304,6 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                 queries.threadId(workspaceId, row.getId()),
                 complete,
                 publicHistory);
+        return new Facts(visible, support, authorized, withdrawn);
     }
 }

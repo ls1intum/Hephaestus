@@ -8,21 +8,27 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.ConversationEligibilityDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PracticePageSupportDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackResponseDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrivateFeedbackHistoryDTO;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
+import de.tum.cit.aet.hephaestus.practices.spi.ConversationEligibility;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageSupport;
+import de.tum.cit.aet.hephaestus.practices.spi.PrivateFeedbackHistory;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,11 +41,14 @@ import org.springframework.stereotype.Service;
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class FeedbackCompositionService {
+    /** The newest matching pieces of earlier private feedback one composition reads. */
+    static final int PRIVATE_HISTORY_LIMIT = 30;
+
     private final FeedbackStore feedback;
     private final ReviewAssignmentStore members;
     private final ResultHistoryQuery history;
     private final HistoryCopies copies;
-    private final FeedbackHistoryQuery publicHistory;
+    private final FeedbackHistoryQuery feedbackHistory;
 
     public PrepareFeedbackResponseDTO prepare(
             ReviewJob job,
@@ -61,7 +70,7 @@ public class FeedbackCompositionService {
                         || draft.state() == FeedbackState.WITHHELD
                         || draft.copies().isEmpty()
                         || itemId == null) continue;
-                var refusal = publicHistory.publicationRefusal(
+                var refusal = feedbackHistory.publicationRefusal(
                         job.getWorkspaceId(),
                         itemId,
                         job.getReviewId(),
@@ -95,13 +104,23 @@ public class FeedbackCompositionService {
                 prepared.preparedAt());
     }
 
+    /** What private composition is given: its routing, its page support, and the earlier feedback on its open routes. */
     public Read read(ReviewJob job, List<AdmittedResultSnapshot> admitted) {
+        return read(job, admitted, true);
+    }
+
+    /** Preparation rechecks routing and page support only; earlier private feedback is no input to it. */
+    public Read readForPreparation(ReviewJob job, List<AdmittedResultSnapshot> admitted) {
+        return read(job, admitted, false);
+    }
+
+    private Read read(ReviewJob job, List<AdmittedResultSnapshot> admitted, boolean withHistory) {
         var people = admitted.stream()
                 .map(row -> row.candidate().developerId())
                 .distinct()
                 .toList();
         if (people.size() != 1 || people.getFirst() == null)
-            return new Read(new FeedbackCompositionContext(null, null), List.of(), List.of());
+            return new Read(new FeedbackCompositionContext(null, null), List.of(), List.of(), null);
         long developer = Objects.requireNonNull(people.getFirst());
         var context = feedback.compositionContext(
                 job.getWorkspaceId(),
@@ -110,6 +129,7 @@ public class FeedbackCompositionService {
         var support = context.practicePageSupport();
         var retained = new ArrayList<ResultHistoryEntry>();
         if (support != null && support.state() == PracticePageSupport.State.COMPLETE) {
+            supported:
             for (var practice : support.practices())
                 for (var occurrence : practice.occurrences()) {
                     var result = history.find(
@@ -128,22 +148,63 @@ public class FeedbackCompositionService {
                             || !Objects.equals(occurrence.summary(), result.summary())
                             || !Objects.equals(occurrence.explanation(), result.explanation())
                             || !Objects.equals(occurrence.evidence(), result.evidence())
-                            || !occurrence.recordedAt().equals(result.recordedAt()))
-                        return new Read(
-                                new FeedbackCompositionContext(
-                                        new PracticePageSupport(
-                                                PracticePageSupport.State.REFUSED,
-                                                support.readAt(),
-                                                List.of(),
-                                                "Copy authority for historical support is unavailable"),
-                                        context.conversationEligibility()),
-                                List.of(),
-                                List.of());
+                            || !occurrence.recordedAt().equals(result.recordedAt())) {
+                        context = new FeedbackCompositionContext(
+                                new PracticePageSupport(
+                                        PracticePageSupport.State.REFUSED,
+                                        support.readAt(),
+                                        List.of(),
+                                        "Copy authority for historical support is unavailable"),
+                                context.conversationEligibility());
+                        retained.clear();
+                        break supported;
+                    }
                     if (retained.stream().noneMatch(entry -> entry.resultId().equals(result.resultId())))
                         retained.add(result);
                 }
         }
-        return new Read(context, retained.stream().map(copies::of).toList(), retained);
+        var routes = withHistory ? routes(context, admitted, retained) : List.<PrivateFeedbackHistory.Route>of();
+        PrivateFeedbackHistory said = routes.isEmpty()
+                ? null
+                : feedbackHistory
+                        .forPrivateComposition(job.getWorkspaceId(), developer, routes, PRIVATE_HISTORY_LIMIT)
+                        .orElse(null);
+        var readCopies = new ArrayList<HistoryCopy>();
+        if (said != null)
+            said.entries().stream().map(entry -> copies.of(entry.feedback())).forEach(readCopies::add);
+        retained.stream().map(copies::of).forEach(readCopies::add);
+        return new Read(context, readCopies, retained, said);
+    }
+
+    /**
+     * The private destinations this same read opened, each for its own practice: a practice page by the support it
+     * admits, a conversation by the NOT_MET result it admits. A practice open on one destination opens no other.
+     */
+    private static List<PrivateFeedbackHistory.Route> routes(
+            FeedbackCompositionContext context,
+            List<AdmittedResultSnapshot> admitted,
+            List<ResultHistoryEntry> retained) {
+        var routes = new LinkedHashSet<PrivateFeedbackHistory.Route>();
+        var page = context.practicePageSupport();
+        if (page != null && page.state() == PracticePageSupport.State.COMPLETE)
+            for (var practice : page.practices())
+                if (practice.decision() == PracticePageDecision.ADMIT)
+                    retained.stream()
+                            .filter(entry -> entry.practiceSlug().equals(practice.practiceSlug()))
+                            .map(entry -> new PrivateFeedbackHistory.Route(
+                                    entry.practiceId(), FeedbackDestination.PRACTICE_PAGE))
+                            .forEach(routes::add);
+        var conversation = context.conversationEligibility();
+        if (conversation != null && conversation.state() == ConversationEligibility.State.COMPLETE)
+            for (var decision : conversation.results())
+                if (decision.decision() == ConversationDecision.ADMIT)
+                    admitted.stream()
+                            .filter(row -> row.id().equals(decision.resultId())
+                                    && row.candidate().outcome() == ResultOutcome.NOT_MET)
+                            .map(row -> new PrivateFeedbackHistory.Route(
+                                    row.candidate().practiceId(), FeedbackDestination.CONVERSATION))
+                            .forEach(routes::add);
+        return List.copyOf(routes);
     }
 
     public Read readForCapture(ReviewJob job, List<AdmittedResultSnapshot> admitted) {
@@ -195,7 +256,65 @@ public class FeedbackCompositionService {
                                 .toList());
     }
 
-    public record Read(FeedbackCompositionContext context, List<HistoryCopy> copies, List<ResultHistoryEntry> support) {
+    public static @Nullable PrivateFeedbackHistoryDTO privateHistory(Read read) {
+        var said = read.privateHistory();
+        if (said == null) return null;
+        var delivered = new ArrayList<PrivateFeedbackHistoryDTO.Delivered>();
+        var queued = new ArrayList<PrivateFeedbackHistoryDTO.Queued>();
+        for (var entry : said.entries()) {
+            var row = entry.feedback();
+            var basedOn = entry.basedOn().stream()
+                    .map(basis -> new PrivateFeedbackHistoryDTO.Basis(
+                            basis.resultId(), basis.practiceSlug(), basis.practiceVersionId(), basis.outcome()))
+                    .toList();
+            // The history owner decides which words may be copied. Words of a claim that no longer holds are still what
+            // was said; recordedClaimCurrentness says the claim's state, never whether it was said.
+            String body = row.body();
+            var deliveredAt = row.deliveredAt();
+            String practice = entry.replaceablePracticeSlug();
+            if (deliveredAt != null)
+                delivered.add(new PrivateFeedbackHistoryDTO.Delivered(
+                        row.feedbackId(),
+                        row.destination(),
+                        deliveredAt,
+                        entry.currentness(),
+                        entry.withdrawn(),
+                        basedOn,
+                        body == null
+                                ? null
+                                : row.destination() == FeedbackDestination.CONVERSATION
+                                        ? PrivateFeedbackHistoryDTO.BodyRole.CONVERSATION_WORDS
+                                        : PrivateFeedbackHistoryDTO.BodyRole.PRACTICE_PAGE_CARD,
+                        body));
+            else if (practice != null)
+                // Its feedback ID is its thread key: preparation replaces exactly this queued piece.
+                queued.add(new PrivateFeedbackHistoryDTO.Queued(
+                        row.feedbackId().toString(),
+                        row.feedbackId(),
+                        row.destination(),
+                        practice,
+                        row.createdAt(),
+                        entry.currentness(),
+                        basedOn,
+                        body == null ? null : PrivateFeedbackHistoryDTO.BodyRole.MENTOR_NOTES,
+                        body));
+        }
+        return new PrivateFeedbackHistoryDTO(
+                said.readAt(),
+                new PrivateFeedbackHistoryDTO.Coverage(said.maxEntries(), said.hasMore(), said.withoutCopyAuthority()),
+                delivered,
+                queued);
+    }
+
+    /**
+     * @param privateHistory null when it was not read: no single developer, no open private route, a preparation
+     *     read, or no membership
+     */
+    public record Read(
+            FeedbackCompositionContext context,
+            List<HistoryCopy> copies,
+            List<ResultHistoryEntry> support,
+            @Nullable PrivateFeedbackHistory privateHistory) {
         public Read {
             copies = List.copyOf(copies);
             support = List.copyOf(support);
