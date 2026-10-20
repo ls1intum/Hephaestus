@@ -128,6 +128,15 @@ describe("practice review search", () => {
 
 		expect(query).toMatchObject({ resultId, itemId: "42", severity: ["CRITICAL"], size: 25 });
 	});
+
+	it("reads the recorded problem ledger when filtering accepted or stale results", () => {
+		for (const filter of [{ accepted: true }, { currentness: "STALE" }] as const) {
+			const query = problemsQuery(problemsSearchSchema.parse(filter), 25);
+
+			expect(query).toMatchObject({ ...filter, openOnly: false });
+		}
+		expect(problemsQuery(problemsSearchSchema.parse({}), 25).openOnly).toBe(false);
+	});
 });
 
 describe("result outcome filter", () => {
