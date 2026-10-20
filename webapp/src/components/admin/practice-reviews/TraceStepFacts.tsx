@@ -10,6 +10,7 @@ import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { formatDayTime } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
+import { firstStartedAt, latestAttempt } from "./job-utils";
 import {
 	countOf,
 	feedbackLocation,
@@ -204,11 +205,9 @@ function ReviewFacts({
 		return null;
 	}
 	const jobs = detail?.runtime?.jobs ?? [];
-	const [pickedUp] = jobs
-		.map((job) => job.startedAt)
-		.filter((startedAt) => startedAt !== null)
-		.sort((a, b) => a.getTime() - b.getTime());
-	const attempts = Math.max(0, ...jobs.map((job) => job.attempt));
+	// Without the first pickup, Finished counts from the request rather than from a later attempt.
+	const pickedUp = firstStartedAt(jobs);
+	const latest = latestAttempt(jobs);
 	return (
 		<FactList>
 			<Fact label="Asked for">
@@ -225,7 +224,7 @@ function ReviewFacts({
 				</Fact>
 			)}
 			{jobs.length > 1 && <Fact label="Jobs">{countOf(jobs.length, "job", "jobs")}</Fact>}
-			{attempts > 1 && <Fact label="Attempts">{attempts}</Fact>}
+			{latest !== undefined && <Fact label="Latest attempt">{latest}</Fact>}
 			{hasText(detail?.model) && <Fact label="Model">{detail.model}</Fact>}
 			<Fact label="How far">
 				<StageLine records={records} />

@@ -21,7 +21,7 @@ import {
 import { durationBetween } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
-import { invocationCompletedAt } from "./job-utils";
+import { firstStartedAt, invocationCompletedAt, latestAttempt } from "./job-utils";
 import {
 	countOf,
 	feedbackOf,
@@ -148,14 +148,6 @@ function feedbackOnPath(
 	return reviewFeedback(records, review);
 }
 
-function pickedUpAt(detail: ReviewDetail | undefined): Date | undefined {
-	const starts = (detail?.runtime?.jobs ?? [])
-		.map((job) => job.startedAt)
-		.filter((startedAt) => startedAt !== null)
-		.sort((a, b) => a.getTime() - b.getTime());
-	return starts[0];
-}
-
 export function traceSpans(
 	lineage: ReviewLineage,
 	here: TraceNode | undefined,
@@ -166,7 +158,8 @@ export function traceSpans(
 	if (review === undefined) {
 		return [];
 	}
-	const pickedUp = pickedUpAt(detail);
+	// Once an attempt continued, its first pickup is gone, so the queue and run are not measured.
+	const pickedUp = firstStartedAt(detail?.runtime?.jobs ?? []);
 	const [delivered] = feedbackOnPath(records, review, here)
 		.map((entry) => entry.deliveredAt)
 		.filter((deliveredAt) => deliveredAt !== null)
@@ -293,15 +286,14 @@ function lost(losses: readonly FeedbackLoss[]): { tone: LossTone; icon: LucideIc
 // Missing feedback for a Not met result warrants attention; it does not prove a delivery failure.
 const NOT_TOLD = { tone: "warning", icon: EyeOffIcon } as const;
 
-function runtimeFailure(detail: ReviewDetail | undefined): { error?: string; attempts: number } {
+function runtimeFailure(detail: ReviewDetail | undefined): { error?: string; latest?: number } {
 	const jobs = detail?.runtime?.jobs ?? [];
 	const failed = [...jobs].reverse().find((job) => hasText(job.errorMessage));
-	const attempts = Math.max(0, ...jobs.map((job) => job.attempt));
 	return {
 		error: hasText(failed?.errorMessage)
 			? failed.errorMessage.trim().replace(/\.?$/u, ".")
 			: undefined,
-		attempts,
+		latest: latestAttempt(jobs),
 	};
 }
 
@@ -312,8 +304,8 @@ function reviewBottleneck(
 ): TraceBottleneck | undefined {
 	const stopReason = detail?.stopReason ?? null;
 	const because = stopReason === null ? undefined : REVIEW_STOP_REASON_SENTENCES[stopReason];
-	const { error, attempts } = runtimeFailure(detail);
-	const tries = attempts > 1 ? ` It was tried ${countOf(attempts, "time", "times")}.` : "";
+	const { error, latest } = runtimeFailure(detail);
+	const tries = latest === undefined ? "" : ` It stopped on attempt ${latest}.`;
 	switch (review.status) {
 		case "FAILED": {
 			const timedOut = stopReason === "TIMED_OUT" || stopReason === "DEADLINE";

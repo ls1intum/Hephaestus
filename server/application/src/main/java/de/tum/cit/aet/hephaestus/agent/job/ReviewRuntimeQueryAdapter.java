@@ -146,14 +146,22 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
                 finishedModel = 0,
                 finishedUnsplit = 0;
         long longWait = 0;
+        boolean publicBreakdownKnown = true, finishedBreakdownKnown = true;
         for (var row : rows) {
             if (row.status() == ReviewJobStatus.QUEUED
                     && !ReviewJob.HOLD_REASON_BUDGET.equals(row.holdReason())
                     && row.availableAt().isBefore(longWaitThreshold)) longWait++;
+            var fact = Objects.requireNonNull(byReview.get(row.reviewId()));
+            if (row.attempt() > 0) {
+                // Requeue replaces these timestamps; the earlier intervals are not retained.
+                if (fact.firstAutomaticPostedAt() != null && fact.publicCompletedAt() != null)
+                    publicBreakdownKnown = false;
+                if (fact.finished()) finishedBreakdownKnown = false;
+                continue;
+            }
             var start = row.startedAt();
             if (start == null) continue;
             sample(samples, "QUEUE", seconds(row.availableAt(), start));
-            var fact = Objects.requireNonNull(byReview.get(row.reviewId()));
             var publicAt = fact.publicCompletedAt();
             var end = row.completedAt();
             var execution = row.executionStartedAt();
@@ -213,14 +221,18 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
         var facts = product.facts(workspaceId, reviewIds, from, to);
         return new ReviewTimingSnapshot(
                 stages,
-                new ReviewTimingSums(facts.asked(), queue, preparation, model, unsplit, posted),
-                new ReviewTimingSums(
-                        facts.finishedAsked(),
-                        finishedQueue,
-                        finishedPreparation,
-                        finishedModel,
-                        finishedUnsplit,
-                        finishedPosted),
+                publicBreakdownKnown
+                        ? new ReviewTimingSums(facts.asked(), queue, preparation, model, unsplit, posted)
+                        : null,
+                finishedBreakdownKnown
+                        ? new ReviewTimingSums(
+                                facts.finishedAsked(),
+                                finishedQueue,
+                                finishedPreparation,
+                                finishedModel,
+                                finishedUnsplit,
+                                finishedPosted)
+                        : null,
                 longWait,
                 facts.finishedAfterMerge(),
                 facts.finishedAfterMergeStartedByMerge(),

@@ -2478,7 +2478,8 @@ function jobsOf(summary: ReviewSummary, count: number): ReviewJob[] {
 		const ended = jobStatus !== "RUNNING" && jobStatus !== "QUEUED";
 		return {
 			id: `${summary.id.slice(0, -3)}${String(index).padStart(3, "0")}`,
-			attempt: 1,
+			// The server counts attempts from 0.
+			attempt: 0,
 			status: jobStatus,
 			processingStatus: processingOf(jobStatus),
 			availableAt: summary.createdAt,
@@ -2607,7 +2608,7 @@ export const reviewDetailBackingOff: ReviewDetail = standaloneReview(
 		}
 		return [
 			{ ...first, errorMessage: "Runner exited with code 137 (out of memory).", exitCode: 137 },
-			{ ...retry, id: `${retry.id.slice(0, -1)}1`, attempt: 2, availableAt: minutesAfter(3) },
+			{ ...retry, id: `${retry.id.slice(0, -1)}1`, attempt: 1, availableAt: minutesAfter(3) },
 		];
 	},
 );
@@ -2654,7 +2655,7 @@ export const reviewDetailPreparationFailed: ReviewDetail = {
 export const reviewUsageTwoAttempts: ReviewUsage = {
 	attempts: [
 		{
-			attempt: 1,
+			attempt: 0,
 			jobId: "11111111-1111-1111-1111-111111111000",
 			pricingState: "PRICED",
 			costUsd: "0.0125",
@@ -2666,7 +2667,7 @@ export const reviewUsageTwoAttempts: ReviewUsage = {
 			cacheWriteTokens: 0,
 		},
 		{
-			attempt: 2,
+			attempt: 1,
 			jobId: "11111111-1111-1111-1111-111111111001",
 			pricingState: "PRICED",
 			costUsd: "0.0300",
@@ -2688,7 +2689,7 @@ export const reviewUsageTwoAttempts: ReviewUsage = {
 export const reviewUsageUnpriced: ReviewUsage = {
 	attempts: [
 		{
-			attempt: 1,
+			attempt: 0,
 			jobId: "11111111-1111-1111-1111-111111111000",
 			pricingState: "UNPRICED",
 			costUsd: null,

@@ -82,7 +82,7 @@ function pieceIn(lineage: ReviewLineage, state: ReviewBoundFeedback["state"]): T
 function job(fields: Partial<ReviewJob>): ReviewJob {
 	return {
 		id: "job",
-		attempt: 1,
+		attempt: 0,
 		status: "COMPLETED",
 		processingStatus: "DONE",
 		availableAt: at("13:35:00"),
@@ -182,20 +182,25 @@ describe("traceBottleneck for the review itself", () => {
 		});
 	});
 
-	it("prefers the runtime job's error and counts the attempts", () => {
+	// Attempts count from 0, so the job's attempt 1 is its second slot; it is not a count of runs.
+	it("prefers the runtime job's error and names the attempt it stopped on", () => {
 		const { lineage } = lineageStateCase("failed");
-		const detail = detailOf("failed", {
-			stopReason: "EXECUTION_FAILED",
-			runtime: {
-				jobs: [
-					job({ attempt: 1, status: "FAILED", errorMessage: "The diff could not be read" }),
-					job({ attempt: 2, status: "FAILED", errorMessage: "The diff could not be read" }),
-				],
-			},
-		});
-		expect(traceBottleneck(lineage, REVIEW, detail, NOW).text).toBe(
-			"The diff could not be read. It was tried 2 times.",
+		const failedOn = (jobs: ReviewJob[]) =>
+			traceBottleneck(
+				lineage,
+				REVIEW,
+				detailOf("failed", { stopReason: "EXECUTION_FAILED", runtime: { jobs } }),
+				NOW,
+			).text;
+		const failed = { status: "FAILED", errorMessage: "The diff could not be read" } as const;
+		expect(failedOn([job({ ...failed, attempt: 1 })])).toBe(
+			"The diff could not be read. It stopped on attempt 2.",
 		);
+		expect(failedOn([job({ ...failed, attempt: 0 })])).toBe("The diff could not be read.");
+		// Two jobs on their second slots are not four tries, nor one review's attempt 2.
+		expect(
+			failedOn([job({ ...failed, attempt: 1 }), job({ ...failed, id: "other", attempt: 1 })]),
+		).toBe("The diff could not be read.");
 	});
 
 	it("says a failed review without a known reason plainly", () => {
@@ -410,6 +415,34 @@ describe("traceSpans", () => {
 			title: "Slow delivery",
 			span: "delivery",
 		});
+	});
+
+	/**
+	 * A continued review keeps one job, whose start is now its latest attempt's. Measured from the
+	 * request, that start would call the first attempt's whole work a queue.
+	 */
+	it("measures no queue or run once the job continued past its first attempt", () => {
+		const { lineage } = lineageStateCase("complete");
+		const continued = (attempt: number) =>
+			detailOf("complete", {
+				createdAt: at("13:28:20"),
+				completedAt: at("13:46:57"),
+				runtime: {
+					jobs: [
+						job({
+							attempt,
+							availableAt: at("13:43:10"),
+							startedAt: at("13:43:14"),
+							completedAt: at("13:46:57"),
+						}),
+					],
+				},
+			});
+		const kinds = (detail: ReviewDetail) =>
+			traceSpans(lineage, REVIEW, detail).map((entry) => [entry.kind, entry.text]);
+		expect(kinds(continued(0))).toContainEqual(["queue", "15 min"]);
+		expect(kinds(continued(1)).map(([kind]) => kind)).not.toContain("queue");
+		expect(kinds(continued(1)).map(([kind]) => kind)).not.toContain("run");
 	});
 
 	it("leaves out what the record cannot tell", () => {
