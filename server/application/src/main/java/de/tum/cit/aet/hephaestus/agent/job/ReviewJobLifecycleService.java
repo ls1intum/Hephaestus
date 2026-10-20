@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -29,7 +28,7 @@ public class ReviewJobLifecycleService {
     private final TransactionTemplate transactionTemplate;
     private final @Nullable SandboxManager sandboxManager;
     private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
-    private final LlmUsageRecorder usageRecorder;
+    private final ReviewAttemptUsageService attemptUsage;
     private final ObjectMapper objectMapper;
     private final ReviewJobTelemetry jobTelemetry;
 
@@ -38,14 +37,14 @@ public class ReviewJobLifecycleService {
             TransactionTemplate transactionTemplate,
             @Nullable SandboxManager sandboxManager,
             Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher,
-            LlmUsageRecorder usageRecorder,
+            ReviewAttemptUsageService attemptUsage,
             ObjectMapper objectMapper,
             ReviewJobTelemetry jobTelemetry) {
         this.jobRepository = jobRepository;
         this.transactionTemplate = transactionTemplate;
         this.sandboxManager = sandboxManager;
         this.workerJobCancelDispatcher = workerJobCancelDispatcher;
-        this.usageRecorder = usageRecorder;
+        this.attemptUsage = attemptUsage;
         this.objectMapper = objectMapper;
         this.jobTelemetry = jobTelemetry;
     }
@@ -55,8 +54,8 @@ public class ReviewJobLifecycleService {
     /**
      * Idempotent when the job is already CANCELLED; throws 409 for any other terminal state.
      *
-     * <p>The ledger write runs INSIDE the status-transition transaction ({@link LlmUsageRecorder}'s
-     * append is {@code MANDATORY}) so accounting and the state change stand or fall together. Only the
+     * <p>The ledger write runs INSIDE the status-transition transaction ({@link ReviewAttemptUsageService}'s
+     * settlement is {@code MANDATORY}) so accounting and the state change stand or fall together. Only the
      * sandbox cancel runs after the commit, because it leaves the database.
      */
     public ReviewJob cancel(Long workspaceId, UUID jobId) {
@@ -124,13 +123,13 @@ public class ReviewJobLifecycleService {
 
         // Reload to read worker_id, which is only set at claim.
         ReviewJob fresh = requireJob(workspaceId, jobId);
-        recordUsageIfStarted(workspaceId, fresh);
+        recordUsageIfStarted(fresh);
         jobTelemetry.terminal(fresh, ReviewJobStatus.CANCELLED, ReviewJobTelemetry.age(fresh));
         return new CancelOutcome(fresh, true);
     }
 
     // A claim alone proves no provider usage; accounting begins at execution_started_at.
-    private void recordUsageIfStarted(Long workspaceId, ReviewJob job) {
+    private void recordUsageIfStarted(ReviewJob job) {
         if (job.getExecutionStartedAt() == null) {
             return;
         }
@@ -138,12 +137,15 @@ public class ReviewJobLifecycleService {
         LlmPriceSnapshot price = snap.model().priceSnapshot() != null
                 ? snap.model().priceSnapshot()
                 : LlmPriceSnapshot.unpricedInstance();
-        // The terminal update holds the row lock and prevents further proxy accumulations.
-        // Read its committed counters directly; the entity can predate a proxy response.
+        // The terminal update holds the row lock, so a call that returns now settles after this, as a late call.
         // Calls without token evidence stay unknown. No calls add no ledger row.
-        boolean billed = TerminalUsage.fromProxy(
+        boolean billed = attemptUsage
+                .settleAttempt(
+                        job,
+                        FrozenCharge.admitted(snap, price),
+                        null,
                         jobRepository.findLlmUsageById(job.getId()).orElse(null))
-                .appendTo(usageRecorder, jobRepository, workspaceId, job, snap, price);
+                .billed();
         log.info("Settled job usage (user-cancel): priced={}, jobId={}", billed, job.getId());
     }
 }

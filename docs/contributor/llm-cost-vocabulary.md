@@ -189,7 +189,31 @@ A rate, including a free-model declaration, cannot establish measurement verific
 Historical `UNKNOWN` unpriced records stay excluded from repricing and continue to block capped purses.
 Historical priced amounts remain in spend totals without gaining a verification claim.
 Do not repair verification decisions with manual database edits.
-This distinction does not recover late provider usage or establish complete call coverage.
+This distinction does not establish complete call coverage.
+
+## Rule 10 — A review attempt's ledger rows project its measurement
+
+Each review job attempt has one measurement, `ReviewAttemptUsage`, and one frozen charge per model kind, `ReviewAttemptCharge`.
+
+The proxy registers a call before it forwards it. Registration needs the attempt to still run on its worker. It freezes the model kind's charge, and it counts no call.
+
+A returned call settles on the attempt that authenticated it, also after a cancellation or a requeue. A practice script row and the attempt's proxy total change in one transaction.
+The ledger rows of the attempt are its projection. `TerminalUsage.resolve` selects the vector again at each projection.
+
+A late call is never added to a selected runner report.
+If the report covers the proxy total, it stays selected.
+If the proxy total covers the report, it replaces the report.
+If the two are incomparable, the row is `UNVERIFIABLE`.
+
+A projection changes only the measurement and the cost that follows from it. Source, model, funding source, rates and date stay frozen.
+A late correction keeps the month of the attempt. It sends a budget alert only for an increase in the current month.
+A price that the repricing pass resolved is also written to the attempt's charge, so a later verified projection keeps it.
+
+This covers only calls the proxy observed with reported usage. It does not recover a call whose response carried no usage, or a call the provider billed after the proxy gave up. It does not recover usage that was dropped before this rule existed. An attempt whose ledger row exists without a measurement stays as it is.
+
+An erasure that cancels a running selected job settles the attempt first, so its ledger row exists before the erasure removes the job's measurements. The preparation then detaches the review ledger rows of each selected job (same job id and workspace) with the ledger store's own redaction. The rows keep their tokens, cost and date.
+
+**Rollout gate.** An attempt that crosses the upgrade can lose its pre-upgrade proxy totals or usage from calls without a registered measurement. Before you start the new version, let every old worker finish its active review attempts with a [graceful drain](../admin/runtime-roles.mdx#graceful-drain). Use a drain timeout that is long enough for those attempts, not `timeout=0`. Then make sure that no review job is `RUNNING` on an old worker. Queued jobs need not drain: the new version registers their first call.
 
 `unpricedEventCount` follows the run-count definition in [Rule 4](#rule-4--never-render-a-pricing-or-budget-enum).
 It is not a per-purse count and must not be used as one in budget banners.
@@ -202,4 +226,5 @@ It is not a per-purse count and must not be used as one in budget banners.
 | USD rendering (rules 1, 5) | `webapp/src/lib/money.ts` |
 | Which purse, and whether it pauses (rules 2, 4) | `LlmBudgetVerdict`, `FundingSource`, `LlmBudgetService` |
 | Measurement acceptance and repair eligibility (rule 9) | `MeasurementVerification`, `LlmUsageRecorder`, `LlmUsageRepricer`, `LlmUsageEventRepository` |
+| One measurement per review attempt, late calls (rule 10) | `ReviewAttemptUsageService`, `ReviewAttemptUsage`, `ReviewAttemptCharge`, `ProxyUsageAccumulator` |
 | The in-flight bound behind rule 7's "within a minute" | [ADR 0026](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md) |

@@ -172,21 +172,56 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             @Param("reason") ReviewJobCancellationReason reason,
             @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses);
 
+    /** The state of a job row that a usage settlement holds: whether the call's attempt is still the running one. */
+    interface UsageOwner {
+        String getStatus();
+
+        int getAttempt();
+
+        UUID getReviewId();
+    }
+
     /**
-     * Adds one proxied call's tokens to the running totals of ONE attempt, so a job that crashes
-     * mid-run still has the calls it made on record. A clean finish overwrites these with the runner's
-     * authoritative totals.
+     * Takes the job row for a usage settlement. Every settlement takes the job row before the attempt's
+     * {@link ReviewAttemptUsage} row, whether it settles a call or the end of an attempt, so the two never wait on
+     * each other in opposite orders. Empty when the job no longer exists in that workspace.
+     */
+    @Query(
+            value = "SELECT j.status AS status, j.attempt AS attempt, j.review_id AS \"reviewId\" FROM review_job j"
+                    + " WHERE j.id = :id AND j.workspace_id = :workspaceId FOR UPDATE",
+            nativeQuery = true)
+    Optional<UsageOwner> lockUsageOwner(@Param("id") UUID id, @Param("workspaceId") long workspaceId);
+
+    /**
+     * Holds the job row while the proxy registers a call, and only while the call's attempt still runs on its
+     * worker. A terminal transition waits for the registration, and the registration waits for the transition.
+     */
+    @Query(
+            value = "SELECT j.attempt FROM review_job j WHERE j.id = :id AND j.workspace_id = :workspaceId AND"
+                    + " j.attempt = :attempt AND j.status = 'RUNNING' AND j.worker_id IS NOT DISTINCT FROM"
+                    + " CAST(:workerId AS varchar) FOR SHARE",
+            nativeQuery = true)
+    Optional<Integer> lockRunningAttemptForCall(
+            @Param("id") UUID id,
+            @Param("workspaceId") long workspaceId,
+            @Param("attempt") int attempt,
+            @Param("workerId") @Nullable String workerId);
+
+    /**
+     * Adds one proxied call's tokens to the running totals of the attempt that runs now. These counters are what
+     * the proxy's in-flight budget reads while the attempt runs. A clean finish overwrites them with the totals the
+     * ledger selected. The attempt's own measurement is its {@link ReviewAttemptUsage} row, which the requeue does
+     * not zero.
      *
-     * <p>Fenced on {@code attempt} and {@code RUNNING} because a provider call can outlive the
-     * attempt that issued it: {@link #requeueOrphan} may hand the row to a new attempt (zeroing these
-     * columns) while the proxy is still waiting on the provider, and a late write would otherwise bill
-     * one attempt's tokens at another attempt's frozen price and funding source.
+     * <p>Fenced on {@code attempt} and {@code RUNNING}: {@link #requeueOrphan} may hand the row to a new attempt
+     * (zeroing these columns) while the proxy is still waiting on the provider, and the new attempt's in-flight
+     * spend must not include an earlier attempt's call.
      *
      * @param attempt the {@code attempt} the caller observed when it authenticated the call
      * @return 1 if the attempt still owns the row, 0 if it has been superseded (a safe no-op)
      */
     @WorkspaceAgnostic("ID-based per-call usage accumulation from the worker-local proxy")
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query("UPDATE ReviewJob j SET " + "j.llmCalls = COALESCE(j.llmCalls, 0) + 1, "
             + "j.llmInputTokens = COALESCE(j.llmInputTokens, 0) + :#{#usage.inputTokens()}, "
             + "j.llmOutputTokens = COALESCE(j.llmOutputTokens, 0) + :#{#usage.outputTokens()}, "
@@ -202,26 +237,26 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
      * the first call. The attempt froze one model per kind, so the first call's tier is the tier of every
      * call. The workspace comes from the job row, never from the caller.
      *
-     * <p>Fenced like {@link #accumulateLlmUsage}: only a {@code RUNNING} job that is
-     * still on {@code attempt} takes the write. {@code FOR SHARE} waits for a terminal transition that
-     * holds the job row, so a call either lands before the terminal ledger append reads these rows or
-     * is dropped. It is never lost between the two.
+     * <p>The attempt is part of the key, so a call of an earlier attempt adds to that attempt's row and never to the
+     * current one. A call that returns after its attempt ended still lands here: {@link ReviewAttemptUsageService}
+     * holds the job row and then projects the attempt's ledger rows again. The job must not be on an earlier attempt
+     * than the call, and the practice must exist in the job's workspace.
      *
-     * @return 1 if the attempt still owns the job, 0 if it has been superseded (a safe no-op)
+     * @return 1 when the call was added, 0 when the job or the practice does not exist
      */
     @WorkspaceAgnostic("ID-based per-call usage accumulation from the worker-local proxy; the job row supplies it")
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query(value = """
         INSERT INTO review_job_script_usage
             (job_id, attempt, model_kind, practice_id, workspace_id, data_handling_tier, calls, reported_calls,
              input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, search_units)
-        SELECT j.id, j.attempt, :#{#call.modelKindName()}, (SELECT p.id FROM practice p WHERE p.workspace_id = j.workspace_id AND p.slug = :#{#call.practiceSlug()}), j.workspace_id,
+        SELECT j.id, :attempt, :#{#call.modelKindName()}, p.id, j.workspace_id,
             CAST(:#{#call.dataHandlingTierName()} AS varchar), 1, :#{#call.usageReported() ? 1 : 0}, :#{#call.inputTokens()},
             :#{#call.outputTokens()}, :#{#call.cacheReadTokens()}, :#{#call.cacheWriteTokens()},
             :#{#call.searchUnits()}
         FROM review_job j
-        WHERE j.id = :jobId AND j.attempt = :attempt AND j.status = 'RUNNING'
-        FOR SHARE
+        JOIN practice p ON p.workspace_id = j.workspace_id AND p.slug = :#{#call.practiceSlug()}
+        WHERE j.id = :jobId AND j.attempt >= :attempt
         ON CONFLICT (job_id, attempt, model_kind, practice_id) DO UPDATE SET
             calls = review_job_script_usage.calls + 1,
             reported_calls = review_job_script_usage.reported_calls + EXCLUDED.reported_calls,

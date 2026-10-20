@@ -1,15 +1,18 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -92,6 +95,53 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         """, nativeQuery = true)
     int insertIfAbsent(@Param("event") LlmUsageInsert event);
 
+    /** The ledger row a projection of a review job attempt replaces, held until the projection commits. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspaceId = :workspaceId AND e.sourceType = :sourceType"
+            + " AND e.sourceId = :sourceId AND e.sourceAttempt = :sourceAttempt")
+    Optional<LlmUsageEvent> lockBySource(
+            @Param("workspaceId") Long workspaceId,
+            @Param("sourceType") UsageSourceType sourceType,
+            @Param("sourceId") UUID sourceId,
+            @Param("sourceAttempt") int sourceAttempt);
+
+    boolean existsByWorkspaceIdAndSourceTypeNotAndSourceIdAndSourceAttempt(
+            Long workspaceId, UsageSourceType sourceType, UUID sourceId, int sourceAttempt);
+
+    /**
+     * Gives a review job attempt's frozen charge the price the repricing pass just resolved for one of its rows, in
+     * the repricing transaction. A later projection of the attempt that finds the row unpriced again, because its
+     * measurement became unverifiable meanwhile, then prices a verified measurement with this resolved price and not
+     * with the price the attempt started with. Mentor turns have no attempt charge.
+     */
+    @WorkspaceAgnostic("ID-based price repair; the event id comes from the cross-tenant repricing enumeration")
+    @Modifying(flushAutomatically = true)
+    @Query(
+            value = "UPDATE review_job_attempt_charge c SET pricing_state = :#{#price.pricingState().name()},"
+                    + " applied_price_id = :#{#price.appliedPriceId()}, applied_workspace_model_id ="
+                    + " :#{#price.appliedWorkspaceModelId()}, applied_per_1m_input_usd = :#{#price.per1mInputUsd()},"
+                    + " applied_per_1m_output_usd = :#{#price.per1mOutputUsd()}, applied_per_1m_cache_read_usd ="
+                    + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()}"
+                    + " FROM llm_usage_event e WHERE e.id = :id AND e.workspace_id = c.workspace_id AND c.job_id ="
+                    + " e.source_id AND c.attempt = e.source_attempt AND e.source_type <> 'MENTOR_TURN' AND"
+                    + " c.model_kind = CASE e.source_type WHEN 'REVIEW_JOB' THEN 'CHAT' ELSE"
+                    + " REPLACE(e.source_type, 'PRACTICE_SCRIPT_', '') END",
+            nativeQuery = true)
+    int adoptResolvedPriceInAttemptCharge(@Param("id") UUID id, @Param("price") LlmPriceSnapshot price);
+
+    /** Replaces the measurement of one row and nothing else; see {@link LlmUsageRecorder#project}. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+        UPDATE llm_usage_event SET input_tokens = :#{#m.inputTokens()}, output_tokens = :#{#m.outputTokens()},
+            cache_read_tokens = :#{#m.cacheReadTokens()}, cache_write_tokens = :#{#m.cacheWriteTokens()},
+            reasoning_tokens = :#{#m.reasoningTokens()}, search_units = :#{#m.searchUnits()},
+            total_calls = :#{#m.totalCalls()}, unreported_calls = :#{#m.unreportedCalls()},
+            usage_provenance = :#{#m.usageProvenance()}, measurement_verification = :#{#m.measurementVerification()},
+            pricing_state = :#{#m.pricingState()}, cost_usd = :#{#m.costUsd()}
+        WHERE id = :#{#m.id()} AND workspace_id = :#{#m.workspaceId()}
+        """, nativeQuery = true)
+    int remeasure(@Param("m") LlmUsageRemeasurement m);
+
     @Query(value = """
         SELECT COALESCE(SUM(u.calls - u.reported_calls), 0)
         FROM review_job_script_usage u
@@ -171,7 +221,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
 
     /**
      * Prices only complete UNPRICED measurements, without changing token counts or the funding source.
-     * Frozen charges are immutable; concurrent repricers can price a row only once.
+     * Frozen charges are immutable; concurrent repricers can price a row only once. The cost was computed from
+     * {@code priced}'s tokens, so a row a late call remeasured since is left for the next pass.
      */
     @WorkspaceAgnostic("ID-based price repair; the event id comes from the cross-tenant repricing enumeration")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -183,10 +234,15 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
                     + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()}"
                     + " WHERE id = :id AND pricing_state = 'UNPRICED' AND measurement_verification = 'VERIFIED' AND"
                     + " unreported_calls = 0 AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR"
-                    + " cache_write_tokens > 0)",
+                    + " cache_write_tokens > 0) AND input_tokens = :#{#priced.inputTokens()} AND output_tokens ="
+                    + " :#{#priced.outputTokens()} AND cache_read_tokens = :#{#priced.cacheReadTokens()} AND"
+                    + " cache_write_tokens = :#{#priced.cacheWriteTokens()}",
             nativeQuery = true)
     int applyResolvedPrice(
-            @Param("id") UUID id, @Param("costUsd") BigDecimal costUsd, @Param("price") LlmPriceSnapshot price);
+            @Param("id") UUID id,
+            @Param("costUsd") BigDecimal costUsd,
+            @Param("price") LlmPriceSnapshot price,
+            @Param("priced") UnpricedLedgerRow priced);
 
     /**
      * What turns the instance verdict from WITHIN into UNVERIFIABLE: spend {@link #sumCost} cannot

@@ -773,9 +773,51 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         private int reprice(UUID eventId, BigDecimal costUsd, LlmPriceSnapshot price) {
-            Integer updated =
-                    transactionTemplate.execute(status -> usageRepository.applyResolvedPrice(eventId, costUsd, price));
+            return reprice(eventId, costUsd, price, measured(reload(eventId), 0));
+        }
+
+        private int reprice(UUID eventId, BigDecimal costUsd, LlmPriceSnapshot price, UnpricedLedgerRow priced) {
+            Integer updated = transactionTemplate.execute(
+                    status -> usageRepository.applyResolvedPrice(eventId, costUsd, price, priced));
             return updated == null ? 0 : updated;
+        }
+
+        /** The row as the repricing pass read it, with {@code extraInput} tokens it no longer holds. */
+        private UnpricedLedgerRow measured(LlmUsageEvent row, long extraInput) {
+            return new UnpricedLedgerRow(
+                    row.getId(),
+                    row.getWorkspaceId(),
+                    row.getModel(),
+                    row.getFundingSource(),
+                    row.getInputTokens() + extraInput,
+                    row.getOutputTokens(),
+                    row.getCacheReadTokens(),
+                    row.getCacheWriteTokens(),
+                    row.getSearchUnits(),
+                    row.getAppliedPriceId(),
+                    row.getAppliedWorkspaceModelId(),
+                    row.getMeasurementVerification());
+        }
+
+        @Test
+        void shouldLeaveARowForTheNextPassWhenALateCallRemeasuredItAfterThePassReadIt() {
+            LlmUsageEvent row = unpricedRow("reprice-stale-tokens");
+            LlmPriceSnapshot price = new LlmPriceSnapshot(
+                    UsageFundingSource.INSTANCE,
+                    UsagePricingState.PRICED,
+                    42L,
+                    null,
+                    new BigDecimal("1.00"),
+                    new BigDecimal("9.00"),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO);
+
+            assertThat(reprice(row.getId(), new BigDecimal("1.000000"), price, measured(row, 5)))
+                    .isZero();
+
+            LlmUsageEvent unchanged = reload(row.getId());
+            assertThat(unchanged.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
+            assertThat(unchanged.getCostUsd()).isNull();
         }
 
         private LlmUsageEvent reload(UUID eventId) {

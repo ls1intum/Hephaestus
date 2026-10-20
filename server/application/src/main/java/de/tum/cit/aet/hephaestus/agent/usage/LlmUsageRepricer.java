@@ -82,10 +82,12 @@ public class LlmUsageRepricer {
             // one thing UNPRICED exists to prevent.
             return ResultOutcome.STILL_UNPRICEABLE;
         }
-        int updated = usageRepository.applyResolvedPrice(row.id(), computed.usd(), price);
+        int updated = usageRepository.applyResolvedPrice(row.id(), computed.usd(), price, row);
         if (updated == 0) {
             return ResultOutcome.STILL_UNPRICEABLE;
         }
+        // The ledger row first, then the attempt's charge: a projection reads charges before it locks a ledger row.
+        usageRepository.adoptResolvedPriceInAttemptCharge(row.id(), price);
         log.info(
                 "Repriced ledger event {} ({} tokens in / {} out, model {}) as {} at {} USD",
                 row.id(),

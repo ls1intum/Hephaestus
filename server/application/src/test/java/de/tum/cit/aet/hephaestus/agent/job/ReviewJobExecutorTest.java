@@ -96,8 +96,15 @@ class ReviewJobExecutorTest extends BaseUnitTest {
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final PracticeScriptRunRecorder practiceScriptRuns = mock(PracticeScriptRunRecorder.class);
     private final LlmUsageRecorder usageRecorder = mock(LlmUsageRecorder.class);
+    private final ReviewAttemptUsageService attemptUsage =
+            TerminalUsageTestFixtures.attemptUsageOverMocks(jobs, usageRecorder);
     private ReviewJobRecovery recovery = new ReviewJobRecovery(
-            jobs, properties(), new JsonMapper(), mock(LlmUsageRecorder.class), Optional.empty(), Optional.empty());
+            jobs,
+            properties(),
+            new JsonMapper(),
+            TerminalUsageTestFixtures.attemptUsageOverMocks(jobs, mock(LlmUsageRecorder.class)),
+            Optional.empty(),
+            Optional.empty());
 
     private static final String OWED_RESULT =
             "{\"contractVersion\":3,\"results\":[{\"practiceSlug\":\"silent-failure\","
@@ -134,7 +141,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                 new JsonMapper(),
                 meters,
                 telemetry,
-                usageRecorder,
+                attemptUsage,
                 practiceScriptRuns,
                 null,
                 capacity,
@@ -226,10 +233,12 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         verify(recovery)
                 .continueComposition(
                         eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport()), aryEq(feedbackReport()));
-        verify(jobs, never()).lockById(any());
+        assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(job.getCompletedAt()).isNull();
+        assertThat(job.getExitCode()).isNull();
         verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any());
         verify(practiceScriptRuns, never()).record(any(), any(), any(), any());
-        verify(usageRecorder, never()).record(any(), any());
+        verify(usageRecorder, never()).project(any(), any());
         verify(kept, never()).forget(any());
     }
 
@@ -254,7 +263,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         assertThat(job.getExitCode()).isEqualTo(SandboxLayout.EXIT_COMPOSITION_OWED);
         assertThat(job.getProcessingStatus()).isEqualTo(ProcessingStatus.PENDING);
         // The ordinary terminal write bills the attempt and records its practice script runs, once each.
-        verify(usageRecorder).record(eq(job.getWorkspaceId()), any());
+        verify(usageRecorder).project(eq(job.getWorkspaceId()), any());
         verify(practiceScriptRuns).record(eq(job), aryEq(scriptReport()), any(), any());
         verify(kept).forget(job);
     }
@@ -272,9 +281,11 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         assertThat(executor.executePrepared(job.getId(), job, mock(SandboxSpec.class)))
                 .isNull();
 
-        verify(jobs, never()).lockById(any());
+        assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(job.getCompletedAt()).isNull();
+        assertThat(job.getExitCode()).isNull();
         verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any());
-        verify(usageRecorder, never()).record(any(), any());
+        verify(usageRecorder, never()).project(any(), any());
         verify(kept, never()).forget(any());
     }
 
@@ -300,7 +311,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         eq("The container timed out."),
                         any(),
                         eq("worker-1"));
-        verify(usageRecorder).record(eq(job.getWorkspaceId()), any());
+        verify(usageRecorder).project(eq(job.getWorkspaceId()), any());
         verify(practiceScriptRuns).record(eq(job), aryEq(scriptReport()), any(), any());
         verify(kept).forget(job);
     }
@@ -379,6 +390,8 @@ class ReviewJobExecutorTest extends BaseUnitTest {
 
     private ReviewJob owedJob() {
         var job = configuredJob();
+        job.setStatus(ReviewJobStatus.RUNNING);
+        job.setWorkerId("worker-1");
         job.setAdmissionAttempt(0);
         job.setAdmissionDigest("admitted");
         return job;

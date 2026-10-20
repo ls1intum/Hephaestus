@@ -92,13 +92,13 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     }
 
     private void repriceSucceeds() {
-        when(usageRepository.applyResolvedPrice(any(), any(), any())).thenReturn(1);
+        when(usageRepository.applyResolvedPrice(any(), any(), any(), any())).thenReturn(1);
     }
 
     /** The price this reprice actually wrote, as one value — which is how the ledger stores it. */
     private LlmPriceSnapshot appliedPrice() {
         ArgumentCaptor<LlmPriceSnapshot> price = ArgumentCaptor.forClass(LlmPriceSnapshot.class);
-        verify(usageRepository).applyResolvedPrice(eq(EVENT_ID), any(), price.capture());
+        verify(usageRepository).applyResolvedPrice(eq(EVENT_ID), any(), price.capture(), any());
         return price.getValue();
     }
 
@@ -113,7 +113,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.REPRICED);
         ArgumentCaptor<BigDecimal> cost = ArgumentCaptor.forClass(BigDecimal.class);
         ArgumentCaptor<LlmPriceSnapshot> price = ArgumentCaptor.forClass(LlmPriceSnapshot.class);
-        verify(usageRepository).applyResolvedPrice(eq(EVENT_ID), cost.capture(), price.capture());
+        verify(usageRepository).applyResolvedPrice(eq(EVENT_ID), cost.capture(), price.capture(), any());
         // One million input tokens at $3.00 per million.
         assertThat(cost.getValue()).isEqualByComparingTo("3.00");
         assertThat(price.getValue().pricingState()).isEqualTo(UsagePricingState.PRICED);
@@ -142,7 +142,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 MeasurementVerification.VERIFIED));
 
         assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.NO_TOKEN_EVIDENCE);
-        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
+        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any(), any());
     }
 
     // Tokens and search units on one row: the tokens have a rate, the search units do not.
@@ -166,7 +166,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 MeasurementVerification.VERIFIED));
 
         assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
-        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
+        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any(), any());
     }
 
     // Every row the ledger backfill created — the ones that actually held a live cap shut — carries no
@@ -196,7 +196,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, null, null));
 
         assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.UNIDENTIFIABLE);
-        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
+        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any(), any());
     }
 
     @Test
@@ -216,7 +216,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, 11L, null));
 
         assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
-        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
+        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any(), any());
     }
 
     // Charging only the buckets a partial price covers would under-bill silently, which is the exact
@@ -292,7 +292,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     @DisplayName("losing the race to another pod is not reported as a reprice")
     void aLostRaceIsNotReportedAsARepricing() {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("3.00"))));
-        when(usageRepository.applyResolvedPrice(any(), any(), any())).thenReturn(0);
+        when(usageRepository.applyResolvedPrice(any(), any(), any(), any())).thenReturn(0);
 
         assertThat(repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, 11L, null)))
                 .isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
