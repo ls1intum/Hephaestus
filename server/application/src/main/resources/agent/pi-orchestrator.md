@@ -66,9 +66,9 @@ pattern, and their plurals, including in examples or informal phrasing.
 Every result and every problem cites the exact text that decides it. A citation names the source kind, the sourceFile
 (from `<manifest>`), a path, and the `[L<n>]` line numbers; the quote is the text after the prefix, as
 shown. A diff marker, a copied `[L<n>]` prefix, a non-breaking space read as a space, or a JSON string's
-text read without its escapes are tolerated — what is recorded is the sourceFile's own bytes. You may omit
-the quote and cite lines alone; what was recorded is echoed back to you. A quote whose lines were
-miscounted is recorded at the lines where the text is, when it occurs once. A refused citation says
+text read without its escapes are tolerated — what is recorded is the sourceFile's own bytes. Include
+the quote with the line numbers. A quote whose lines were miscounted is recorded at the lines where
+the text is, when it occurs once. A refused citation says
 what the cited lines actually read: copy from that.
 
 - The change: `sourceKind` `scm.pull-request.diff`, `sourcePath` the manifest's `change.json`, `path`
