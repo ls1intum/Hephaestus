@@ -524,7 +524,8 @@ class ReviewAttemptLateUsageIntegrationTest extends AbstractWorkspaceIntegration
         register(job, 0, ModelKind.CHAT, INSTANCE_CHAT);
         call(job, 0, 100, 10);
         end(job, ReviewJobStatus.CANCELLED, null, INSTANCE_CHAT);
-        Timestamp lastMonth = Timestamp.from(Instant.now().minus(40, ChronoUnit.DAYS));
+        Timestamp lastMonth =
+                Timestamp.from(Instant.now().minus(40, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS));
         jdbc.update("UPDATE review_job_attempt_usage SET occurred_at = ? WHERE job_id = ?", lastMonth, job.getId());
         jdbc.update("UPDATE llm_usage_event SET occurred_at = ? WHERE source_id = ?", lastMonth, job.getId());
 

@@ -213,7 +213,7 @@ This covers only calls the proxy observed with reported usage. It does not recov
 
 An erasure that cancels a running selected job settles the attempt first, so its ledger row exists before the erasure removes the job's measurements. The preparation then detaches the review ledger rows of each selected job (same job id and workspace) with the ledger store's own redaction. The rows keep their tokens, cost and date.
 
-**Rollout gate.** An attempt that crosses the upgrade can lose its pre-upgrade proxy totals or usage from calls without a registered measurement. Before you start the new version, let every old worker finish its active review attempts with a [graceful drain](../admin/runtime-roles.mdx#graceful-drain). Use a drain timeout that is long enough for those attempts, not `timeout=0`. Then make sure that no review job is `RUNNING` on an old worker. Queued jobs need not drain: the new version registers their first call.
+**Rollout gate.** An attempt that crosses the upgrade can lose its pre-upgrade proxy totals or usage from calls without a registered measurement. Before you start the new version, let every old worker finish its active review attempts with a [graceful drain](/admin/runtime-roles#graceful-drain). Use a drain timeout that is long enough for those attempts, not `timeout=0`. Then make sure that no review job is `RUNNING` on an old worker. Queued jobs need not drain: the new version registers their first call.
 
 `unpricedEventCount` follows the run-count definition in [Rule 4](#rule-4--never-render-a-pricing-or-budget-enum).
 It is not a per-purse count and must not be used as one in budget banners.

@@ -221,8 +221,9 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
 
     /**
      * Prices only complete UNPRICED measurements, without changing token counts or the funding source.
-     * Frozen charges are immutable; concurrent repricers can price a row only once. The cost was computed from
-     * {@code priced}'s tokens, so a row a late call remeasured since is left for the next pass.
+     * Frozen charges are immutable; concurrent repricers can price a row only once. The cost and the decision to
+     * price were taken from {@code priced}'s measurement: its tokens and its search units, which no price covers. A
+     * row a late call remeasured since in any of them is left for the next pass, which reads the new measurement.
      */
     @WorkspaceAgnostic("ID-based price repair; the event id comes from the cross-tenant repricing enumeration")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -236,7 +237,8 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
                     + " unreported_calls = 0 AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR"
                     + " cache_write_tokens > 0) AND input_tokens = :#{#priced.inputTokens()} AND output_tokens ="
                     + " :#{#priced.outputTokens()} AND cache_read_tokens = :#{#priced.cacheReadTokens()} AND"
-                    + " cache_write_tokens = :#{#priced.cacheWriteTokens()}",
+                    + " cache_write_tokens = :#{#priced.cacheWriteTokens()} AND search_units ="
+                    + " :#{#priced.searchUnits()}",
             nativeQuery = true)
     int applyResolvedPrice(
             @Param("id") UUID id,

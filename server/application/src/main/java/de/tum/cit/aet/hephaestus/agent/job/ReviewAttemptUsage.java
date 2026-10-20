@@ -50,6 +50,7 @@ import org.springframework.data.domain.Persistable;
 public class ReviewAttemptUsage implements Persistable<ReviewAttemptUsage.Id> {
 
     @EmbeddedId
+    @Getter(onMethod_ = @Override)
     private Id id;
 
     @Column(name = "workspace_id", nullable = false)
