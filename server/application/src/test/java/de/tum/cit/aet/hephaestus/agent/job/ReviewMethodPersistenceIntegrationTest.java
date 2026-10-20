@@ -194,8 +194,14 @@ class ReviewMethodPersistenceIntegrationTest extends BaseIntegrationTest {
                 new PiResultParser(mapper, meters), scriptRuns, meters, mapper, assignments);
         transactions.executeWithoutResult(status -> {
             recorder.record(job, report, Map.of(), Instant.now());
-            TerminalUsage.fromProxy(new ReviewJobLlmUsage(1, 120, 30, 0, 0, 0))
-                    .appendTo(usageRecorder, jobs, workspaceId, job, null, LlmPriceSnapshot.unpricedInstance());
+            TerminalUsageTestFixtures.project(
+                    TerminalUsage.fromProxy(new ReviewJobLlmUsage(1, 120, 30, 0, 0, 0)),
+                    usageRecorder,
+                    jobs,
+                    workspaceId,
+                    job,
+                    null,
+                    LlmPriceSnapshot.unpricedInstance());
         });
         assertThat(assignments.load(job)).containsExactly(pinned);
         assertThat(snapshots.find(workspaceId, job.getReviewId()).orElseThrow().practices())

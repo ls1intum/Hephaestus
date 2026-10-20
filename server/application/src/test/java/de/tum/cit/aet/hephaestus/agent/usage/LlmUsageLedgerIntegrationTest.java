@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import org.assertj.core.api.SoftAssertions;
 import org.jspecify.annotations.Nullable;
@@ -773,13 +774,194 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         private int reprice(UUID eventId, BigDecimal costUsd, LlmPriceSnapshot price) {
-            Integer updated =
-                    transactionTemplate.execute(status -> usageRepository.applyResolvedPrice(eventId, costUsd, price));
+            return reprice(eventId, costUsd, price, measured(reload(eventId), 0));
+        }
+
+        private int reprice(UUID eventId, BigDecimal costUsd, LlmPriceSnapshot price, UnpricedLedgerRow priced) {
+            Integer updated = transactionTemplate.execute(
+                    status -> usageRepository.applyResolvedPrice(eventId, costUsd, price, priced));
             return updated == null ? 0 : updated;
+        }
+
+        /** The row as the repricing pass read it, with {@code extraInput} tokens it no longer holds. */
+        private UnpricedLedgerRow measured(LlmUsageEvent row, long extraInput) {
+            return new UnpricedLedgerRow(
+                    row.getId(),
+                    row.getWorkspaceId(),
+                    row.getModel(),
+                    row.getFundingSource(),
+                    row.getInputTokens() + extraInput,
+                    row.getOutputTokens(),
+                    row.getCacheReadTokens(),
+                    row.getCacheWriteTokens(),
+                    row.getSearchUnits(),
+                    row.getAppliedPriceId(),
+                    row.getAppliedWorkspaceModelId(),
+                    row.getMeasurementVerification());
+        }
+
+        @Test
+        void shouldLeaveARowForTheNextPassWhenALateCallRemeasuredItAfterThePassReadIt() {
+            LlmUsageEvent row = unpricedRow("reprice-stale-tokens");
+            LlmPriceSnapshot price = new LlmPriceSnapshot(
+                    UsageFundingSource.INSTANCE,
+                    UsagePricingState.PRICED,
+                    42L,
+                    null,
+                    new BigDecimal("1.00"),
+                    new BigDecimal("9.00"),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO);
+
+            assertThat(reprice(row.getId(), new BigDecimal("1.000000"), price, measured(row, 5)))
+                    .isZero();
+
+            LlmUsageEvent unchanged = reload(row.getId());
+            assertThat(unchanged.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
+            assertThat(unchanged.getCostUsd()).isNull();
         }
 
         private LlmUsageEvent reload(UUID eventId) {
             return usageRepository.findById(eventId).orElseThrow();
+        }
+
+        /** A verified reranking row, unpriced when it was recorded, whose catalogue price is now PRICED. */
+        private LlmUsageEvent rerankingRow(Workspace workspace, ReviewJob job, long inputTokens, long searchUnits) {
+            LlmModelPrice price = new LlmModelPrice();
+            price.setModel(instanceModel(workspace.getWorkspaceSlug()));
+            price.setPricingMode(PricingMode.UNPRICED);
+            price.setEffectiveFrom(Instant.now().minusSeconds(60));
+            price = priceRepository.saveAndFlush(price);
+            record(workspace.getId(), rerankingSample(job, price.getId(), inputTokens, searchUnits, 1));
+            price.setPricingMode(PricingMode.PRICED);
+            price.setPer1mInputUsd(new BigDecimal("3.00"));
+            price.setPer1mOutputUsd(new BigDecimal("9.00"));
+            priceRepository.saveAndFlush(price);
+            return eventsOf(workspace).getFirst();
+        }
+
+        /** The attempt's reranking measurement, frozen at the unpriced snapshot it was recorded with. */
+        private LlmUsageRecorder.LlmUsageSample rerankingSample(
+                ReviewJob job, long priceId, long inputTokens, long searchUnits, int calls) {
+            return new LlmUsageRecorder.LlmUsageSample(
+                    null,
+                    "PRACTICE_REVIEW",
+                    UsageSourceType.PRACTICE_SCRIPT_RERANKING,
+                    job.getId(),
+                    job.getAttempt(),
+                    "gpt-ledger",
+                    inputTokens,
+                    0,
+                    0,
+                    0,
+                    0,
+                    searchUnits,
+                    calls,
+                    new LlmPriceSnapshot(
+                            UsageFundingSource.INSTANCE,
+                            UsagePricingState.UNPRICED,
+                            priceId,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null),
+                    UsageProvenance.PROXY,
+                    MeasurementVerification.VERIFIED,
+                    Instant.now());
+        }
+
+        private List<UnpricedLedgerRow> workList(LlmUsageEvent row) {
+            return usageRepository.findUnpricedInWindow(
+                    row.getOccurredAt().minusSeconds(60),
+                    row.getOccurredAt().plusSeconds(60),
+                    PageRequest.of(0, LlmUsageRepricingSweeper.MAX_ROWS_PER_PASS));
+        }
+
+        @Test
+        void shouldRefuseAStalePriceWhenALateRerankingCallAddedSearchUnitsAfterThePassReadTheRow() {
+            Workspace workspace = setupWorkspace("reprice-stale-search-units");
+            ReviewJob job = queuedJob(workspace, Instant.now(), null);
+            LlmUsageEvent row = rerankingRow(workspace, job, 1_000_000, 0);
+            long priceId = Objects.requireNonNull(row.getAppliedPriceId());
+            // The repricing pass reads the row: tokens it can price, no search units.
+            UnpricedLedgerRow read = workList(row).stream()
+                    .filter(candidate -> candidate.id().equals(row.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(read.searchUnits()).isZero();
+
+            // A late reranking call adds search units and no tokens; the attempt's row is projected again.
+            transactionTemplate.executeWithoutResult(
+                    status -> recorder.project(workspace.getId(), rerankingSample(job, priceId, 1_000_000, 5, 2)));
+            assertThat(reload(row.getId()).getSearchUnits()).isEqualTo(5);
+
+            // The pass prices what it read; the row it read no longer exists in that form.
+            assertThat(repricer.reprice(read)).isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
+            LlmUsageEvent unchanged = reload(row.getId());
+            assertThat(unchanged.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
+            assertThat(unchanged.getCostUsd()).isNull();
+            assertThat(unchanged.getInputTokens()).isEqualTo(1_000_000);
+            assertThat(unchanged.getSearchUnits()).isEqualTo(5);
+
+            // The next pass reads the new measurement: no price covers search units, so it stays unpriced.
+            UnpricedLedgerRow fresh = workList(row).stream()
+                    .filter(candidate -> candidate.id().equals(row.getId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(fresh.searchUnits()).isEqualTo(5);
+            assertThat(repricer.reprice(fresh)).isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
+            assertThat(reload(row.getId()).getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
+            assertThat(reload(row.getId()).getCostUsd()).isNull();
+        }
+
+        @Test
+        void shouldPriceTheReadTokenMeasurementWhenNoLateCallChangedIt() {
+            Workspace workspace = setupWorkspace("reprice-search-units-control");
+            ReviewJob job = queuedJob(workspace, Instant.now(), null);
+            LlmUsageEvent row = rerankingRow(workspace, job, 1_000_000, 0);
+            UnpricedLedgerRow read = workList(row).stream()
+                    .filter(candidate -> candidate.id().equals(row.getId()))
+                    .findFirst()
+                    .orElseThrow();
+
+            assertThat(repricer.reprice(read)).isEqualTo(LlmUsageRepricer.ResultOutcome.REPRICED);
+
+            LlmUsageEvent repriced = reload(row.getId());
+            assertThat(repriced.getPricingState()).isEqualTo(UsagePricingState.PRICED);
+            assertThat(repriced.getCostUsd()).isEqualByComparingTo("3.00");
+            assertThat(repriced.getSearchUnits()).isZero();
+        }
+
+        @Test
+        void shouldNeverPriceAMeasurementOfSearchUnitsWithoutTokens() {
+            Workspace workspace = setupWorkspace("reprice-search-units-only");
+            ReviewJob job = queuedJob(workspace, Instant.now(), null);
+            LlmUsageEvent row = rerankingRow(workspace, job, 0, 5);
+            UnpricedLedgerRow read = projection(row);
+
+            assertThat(workList(row)).extracting(UnpricedLedgerRow::id).doesNotContain(row.getId());
+            assertThat(repricer.reprice(read)).isEqualTo(LlmUsageRepricer.ResultOutcome.NO_TOKEN_EVIDENCE);
+            assertThat(reprice(
+                            row.getId(),
+                            new BigDecimal("1.000000"),
+                            new LlmPriceSnapshot(
+                                    UsageFundingSource.INSTANCE,
+                                    UsagePricingState.PRICED,
+                                    row.getAppliedPriceId(),
+                                    null,
+                                    new BigDecimal("3.00"),
+                                    new BigDecimal("9.00"),
+                                    null,
+                                    null),
+                            read))
+                    .as("the update itself refuses a row without tokens, also with an exact read")
+                    .isZero();
+
+            LlmUsageEvent unchanged = reload(row.getId());
+            assertThat(unchanged.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
+            assertThat(unchanged.getCostUsd()).isNull();
+            assertThat(unchanged.getSearchUnits()).isEqualTo(5);
         }
 
         @Test

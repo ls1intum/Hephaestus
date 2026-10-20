@@ -1464,6 +1464,41 @@ erDiagram
         TIMESTAMPTZ completed_at
     }
 
+    ReviewJobAttemptCharge {
+        INTEGER attempt PK,FK
+        UUID job_id PK,FK
+        VARCHAR(16) model_kind PK
+        NUMERIC(18,8) applied_per_1m_cache_read_usd
+        NUMERIC(18,8) applied_per_1m_cache_write_usd
+        NUMERIC(18,8) applied_per_1m_input_usd
+        NUMERIC(18,8) applied_per_1m_output_usd
+        BIGINT applied_price_id
+        BIGINT applied_workspace_model_id
+        VARCHAR(16) funding_source "NOT NULL"
+        VARCHAR(128) model
+        VARCHAR(16) pricing_state "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+    }
+
+    ReviewJobAttemptUsage {
+        INTEGER attempt PK,UK
+        UUID job_id PK,FK,UK
+        TIMESTAMPTZ occurred_at
+        BIGINT proxy_cache_read_tokens "NOT NULL"
+        BIGINT proxy_cache_write_tokens "NOT NULL"
+        INTEGER proxy_calls "NOT NULL"
+        BIGINT proxy_input_tokens "NOT NULL"
+        BIGINT proxy_output_tokens "NOT NULL"
+        BIGINT proxy_reasoning_tokens "NOT NULL"
+        INTEGER runner_cache_read_tokens
+        INTEGER runner_cache_write_tokens
+        INTEGER runner_calls
+        INTEGER runner_input_tokens
+        INTEGER runner_output_tokens
+        INTEGER runner_reasoning_tokens
+        BIGINT workspace_id FK,UK "NOT NULL"
+    }
+
     ReviewJobScriptRun {
         UUID job_id PK,FK
         INTEGER attempt PK
@@ -2003,6 +2038,9 @@ erDiagram
     Workspace ||--o{ ReviewItem : reviewed
     Review ||--o{ ReviewJob : reviewed
     Workspace ||--o{ ReviewJob : reviewed
+    ReviewJobAttemptUsage ||--o{ ReviewJobAttemptCharge : reviewed
+    ReviewJob ||--o{ ReviewJobAttemptUsage : reviewed
+    Workspace ||--o{ ReviewJobAttemptUsage : reviewed
     ReviewJob ||--o{ ReviewJobScriptRun : reviewed
     PracticeVersion ||--o{ ReviewJobScriptRun : reviewed
     Workspace ||--o{ ReviewJobScriptRun : reviewed

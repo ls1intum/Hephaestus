@@ -52,7 +52,7 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
         assertThat(missing(UsageSourceType.REVIEW_JOB.name()))
                 .as("an unreadable body is not also an absent one")
                 .isZero();
-        verify(usageAccumulator, never()).accumulate(any(), any());
+        verify(usageAccumulator, never()).accumulate(any(), any(), any());
     }
 
     @Test
@@ -123,7 +123,7 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
                 .as("the counter must mean 'unbilled', not 'a call happened'")
                 .isZero();
         assertThat(missing(UsageSourceType.REVIEW_JOB.name())).isZero();
-        verify(usageAccumulator).accumulate(attempt, new ProxyTokenUsage(6, 5, 2, 4, 0));
+        verify(usageAccumulator).accumulate(attempt, null, new ProxyTokenUsage(6, 5, 2, 4, 0));
     }
 
     @Test
@@ -140,7 +140,7 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
                         .counter("llm.proxy.usage.unparseable", "sourceType", UsageSourceType.REVIEW_JOB.name())
                         .count())
                 .isEqualTo(1.0);
-        verify(usageAccumulator, never()).accumulate(any(), any());
+        verify(usageAccumulator, never()).accumulate(any(), any(), any());
     }
 
     @Test
@@ -157,6 +157,6 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
                         .counter("llm.proxy.usage.unparseable", "sourceType", "PRACTICE_SCRIPT_EMBEDDING")
                         .count())
                 .isEqualTo(1.0);
-        verify(usageAccumulator).accumulatePracticeScript(attempt, call, null);
+        verify(usageAccumulator).accumulate(attempt, call, null);
     }
 }

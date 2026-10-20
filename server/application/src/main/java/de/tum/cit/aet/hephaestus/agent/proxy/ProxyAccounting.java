@@ -133,7 +133,7 @@ public class ProxyAccounting {
             // An unreadable body is not also an absent one: the practice script row still counts the
             // call, and only the unparseable counter records the gap.
             if (practiceScript != null) {
-                usageAccumulator.accumulatePracticeScript(attempt, practiceScript, null);
+                usageAccumulator.accumulate(attempt, practiceScript, null);
             }
             return null;
         }
@@ -143,17 +143,14 @@ public class ProxyAccounting {
 
     /**
      * A practice script call counts on its row even when its provider reports no tokens, so the row shows
-     * every call. A practice script call on the chat model also goes into the job's own counters, because the
-     * review's ledger row bills the chat model. A served response without reported usage is counted by
-     * source type; tokens and provider charges are never estimated.
+     * every call. A practice script call on the chat model also goes into the attempt's own total, because the
+     * review's ledger row bills the chat model; the two change in one settlement. A served response without
+     * reported usage is counted by source type; tokens and provider charges are never estimated.
      */
     public void recordUsage(
             ProxyRouting.BilledAttempt attempt,
             @Nullable PracticeScriptCall practiceScript,
             @Nullable ProxyTokenUsage usage) {
-        if (practiceScript != null) {
-            usageAccumulator.accumulatePracticeScript(attempt, practiceScript, usage);
-        }
         if (usage == null) {
             meterRegistry
                     .counter(
@@ -161,12 +158,16 @@ public class ProxyAccounting {
                             "sourceType",
                             attempt.sourceType().name())
                     .increment();
-            return;
         }
         switch (attempt.sourceType()) {
-            case REVIEW_JOB -> usageAccumulator.accumulate(attempt, usage);
-            case MENTOR_TURN -> mentorTurnUsageAccumulator.accumulate(attempt, usage);
-            case PRACTICE_SCRIPT_DECISION, PRACTICE_SCRIPT_EMBEDDING, PRACTICE_SCRIPT_RERANKING -> {}
+            case MENTOR_TURN -> {
+                if (usage != null) mentorTurnUsageAccumulator.accumulate(attempt, usage);
+            }
+            case REVIEW_JOB, PRACTICE_SCRIPT_DECISION, PRACTICE_SCRIPT_EMBEDDING, PRACTICE_SCRIPT_RERANKING -> {
+                // The review's own call without usage has nothing to settle; it stays the missing-usage count.
+                if (practiceScript != null || usage != null)
+                    usageAccumulator.accumulate(attempt, practiceScript, usage);
+            }
         }
     }
 

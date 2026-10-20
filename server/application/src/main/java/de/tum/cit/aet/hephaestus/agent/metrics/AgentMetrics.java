@@ -48,6 +48,7 @@ public final class AgentMetrics {
     public static final String LLM_PROXY_UNBILLABLE_REFUSED = "llm.proxy.unbillable.refused";
     public static final String LLM_PROXY_USAGE_ACCUMULATE_FAILURE = "llm.proxy.usage.accumulate.failure";
     public static final String LLM_PROXY_USAGE_ACCUMULATE_SUPERSEDED = "llm.proxy.usage.accumulate.superseded";
+    public static final String LLM_PROXY_USAGE_LATE_SETTLED = "llm.proxy.usage.late_settled";
     public static final String LLM_PROXY_USAGE_MENTOR_FAILURE = "llm.proxy.usage.mentor.failure";
     public static final String LLM_PROXY_USAGE_MENTOR_SUPERSEDED = "llm.proxy.usage.mentor.superseded";
     public static final String LLM_PROXY_USAGE_MISSING = "llm.proxy.usage.missing";

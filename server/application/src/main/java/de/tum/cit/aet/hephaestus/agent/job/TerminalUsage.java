@@ -1,9 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
-import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult.LlmUsage;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
@@ -12,7 +9,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -32,8 +31,9 @@ record TerminalUsage(
         UsageProvenance provenance) {
     /**
      * @param runnerUsage what the agent runner reported, or {@code null} when it never produced one
-     * @param proxyCounts the {@code review_job} row's proxy accumulators, read BEFORE any requeue
-     *     (which zeroes them) and BEFORE the runner's totals are written over them
+     * @param proxyCounts every proxied call of the attempt ({@link ReviewAttemptUsage#proxyUsage}), including one
+     *     that returned after the attempt ended. The {@code review_job} counters are not this: a requeue zeroes
+     *     them and a clean finish writes the selected totals over them
      * @param practiceScript the attempt's practice script totals by model kind. Its chat total is added to the
      *     runner's report: its session events contain no direct calls, while the proxy's counters do.
      *     Its buckets are those of the proxy's counters, so its cache reads and writes keep their own rates.
@@ -92,34 +92,36 @@ record TerminalUsage(
     }
 
     /**
-     * Append this ending attempt to the spend ledger — the ONE way an {@code review_job} attempt becomes
-     * ledger rows: its own row, then one row for each model for practice scripts other than chat that it called,
-     * over all its practices. The ledger key holds no practice, so one row per practice would keep only
-     * the first.
+     * The attempt whose ledger rows a projection writes.
+     *
+     * @param occurredAt the attempt's one date: every row of the attempt keeps it, so midnight on the 1st cannot
+     *     split the attempt across two months, and a late call cannot move it
+     */
+    record Source(long workspaceId, UUID reviewId, UUID jobId, int attempt, Instant occurredAt) {}
+
+    /**
+     * Projects this selection onto the spend ledger — the ONE way an {@code review_job} attempt becomes ledger
+     * rows: its own row, then one row for each model for practice scripts other than chat that it called, over all
+     * its practices. The ledger key holds no practice, so one row per practice would keep only the first. Projecting
+     * the same attempt again replaces only the measurement of its rows ({@link LlmUsageRecorder#project}).
      * The practice script chat calls are already in this attempt's own row: the proxy's counters hold them, and
      * {@link #resolve} adds them to a runner report. Which of the recorder's two
      * append paths a row takes is derived here, never chosen by the caller: a caller picking it itself
      * could write a PRICED row of invented zeros, the exact failure the ledger exists to prevent.
      *
-     * @param workspaceId passed explicitly rather than read off {@code job}: the terminal paths differ
-     *     in whether they hold a workspace-scoped id or a job loaded with its workspace
-     * @param snapshot the admitted snapshot, which names the models and prices the practice script rows;
-     *     {@code null} when it cannot be read, which leaves the practice script rows UNPRICED
-     * @param price the price of the attempt's own row
+     * @param charges the attempt's frozen charge of each model kind; a kind without one stays UNPRICED
+     * @param practiceScript the attempt's practice script totals, the same list {@link #resolve} received
      * @return true when the attempt's own calls were billed at their frozen price or no calls occurred,
      *     false when they were appended UNPRICED
      */
-    boolean appendTo(
+    boolean projectTo(
             LlmUsageRecorder recorder,
-            ReviewJobRepository jobs,
-            Long workspaceId,
-            ReviewJob job,
-            @Nullable ConfigSnapshot snapshot,
-            LlmPriceSnapshot price) {
-        // One instant for every row of the attempt, so midnight on the 1st cannot split it across two months.
-        Instant occurredAt = Instant.now();
-        List<PracticeScriptKindTotal> practiceScript =
-                jobs.sumPracticeScriptUsageByKind(workspaceId, job.getId(), job.getAttempt());
+            Source source,
+            Map<ModelKind, FrozenCharge> charges,
+            List<PracticeScriptKindTotal> practiceScript) {
+        Long workspaceId = source.workspaceId();
+        Instant occurredAt = source.occurredAt();
+        FrozenCharge chat = charges.getOrDefault(ModelKind.CHAT, FrozenCharge.UNKNOWN);
         long chatCalls = practiceScript.stream()
                 .filter(total -> total.modelKind() == ModelKind.CHAT)
                 .mapToLong(PracticeScriptKindTotal::calls)
@@ -132,12 +134,12 @@ record TerminalUsage(
                         recorder,
                         workspaceId,
                         new LlmUsageRecorder.LlmUsageSample(
-                                job.getReviewId(),
+                                source.reviewId(),
                                 "PRACTICE_REVIEW",
                                 UsageSourceType.REVIEW_JOB,
-                                job.getId(),
-                                job.getAttempt(),
-                                snapshot == null ? null : snapshot.model().upstreamModelId(),
+                                source.jobId(),
+                                source.attempt(),
+                                chat.model(),
                                 inputTokens,
                                 outputTokens,
                                 cacheReadTokens,
@@ -145,7 +147,7 @@ record TerminalUsage(
                                 reasoningTokens,
                                 0L,
                                 calls,
-                                price,
+                                chat.price(),
                                 provenance,
                                 verifiable && chatUsageReported(practiceScript)
                                         ? MeasurementVerification.VERIFIED
@@ -155,18 +157,17 @@ record TerminalUsage(
             if (total.modelKind() == ModelKind.CHAT) {
                 continue;
             }
-            FrozenModel model = snapshot == null ? null : snapshot.practiceScriptSlot(total.modelKind());
-            LlmPriceSnapshot frozen = model == null ? null : model.priceSnapshot();
+            FrozenCharge frozen = charges.getOrDefault(total.modelKind(), FrozenCharge.UNKNOWN);
             append(
                     recorder,
                     workspaceId,
                     new LlmUsageRecorder.LlmUsageSample(
-                            job.getReviewId(),
+                            source.reviewId(),
                             "PRACTICE_REVIEW",
                             ScriptUsage.ledgerSourceType(total.modelKind()),
-                            job.getId(),
-                            job.getAttempt(),
-                            model == null ? null : model.upstreamModelId(),
+                            source.jobId(),
+                            source.attempt(),
+                            frozen.model(),
                             total.inputTokens(),
                             total.outputTokens(),
                             total.cacheReadTokens(),
@@ -174,7 +175,7 @@ record TerminalUsage(
                             0L,
                             total.searchUnits(),
                             (int) Math.min(Integer.MAX_VALUE, total.calls()),
-                            frozen != null ? frozen : LlmPriceSnapshot.unpricedInstance(),
+                            frozen.price(),
                             UsageProvenance.PROXY,
                             total.hasCompleteUsage()
                                     ? MeasurementVerification.VERIFIED
@@ -186,7 +187,7 @@ record TerminalUsage(
 
     // Only verified measurements may use the frozen price.
     private static boolean append(LlmUsageRecorder recorder, Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
-        recorder.record(workspaceId, sample);
+        recorder.project(workspaceId, sample);
         return sample.measurementVerification() == MeasurementVerification.VERIFIED
                 && sample.price().pricingState() != UsagePricingState.UNPRICED;
     }

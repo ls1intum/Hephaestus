@@ -62,6 +62,10 @@ class PersonalDataMapArchTest {
             "review_job_script_run",
             // A job's token counters, like the token columns review_job keeps after a person's erasure.
             "review_job_script_usage",
+            // Each attempt's token counts and frozen rates, keyed by job and attempt only; removed with the job and
+            // when an erasure selects the job.
+            "review_job_attempt_usage",
+            "review_job_attempt_charge",
             "commit_pull_request",
             "connection",
             "connection_activity",

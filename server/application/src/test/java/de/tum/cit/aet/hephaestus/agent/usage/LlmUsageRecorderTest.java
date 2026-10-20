@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
@@ -11,10 +13,14 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Answers;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -302,6 +308,70 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         assertThat(registry.counter("llm.budget.alert.failure").count()).isEqualTo(1.0);
     }
 
+    @Test
+    void shouldKeepAnEarlierMonthsFirstChargeWithoutSchedulingACurrentMonthAlert() {
+        AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
+        LlmBudgetService budget = mock(LlmBudgetService.class);
+        LlmUsageRecorder recorder = new LlmUsageRecorder(capturing(event), budget, new SimpleMeterRegistry());
+        Instant occurredAt = Instant.now().minus(40, ChronoUnit.DAYS);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            recorder.record(7L, sampleOfInputTokensOnly(instancePriced(), 1_000_000, occurredAt));
+            assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(captured(event).costUsd()).isEqualByComparingTo("1.000000");
+        assertThat(captured(event).occurredAt()).isEqualTo(occurredAt);
+        verifyNoInteractions(budget);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1.50, 0.0", "1.75, 1.0"})
+    void shouldAlertOnlyWhenThePositiveCorrectionCrossesTheBudget(String monthlyBudget, double crossings) {
+        var measurement = sampleOfInputTokensOnly(instancePriced(), 1_000_000);
+        LlmUsageEvent previous = new LlmUsageEvent();
+        previous.setId(UUID.randomUUID());
+        previous.setWorkspaceId(7L);
+        previous.setSourceId(measurement.sourceId());
+        previous.setSourceAttempt(measurement.sourceAttempt());
+        previous.setSourceType(UsageSourceType.REVIEW_JOB);
+        previous.setJobType("PRACTICE_REVIEW");
+        previous.setInputTokens(500_000);
+        previous.setCostUsd(new BigDecimal("0.500000"));
+        previous.setFundingSource(UsageFundingSource.INSTANCE);
+        previous.setPricingState(UsagePricingState.PRICED);
+        previous.setAppliedPer1mInputUsd(BigDecimal.ONE);
+        previous.setOccurredAt(Instant.now());
+        previous.setMeasurementVerification(MeasurementVerification.VERIFIED);
+        LlmUsageEventRepository repository = mock(LlmUsageEventRepository.class);
+        when(repository.lockBySource(
+                        7L, UsageSourceType.REVIEW_JOB, measurement.sourceId(), measurement.sourceAttempt()))
+                .thenReturn(Optional.of(previous));
+        when(repository.remeasure(any())).thenReturn(1);
+        LlmBudgetService budget = mock(LlmBudgetService.class);
+        // The corrected row adds $0.50 to $1.50 already recorded this month, rather than charging its whole $1 again.
+        when(budget.headroom(7L))
+                .thenReturn(new LlmBudgetHeadroom(
+                        new BigDecimal("2.00"), new BigDecimal(monthlyBudget), false, null, null, false));
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        LlmUsageRecorder recorder = new LlmUsageRecorder(repository, budget, registry);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            recorder.project(7L, measurement);
+            var callbacks = TransactionSynchronizationManager.getSynchronizations();
+            assertThat(callbacks).hasSize(1);
+            callbacks.getFirst().afterCommit();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(registry.counter("llm.budget.exhausted").count()).isEqualTo(crossings);
+    }
+
     private static LlmPriceSnapshot instancePriced() {
         return new LlmPriceSnapshot(
                 UsageFundingSource.INSTANCE,
@@ -320,6 +390,11 @@ class LlmUsageRecorderTest extends BaseUnitTest {
     }
 
     private static LlmUsageRecorder.LlmUsageSample sampleOfInputTokensOnly(LlmPriceSnapshot price, long inputTokens) {
+        return sampleOfInputTokensOnly(price, inputTokens, Instant.now());
+    }
+
+    private static LlmUsageRecorder.LlmUsageSample sampleOfInputTokensOnly(
+            LlmPriceSnapshot price, long inputTokens, Instant occurredAt) {
         return new LlmUsageRecorder.LlmUsageSample(
                 null,
                 "PRACTICE_REVIEW",
@@ -337,7 +412,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 price,
                 UsageProvenance.RUNNER,
                 MeasurementVerification.VERIFIED,
-                Instant.now());
+                occurredAt);
     }
 
     @Test
