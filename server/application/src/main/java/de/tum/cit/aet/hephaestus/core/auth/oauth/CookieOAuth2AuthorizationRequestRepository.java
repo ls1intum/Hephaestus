@@ -99,7 +99,9 @@ public class CookieOAuth2AuthorizationRequestRepository
             byte[] plain = decrypt(decoded);
             return deserialize(plain);
         } catch (RuntimeException ex) {
-            log.warn("auth.oauth: rejecting tampered/expired oauth-state cookie: {}", ex.getMessage());
+            log.warn(
+                    "auth.oauth: rejecting tampered/expired oauth-state cookie: errorType={}",
+                    ex.getClass().getName());
             return null;
         }
     }

@@ -169,9 +169,11 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
         handler.handleEvent(event);
 
         assertThat(persistedWorkspace(event).getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
+        // The failure is named by class; the provider's message is not repeated in the shared log.
         assertThat(output)
                 .contains("Failed to verify installation status via API, skipping status update:"
-                        + " installationId=78181208, error=fixture provider unavailable");
+                        + " installationId=78181208, error=IllegalStateException")
+                .doesNotContain("fixture provider unavailable");
     }
 
     @Test

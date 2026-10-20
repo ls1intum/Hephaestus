@@ -210,7 +210,6 @@ expectConfig("allowBuilds", {
 	esbuild: true,
 	"@google/genai": false,
 	"@swc/core": true,
-	"@sentry/cli": true,
 });
 const { overrides } = workspace;
 if (!isRecord(overrides)) {

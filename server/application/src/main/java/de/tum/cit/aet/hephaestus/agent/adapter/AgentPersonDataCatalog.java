@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.adapter;
 
+import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
+import de.tum.cit.aet.hephaestus.agent.job.ScriptUsage;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.JdbcPersonDataStore;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCatalog;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataContributor;
@@ -8,7 +10,9 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonEvidenceErasure;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,10 +52,21 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
         """;
     private static final String SELECTED_JOBS = SUBJECT_JOBS + " UNION " + COPYING_JOBS;
 
+    /** How an erased ledger row is detached from its source; the ledger store and job preparation share it. */
+    private static final String LEDGER_REDACTION = "source_id=gen_random_uuid(),review_id=NULL";
+
+    /** The ledger source kinds of a review job attempt: its own row and one per practice script model kind. */
+    private static final Object[] REVIEW_SOURCE_TYPES = Arrays.stream(ModelKind.values())
+            .map(ScriptUsage::ledgerSourceType)
+            .map(Enum::name)
+            .distinct()
+            .toArray();
+
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final List<PersonEvidenceErasure> evidenceCopies;
     private final ReviewJobLifecycleService lifecycle;
+    private final ReviewAttemptUsageService attemptUsage;
 
     @Override
     public List<PersonDataContributor> contributors() {
@@ -80,7 +95,7 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                                 + " c.account_id=:account))",
                         "id,workspace_id,job_type,source_type,source_id,source_attempt,review_id,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,reasoning_tokens,search_units,total_calls,unreported_calls,cost_usd,pricing_state,funding_source,applied_price_id,applied_workspace_model_id,applied_per_1m_input_usd,applied_per_1m_output_usd,applied_per_1m_cache_read_usd,applied_per_1m_cache_write_usd,occurred_at,usage_provenance",
                         "id,workspace_id",
-                        "source_id=gen_random_uuid(),review_id=NULL",
+                        LEDGER_REDACTION,
                         -85),
                 new JdbcPersonDataStore(
                         jdbc,
@@ -95,6 +110,9 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
     }
 
     private record JobRow(UUID id, long workspaceId, ReviewJobStatus status, boolean evidence) {}
+
+    /** One job exactly as the frozen selection names it: its id together with its own workspace. */
+    private record JobKey(UUID id, long workspaceId) {}
 
     private final class AgentJobStore extends JdbcPersonDataStore {
         AgentJobStore() {
@@ -135,13 +153,49 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                             row.getBoolean("evidence")));
         }
 
+        private Set<JobKey> keys(PersonDataSelection selection) {
+            return selection.rows().stream()
+                    .map(row -> new JobKey(
+                            UUID.fromString(Objects.requireNonNull(row.columns().get("id"))),
+                            Long.parseLong(Objects.requireNonNull(row.columns().get("workspace_id")))))
+                    .collect(Collectors.toUnmodifiableSet());
+        }
+
+        /**
+         * Cancels the selected jobs that still run, then removes every attempt measurement of every selected job, then
+         * detaches every review ledger row of those jobs from them. Each step uses the job id together with its own
+         * workspace, exactly as the frozen selection names it.
+         *
+         * <p>The cancellation settles the attempt, which can append a ledger row that the frozen ledger selection does
+         * not hold. Removing the measurements first leaves a call that returns later with no attempt to settle on, so
+         * nothing writes the job back into the ledger after the detach. The detach keeps every row with its tokens, cost
+         * and date, and applies the ledger store's own redaction. Repeating the preparation is safe: a cancelled job is
+         * not cancelled again, a removed measurement stays removed, and a detached row no longer names the job.
+         */
         @Override
         public void prepareErasure(PersonDataSelection selection) {
+            Set<JobKey> frozen = keys(selection);
             for (var row : jobs(selection)) {
+                if (!frozen.contains(new JobKey(row.id(), row.workspaceId()))) continue;
                 if (row.status() == ReviewJobStatus.QUEUED || row.status() == ReviewJobStatus.RUNNING)
                     lifecycle.cancel(row.workspaceId(), row.id());
             }
+            for (var key : frozen) attemptUsage.forgetJob(key.workspaceId(), key.id());
+            for (var key : frozen) detachLedger(key);
             eraseEvidence(selection);
+        }
+
+        private void detachLedger(JobKey key) {
+            jdbc.update(
+                    "UPDATE llm_usage_event SET " + LEDGER_REDACTION
+                            + " WHERE workspace_id=:workspace AND source_id=:job AND source_type=ANY(:types)",
+                    Map.of(
+                            "workspace",
+                            key.workspaceId(),
+                            "job",
+                            key.id(),
+                            "types",
+                            new SqlArrayValue("varchar", REVIEW_SOURCE_TYPES)));
         }
 
         private void eraseEvidence(PersonDataSelection selection) {

@@ -9,7 +9,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
@@ -73,7 +72,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
                 transactionTemplate,
                 sandboxManager,
                 Optional.empty(),
-                usageRecorder,
+                TerminalUsageTestFixtures.attemptUsageOverMocks(jobRepository, usageRecorder),
                 objectMapper,
                 new ReviewJobTelemetry(new SimpleMeterRegistry(), Tracer.NOOP));
 
@@ -196,7 +195,8 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            verifyNoInteractions(usageRecorder);
+            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never()).project(any(), any());
         }
 
         @Test
@@ -218,7 +218,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             service.cancel(1L, id);
 
             var captured = ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).record(eq(1L), captured.capture());
+            verify(usageRecorder).project(eq(1L), captured.capture());
             assertThat(captured.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
             assertThat(captured.getValue().inputTokens()).isEqualTo(900);
             assertThat(captured.getValue().outputTokens()).isEqualTo(600);
@@ -255,7 +255,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             assertThat(result.getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).record(eq(1L), sample.capture());
+            verify(usageRecorder).project(eq(1L), sample.capture());
             assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
             assertThat(sample.getValue().totalCalls()).isEqualTo(1);
             assertThat(sample.getValue().price().fundingSource()).isEqualTo(UsageFundingSource.INSTANCE);
@@ -279,7 +279,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             service.cancel(1L, jobId);
 
             verify(usageRecorder, never())
-                    .record(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
+                    .project(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -301,7 +301,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             service.cancel(1L, jobId);
 
             verify(usageRecorder, never())
-                    .record(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
+                    .project(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -315,7 +315,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             service.cancel(1L, jobId);
 
             verify(usageRecorder, never())
-                    .record(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
+                    .project(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
             verify(jobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
         }
     }
@@ -339,7 +339,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-        verify(usageRecorder).record(eq(1L), sample.capture());
+        verify(usageRecorder).project(eq(1L), sample.capture());
         assertThat(sample.getValue().inputTokens()).isEqualTo(120);
         assertThat(sample.getValue().outputTokens()).isEqualTo(30);
         assertThat(sample.getValue().sourceId()).isEqualTo(running.getId());

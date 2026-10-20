@@ -125,7 +125,7 @@ public class SlackMessageService {
                     "Slack chat.postMessage transport failure: workspaceId={}, channelId={}, error={}",
                     workspaceId,
                     channelId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
         }
     }
@@ -166,7 +166,7 @@ public class SlackMessageService {
                     "Slack chat.postEphemeral transport failure: workspaceId={}, channelId={}, error={}",
                     workspaceId,
                     channelId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
         }
     }
@@ -205,7 +205,10 @@ public class SlackMessageService {
             log.debug("Slack auth.test not ok for workspaceId={}: error={}", workspaceId, r.getError());
             return Optional.empty();
         } catch (SlackApiException | IOException e) {
-            log.debug("Slack auth.test failed for workspaceId={}: {}", workspaceId, e.getMessage());
+            log.debug(
+                    "Slack auth.test failed for workspaceId={}: {}",
+                    workspaceId,
+                    e.getClass().getSimpleName());
             return Optional.empty();
         }
     }
@@ -322,7 +325,7 @@ public class SlackMessageService {
                     "Slack views.publish transport failure: workspaceId={}, userId={}, error={}",
                     workspaceId,
                     slackUserId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             throw new SlackSendException(workspaceId, slackUserId, "transport_failure", e);
         }
     }
@@ -345,7 +348,10 @@ public class SlackMessageService {
                     .assistantThreadsSetStatus(
                             req -> req.channelId(channel).threadTs(threadTs).status(status));
         } catch (Exception e) {
-            log.debug("Slack setStatus skipped (channel={}): {}", channel, e.getMessage());
+            log.debug(
+                    "Slack setStatus skipped (channel={}): {}",
+                    channel,
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -367,7 +373,10 @@ public class SlackMessageService {
                     .assistantThreadsSetSuggestedPrompts(
                             req -> req.channelId(channel).title(title).prompts(prompts));
         } catch (Exception e) {
-            log.debug("Slack setSuggestedPrompts skipped (channel={}): {}", channel, e.getMessage());
+            log.debug(
+                    "Slack setSuggestedPrompts skipped (channel={}): {}",
+                    channel,
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -450,7 +459,7 @@ public class SlackMessageService {
                     "Slack conversations.list transport failure: workspaceId={}, collected={}, error={}",
                     workspaceId,
                     channels.size(),
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return channels;
         }
     }
@@ -477,7 +486,7 @@ public class SlackMessageService {
                     "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
                     workspaceId,
                     channelId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return Optional.empty();
         }
     }
@@ -511,7 +520,7 @@ public class SlackMessageService {
                     "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
                     workspaceId,
                     channelId,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return new ConversationLookup.Unavailable("transport_failure");
         }
     }

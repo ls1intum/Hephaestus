@@ -70,7 +70,7 @@ public final class ScmTransportErrors {
                         || lower.contains("connection abort")
                         || lower.contains("premature")
                         || lower.contains("stream closed")) {
-                    log.debug("Transport error detected: IOException - {}", message);
+                    log.debug("Transport error detected: {}", cause.getClass().getSimpleName());
                     return true;
                 }
             }

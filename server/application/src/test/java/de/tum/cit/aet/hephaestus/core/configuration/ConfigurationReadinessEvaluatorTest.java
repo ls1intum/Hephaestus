@@ -262,6 +262,21 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldLogWhyASettingIsUnreadableWithoutTheValueAroundItsPlaceholder(CapturedOutput output) {
+        Map<String, Object> properties = validProperties();
+        // The resolver's message quotes the whole value, including what surrounds the placeholder.
+        properties.put("spring.datasource.url", "jdbc:postgresql://db/" + SECRET_MARKER + "?user=${DATABASE_USER}");
+
+        List<ConfigurationFactDTO> facts = evaluateReadiness(properties, true);
+
+        assertStatus(facts, "database.url", ConfigurationStatus.ACTION_REQUIRED);
+        assertThat(output)
+                .contains("Could not read spring.datasource.url while checking configuration: "
+                        + "reason=unresolvedPlaceholder")
+                .doesNotContain(SECRET_MARKER);
+    }
+
+    @Test
     void shouldRejectSecurityBooleansItCannotRead() {
         Map<String, Object> properties = validProperties();
         properties.put("hephaestus.llm.egress.allow-loopback", "${MISSING_EGRESS_FLAG}");

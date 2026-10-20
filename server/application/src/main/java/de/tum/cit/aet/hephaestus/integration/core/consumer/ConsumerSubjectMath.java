@@ -187,6 +187,18 @@ public final class ConsumerSubjectMath {
     // Subject → kind
 
     /**
+     * The provider and event of a subject, for logs: {@code github.acme.private-repo.push} becomes {@code github.push}.
+     * The middle tokens name an owner, repository, team or channel, so they stay out of collected logs.
+     */
+    public static String routeLabel(@Nullable String fullSubject) {
+        String kind = kindFromSubjectPrefix(fullSubject)
+                .map(k -> k.name().toLowerCase(Locale.ROOT))
+                .orElse("unknown");
+        String event = fullSubject == null ? "" : fullSubject.substring(fullSubject.lastIndexOf('.') + 1);
+        return event.matches("[A-Za-z0-9_~-]{1,64}") ? kind + "." + event : kind;
+    }
+
+    /**
      * Explicit allow-list mapping of subject prefix → {@link IntegrationKind}. Returns
      * {@link Optional#empty()} for null, blank, dot-less, or unknown prefixes.
      */

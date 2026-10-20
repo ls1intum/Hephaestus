@@ -449,7 +449,10 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         } catch (Exception e) {
             if (e instanceof SlackSendException failure && failure.visibilityUnknown()) visibilityUnconfirmed.set(true);
             // Terminals never throw (contract). A gone recipient just means the stream is already finalized.
-            log.debug("Slack stream finalize skipped (channel={}): {}", channel, e.getMessage());
+            log.debug(
+                    "Slack stream finalize skipped (channel={}): {}",
+                    channel,
+                    e.getClass().getSimpleName());
         }
     }
 

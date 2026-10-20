@@ -19,7 +19,9 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.job.FrozenCharge;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
@@ -78,6 +80,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
@@ -119,6 +122,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private LlmUsageRecorder usageRecorder;
+
+    @Autowired
+    private ReviewAttemptUsageService attemptUsage;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private JobTokenAuthenticationFilter filter;
     private Workspace workspace;
@@ -557,32 +566,35 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void shouldKeepEachAttemptsPracticeScriptRowApartWhenTheJobIsRequeued() {
+    void shouldSettleALateCallOnItsOwnAttemptRowWhenTheJobIsRequeued() {
         ReviewJob job = practiceScriptJob("https://models.example.com/v1");
         ProxyUsageAccumulator accumulator = accumulator();
+        register(job, ModelKind.DECISION);
         var attemptZero = billed(job, 0, UsageSourceType.PRACTICE_SCRIPT_DECISION);
         var decision = new PracticeScriptCall(ModelKind.DECISION, null, PRACTICE);
-        accumulator.accumulatePracticeScript(attemptZero, decision, new ProxyTokenUsage(10, 2, 0, 0, 0));
-        accumulator.accumulatePracticeScript(attemptZero, decision, new ProxyTokenUsage(5, 1, 0, 0, 0));
+        accumulator.accumulate(attemptZero, decision, new ProxyTokenUsage(10, 2, 0, 0, 0));
+        accumulator.accumulate(attemptZero, decision, new ProxyTokenUsage(5, 1, 0, 0, 0));
 
         job.setAttempt(1);
         job = jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
-        accumulator.accumulatePracticeScript(attemptZero, decision, new ProxyTokenUsage(1000, 0, 0, 0, 0));
-        accumulator.accumulatePracticeScript(
+        register(job, ModelKind.DECISION);
+        accumulator.accumulate(attemptZero, decision, new ProxyTokenUsage(1000, 0, 0, 0, 0));
+        accumulator.accumulate(
                 billed(job, 1, UsageSourceType.PRACTICE_SCRIPT_DECISION), decision, new ProxyTokenUsage(7, 0, 0, 0, 0));
 
-        assertThat(practiceScriptRows(job, 0)).containsExactly(new UsageRow(ModelKind.DECISION, PRACTICE, 2, 15, 3));
+        // The late call belongs to attempt 0, which authenticated it; attempt 1 keeps only its own call.
+        assertThat(practiceScriptRows(job, 0)).containsExactly(new UsageRow(ModelKind.DECISION, PRACTICE, 3, 1015, 3));
         assertThat(practiceScriptRows(job, 1)).containsExactly(new UsageRow(ModelKind.DECISION, PRACTICE, 1, 7, 0));
     }
 
     @Test
-    void shouldDropAPracticeScriptCallWhenItReturnsAfterTheJobEnded() {
+    void shouldDropAPracticeScriptCallWhenItsAttemptWasNeverRegistered() {
         ReviewJob job = practiceScriptJob("https://models.example.com/v1");
         job.setStatus(ReviewJobStatus.COMPLETED);
         job = jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
 
         accumulator()
-                .accumulatePracticeScript(
+                .accumulate(
                         billed(job, 0, UsageSourceType.PRACTICE_SCRIPT_EMBEDDING),
                         new PracticeScriptCall(ModelKind.EMBEDDING, null, PRACTICE),
                         new ProxyTokenUsage(9, 0, 0, 0, 0));
@@ -659,26 +671,29 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         objectMapper),
                 policy,
                 mock(ScanCallGuard.class),
-                new ProxyRoutingService(jobRepository, objectMapper, new MentorProxyCredentialRegistry()));
+                new ProxyRoutingService(
+                        jobRepository, objectMapper, new MentorProxyCredentialRegistry(), attemptUsage));
     }
 
+    // The worker role is off here, so the accumulator is built with its own transaction boundary.
     private ProxyUsageAccumulator accumulator() {
-        return new ProxyUsageAccumulator(jobRepository, new SimpleMeterRegistry()) {
-            @Override
-            public void accumulate(ProxyRouting.@Nullable BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
-                transactionTemplate.executeWithoutResult(tx -> super.accumulate(attempt, usage));
-            }
-
-            @Override
-            public void accumulatePracticeScript(
-                    ProxyRouting.BilledAttempt attempt, PracticeScriptCall call, @Nullable ProxyTokenUsage usage) {
-                transactionTemplate.executeWithoutResult(tx -> super.accumulatePracticeScript(attempt, call, usage));
-            }
-        };
+        return new ProxyUsageAccumulator(attemptUsage, transactionManager, new SimpleMeterRegistry());
     }
 
     private static ProxyRouting.BilledAttempt billed(ReviewJob job, int attempt, UsageSourceType sourceType) {
-        return new ProxyRouting.BilledAttempt(sourceType, job.getId(), attempt, BigDecimal.ZERO, "worker-1");
+        return new ProxyRouting.BilledAttempt(
+                sourceType, job.getId(), attempt, BigDecimal.ZERO, "worker-1", 0L, 0L, job.getWorkspaceId());
+    }
+
+    private void register(ReviewJob job, ModelKind kind) {
+        assertThat(attemptUsage.registerCall(
+                        job.getId(),
+                        job.getWorkspaceId(),
+                        job.getAttempt(),
+                        job.getWorkerId(),
+                        kind,
+                        FrozenCharge.UNKNOWN))
+                .isTrue();
     }
 
     private List<UsageRow> practiceScriptRows(ReviewJob job, int attempt) {
@@ -814,7 +829,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private ProxyRouting routingOf(AuthenticationResult result) {
         Authentication authentication = Objects.requireNonNull(result.authentication(), "token did not authenticate");
-        return new ProxyRoutingService(jobRepository, objectMapper, new MentorProxyCredentialRegistry())
+        return new ProxyRoutingService(jobRepository, objectMapper, new MentorProxyCredentialRegistry(), attemptUsage)
                 .resolve(
                         (ProxyIdentity) Objects.requireNonNull(authentication.getPrincipal()),
                         new MockHttpServletRequest("POST", "/internal/llm/chat/completions"));

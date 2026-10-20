@@ -211,7 +211,8 @@ public class ConnectionController {
      */
     @ExceptionHandler(NoSuchElementException.class)
     ProblemDetail handleNotFound(NoSuchElementException e) {
-        log.info("Connection lookup 404: {}", e.getMessage());
+        // The response carries the message; the log names the failure only.
+        log.info("Connection lookup 404: {}", e.getClass().getSimpleName());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
         problem.setTitle("Resource not found");
         return problem;

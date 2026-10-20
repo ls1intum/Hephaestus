@@ -1,5 +1,6 @@
 /**
- * Observability module — Sentry replication identity filter and related cross-cutting hooks.
+ * Observability module — request correlation, replica identity, context propagation and the structured log
+ * customizer.
  */
 @org.springframework.modulith.ApplicationModule(displayName = "Observability")
 @org.jspecify.annotations.NullMarked

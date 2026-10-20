@@ -157,31 +157,28 @@ public class GitLabExceptionClassifier {
             switch (type) {
                 case "NOT_FOUND" -> {
                     notFoundCounter.increment();
-                    return ClassificationResult.of(Category.NOT_FOUND, "GraphQL NOT_FOUND: " + error.getMessage());
+                    return ClassificationResult.of(Category.NOT_FOUND, "GraphQL NOT_FOUND");
                 }
                 case "RATE_LIMITED", "RATE_LIMIT", "TOO_MANY_REQUESTS" -> {
                     rateLimitedCounter.increment();
-                    return ClassificationResult.rateLimited(
-                            Duration.ofMinutes(1), "GraphQL rate limit: " + error.getMessage());
+                    return ClassificationResult.rateLimited(Duration.ofMinutes(1), "GraphQL rate limit");
                 }
                 case "FORBIDDEN" -> {
                     String message = error.getMessage();
                     if (message != null && message.toLowerCase(Locale.ROOT).contains("rate limit")) {
                         rateLimitedCounter.increment();
-                        return ClassificationResult.rateLimited(
-                                Duration.ofMinutes(1), "GraphQL rate limit: " + message);
+                        return ClassificationResult.rateLimited(Duration.ofMinutes(1), "GraphQL rate limit");
                     }
                     authErrorCounter.increment();
-                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL FORBIDDEN: " + message);
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL FORBIDDEN");
                 }
                 case "UNAUTHORIZED" -> {
                     authErrorCounter.increment();
-                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL UNAUTHORIZED: " + error.getMessage());
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL UNAUTHORIZED");
                 }
                 case "RESOURCE_LIMITS_EXCEEDED", "MAX_COMPLEXITY_EXCEEDED" -> {
                     clientErrorCounter.increment();
-                    return ClassificationResult.of(
-                            Category.CLIENT_ERROR, "GraphQL resource limit: " + error.getMessage());
+                    return ClassificationResult.of(Category.CLIENT_ERROR, "GraphQL resource limit: " + type);
                 }
                 default -> {
                     /* continue */
@@ -191,7 +188,8 @@ public class GitLabExceptionClassifier {
 
         unknownCounter.increment();
         return ClassificationResult.of(
-                Category.UNKNOWN, "Unclassified GraphQL error: " + errors.get(0).getMessage());
+                Category.UNKNOWN,
+                "Unclassified GraphQL error: type=" + errorType(firstErrorType(errors)) + ", errors=" + errors.size());
     }
 
     private ClassificationResult doClassify(Throwable e) {
@@ -210,18 +208,18 @@ public class GitLabExceptionClassifier {
 
         // GitLabSyncException — invalid GraphQL response
         if (cause instanceof GitLabSyncException) {
-            return ClassificationResult.of(Category.RETRYABLE, "GitLab sync error: " + cause.getMessage());
+            return ClassificationResult.of(Category.RETRYABLE, "GitLab sync error: " + type(cause));
         }
 
         // Database deadlocks
         if (isDeadlockException(cause)) {
             return ClassificationResult.of(
-                    Category.RETRYABLE, "Database deadlock detected - will retry: " + cause.getMessage());
+                    Category.RETRYABLE, "Database deadlock detected - will retry: " + type(cause));
         }
 
         if (cause instanceof UnexpectedRollbackException) {
             return ClassificationResult.of(
-                    Category.RETRYABLE, "Transaction rollback detected - will retry: " + cause.getMessage());
+                    Category.RETRYABLE, "Transaction rollback detected - will retry: " + type(cause));
         }
 
         // HTTP response errors
@@ -235,7 +233,7 @@ public class GitLabExceptionClassifier {
         }
 
         if (isTimeoutException(cause)) {
-            return ClassificationResult.of(Category.RETRYABLE, "Timeout: " + cause.getMessage());
+            return ClassificationResult.of(Category.RETRYABLE, "Timeout: " + type(cause));
         }
 
         if (isNetworkException(cause)) {
@@ -243,7 +241,7 @@ public class GitLabExceptionClassifier {
         }
 
         if (cause instanceof IOException) {
-            return ClassificationResult.of(Category.RETRYABLE, "IO error: " + cause.getMessage());
+            return ClassificationResult.of(Category.RETRYABLE, "IO error: " + type(cause));
         }
 
         // FieldAccessException from Spring GraphQL
@@ -251,21 +249,20 @@ public class GitLabExceptionClassifier {
             String message = cause.getMessage();
             if (message != null) {
                 if (message.contains("NOT_FOUND") || message.contains("Could not resolve")) {
-                    return ClassificationResult.of(Category.NOT_FOUND, "GraphQL resource not found: " + message);
+                    return ClassificationResult.of(Category.NOT_FOUND, "GraphQL resource not found");
                 }
                 if (message.contains("FORBIDDEN") || message.contains("forbidden")) {
-                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL forbidden: " + message);
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL forbidden");
                 }
             }
         }
 
-        return ClassificationResult.of(
-                Category.UNKNOWN, "Unclassified: " + cause.getClass().getSimpleName() + " - " + cause.getMessage());
+        return ClassificationResult.of(Category.UNKNOWN, "Unclassified: " + type(cause));
     }
 
     private ClassificationResult classifyHttpStatus(WebClientResponseException e) {
         int status = e.getStatusCode().value();
-        String message = "HTTP " + status + ": " + e.getMessage();
+        String message = "HTTP " + status;
 
         if (status == 400) return ClassificationResult.of(Category.CLIENT_ERROR, message);
         if (status == 401) return ClassificationResult.of(Category.AUTH_ERROR, message);
@@ -303,8 +300,29 @@ public class GitLabExceptionClassifier {
     }
 
     private ClassificationResult classifyNetworkException(Throwable e) {
-        return ClassificationResult.of(
-                Category.RETRYABLE, "Network error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+        return ClassificationResult.of(Category.RETRYABLE, "Network error: " + type(e));
+    }
+
+    /**
+     * The summary is logged by every sync service, so it names a failure by its HTTP status, GraphQL error type or
+     * exception class only. Provider, client and driver texts quote request URIs, private repository and user
+     * names and rejected row values; the classification above reads them but never repeats them.
+     */
+    private static String type(Throwable e) {
+        return e.getClass().getSimpleName();
+    }
+
+    /** A provider-reported GraphQL error type, echoed only when it is a plain identifier. */
+    private static String errorType(@Nullable Object value) {
+        String text = value == null ? "" : value.toString();
+        return text.matches("[A-Za-z][A-Za-z0-9_]{0,63}") ? text : "other";
+    }
+
+    private static @Nullable Object firstErrorType(List<ResponseError> errors) {
+        Map<String, Object> extensions = errors.get(0).getExtensions();
+        if (extensions == null) return null;
+        Object type = extensions.get("type");
+        return type != null ? type : extensions.get("code");
     }
 
     private boolean isDeadlockException(Throwable e) {

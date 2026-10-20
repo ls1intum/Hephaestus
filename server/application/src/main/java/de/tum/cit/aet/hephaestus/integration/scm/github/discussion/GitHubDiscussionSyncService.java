@@ -281,7 +281,7 @@ public class GitHubDiscussionSyncService {
                                         safeNameWithOwner,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage()))
+                                        signal.failure().getClass().getSimpleName()))
                                 .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
                         .block(timeout);
 

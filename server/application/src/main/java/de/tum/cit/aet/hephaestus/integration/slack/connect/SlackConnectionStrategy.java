@@ -112,7 +112,11 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         try {
             r = oauthClient.exchangeCode(code, redirectUri());
         } catch (SlackOAuthException e) {
-            log.warn("Slack OAuth exchange failed: workspaceId={}, error={}", ref.workspaceId(), e.getMessage());
+            // The admin sees Slack's reason in the finalization result; the log keeps the failure class.
+            log.warn(
+                    "Slack OAuth exchange failed: workspaceId={}, error={}",
+                    ref.workspaceId(),
+                    e.getClass().getSimpleName());
             return new ConnectFinalization.Failed("Hephaestus could not finish connecting to Slack: " + e.getMessage());
         }
         if (r.expiresIn() != null || r.refreshToken() != null) {

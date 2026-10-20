@@ -198,7 +198,7 @@ public class GitHubIssueCommentSyncService {
                                         issue.getNumber(),
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -415,7 +415,7 @@ public class GitHubIssueCommentSyncService {
                                         issue.getNumber(),
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {

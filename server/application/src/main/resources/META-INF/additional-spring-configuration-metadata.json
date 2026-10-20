@@ -25,10 +25,6 @@
       "description": "Slack integration toggle and OAuth client credentials"
     },
     {
-      "name": "hephaestus.sentry",
-      "description": "Sentry error tracking integration"
-    },
-    {
       "name": "hephaestus.agent.image",
       "description": "Shared image reference for the Pi practice + mentor agent runtime"
     }
@@ -108,11 +104,6 @@
       "name": "hephaestus.integration.slack.api-base",
       "type": "java.lang.String",
       "description": "Base URL of the Slack API. Defaults to https://slack.com; override in tests to point at a mock server."
-    },
-    {
-      "name": "hephaestus.sentry.dsn",
-      "type": "java.lang.String",
-      "description": "Sentry DSN for error tracking; leave blank to disable"
     },
     {
       "name": "hephaestus.agent.image.reference",

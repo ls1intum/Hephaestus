@@ -211,32 +211,29 @@ public class GitHubExceptionClassifier {
             switch (type) {
                 case "NOT_FOUND" -> {
                     notFoundCounter.increment();
-                    return ClassificationResult.of(Category.NOT_FOUND, "GraphQL NOT_FOUND: " + error.getMessage());
+                    return ClassificationResult.of(Category.NOT_FOUND, "GraphQL NOT_FOUND");
                 }
                 case "RATE_LIMIT", "RATE_LIMITED" -> {
                     rateLimitedCounter.increment();
-                    return ClassificationResult.rateLimited(
-                            Duration.ofMinutes(1), "GraphQL rate limit: " + error.getMessage());
+                    return ClassificationResult.rateLimited(Duration.ofMinutes(1), "GraphQL rate limit");
                 }
                 case "FORBIDDEN" -> {
                     // Check if it's a rate limit error
                     String message = error.getMessage();
                     if (message != null && message.toLowerCase(Locale.ROOT).contains("rate limit")) {
                         rateLimitedCounter.increment();
-                        return ClassificationResult.rateLimited(
-                                Duration.ofMinutes(1), "GraphQL rate limit: " + message);
+                        return ClassificationResult.rateLimited(Duration.ofMinutes(1), "GraphQL rate limit");
                     }
                     authErrorCounter.increment();
-                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL FORBIDDEN: " + message);
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL FORBIDDEN");
                 }
                 case "UNAUTHORIZED" -> {
                     authErrorCounter.increment();
-                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL UNAUTHORIZED: " + error.getMessage());
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL UNAUTHORIZED");
                 }
                 case "MAX_NODE_LIMIT_EXCEEDED", "RESOURCE_LIMITS_EXCEEDED" -> {
                     clientErrorCounter.increment();
-                    return ClassificationResult.of(
-                            Category.CLIENT_ERROR, "GraphQL resource limit: " + error.getMessage());
+                    return ClassificationResult.of(Category.CLIENT_ERROR, "GraphQL resource limit: " + type);
                 }
                 default -> {
                     // Continue checking other errors
@@ -249,14 +246,15 @@ public class GitHubExceptionClassifier {
             String message = error.getMessage();
             if (message != null && message.toLowerCase(Locale.ROOT).contains("rate limit")) {
                 rateLimitedCounter.increment();
-                return ClassificationResult.rateLimited(Duration.ofMinutes(1), "GraphQL rate limit: " + message);
+                return ClassificationResult.rateLimited(Duration.ofMinutes(1), "GraphQL rate limit");
             }
         }
 
         // Default for unrecognized errors
         unknownCounter.increment();
         return ClassificationResult.of(
-                Category.UNKNOWN, "Unclassified GraphQL error: " + errors.get(0).getMessage());
+                Category.UNKNOWN,
+                "Unclassified GraphQL error: type=" + errorType(firstErrorType(errors)) + ", errors=" + errors.size());
     }
 
     private ClassificationResult doClassify(@Nullable Throwable e) {
@@ -284,14 +282,14 @@ public class GitHubExceptionClassifier {
         // These occur when multiple threads try to upsert the same user concurrently
         if (isDeadlockException(cause)) {
             return ClassificationResult.of(
-                    Category.RETRYABLE, "Database deadlock detected - will retry: " + cause.getMessage());
+                    Category.RETRYABLE, "Database deadlock detected - will retry: " + type(cause));
         }
 
         // UnexpectedRollbackException is transient — typically caused by a nested
         // transaction that was rolled back (e.g., deadlock in a sub-transaction)
         if (cause instanceof UnexpectedRollbackException) {
             return ClassificationResult.of(
-                    Category.RETRYABLE, "Transaction rollback detected - will retry: " + cause.getMessage());
+                    Category.RETRYABLE, "Transaction rollback detected - will retry: " + type(cause));
         }
 
         // Check for WebClient response exceptions (HTTP errors)
@@ -306,7 +304,7 @@ public class GitHubExceptionClassifier {
 
         // Check for timeout exceptions
         if (isTimeoutException(cause)) {
-            return ClassificationResult.of(Category.RETRYABLE, "Timeout: " + cause.getMessage());
+            return ClassificationResult.of(Category.RETRYABLE, "Timeout: " + type(cause));
         }
 
         // Check for network/IO exceptions
@@ -316,7 +314,7 @@ public class GitHubExceptionClassifier {
 
         // Check for IOException (may indicate network issues)
         if (cause instanceof IOException) {
-            return ClassificationResult.of(Category.RETRYABLE, "IO error: " + cause.getMessage());
+            return ClassificationResult.of(Category.RETRYABLE, "IO error: " + type(cause));
         }
 
         String message = cause.getMessage();
@@ -325,17 +323,16 @@ public class GitHubExceptionClassifier {
         if (cause.getClass().getSimpleName().equals("FieldAccessException") && message != null) {
             // GraphQL NOT_FOUND errors (e.g., "Could not resolve to a Repository")
             if (message.contains("NOT_FOUND") || message.contains("Could not resolve")) {
-                return ClassificationResult.of(Category.NOT_FOUND, "GraphQL resource not found: " + message);
+                return ClassificationResult.of(Category.NOT_FOUND, "GraphQL resource not found");
             }
             // GraphQL FORBIDDEN errors
             if (message.contains("FORBIDDEN") || message.contains("forbidden")) {
-                return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL forbidden: " + message);
+                return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL forbidden");
             }
         }
 
         // Default: unknown
-        return ClassificationResult.of(
-                Category.UNKNOWN, "Unclassified: " + cause.getClass().getSimpleName() + " - " + cause.getMessage());
+        return ClassificationResult.of(Category.UNKNOWN, "Unclassified: " + type(cause));
     }
 
     /**
@@ -343,7 +340,7 @@ public class GitHubExceptionClassifier {
      */
     private ClassificationResult classifyHttpStatus(WebClientResponseException e) {
         int status = e.getStatusCode().value();
-        String message = "HTTP " + status + ": " + e.getMessage();
+        String message = "HTTP " + status;
 
         // 4xx Client Errors
         if (status == 400) {
@@ -392,8 +389,29 @@ public class GitHubExceptionClassifier {
     }
 
     private ClassificationResult classifyNetworkException(Throwable e) {
-        String message = "Network error: " + e.getClass().getSimpleName() + " - " + e.getMessage();
-        return ClassificationResult.of(Category.RETRYABLE, message);
+        return ClassificationResult.of(Category.RETRYABLE, "Network error: " + type(e));
+    }
+
+    /**
+     * The summary is logged by every sync service, so it names a failure by its HTTP status, GraphQL error type or
+     * exception class only. Provider, client and driver texts quote request URIs, private repository and user
+     * names and rejected row values; the classification above reads them but never repeats them.
+     */
+    private static String type(Throwable e) {
+        return e.getClass().getSimpleName();
+    }
+
+    /** A provider-reported GraphQL error type, echoed only when it is a plain identifier. */
+    private static String errorType(@Nullable Object value) {
+        String text = value == null ? "" : value.toString();
+        return text.matches("[A-Za-z][A-Za-z0-9_]{0,63}") ? text : "other";
+    }
+
+    private static @Nullable Object firstErrorType(List<ResponseError> errors) {
+        Map<String, Object> extensions = errors.get(0).getExtensions();
+        if (extensions == null) return null;
+        Object type = extensions.get("type");
+        return type != null ? type : extensions.get("code");
     }
 
     private static @Nullable InstallationSuspendedException suspendedInstallation(Throwable e) {

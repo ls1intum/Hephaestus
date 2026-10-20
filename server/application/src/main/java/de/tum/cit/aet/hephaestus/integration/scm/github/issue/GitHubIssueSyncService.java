@@ -339,7 +339,7 @@ public class GitHubIssueSyncService {
                                         safeNameWithOwner,
                                         currentPage,
                                         signal.totalRetries() + 1,
-                                        signal.failure().getMessage())))
+                                        signal.failure().getClass().getSimpleName())))
                         .block(timeout);
 
                 if (response == null || !response.isValid()) {
@@ -733,7 +733,7 @@ public class GitHubIssueSyncService {
                                     "Retrying after transport error: context=issueCountProbe, repoName={}, attempt={}, error={}",
                                     safeNameWithOwner,
                                     signal.totalRetries() + 1,
-                                    signal.failure().getMessage())))
+                                    signal.failure().getClass().getSimpleName())))
                     .block(timeout);
 
             if (response == null || !response.isValid()) {
@@ -757,7 +757,7 @@ public class GitHubIssueSyncService {
             log.warn(
                     "Issue count probe failed, falling back to full sync: repoName={}, error={}",
                     safeNameWithOwner,
-                    e.getMessage());
+                    e.getClass().getSimpleName());
             return -1;
         }
     }

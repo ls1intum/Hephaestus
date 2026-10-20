@@ -13,7 +13,6 @@ async function serveEnvConfig(context: BrowserContext): Promise<void> {
 				APPLICATION_CLIENT_URL: E2E_BASE_URL,
 				XSRF_COOKIE_NAME: "XSRF-TOKEN",
 				TANSTACK_DEVTOOLS_ENABLED: "false",
-				SENTRY_DSN: "",
 			})};`,
 		}),
 	);
@@ -44,10 +43,6 @@ export { expect } from "@playwright/test";
 
 export async function loginAsDevAdmin(page: Page, username = "e2e"): Promise<void> {
 	await page.goto("/login");
-	const consent = page.getByRole("region", { name: "Your privacy" });
-	if (await consent.isVisible()) {
-		await consent.getByRole("button", { name: "Decline error reports" }).click();
-	}
 	await page.getByPlaceholder("username").fill(username);
 	await page.getByRole("button", { name: /continue as dev admin/iu }).click();
 	await page.waitForURL((url) => !url.pathname.startsWith("/login"));

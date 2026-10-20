@@ -88,16 +88,18 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
                 })
                 .when(transactionTemplate)
                 .executeWithoutResult(any());
+        ReviewAttemptUsageService attemptUsage =
+                TerminalUsageTestFixtures.attemptUsageOverMocks(jobRepository, usageRecorder);
         sweeper = new ReviewJobZombieSweeper(
                 jobRepository,
                 workerRegistryRepository,
                 objectMapper,
                 transactionTemplate,
-                usageRecorder,
+                attemptUsage,
                 meterRegistry,
                 new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
                 new ReviewJobRecovery(
-                        jobRepository, AGENT_PROPS, objectMapper, usageRecorder, Optional.empty(), Optional.empty()));
+                        jobRepository, AGENT_PROPS, objectMapper, attemptUsage, Optional.empty(), Optional.empty()));
     }
 
     private ConfigSnapshot admittedSnapshot(int timeoutSeconds) {
@@ -164,9 +166,9 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
     private LlmUsageRecorder.LlmUsageSample capturePriced() {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-        verify(usageRecorder).record(eq(7L), sample.capture());
+        verify(usageRecorder).project(eq(7L), sample.capture());
         verify(usageRecorder, never())
-                .record(
+                .project(
                         any(),
                         argThat(recorded ->
                                 recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
@@ -176,10 +178,10 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
     private LlmUsageRecorder.LlmUsageSample captureVerifiedWithoutPrice() {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-        verify(usageRecorder).record(eq(7L), sample.capture());
+        verify(usageRecorder).project(eq(7L), sample.capture());
         assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
         verify(usageRecorder, never())
-                .record(
+                .project(
                         any(),
                         argThat(recorded ->
                                 recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
@@ -235,7 +237,8 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
             verify(jobRepository).requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any());
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count())
                     .isEqualTo(1d);
-            verifyNoInteractions(usageRecorder);
+            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never()).project(any(), any());
         }
 
         @Test
@@ -274,7 +277,7 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).record(eq(7L), sample.capture());
+            verify(usageRecorder).project(eq(7L), sample.capture());
             assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
             assertThat(sample.getValue().totalCalls()).isEqualTo(1);
             assertThat(sample.getValue().price().pricingState()).isEqualTo(UsagePricingState.UNPRICED);
@@ -295,7 +298,7 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
             verify(jobRepository).requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any());
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
             verify(usageRecorder, never())
-                    .record(
+                    .project(
                             any(),
                             argThat(recorded ->
                                     recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
@@ -330,7 +333,8 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
                             any(),
                             eq(Set.of(ReviewJobStatus.RUNNING)),
                             eq(DEAD_WORKER_ID));
-            verifyNoInteractions(usageRecorder);
+            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never()).project(any(), any());
         }
     }
 

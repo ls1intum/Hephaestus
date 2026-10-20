@@ -13,23 +13,19 @@ import { expect, it, vi } from "vitest";
 import { ROUTER_SEARCH } from "@/lib/router-search";
 import { RouteError } from "./RouteError";
 
-const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
-
-vi.mock("@/runtime/sentry", () => ({ captureException }));
-
-it("reports a thrown route error once and renders recovery controls", async () => {
-	const error = new Error("failed route");
+it("runs a failed route again on retry and shows the page once it renders", async () => {
+	const error = new Error("failed route with private detail");
+	const renderPage = vi
+		.fn(() => <h1>Recovered page</h1>)
+		.mockImplementation(() => {
+			throw error;
+		});
 	const onCaughtError = vi.fn();
-	using routeWarning = vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
-		expect(args).toStrictEqual(["Warning: Error in route match: //"]);
-	});
 	const rootRoute = createRootRoute();
 	const route = createRoute({
 		getParentRoute: () => rootRoute,
 		path: "/",
-		component: () => {
-			throw error;
-		},
+		component: renderPage,
 	});
 	const router = createRouter({
 		...ROUTER_SEARCH,
@@ -47,12 +43,22 @@ it("reports a thrown route error once and renders recovery controls", async () =
 
 	const alert = await screen.findByRole("alert");
 	expect(alert.textContent).toContain("We could not load this page");
-	expect(captureException).toHaveBeenCalledExactlyOnceWith(error);
+	// The page names no error detail: a message can carry data the reader should not see.
+	expect(document.body.textContent).not.toContain(error.message);
 
+	// Retry runs the route again: a failure that persists is caught again, and the page still offers
+	// a retry.
+	const caughtBeforeRetry = onCaughtError.mock.calls.length;
 	await userEvent.click(screen.getByRole("button", { name: "Retry" }));
-	await vi.waitFor(() => expect(captureException).toHaveBeenCalledTimes(2));
-	expect(onCaughtError).toHaveBeenCalledTimes(2);
-	expect(routeWarning).toHaveBeenCalledTimes(2);
+	await vi.waitFor(() =>
+		expect(onCaughtError.mock.calls.length).toBeGreaterThan(caughtBeforeRetry),
+	);
+	expect(screen.getByRole("alert").textContent).toContain("We could not load this page");
+
+	renderPage.mockReturnValue(<h1>Recovered page</h1>);
+	await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+	await screen.findByRole("heading", { name: "Recovered page" });
+	expect(screen.queryByRole("alert")).toBeNull();
 	for (const [caught] of onCaughtError.mock.calls) {
 		expect(caught).toBe(error);
 	}

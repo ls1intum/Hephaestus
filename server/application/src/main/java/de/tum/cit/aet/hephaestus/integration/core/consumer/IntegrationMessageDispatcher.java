@@ -90,7 +90,10 @@ public class IntegrationMessageDispatcher {
             // "well-formed" means per kind. We surface this to the consumer layer at
             // DEBUG since the consumer will already log/handle it via its own error
             // path; double-logging here just creates noise.
-            log.debug("SubjectParser rejected subject '{}': {}", fullSubject, e.getMessage());
+            log.debug(
+                    "SubjectParser rejected subject: route={}, error={}",
+                    ConsumerSubjectMath.routeLabel(fullSubject),
+                    e.getClass().getSimpleName());
             return Optional.empty();
         }
         // A handler may declare itself disabled (e.g. its feature flag is off). Filtering

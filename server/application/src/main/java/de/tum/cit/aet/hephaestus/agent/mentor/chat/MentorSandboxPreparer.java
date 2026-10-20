@@ -56,7 +56,9 @@ public class MentorSandboxPreparer {
         try {
             turnExecutor.executor().execute(() -> prepareSandbox(sandboxService, workspaceId, developerId));
         } catch (RejectedExecutionException rejected) {
-            log.debug("Mentor sandbox prepare rejected by executor: {}", rejected.getMessage());
+            log.debug(
+                    "Mentor sandbox prepare rejected by executor: errorType={}",
+                    rejected.getClass().getName());
         }
     }
 
@@ -98,10 +100,10 @@ public class MentorSandboxPreparer {
         } catch (RuntimeException e) {
             // The next turn attaches for itself and reports whatever still fails.
             log.info(
-                    "Mentor sandbox not prepared: workspaceId={}, developerId={}: {}",
+                    "Mentor sandbox not prepared: workspaceId={}, developerId={}, errorType={}",
                     workspaceId,
                     developerId,
-                    e.getMessage());
+                    e.getClass().getName());
         }
     }
 }

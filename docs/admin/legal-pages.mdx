@@ -367,8 +367,9 @@ Use Art. 13 GDPR as the outline. Hephaestus processes personal data in at least 
   The notice must name the relay operator as a recipient.
 - **AI-assisted features** — if enabled: messages sent to the configured LLM provider, persisted conversations, generated practice results.
 - **Server logs** — IP address and request metadata.
-- **Error telemetry** — if you run a Sentry or equivalent instance, the notice must explicitly state this.
-  It must link to the instance's retention policy.
+- **Log collection** — you can ship container logs to a log store such as Loki ([Collecting logs](./observability.mdx#collecting-logs)).
+  Name the store's operator and retention in the notice.
+  Hephaestus ships no error telemetry service.
 - **Public activity page** — if you allow it, use the [template below](#the-public-activity-page).
 - **Workspace addresses** — if you turn them on, use the [template below](#workspace-addresses).
 

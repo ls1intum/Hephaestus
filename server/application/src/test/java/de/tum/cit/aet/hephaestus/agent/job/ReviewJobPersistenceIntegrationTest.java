@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEvent;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
@@ -71,7 +70,7 @@ class ReviewJobPersistenceIntegrationTest extends BaseIntegrationTest {
     private ReviewJobLifecycleService lifecycleService;
 
     @Autowired
-    private LlmUsageRecorder usageRecorder;
+    private ReviewAttemptUsageService attemptUsage;
 
     @Autowired
     private MeterRegistry meterRegistry;
@@ -111,14 +110,14 @@ class ReviewJobPersistenceIntegrationTest extends BaseIntegrationTest {
                 workerRegistryRepository,
                 objectMapper,
                 transactionTemplate,
-                usageRecorder,
+                attemptUsage,
                 meterRegistry,
                 new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
                 new ReviewJobRecovery(
                         jobRepository,
                         agentProperties,
                         objectMapper,
-                        usageRecorder,
+                        attemptUsage,
                         Optional.empty(),
                         Optional.empty()));
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("stale-reap-ws"));

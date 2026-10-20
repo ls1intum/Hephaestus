@@ -75,7 +75,9 @@ public class GitHubEmailOAuth2UserService implements OAuth2UserService<OAuth2Use
         } catch (RuntimeException ex) {
             // Email enrichment is best-effort: login must not fail because /user/emails is unreachable.
             // Without it the email is simply stored unverified (VerifiedEmailResolver returns verified=false).
-            log.warn("auth.github: /user/emails lookup failed; email stored unverified: {}", ex.getMessage());
+            log.warn(
+                    "auth.github: /user/emails lookup failed; email stored unverified: errorType={}",
+                    ex.getClass().getName());
             return Optional.empty();
         }
     }

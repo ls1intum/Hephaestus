@@ -44,6 +44,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Service
 @ConditionalOnServerRole
@@ -329,7 +330,9 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
             log.debug(
                     "GET /api/v4/user failed; trying the group endpoint: serverUrl={}, status={}",
                     serverUrl,
-                    e.getMessage());
+                    e instanceof WebClientResponseException response
+                            ? response.getStatusCode().value()
+                            : e.getClass().getSimpleName());
         }
 
         if (userInfo != null && userInfo.id() != null) {

@@ -46,7 +46,7 @@ public class WorkerJwtHandshakeInterceptor implements HandshakeInterceptor {
             attributes.put(ATTR_JWT, jwt);
             return true;
         } catch (WorkerJwtInvalidException e) {
-            log.warn("worker handshake rejected: {}", e.getMessage());
+            log.warn("worker handshake rejected: errorType={}", e.getClass().getName());
             reject401(response);
             return false;
         }

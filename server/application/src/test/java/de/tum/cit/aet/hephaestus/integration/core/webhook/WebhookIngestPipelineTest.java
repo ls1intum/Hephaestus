@@ -9,6 +9,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookPublishGate;
@@ -29,6 +32,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -261,6 +265,47 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
         assertThat(resp.getBody()).isEqualTo(echoBody);
         verify(publisher, never()).publish(any());
         verify(publisher, never()).publishFast(any(), any());
+    }
+
+    @Test
+    void shouldLogOnlyTheFailureTypeWhenAVerifierThrowsOnAnUnauthenticatedBody() {
+        WebhookSignatureVerifier throwing = new WebhookSignatureVerifier() {
+            @Override
+            public IntegrationKind kind() {
+                return IntegrationKind.SLACK;
+            }
+
+            @Override
+            public VerificationResult verify(WebhookRequest request) {
+                throw new IllegalArgumentException(
+                        "Unexpected token in " + new String(request.body(), StandardCharsets.UTF_8));
+            }
+        };
+        WebhookIngestPipeline pipeline =
+                new WebhookIngestPipeline(List.of(throwing), List.of(), publisher, objectMapper);
+        Logger logger = (Logger) LoggerFactory.getLogger(WebhookIngestPipeline.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        ResponseEntity<?> response;
+        try {
+            response = pipeline.handle(
+                    IntegrationKind.SLACK,
+                    "{\"text\":\"private-message-canary\"}".getBytes(StandardCharsets.UTF_8),
+                    headers());
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertProblem(response, HttpStatus.UNAUTHORIZED, "invalid");
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage())
+                    .contains(IllegalArgumentException.class.getName())
+                    .doesNotContain("canary");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+        verify(publisher, never()).publish(any());
     }
 
     @Test

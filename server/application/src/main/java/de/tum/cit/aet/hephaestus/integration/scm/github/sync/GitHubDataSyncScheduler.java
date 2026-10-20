@@ -633,7 +633,7 @@ public class GitHubDataSyncScheduler {
                             "Failed to sync project items: projectId={}, scopeId={}, error={}",
                             project.getId(),
                             session.scopeId(),
-                            e.getMessage());
+                            e.getClass().getSimpleName());
                     reportWarning(handle);
                     // Continue with next project on error
                 }

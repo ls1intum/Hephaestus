@@ -333,12 +333,18 @@ class TerminalUsageTest extends BaseUnitTest {
                     .thenReturn(List.of(
                             new PracticeScriptKindTotal(ModelKind.EMBEDDING, 2, tokens, 0, 0, 0, 0, reportedCalls)));
 
-            TerminalUsage.none()
-                    .appendTo(recorder, jobs, 7L, jobFor(jobId, 1), withEmbedding, LlmPriceSnapshot.unpricedInstance());
+            TerminalUsageTestFixtures.project(
+                    TerminalUsage.none(),
+                    recorder,
+                    jobs,
+                    7L,
+                    jobFor(jobId, 1),
+                    withEmbedding,
+                    LlmPriceSnapshot.unpricedInstance());
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), sample.capture());
+            verify(recorder).project(eq(7L), sample.capture());
             var embedding = sample.getValue();
             assertThat(embedding.sourceType()).isEqualTo(UsageSourceType.PRACTICE_SCRIPT_EMBEDDING);
             assertThat(embedding.totalCalls()).isEqualTo(2);
@@ -353,20 +359,32 @@ class TerminalUsageTest extends BaseUnitTest {
             when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
                     .thenReturn(List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 40, 0, 0, 0, 0, 1)));
 
-            boolean billed = TerminalUsage.fromProxy(new ReviewJobLlmUsage(1, 40, 0, 0, 0, 0))
-                    .appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
+            boolean billed = TerminalUsageTestFixtures.project(
+                    TerminalUsage.fromProxy(new ReviewJobLlmUsage(1, 40, 0, 0, 0, 0)),
+                    recorder,
+                    jobs,
+                    7L,
+                    jobFor(jobId, 1),
+                    snapshot,
+                    pricedInstance());
 
             assertThat(billed).isFalse();
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), sample.capture());
+            verify(recorder).project(eq(7L), sample.capture());
             assertThat(sample.getValue().inputTokens()).isEqualTo(40);
         }
 
         @Test
         void shouldOmitTheLedgerRowWhenNeitherSourceRecordedAModelCall() {
-            boolean settled = TerminalUsage.resolve(runner(0, 0, 0), new ReviewJobLlmUsage(0, 0, 0, 0, 0, 0), List.of())
-                    .appendTo(recorder, jobs, 7L, jobFor(UUID.randomUUID(), 1), snapshot, pricedInstance());
+            boolean settled = TerminalUsageTestFixtures.project(
+                    TerminalUsage.resolve(runner(0, 0, 0), new ReviewJobLlmUsage(0, 0, 0, 0, 0, 0), List.of()),
+                    recorder,
+                    jobs,
+                    7L,
+                    jobFor(UUID.randomUUID(), 1),
+                    snapshot,
+                    pricedInstance());
 
             assertThat(settled).isTrue();
             verifyNoInteractions(recorder);
@@ -378,11 +396,12 @@ class TerminalUsageTest extends BaseUnitTest {
             when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
                     .thenReturn(List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 0, 0, 0, 0, 0, 0)));
 
-            assertThat(TerminalUsage.none().appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance()))
+            assertThat(TerminalUsageTestFixtures.project(
+                            TerminalUsage.none(), recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance()))
                     .isFalse();
 
             var captured = ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), captured.capture());
+            verify(recorder).project(eq(7L), captured.capture());
             assertThat(captured.getValue().totalCalls()).isEqualTo(2);
             assertThat(captured.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
         }
@@ -416,12 +435,13 @@ class TerminalUsageTest extends BaseUnitTest {
         @ParameterizedTest(name = "{argumentSetName}")
         @MethodSource("billable")
         void billsWhenThePriceCanChargeWhatWasObserved(TerminalUsage usage, LlmPriceSnapshot price) {
-            assertThat(usage.appendTo(recorder, jobs, 7L, jobFor(UUID.randomUUID(), 2), snapshot, price))
+            assertThat(TerminalUsageTestFixtures.project(
+                            usage, recorder, jobs, 7L, jobFor(UUID.randomUUID(), 2), snapshot, price))
                     .isTrue();
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), sample.capture());
+            verify(recorder).project(eq(7L), sample.capture());
             assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
             assertThat(sample.getValue().model()).isEqualTo("gpt-5");
             assertThat(sample.getValue().provenance()).isNotNull();
@@ -430,12 +450,13 @@ class TerminalUsageTest extends BaseUnitTest {
         @ParameterizedTest(name = "{argumentSetName}")
         @MethodSource("unbillable")
         void appendsUnpricedWhenThePriceCannotChargeWhatWasObserved(TerminalUsage usage, LlmPriceSnapshot price) {
-            assertThat(usage.appendTo(recorder, jobs, 7L, jobFor(UUID.randomUUID(), 2), snapshot, price))
+            assertThat(TerminalUsageTestFixtures.project(
+                            usage, recorder, jobs, 7L, jobFor(UUID.randomUUID(), 2), snapshot, price))
                     .isFalse();
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), sample.capture());
+            verify(recorder).project(eq(7L), sample.capture());
             assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
             assertThat(sample.getValue().model()).isEqualTo("gpt-5");
             // An unpriced row's tokens are still the evidence somebody will reconcile once a price exists.
@@ -451,12 +472,18 @@ class TerminalUsageTest extends BaseUnitTest {
         void theRowIsKeyedByJobAndAttemptSoARetryBillsSeparately() {
             UUID jobId = UUID.randomUUID();
 
-            TerminalUsage.resolve(runner(10, 20, 1), null, List.of())
-                    .appendTo(recorder, jobs, 7L, jobFor(jobId, 3), snapshot, pricedInstance());
+            TerminalUsageTestFixtures.project(
+                    TerminalUsage.resolve(runner(10, 20, 1), null, List.of()),
+                    recorder,
+                    jobs,
+                    7L,
+                    jobFor(jobId, 3),
+                    snapshot,
+                    pricedInstance());
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), sample.capture());
+            verify(recorder).project(eq(7L), sample.capture());
             assertThat(sample.getValue().sourceId()).isEqualTo(jobId);
             assertThat(sample.getValue().sourceAttempt()).isEqualTo(3);
         }
@@ -466,16 +493,22 @@ class TerminalUsageTest extends BaseUnitTest {
         void incomparableTotalsAreNotBilled() {
             LlmPriceSnapshot price = pricedInstance();
 
-            boolean billed = TerminalUsage.resolve(
+            boolean billed = TerminalUsageTestFixtures.project(
+                    TerminalUsage.resolve(
                             new LlmUsage("m", 100, 4_000, 0, 0, 0, 0.0, 3),
                             new ReviewJobLlmUsage(9, 8_000, 200, 0, 0, 0),
-                            List.of())
-                    .appendTo(recorder, jobs, 7L, jobFor(UUID.randomUUID(), 1), snapshot, price);
+                            List.of()),
+                    recorder,
+                    jobs,
+                    7L,
+                    jobFor(UUID.randomUUID(), 1),
+                    snapshot,
+                    price);
 
             assertThat(billed).isFalse();
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), sample.capture());
+            verify(recorder).project(eq(7L), sample.capture());
             assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().inputTokens()).isEqualTo(8_000);
             assertThat(sample.getValue().outputTokens()).isEqualTo(200);
@@ -487,14 +520,20 @@ class TerminalUsageTest extends BaseUnitTest {
         void incomparableUsageAtAFreeModelHasUnavailableCost() {
             var price = new LlmPriceSnapshot(
                     UsageFundingSource.INSTANCE, UsagePricingState.NO_CHARGE, null, null, null, null, null, null);
-            boolean billed = TerminalUsage.resolve(
+            boolean billed = TerminalUsageTestFixtures.project(
+                    TerminalUsage.resolve(
                             new LlmUsage("m", 100, 4_000, 0, 0, 0, 0.0, 3),
                             new ReviewJobLlmUsage(9, 8_000, 200, 0, 0, 0),
-                            List.of())
-                    .appendTo(recorder, jobs, 7L, jobFor(UUID.randomUUID(), 1), snapshot, price);
+                            List.of()),
+                    recorder,
+                    jobs,
+                    7L,
+                    jobFor(UUID.randomUUID(), 1),
+                    snapshot,
+                    price);
             assertThat(billed).isFalse();
             var captured = ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), captured.capture());
+            verify(recorder).project(eq(7L), captured.capture());
             assertThat(captured.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(captured.getValue().inputTokens()).isEqualTo(8_000);
             assertThat(captured.getValue().outputTokens()).isEqualTo(200);
@@ -504,18 +543,18 @@ class TerminalUsageTest extends BaseUnitTest {
         @Test
         @DisplayName("token counts survive onto an unpriced row")
         void unpricedRowKeepsItsTokenCounts() {
-            TerminalUsage.resolve(runner(900, 600, 4), null, List.of())
-                    .appendTo(
-                            recorder,
-                            jobs,
-                            7L,
-                            jobFor(UUID.randomUUID(), 0),
-                            snapshot,
-                            LlmPriceSnapshot.unpricedInstance());
+            TerminalUsageTestFixtures.project(
+                    TerminalUsage.resolve(runner(900, 600, 4), null, List.of()),
+                    recorder,
+                    jobs,
+                    7L,
+                    jobFor(UUID.randomUUID(), 0),
+                    snapshot,
+                    LlmPriceSnapshot.unpricedInstance());
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).record(eq(7L), sample.capture());
+            verify(recorder).project(eq(7L), sample.capture());
             assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
             assertThat(sample.getValue().inputTokens()).isEqualTo(900);
             assertThat(sample.getValue().totalCalls()).isEqualTo(4);
@@ -530,12 +569,18 @@ class TerminalUsageTest extends BaseUnitTest {
                             new PracticeScriptKindTotal(ModelKind.CHAT, 2, 70, 20, 0, 0, 0, 2),
                             new PracticeScriptKindTotal(ModelKind.DECISION, 5, 500_000, 100_000, 0, 0, 0, 5)));
 
-            TerminalUsage.fromProxy(new ReviewJobLlmUsage(2, 70, 20, 0, 0, 0))
-                    .appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
+            TerminalUsageTestFixtures.project(
+                    TerminalUsage.fromProxy(new ReviewJobLlmUsage(2, 70, 20, 0, 0, 0)),
+                    recorder,
+                    jobs,
+                    7L,
+                    jobFor(jobId, 1),
+                    snapshot,
+                    pricedInstance());
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder, times(2)).record(eq(7L), sample.capture());
+            verify(recorder, times(2)).project(eq(7L), sample.capture());
             LlmUsageRecorder.LlmUsageSample decision = sample.getAllValues().get(1);
             assertThat(decision.sourceType()).isEqualTo(UsageSourceType.PRACTICE_SCRIPT_DECISION);
             assertThat(decision.sourceAttempt()).isEqualTo(1);

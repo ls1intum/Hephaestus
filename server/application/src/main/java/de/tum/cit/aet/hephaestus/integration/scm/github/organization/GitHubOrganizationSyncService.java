@@ -127,7 +127,7 @@ public class GitHubOrganizationSyncService {
                                     "Retrying after transport error: context=organizationSync, orgLogin={}, attempt={}, error={}",
                                     safeOrganizationLogin,
                                     signal.totalRetries() + 1,
-                                    signal.failure().getMessage())))
+                                    signal.failure().getClass().getSimpleName())))
                     .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -297,7 +297,7 @@ public class GitHubOrganizationSyncService {
                                     Objects.requireNonNullElse(sanitizeForLog(organization.getLogin()), "unknown"),
                                     currentPage,
                                     signal.totalRetries() + 1,
-                                    signal.failure().getMessage())))
+                                    signal.failure().getClass().getSimpleName())))
                     .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {

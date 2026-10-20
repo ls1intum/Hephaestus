@@ -183,7 +183,10 @@ public class InteractiveSandboxRegistry {
                         containerManager.forceRemove(c.id());
                         removed++;
                     } catch (Exception e) {
-                        log.warn("Failed to remove orphaned interactive container {}: {}", c.id(), e.getMessage());
+                        log.warn(
+                                "Failed to remove orphaned interactive container {}: errorType={}",
+                                c.id(),
+                                e.getClass().getName());
                     }
                 }
             }
@@ -191,7 +194,9 @@ public class InteractiveSandboxRegistry {
                 log.info("Removed {} orphaned interactive container(s) on startup", removed);
             }
         } catch (Exception e) {
-            log.warn("Startup interactive container sweep failed: {}", e.getMessage());
+            log.warn(
+                    "Startup interactive container sweep failed: errorType={}",
+                    e.getClass().getName());
         }
     }
 
@@ -211,7 +216,9 @@ public class InteractiveSandboxRegistry {
                     try {
                         sandbox.close(grace);
                     } catch (Exception e) {
-                        log.warn("Error closing sandbox during shutdown: {}", e.getMessage());
+                        log.warn(
+                                "Error closing sandbox during shutdown: errorType={}",
+                                e.getClass().getName());
                     }
                 }))
                 .toArray(CompletableFuture[]::new);
@@ -219,7 +226,10 @@ public class InteractiveSandboxRegistry {
         try {
             CompletableFuture.allOf(futures).get(deadlineSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
-            log.warn("Parallel shutdown did not complete cleanly within {}s: {}", deadlineSeconds, e.getMessage());
+            log.warn(
+                    "Parallel shutdown did not complete cleanly within {}s: errorType={}",
+                    deadlineSeconds,
+                    e.getClass().getName());
         }
     }
 

@@ -140,7 +140,9 @@ public class MentorChatService implements MentorTurnRunner {
                 }
             });
         } catch (RejectedExecutionException rejected) {
-            log.warn("Mentor turn rejected by executor (probably shutting down): {}", rejected.getMessage());
+            log.warn(
+                    "Mentor turn rejected by executor (probably shutting down): errorType={}",
+                    rejected.getClass().getName());
             metrics.recordCompleted(MentorChatMetrics.ResultOutcome.REJECTED);
             channel.completeWithError("Heph is not available because the server is stopping. Try again in a moment.");
         }
@@ -174,7 +176,9 @@ public class MentorChatService implements MentorTurnRunner {
                 }
             });
         } catch (RejectedExecutionException rejected) {
-            log.warn("Slack mentor turn rejected by executor: {}", rejected.getMessage());
+            log.warn(
+                    "Slack mentor turn rejected by executor: errorType={}",
+                    rejected.getClass().getName());
             metrics.recordCompleted(MentorChatMetrics.ResultOutcome.REJECTED);
             channel.completeWithError("Heph is not available because the server is stopping. Try again in a moment.");
         }
@@ -197,7 +201,10 @@ public class MentorChatService implements MentorTurnRunner {
                     return Boolean.TRUE;
                 } catch (TurnAlreadyInFlightException dup) {
                     // WARN (not INFO): DB index trip means the JVM lock missed — pageable signal.
-                    log.warn("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
+                    log.warn(
+                            "Mentor turn rejected (DB in-flight index): workspaceId={}, threadId={}",
+                            request.workspaceId(),
+                            request.threadId());
                     metrics.recordCompleted(MentorChatMetrics.ResultOutcome.IN_FLIGHT_CONFLICT_DB);
                     channel.completeWithConflict();
                     return Boolean.FALSE;
@@ -206,7 +213,7 @@ public class MentorChatService implements MentorTurnRunner {
                             "Mentor turn failed: workspaceId={}, threadId={}: {}",
                             key.workspaceId(),
                             key.threadId(),
-                            e.getMessage(),
+                            e.getClass().getName(),
                             e);
                     metrics.recordCompleted(MentorChatMetrics.ResultOutcome.ERROR);
                     completeWithError(channel, e, userFacingError(e));
@@ -228,7 +235,7 @@ public class MentorChatService implements MentorTurnRunner {
                     "Mentor dispatchTurn escaped: workspaceId={}, threadId={}: {}",
                     key.workspaceId(),
                     key.threadId(),
-                    t.getMessage(),
+                    t.getClass().getName(),
                     t);
             metrics.recordCompleted(MentorChatMetrics.ResultOutcome.ERROR);
             try {
@@ -413,7 +420,7 @@ public class MentorChatService implements MentorTurnRunner {
                         log.warn(
                                 "Mentor session restore failed for thread {}; retrying once without it: {}",
                                 request.threadId(),
-                                openFailure.toString());
+                                openFailure.getClass().getName());
                         discardRunner(client, sandbox);
                         clientHolder.set(null);
 
@@ -478,7 +485,9 @@ public class MentorChatService implements MentorTurnRunner {
                 // No runner subscription exists to complete the persisted turn.
                 failTurn(turn, state, channel, cookie, disconnect, null);
             } else {
-                log.info("Mentor client disconnected; runner draining: {}", disconnect.getMessage());
+                log.info(
+                        "Mentor client disconnected; runner draining: errorType={}",
+                        disconnect.getClass().getName());
                 try {
                     turn.done.get(20, TimeUnit.SECONDS);
                 } catch (Exception drainEx) {
@@ -489,7 +498,11 @@ public class MentorChatService implements MentorTurnRunner {
             outcome = MentorChatMetrics.ResultOutcome.CLIENT_DISCONNECT;
         } catch (Exception e) {
             poisoned = isPoisoning(e);
-            log.warn("Mentor turn errored (poisoned={}): {}", poisoned, e.getMessage(), e);
+            log.warn(
+                    "Mentor turn errored (poisoned={}): {}",
+                    poisoned,
+                    e.getClass().getName(),
+                    e);
             failTurn(turn, state, channel, cookie, e, userFacingError(e));
             outcome = poisoned ? MentorChatMetrics.ResultOutcome.POISONED : MentorChatMetrics.ResultOutcome.ERROR;
         } finally {
@@ -688,7 +701,8 @@ public class MentorChatService implements MentorTurnRunner {
             if (!isStillbornContainerAttach(first)) {
                 throw first;
             }
-            log.warn("Mentor sandbox died during attach; retrying once: {}", first.getMessage());
+            // isStillbornContainerAttach already matched the cause; the message names the container.
+            log.warn("Mentor sandbox died during attach; retrying once: reason=containerNotRunning");
             return sandboxService.attach(retrySpec.get());
         }
     }
@@ -801,7 +815,7 @@ public class MentorChatService implements MentorTurnRunner {
                     channel.isClientGone(),
                     disconnect.toString());
         } catch (RuntimeException e) {
-            log.warn("Event translation/send failed: {}", e.getMessage(), e);
+            log.warn("Event translation/send failed: {}", e.getClass().getName(), e);
             // Claimed while delivery is still held, so no later event can finish a reply missing this one.
             turn.terminal.compareAndSet(null, Terminal.FAILED);
             turn.done.completeExceptionally(e);

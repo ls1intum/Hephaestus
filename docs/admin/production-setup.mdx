@@ -524,7 +524,7 @@ Use the private endpoint and example rules in [Scrape metrics](./observability.m
 - `llm.budget.blocked`: tagged by admission-point `surface`, including `review_job` and `mentor`.
   The agent-job tag also has `cap`, which names the purse that refused work.
 
-Each EXHAUSTED transition logs a WARN, visible in Sentry if configured.
+Each EXHAUSTED transition logs a WARN.
 Compatible endpoint reasoning tokens remain in telemetry when reported.
 They have no separate price.
 OpenAI-compatible usage includes them in billable output tokens.

@@ -98,7 +98,7 @@ public class SlackOAuthClient {
             revokeStrict(botToken);
             return true;
         } catch (SlackOAuthException e) {
-            log.warn("Slack auth.revoke failed: {}", e.getMessage());
+            log.warn("Slack auth.revoke failed: {}", e.getClass().getSimpleName());
             return false;
         }
     }
