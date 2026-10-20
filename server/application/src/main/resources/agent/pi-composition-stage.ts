@@ -173,7 +173,6 @@ export type CompositionFailureReason =
 	| "LOOP"
 	| "NO_DECISION"
 	| "SERVER_REFUSED"
-	| "PRIVATE_NOT_RECOVERED"
 	| PublicationRefusal;
 
 interface CompositionFailure {
@@ -1340,6 +1339,9 @@ export function destinationRefusal(
 	destination: PrivateDestination,
 	practiceSlug: string,
 ): string {
+	if (admission.privateProgress.decidedPractices.includes(practiceSlug)) {
+		return "already decided by private feedback an earlier attempt of this review prepared";
+	}
 	if (destination === "PRACTICE_PAGE") {
 		const decision =
 			admission.practicePageSupport?.state === "COMPLETE"
@@ -1538,6 +1540,11 @@ export function buildCompositionTurn(
 	const closedNote =
 		closed.length > 0 ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.` : "";
 	const coverageNote = notReachedNote(notReached);
+	const { decidedPractices } = admission.privateProgress;
+	const decidedNote =
+		decidedPractices.length > 0
+			? ` Private feedback that an earlier attempt of this review prepared already decides ${decidedPractices.join(", ")}; it stands, and the limits above are the room it left.`
+			: "";
 	const routing = PRIVATE_DESTINATIONS.filter(
 		(destination) => request.destinations[destination] !== undefined,
 	)
@@ -1585,24 +1592,33 @@ ${admitted}
 
 ${context}
 ${onTheWork}
-Destinations open this turn: ${openDestinations}.${closedNote}
+Destinations open this turn: ${openDestinations}.${closedNote}${decidedNote}
 The practices each open destination may carry: ${routing}. Write no piece, not even a WITHHOLD, for a practice on a destination that does not list it.
 A pattern claim needs at least ${request.minDistinctItems} distinct pieces of work.
 
 ${coverageNote}Persist the feedback with report_feedback — every piece you have in one call. Writing nothing on a destination is a correct and common outcome; say in one line why, and stop.`;
 }
 
-// Private composition requires a complete server routing read; missing routing closes the destination.
+// Private composition requires a complete server routing read; missing routing closes the destination. What earlier
+// attempts of this review prepared is this attempt's starting point: their practices are decided, so no destination
+// carries them again, and their delivering pieces keep the room they used. Pieces this attempt adds do not move it.
 export function closeUnroutedPrivateDestinations(
 	request: CompositionRequest,
 	admission: Admission,
 	feedback: ComposedFeedback,
 ): ReadonlyMap<string, readonly PrivateDestination[]> {
 	const notMet = notMetPractices(admission.results);
+	const decided = new Set(admission.privateProgress.decidedPractices);
+	const undecided = notMet.filter((slug) => !decided.has(slug));
 	for (const destination of PRIVATE_DESTINATIONS) {
-		if (request.destinations[destination] === undefined || notMet.length === 0) {
+		const bounds = request.destinations[destination];
+		if (bounds === undefined || undecided.length === 0) {
 			continue;
 		}
+		bounds.maxPieces = Math.max(
+			0,
+			bounds.maxPieces - admission.privateProgress.deliveries[destination],
+		);
 		const read =
 			destination === "PRACTICE_PAGE"
 				? admission.practicePageSupport
@@ -1619,22 +1635,27 @@ export function closeUnroutedPrivateDestinations(
 			if (read?.state !== "REFUSED") {
 				recordCompositionFailure(feedback, "PRIVATE_FEEDBACK", "RUNTIME_ERROR");
 			}
-		} else if (!notMet.some((slug) => routedTo(admission, destination, slug))) {
+		} else if (!undecided.some((slug) => routedTo(admission, destination, slug))) {
 			if (destination === "PRACTICE_PAGE") {
 				delete request.destinations.PRACTICE_PAGE;
 			} else {
 				delete request.destinations.CONVERSATION;
 			}
-			console.error(`[pi-runner] ${destination} closed for this run: no practice is routed to it`);
+			console.error(
+				`[pi-runner] ${destination} closed for this run: no undecided practice is routed to it`,
+			);
 		}
 	}
 	return new Map(
 		notMet.map((slug) => [
 			slug,
-			PRIVATE_DESTINATIONS.filter(
-				(destination) =>
-					request.destinations[destination] !== undefined && routedTo(admission, destination, slug),
-			),
+			decided.has(slug)
+				? []
+				: PRIVATE_DESTINATIONS.filter(
+						(destination) =>
+							request.destinations[destination] !== undefined &&
+							routedTo(admission, destination, slug),
+					),
 		]),
 	);
 }

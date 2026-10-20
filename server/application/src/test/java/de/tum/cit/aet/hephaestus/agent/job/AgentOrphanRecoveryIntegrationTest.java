@@ -22,8 +22,11 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.FeedbackCompositionService;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
@@ -31,6 +34,8 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
@@ -39,11 +44,28 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.item.Item;
+import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemService;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemSourceAccess;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
@@ -51,10 +73,17 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultProofMapper;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionTrace;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
@@ -63,10 +92,15 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -89,6 +123,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -195,6 +230,45 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ReviewMethodVerifier methods;
+
+    @Autowired
+    private AccountRepository privateAccounts;
+
+    @Autowired
+    private IdentityRepository privateIdentities;
+
+    @Autowired
+    private MembershipRepository privateMemberships;
+
+    @Autowired
+    private ProblemRepository privateProblems;
+
+    @Autowired
+    private ResultProofMapper privateProof;
+
+    @Autowired
+    private FeedbackCompositionService privateComposition;
+
+    @Autowired
+    private ConnectionRepository privateConnections;
+
+    @Autowired
+    private RepositoryRepository privateRepositories;
+
+    @Autowired
+    private RepositoryToMonitorRepository privateMonitors;
+
+    @Autowired
+    private PullRequestRepository privatePullRequests;
+
+    @Autowired
+    private ItemRepository privateItems;
+
+    @Autowired
+    private ScmItemService privateItemSource;
+
+    @Autowired
+    private ScmItemSourceAccess privateSourceAccess;
 
     private AgentProperties properties;
     private ReviewJobRecovery recovery;
@@ -556,11 +630,10 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
         assertThat(continuing.getAttempt()).isEqualTo(1);
         assertThat(continuing.getOutput()).isNull();
-        // The same admission, the same accepted public review, and still no private piece.
+        // The same admission and the same accepted public review.
         assertThat(ResultAdmissionService.citationAttempt(continuing)).isZero();
         assertThat(continuing.getAdmissionDigest()).isEqualTo("admitted-digest");
         assertThat(continuing.getPublicReviewDigest()).isEqualTo(owing.getPublicReviewDigest());
-        assertThat(ResultAdmissionService.privatePrepared(continuing)).isFalse();
         assertThat(practiceResultRepository.findById(observed.getId())).isPresent();
         // The original inputs keep their own expiry: queuing does not extend their retention.
         ReviewCompositionBasis basis = compositionBasisRepository
@@ -575,16 +648,310 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(usageCalls(jobId)).containsExactly(4);
     }
 
+    @ParameterizedTest(name = "accepted {0}, all private practices decided: {1}")
+    @CsvSource({"PRACTICE_PAGE,false", "PRACTICE_PAGE,true", "CONVERSATION,false", "CONVERSATION,true"})
+    @DisplayName(
+            "an accepted private decision leaves only the original admission's undecided practices recoverable without a report")
+    void shouldContinueOnlyThePrivatePracticesNotYetDecidedWithoutAFeedbackReport(
+            FeedbackDestination destination, boolean allDecided) {
+        TestUserFactory.ensureAccountForUser(privateAccounts, privateIdentities, developer);
+        long providerId = requireNonNull(requireNonNull(developer.getProvider()).getId());
+        long accountId = requireNonNull(privateIdentities
+                .findActiveByProviderSubject(providerId, "100", null)
+                .orElseThrow()
+                .getAccount()
+                .getId());
+        var member = new Membership();
+        member.setWorkspace(workspace);
+        member.setId(new Membership.Id(workspace.getId(), accountId));
+        member.setReviewSelected(true);
+        privateMemberships.saveAndFlush(member);
+
+        ItemRef preparedWork = privateRecoveryWork();
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0, preparedWork);
+        Practice sibling = withPrivateRecoverySibling(jobId);
+        // Pin first: that helper initializes detail; the new results then record admissionAttempt alongside the
+        // account.
+        pinScriptAssignments(jobId);
+        Result decided = admitPrivateNegative(jobId, practice, accountId);
+        Result pending = admitPrivateNegative(jobId, sibling, accountId);
+        acceptPublicReview(jobId);
+        Instant expiry = Instant.now().plus(Duration.ofHours(1)).truncatedTo(ChronoUnit.MICROS);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", expiry);
+        ReviewJob original = jobRepository.findById(jobId).orElseThrow();
+        var rows = List.of(privateProof.snapshot(decided), privateProof.snapshot(pending));
+        var pieces = allDecided
+                ? List.of(privateQuietDecision(destination, decided), privateQuietDecision(destination, pending))
+                : List.of(privateQuietDecision(destination, decided));
+        assertThat(reviews.start(workspace.getId(), original.getReviewId())).isTrue();
+        var accepted = requireNonNull(transactionTemplate.execute(status -> {
+            ReviewJob owned = jobRepository.lockById(jobId).orElseThrow();
+            var receipt = privateComposition.prepare(
+                    owned,
+                    new PrepareFeedbackRequestDTO(
+                            owned.getReviewId(),
+                            jobId,
+                            0,
+                            List.of(decided.getId(), pending.getId()),
+                            pieces,
+                            false,
+                            null),
+                    rows,
+                    new FeedbackCompositionService.Read(
+                            new FeedbackCompositionContext(null, null), List.of(), List.of(), null),
+                    Map.of(),
+                    false);
+            jobRepository.saveAndFlush(owned);
+            return receipt;
+        }));
+        assertThat(accepted.feedbackIds()).hasSize(allDecided ? 2 : 1);
+        UUID acceptedId = accepted.feedbackIds().getFirst();
+        String acceptedBefore = jdbc.queryForObject(
+                "SELECT row_to_json(f)::text FROM feedback f WHERE workspace_id=? AND id=?",
+                String.class,
+                workspace.getId(),
+                acceptedId);
+        String decisionsBefore = jdbc.queryForObject(
+                "SELECT (checks->'feedbackComposition')::text FROM review WHERE workspace_id=? AND id=?",
+                String.class,
+                workspace.getId(),
+                original.getReviewId());
+        assertThat(acceptedBefore).isNotBlank();
+        assertThat(jdbc.queryForObject(
+                        "SELECT state FROM feedback WHERE workspace_id=? AND id=?",
+                        String.class,
+                        workspace.getId(),
+                        acceptedId))
+                .isEqualTo("WITHHELD");
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+        assertThat(
+                        destination == FeedbackDestination.PRACTICE_PAGE
+                                ? owing.getPracticePagePreparedAt()
+                                : owing.getConversationPreparedAt())
+                .isNotNull();
+
+        // Null is the established accepted-public protocol; no returned phase report grants this recovery.
+        assertThat(continueComposition(owing, "live-owner")).isEqualTo(!allDecided);
+
+        ReviewJob after = jobRepository.findById(jobId).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(allDecided ? ReviewJobStatus.RUNNING : ReviewJobStatus.QUEUED);
+        assertThat(after.getAttempt()).isEqualTo(allDecided ? 0 : 1);
+        assertThat(ResultAdmissionService.citationAttempt(after)).isZero();
+        assertThat(after.getAdmissionDigest()).isEqualTo(original.getAdmissionDigest());
+        assertThat(after.getPublicReviewDigest()).isEqualTo(original.getPublicReviewDigest());
+        assertThat(after.getInput()).isEqualTo(original.getInput());
+        assertThat(after.getCapture()).isEqualTo(original.getCapture());
+        assertThat(practiceResultRepository.findAllById(List.of(decided.getId(), pending.getId())))
+                .extracting(Result::getOutcome)
+                .containsExactly(ResultOutcome.NOT_MET, ResultOutcome.NOT_MET);
+        assertThat(jdbc.queryForObject(
+                        "SELECT row_to_json(f)::text FROM feedback f WHERE workspace_id=? AND id=?",
+                        String.class,
+                        workspace.getId(),
+                        acceptedId))
+                .isEqualTo(acceptedBefore);
+        assertThat(jdbc.queryForObject(
+                        "SELECT (checks->'feedbackComposition')::text FROM review WHERE workspace_id=? AND id=?",
+                        String.class,
+                        workspace.getId(),
+                        original.getReviewId()))
+                .isEqualTo(decisionsBefore);
+        assertThat(compositionBasisRepository
+                        .findByWorkspaceIdAndJobId(workspace.getId(), jobId)
+                        .orElseThrow()
+                        .getExpiresAt())
+                .isEqualTo(expiry);
+        // Repeating the old owner's request can neither queue twice nor replace the accepted decision.
+        assertThat(continueComposition(owing, "live-owner")).isFalse();
+    }
+
+    private static ComposedFeedback privateQuietDecision(FeedbackDestination destination, Result result) {
+        return new ComposedFeedback(
+                destination,
+                List.of(result.getId()),
+                null,
+                List.of(),
+                FeedbackStopReason.COMPOSER_WITHHELD,
+                new FeedbackCompositionTrace(
+                        List.of(),
+                        List.of(new FeedbackCompositionTrace.QuietDecision(
+                                List.of(new FeedbackCompositionTrace.Support(result.getId(), null)),
+                                "BELOW_BAR",
+                                List.of())),
+                        null,
+                        null),
+                null);
+    }
+
+    private ItemRef privateRecoveryWork() {
+        var provider = requireNonNull(developer.getProvider());
+        var now = Instant.now();
+        var connection = new Connection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "17",
+                new ConnectionConfig.GitHubAppConfig(17L, "private-recovery", null, Set.of()));
+        connection.setState(IntegrationState.ACTIVE);
+        privateConnections.saveAndFlush(connection);
+        var repository = new Repository();
+        repository.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+        repository.setProvider(provider);
+        repository.setName("private-recovery");
+        repository.setNameWithOwner("private-recovery/work");
+        repository.setHtmlUrl("https://github.com/private-recovery/work");
+        repository.setDefaultBranch("main");
+        repository.setVisibility(Repository.Visibility.PUBLIC);
+        repository.setPushedAt(now);
+        repository.setCreatedAt(now);
+        repository.setUpdatedAt(now);
+        repository = privateRepositories.saveAndFlush(repository);
+        var monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, repository.getNameWithOwner());
+        monitor.setNativeId(repository.getNativeId());
+        privateMonitors.saveAndFlush(monitor);
+        var pull = new PullRequest();
+        pull.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+        pull.setProvider(provider);
+        pull.setRepository(repository);
+        pull.setNumber(17);
+        pull.setTitle("Preserve failure context");
+        pull.setBody("verified quote");
+        pull.setState(Issue.State.OPEN);
+        pull.setAuthor(developer);
+        pull.setHtmlUrl(repository.getHtmlUrl() + "/pull/17");
+        pull.setCreatedAt(now);
+        pull.setUpdatedAt(now);
+        pull.setHeadRefOid("a".repeat(40));
+        pull.setBaseRefOid("b".repeat(40));
+        pull.setHeadRefName("failure-context");
+        pull.setBaseRefName("main");
+        pull = privatePullRequests.saveAndFlush(pull);
+        var parent = new Item();
+        parent.setWorkspaceId(workspace.getId());
+        parent.setKind(ScmItemEvents.REPOSITORY);
+        parent.setSourceId(repository.getId());
+        parent.setCreatedAt(now);
+        parent = privateItems.saveAndFlush(parent);
+        var item = new Item();
+        item.setWorkspaceId(workspace.getId());
+        item.setKind(ScmItemEvents.PULL_REQUEST);
+        item.setParentId(parent.getId());
+        item.setSourceId(pull.getId());
+        item.setCreatedAt(now);
+        item = privateItems.saveAndFlush(item);
+        var ref = new ItemRef(
+                workspace.getId(), item.getId(), item.getKind(), item.getSourceId(), item.getParentId(), null);
+        assertThat(privateRepositories.isMonitored(workspace.getId(), repository.getId()))
+                .isTrue();
+        assertThat(privateSourceAccess.permits(ref, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isTrue();
+        return ref;
+    }
+
+    private Practice withPrivateRecoverySibling(UUID jobId) {
+        Practice sibling = runtimePracticeVersions.create(new PracticeVersionService.NewPractice(
+                workspace,
+                "private-recovery-sibling",
+                new ItemKind("scm.pull_request"),
+                DefinitionTestFixtures.definition(
+                        new ItemKind("scm.pull_request"), "Private recovery sibling", "The sibling definition", null),
+                null,
+                0,
+                null));
+        transactionTemplate.executeWithoutResult(status -> {
+            ReviewJob job = jobRepository.findById(jobId).orElseThrow();
+            long itemId = job.getInput().itemId();
+            jdbc.update(
+                    "INSERT INTO review_practice(review_id,workspace_id,practice_id,practice_version_id,status)"
+                            + " VALUES (?,?,?,?,'READY')",
+                    job.getReviewId(),
+                    workspace.getId(),
+                    sibling.getId(),
+                    sibling.getCurrentVersion().getId());
+            jdbc.update(
+                    "INSERT INTO review_item(review_id,workspace_id,practice_id,item_id,item_version)"
+                            + " SELECT ?,?,?,?,item_version FROM review WHERE workspace_id=? AND id=?",
+                    job.getReviewId(),
+                    workspace.getId(),
+                    sibling.getId(),
+                    itemId,
+                    workspace.getId(),
+                    job.getReviewId());
+            job.setInput(new ReviewJobInput(
+                    itemId,
+                    List.of(
+                            new ReviewAssignmentId(job.getReviewId(), practice.getId(), itemId),
+                            new ReviewAssignmentId(job.getReviewId(), sibling.getId(), itemId))));
+            jobRepository.saveAndFlush(job);
+        });
+        return sibling;
+    }
+
+    private Result admitPrivateNegative(UUID jobId, Practice about, long accountId) {
+        return requireNonNull(transactionTemplate.execute(status -> {
+            ReviewJob job = jobRepository.findById(jobId).orElseThrow();
+            var evidence = AdmittedResultFixtures.evidence("scm.pull-request.core");
+            String version = requireNonNull(jdbc.queryForObject(
+                    "SELECT item_version FROM review WHERE workspace_id=? AND id=?",
+                    String.class,
+                    workspace.getId(),
+                    job.getReviewId()));
+            var row = practiceResultRepository.saveAndFlush(Result.builder()
+                    .id(UUID.randomUUID())
+                    .workspaceId(job.getWorkspaceId())
+                    .reviewId(job.getReviewId())
+                    .practiceId(about.getId())
+                    .practiceVersionId(about.getCurrentVersion().getId())
+                    .itemId(job.getInput().itemId())
+                    .itemVersion(version)
+                    .developerId(accountId)
+                    .outcome(ResultOutcome.NOT_MET)
+                    .severity(Severity.MAJOR)
+                    .summary("Keep failure context")
+                    .explanation("The captured event loses its failure context.")
+                    .evidence(evidence)
+                    .evidenceVersion((short) 1)
+                    .coverage(objectMapper.readTree(
+                            "{\"source\":\"claimed\",\"complete\":true,\"selected\":1,\"checked\":1,\"total\":1}"))
+                    .recordedAt(Instant.now())
+                    .build());
+            privateProblems.saveAndFlush(Problem.builder()
+                    .id(UUID.randomUUID())
+                    .workspaceId(job.getWorkspaceId())
+                    .resultId(row.getId())
+                    .position(0)
+                    .severity(Severity.MAJOR)
+                    .summary("Keep failure context")
+                    .explanation("The captured event loses its failure context.")
+                    .citations(evidence.path("citations"))
+                    .basis(objectMapper
+                            .createObjectNode()
+                            .put("type", "introduced")
+                            .put("head", 0)
+                            .put("explanation", "The captured change introduces the gap."))
+                    .build());
+            jdbc.update(
+                    "UPDATE review_item SET state='JUDGED',result_id=?,job_id=?,"
+                            + " detail=jsonb_build_object('developerId',?,'admissionAttempt',0)"
+                            + " WHERE workspace_id=? AND review_id=? AND practice_id=? AND item_id=?",
+                    row.getId(),
+                    job.getId(),
+                    accountId,
+                    job.getWorkspaceId(),
+                    job.getReviewId(),
+                    about.getId(),
+                    job.getInput().itemId());
+            job.setAdmissionDigest("admitted-digest");
+            job.setAdmissionAttempt(0);
+            job.setCapture(objectMapper
+                    .createObjectNode()
+                    .set("manifest", objectMapper.createObjectNode().put("contractVersion", "2.0.0")));
+            jobRepository.saveAndFlush(job);
+            return row;
+        }));
+    }
+
     @ParameterizedTest(name = "{0}")
-    @ValueSource(
-            strings = {
-                "practice page piece prepared",
-                "conversation piece prepared",
-                "retry limit reached",
-                "expired inputs",
-                "erased receipt",
-                "another worker"
-            })
+    @ValueSource(strings = {"retry limit reached", "expired inputs", "erased receipt", "another worker"})
     @DisplayName("an admitted attempt that owes private feedback ends as itself when a fence does not hold")
     void shouldNotContinueOwedPrivateFeedbackWhenAFenceDoesNotHold(String why) {
         int attempt = why.equals("retry limit reached") ? 5 : 0;
@@ -600,10 +967,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         } else {
             keepOriginalInputs(jobId, attempt, "READY", "COMPLETE", fresh);
         }
-        if (why.equals("practice page piece prepared"))
-            jdbc.update("UPDATE review_job SET practice_page_prepared_at = now() WHERE id = ?", jobId);
-        if (why.equals("conversation piece prepared"))
-            jdbc.update("UPDATE review_job SET conversation_prepared_at = now() WHERE id = ?", jobId);
         spentBeforeItWasLost(jobId, 2);
         ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
 
@@ -641,9 +1004,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(ResultAdmissionService.citationAttempt(continuing)).isZero();
         assertThat(continuing.getAdmissionDigest()).isEqualTo("admitted-digest");
         assertThat(continuing.getPublicReviewDigest()).isNull();
-        // A prepared private piece stays exactly as it was: the next attempt composes no private feedback.
+        // A prepared private piece stays exactly as it was.
         assertThat(continuing.getConversationPreparedAt()).isEqualTo(preparedAt);
-        assertThat(ResultAdmissionService.privatePrepared(continuing)).isEqualTo(privatePiece);
         assertThat(practiceResultRepository.findById(observed.getId())).isPresent();
         assertThat(compositionBasisRepository
                         .findByWorkspaceIdAndJobId(workspace.getId(), jobId)
@@ -909,9 +1271,11 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         admitWithResult(jobId);
         pinScriptAssignments(jobId);
         acceptPublicReview(jobId);
-        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
-        if (why.equals("refused requeue"))
-            jdbc.update("UPDATE review_job SET practice_page_prepared_at = now() WHERE id = ?", jobId);
+        // Expired original inputs refuse the requeue the attempt asked for.
+        Instant expiresAt = why.equals("refused requeue")
+                ? Instant.now().minusSeconds(1)
+                : Instant.now().plus(Duration.ofHours(1));
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", expiresAt);
         ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
         byte[] report = why.equals("no report")
                 ? null
@@ -929,8 +1293,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     @ParameterizedTest(name = "private piece prepared: {0}")
     @ValueSource(booleans = {false, true})
-    @DisplayName(
-            "a lost admitted review with an accepted public review continues; its new attempt reads the private fact")
+    @DisplayName("a lost admitted review with an accepted public review continues whatever private piece it prepared")
     void shouldContinueALostAdmittedReviewWithAnAcceptedPublicReview(boolean privatePiece) {
         UUID jobId = runningJobOwnedBy("dead-replica-11", Instant.now().minus(Duration.ofMinutes(5)), 0);
         admitWithResult(jobId);
@@ -941,12 +1304,12 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         sweeper.recoverOrphanedJobs();
 
+        // The new attempt's admission answer says which practices the prepared pieces decide; it composes the rest.
         ReviewJob continuing = jobRepository.findById(jobId).orElseThrow();
         assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
         assertThat(continuing.getAttempt()).isEqualTo(1);
         assertThat(continuing.getPublicReviewDigest()).isEqualTo("b".repeat(64));
-        // The new attempt's admission answer carries this fact: private feedback is composed only without it.
-        assertThat(ResultAdmissionService.privatePrepared(continuing)).isEqualTo(privatePiece);
+        assertThat(continuing.getPracticePagePreparedAt() != null).isEqualTo(privatePiece);
     }
 
     @ParameterizedTest(name = "retained task envelope: {0}")
@@ -1055,25 +1418,25 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo("JUDGED");
     }
 
-    @ParameterizedTest(name = "private piece committed: {0}")
+    @ParameterizedTest(name = "public review committed: {0}")
     @ValueSource(booleans = {true, false})
-    @DisplayName("an owed continuation waiting on a private preparation's row lock decides on what it committed")
-    void shouldDecideOnTheCommittedPrivatePieceWhenTheOwedContinuationWaits(boolean committed) throws Exception {
+    @DisplayName("an owed continuation waiting on a preparation's row lock decides on what it committed")
+    void shouldDecideOnTheCommittedPreparationWhenTheOwedContinuationWaits(boolean committed) throws Exception {
         UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
         admitWithResult(jobId);
-        acceptPublicReview(jobId);
         keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
         ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
 
+        // Without a report, only a committed public review leaves private feedback owed.
         whileLocked(
                 jobId,
                 committed,
-                job -> job.setConversationPreparedAt(Instant.now()),
+                job -> job.setPublicReviewDigest("b".repeat(64)),
                 () -> continueComposition(owing, "live-owner"));
 
         ReviewJob after = jobRepository.findById(jobId).orElseThrow();
-        assertThat(after.getStatus()).isEqualTo(committed ? ReviewJobStatus.RUNNING : ReviewJobStatus.QUEUED);
-        assertThat(after.getAttempt()).isEqualTo(committed ? 0 : 1);
+        assertThat(after.getStatus()).isEqualTo(committed ? ReviewJobStatus.QUEUED : ReviewJobStatus.RUNNING);
+        assertThat(after.getAttempt()).isEqualTo(committed ? 1 : 0);
     }
 
     @ParameterizedTest(name = "admission committed: {0}")
@@ -1434,6 +1797,10 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     private UUID runningJobOwnedBy(String workerId, Instant startedAt, int attempt) {
+        return runningJobOwnedBy(workerId, startedAt, attempt, null);
+    }
+
+    private UUID runningJobOwnedBy(String workerId, Instant startedAt, int attempt, @Nullable ItemRef preparedWork) {
         ReviewJob job = new ReviewJob();
         RuntimeJobTestData.initialize(job, workspace.getId());
 
@@ -1462,18 +1829,29 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         job.setWorkerId(workerId);
         job.setStartedAt(startedAt);
         job.setAttempt(attempt);
-        long itemId = requireNonNull(jdbc.queryForObject(
-                "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES (?,?,?,now()) RETURNING id",
-                Long.class,
-                workspace.getId(),
-                practice.getKind().value(),
-                (job.getReviewId().getLeastSignificantBits() & Long.MAX_VALUE) | 1));
+        long itemId;
+        String itemVersion;
+        if (preparedWork == null) {
+            itemId = requireNonNull(jdbc.queryForObject(
+                    "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES (?,?,?,now()) RETURNING id",
+                    Long.class,
+                    workspace.getId(),
+                    practice.getKind().value(),
+                    (job.getReviewId().getLeastSignificantBits() & Long.MAX_VALUE) | 1));
+            itemVersion = "fixture:one";
+        } else {
+            assertThat(preparedWork.workspaceId()).isEqualTo(workspace.getId());
+            assertThat(preparedWork.kind()).isEqualTo(practice.getKind());
+            itemId = preparedWork.itemId();
+            itemVersion = privateItemSource.pin(preparedWork, null).version().value();
+        }
         jdbc.update(
                 "INSERT INTO review(id,workspace_id,item_id,kind,item_version,origin,ordered_at) VALUES"
-                        + " (?,?,?,'ITEM','fixture:one','REQUEST',now())",
+                        + " (?,?,?,'ITEM',?,'REQUEST',now())",
                 job.getReviewId(),
                 workspace.getId(),
-                itemId);
+                itemId,
+                itemVersion);
         jdbc.update(
                 "INSERT INTO review_practice(review_id,workspace_id,practice_id,practice_version_id,status) VALUES"
                         + " (?,?,?,?,'READY')",
@@ -1483,11 +1861,12 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 practice.getCurrentVersion().getId());
         jdbc.update(
                 "INSERT INTO review_item(review_id,workspace_id,practice_id,item_id,item_version) VALUES"
-                        + " (?,?,?,?,'fixture:one')",
+                        + " (?,?,?,?,?)",
                 job.getReviewId(),
                 workspace.getId(),
                 practice.getId(),
-                itemId);
+                itemId,
+                itemVersion);
         job.setInput(new ReviewJobInput(
                 itemId, List.of(new ReviewAssignmentId(job.getReviewId(), practice.getId(), itemId))));
         return jobRepository.saveAndFlush(job).getId();

@@ -189,8 +189,8 @@ public final class SandboxLayout {
      * it reached its safety ceiling or stalled. Another attempt can compose it from the original inputs. The runner asks
      * for it for private feedback only once a review on the work exists, and for the review on the work only from the
      * attempt that admitted the results. The server allows private feedback after an accepted review on the work while
-     * no private piece is prepared, and otherwise only the attempt that admitted the results. Otherwise the attempt
-     * ends like any admitted run.
+     * a NOT_MET practice has no prepared private piece, and otherwise only the attempt that admitted the results.
+     * Otherwise the attempt ends like any admitted run.
      */
     public static final int EXIT_COMPOSITION_OWED = 77;
 

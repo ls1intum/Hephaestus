@@ -41,7 +41,7 @@ class ProxyStandInAdmissionTest {
         var answer = PracticeRunnerLiveLlmTest.ProxyStandIn.admit(request);
         var response = MAPPER.treeToValue(answer, AdmissionResponseDTO.class);
 
-        assertThat(response.contractVersion()).isEqualTo(3);
+        assertThat(response.contractVersion()).isEqualTo(AdmissionResponseDTO.CONTRACT_VERSION);
         assertThat(response.admissionDigest()).matches("[0-9a-f]{64}");
         assertThat(response.reviewId()).isEqualTo(REVIEW);
         assertThat(response.jobId()).isEqualTo(JOB);

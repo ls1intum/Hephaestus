@@ -48,6 +48,11 @@ public class ReviewCompositionContinuation {
         files.holdCopyAdmission();
     }
 
+    /** Whether the admitted job may still owe private feedback, from the pieces its review already prepared. */
+    public boolean privateFeedbackOwed(ReviewJob job) {
+        return admission.privateFeedbackOwed(job);
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public int requeue(ReviewJob job, String workerId, ReviewJobRepository.CompositionRequeue request) {
         var original = bases.findOriginalCopy(job.getWorkspaceId(), job.getId()).orElse(null);

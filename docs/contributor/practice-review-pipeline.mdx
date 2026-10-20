@@ -247,7 +247,7 @@ The destinations remain independently eligible.
 The run can stop composition at its safety ceiling or after a stall.
 Then the runner can ask for a new attempt of the same job in two cases:
 
-- Private feedback stopped after the public review was accepted, and no private piece of the job is prepared.
+- Private feedback stopped after an accepted public review. Some Not met practices still have no private decision.
 - The public review itself stopped, and the stopped attempt is the one that admitted the results.
 
 In the second case the public review gets one more returned attempt.
@@ -268,11 +268,24 @@ Its task envelope is its own and names the new attempt. The retained inputs neve
 
 It reads routing, consent and erasure again.
 Like the first attempt, it composes the public review only if none is accepted.
-Then it composes private feedback only if no private piece is prepared.
+Then it composes private feedback only for the practices that no prepared private piece decides.
 The retry limit and the original expiry of those inputs stay in effect.
 
-After one private piece is accepted, no attempt composes private feedback again.
-The other private pieces of that run are then not recovered.
+The admission answer states this progress without words.
+It names the admitted results that the review's prepared private pieces rest on, for the reviewed developer.
+A piece decides the practice it names and every practice in its support, whether it delivers or withholds.
+It also counts the pieces composed for delivery on each private destination.
+A piece that the server withheld after it was composed for delivery still counts.
+A composer's withholding does not count.
+
+The new attempt starts from that progress.
+It closes the decided practices on every destination, including the support of a grouped conversation.
+Each destination keeps only the room that the earlier pieces left.
+Pieces of the same attempt do not close each other.
+
+A practice can still get a practice-page card and conversation notes in one attempt.
+Prepared pieces are never composed or prepared again.
+When every Not met practice is decided, the new attempt composes no private feedback and records no private failure.
 A new attempt does not see a public review that an earlier attempt composed.
 Its private feedback can repeat a point of that review.
 

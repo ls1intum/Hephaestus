@@ -131,14 +131,14 @@ public class ReviewJobRecovery {
 
     /**
      * Continues an admitted attempt whose feedback composition the run stopped. The locked row decides. After an
-     * accepted review on the work, only private feedback is owed, and only while no private piece is prepared, so none
-     * is composed twice; the attempt's own report does not matter, as a response the runner lost does not undo the
-     * review the row accepted. Without one, only the attempt that admitted the results may continue, and only when
-     * its feedback report says the run stopped the review on the work itself. An attempt that continued it had the
-     * whole run for composition and ends with its outcome. A prepared private piece stays as it is, and the next attempt
-     * composes no private feedback. Recovery after a lost worker is separate and keeps its own shared retry limit. The
-     * attempt returned, so it is billed once from its own report, selected as at a terminal write, and keeps the
-     * practice script runs it reported.
+     * accepted review on the work, only private feedback is owed, and only while the review's prepared private pieces
+     * leave a NOT_MET practice undecided; the attempt's own report does not matter, as a response the runner lost does
+     * not undo the review the row accepted. Without one, only the attempt that admitted the results may continue, and
+     * only when its feedback report says the run stopped the review on the work itself. An attempt that continued it
+     * had the whole run for composition and ends with its outcome. A prepared private piece stays as it is, and the
+     * next attempt composes only for the practices that no prepared piece decides. Recovery after a lost worker is
+     * separate and keeps its own shared retry limit. The attempt returned, so it is billed once from its own report,
+     * selected as at a terminal write, and keeps the practice script runs it reported.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean continueComposition(
@@ -154,7 +154,7 @@ public class ReviewJobRecovery {
         ReviewJob owned = Objects.requireNonNull(locked);
         if (!ResultAdmissionService.isAdmitted(owned)) return false;
         boolean owed = owned.getPublicReviewDigest() != null
-                ? !ResultAdmissionService.privatePrepared(owned)
+                ? continuation.get().privateFeedbackOwed(owned)
                 : !ResultAdmissionService.isContinuation(owned) && reviewOnTheWorkStopped(owned, feedbackReport);
         if (!owed) return false;
         TerminalUsage spent = TerminalUsage.resolve(

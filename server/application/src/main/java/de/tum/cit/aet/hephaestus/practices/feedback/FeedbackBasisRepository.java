@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
@@ -53,6 +54,33 @@ public interface FeedbackBasisRepository extends JpaRepository<FeedbackBasis, UU
             @Param("workspaceId") long workspaceId,
             @Param("developerId") long developerId,
             @Param("resultId") UUID resultId);
+
+    // The immutable trace keeps delivery intent after a later withholding. Missing traces conservatively use an
+    // allowance.
+    @Query(value = """
+        SELECT f.id AS feedbackId, f.destination AS destination, b.result_id AS resultId,
+          COALESCE(jsonb_array_length(r.checks -> 'feedbackComposition' -> (f.id::text) -> 'copies') > 0, true)
+            AS delivering
+        FROM feedback f JOIN feedback_basis b ON b.feedback_id=f.id AND b.workspace_id=f.workspace_id
+          JOIN review r ON r.id=f.review_id AND r.workspace_id=f.workspace_id
+        WHERE f.workspace_id=:workspaceId AND f.review_id=:reviewId AND f.developer_id=:developerId
+          AND f.destination IN ('PRACTICE_PAGE','CONVERSATION') AND b.result_id IN (:resultIds)
+        """, nativeQuery = true)
+    List<PrivateDecisionRow> findPrivateDecisions(
+            @Param("workspaceId") long workspaceId,
+            @Param("reviewId") UUID reviewId,
+            @Param("developerId") long developerId,
+            @Param("resultIds") Collection<UUID> resultIds);
+
+    interface PrivateDecisionRow {
+        UUID getFeedbackId();
+
+        FeedbackDestination getDestination();
+
+        UUID getResultId();
+
+        boolean getDelivering();
+    }
 
     List<FeedbackBasis> findByWorkspaceIdAndFeedbackIdInOrderByOrdinalAsc(
             long workspaceId, Collection<UUID> feedbackIds);

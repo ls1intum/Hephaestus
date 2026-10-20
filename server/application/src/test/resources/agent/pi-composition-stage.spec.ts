@@ -9,9 +9,11 @@ import {
 	buildReviewTool,
 	buildFeedbackTool,
 	closeUnroutedPrivateDestinations,
+	destinationRefusal,
 	persistComposedFeedback,
 	compositionOwed,
 	stagePrivateHistory,
+	undecidedPrivatePractices,
 	type ComposedFeedback,
 	type PublicReviewState,
 } from "../../../main/resources/agent/pi-composition-stage.ts";
@@ -126,6 +128,232 @@ void test("missing private routing closes only that destination and records its 
 	assert.deepEqual(feedback.compositionFailures, [
 		{ phase: "PRIVATE_FEEDBACK", reason: "RUNTIME_ERROR" },
 	]);
+});
+
+// Two NOT_MET practices, both routed to both private destinations, and what earlier attempts of the review prepared.
+const handlesErrors = "30000000-0000-4000-8000-00000000000a";
+const namesThings = "30000000-0000-4000-8000-00000000000b";
+function resumedResult(practiceSlug: string, resultId: string, problemId: string) {
+	return {
+		practiceSlug,
+		itemId: "42",
+		resultId,
+		outcome: "NOT_MET",
+		summary: "The failure is dropped",
+		explanation: "The catch returns without recording the error.",
+		evidence: { citations: [] },
+		example: null,
+		problems: [{ id: problemId, severity: "MAJOR", resultId, citations: [] }],
+	};
+}
+function resumedAdmission(
+	decidedResultIds: string[],
+	deliveries: { page: number; conversation: number },
+	routing: "complete" | "unread" = "complete",
+) {
+	const readAt = "2026-10-14T00:00:00Z";
+	return parseAdmission({
+		contractVersion: 4,
+		admissionDigest: "a".repeat(64),
+		admitted: [
+			resumedResult("handles-errors", handlesErrors, "40000000-0000-4000-8000-00000000000a"),
+			resumedResult("names-things", namesThings, "40000000-0000-4000-8000-00000000000b"),
+		],
+		withheld: [],
+		publicReviewed: true,
+		privateProgress: {
+			decidedResultIds,
+			practicePageDeliveries: deliveries.page,
+			conversationDeliveries: deliveries.conversation,
+		},
+		practicePageSupport:
+			routing === "unread"
+				? null
+				: {
+						state: "COMPLETE",
+						readAt,
+						practices: ["handles-errors", "names-things"].map((practiceSlug) => ({
+							practiceSlug,
+							decision: "ADMIT",
+							stopReason: null,
+							occurrences: [],
+						})),
+					},
+		conversationEligibility:
+			routing === "unread"
+				? null
+				: {
+						state: "COMPLETE",
+						readAt,
+						results: [handlesErrors, namesThings].map((resultId) => ({
+							resultId,
+							decision: "ADMIT",
+							stopReason: null,
+						})),
+					},
+	});
+}
+
+/** Starts private composition the way the runner does after admission, and reports pieces through its tool. */
+function resumePrivately(admission: ReturnType<typeof resumedAdmission>) {
+	const request = {
+		contractVersion: 3 as const,
+		destinations: { PRACTICE_PAGE: { maxPieces: 1 }, CONVERSATION: { maxPieces: 1 } },
+		minDistinctItems: 2,
+		onWorkCopyForms: [],
+	};
+	const feedback: ComposedFeedback = {
+		compositionFailures: [],
+		contractVersion: 3,
+		admissionDigest: admission.digest,
+		results: [],
+		preparedTargets: [],
+		feedback: [],
+		review: null,
+		preparation: null,
+	};
+	const routes = closeUnroutedPrivateDestinations(request, admission, feedback);
+	const tool = buildFeedbackTool(
+		["handles-errors", "names-things"],
+		request,
+		admission.results,
+		[],
+		new Map(),
+		{
+			feedback,
+			admitted: () => true,
+			routes: (slug) => routes.get(slug),
+			destinationRefusal: (destination, slug) => destinationRefusal(admission, destination, slug),
+			negativeItems: () => 2,
+			documentedShape: (schema) => schema,
+			listSchema: (items) => ({ type: "array", items }),
+			submittedList: (value) =>
+				Array.isArray(value) ? { items: value } : { error: "Expected list" },
+			refusal: async (_id, text) => ({ content: [{ type: "text", text }], details: { stored: 0 } }),
+			persist: () => undefined,
+			paid: () => false,
+			onStored: () => undefined,
+		},
+	);
+	const send = async (piece: Record<string, unknown>) =>
+		JSON.stringify(
+			await Reflect.apply(tool.execute.bind(tool), tool, [
+				"resume",
+				tool.prepareArguments?.({ feedback: [piece] }),
+			]),
+		);
+	const stored = () =>
+		feedback.feedback.map((piece) => `${piece.destination}:${piece.practiceSlug}`);
+	const undecided = () => undecidedPrivatePractices(admission, feedback, routes);
+	return { request, routes, feedback, send, stored, undecided };
+}
+
+const resumedCard = (practiceSlug: string, resultId: string) => ({
+	destination: "PRACTICE_PAGE",
+	practiceSlug,
+	basedOn: [resultId],
+	action: "NEW",
+	title: "Keep failure context",
+	body: "Failures lose their context across these changes. This makes the cause hard to trace.",
+	nextStep: "Before returning an error, check that its context reaches the caller.",
+});
+const resumedConversation = (practiceSlug: string, basedOn: string[]) => ({
+	destination: "CONVERSATION",
+	practiceSlug,
+	basedOn,
+	action: "NEW",
+	title: "Keep failure context",
+	notes: {
+		situation: "Errors lose their context before they reach the caller.",
+		capability: "The developer can trace which failure details reach a caller.",
+		evidenceSummary: "The catch in ‘Handle failed requests’ returns without the error details.",
+		inConversationLearning:
+			"The developer explains which details a caller needs to identify the cause.",
+	},
+});
+const resumedWithholding = (destination: string, practiceSlug: string, resultId: string) => ({
+	destination,
+	practiceSlug,
+	basedOn: [resultId],
+	action: "WITHHOLD",
+	withholdReason: "BELOW_BAR",
+	witnessIds: [],
+});
+
+void test("a card an earlier attempt prepared keeps its practice decided and its page room used", async () => {
+	const resumed = resumePrivately(resumedAdmission([handlesErrors], { page: 1, conversation: 0 }));
+	assert.deepEqual(resumed.routes.get("handles-errors"), []);
+	assert.deepEqual(resumed.routes.get("names-things"), ["PRACTICE_PAGE", "CONVERSATION"]);
+	assert.deepEqual(resumed.request.destinations, {
+		PRACTICE_PAGE: { maxPieces: 0 },
+		CONVERSATION: { maxPieces: 1 },
+	});
+	assert.deepEqual(resumed.undecided(), ["names-things"]);
+	// The page holds the earlier card: a second card for the other practice does not fit.
+	assert.match(
+		await resumed.send(resumedCard("names-things", namesThings)),
+		/PRACTICE_PAGE holds at most 0/u,
+	);
+	// Neither the decided practice nor a grouped conversation that rests on it is composed again.
+	assert.match(
+		await resumed.send(resumedConversation("handles-errors", [handlesErrors])),
+		/already decided by private feedback an earlier attempt of this review prepared/u,
+	);
+	assert.match(
+		await resumed.send(resumedConversation("names-things", [namesThings, handlesErrors])),
+		/already decided by private feedback an earlier attempt of this review prepared/u,
+	);
+	assert.deepEqual(resumed.stored(), []);
+	// An explicit withholding uses no room, so it still settles the open practice on the full page.
+	await resumed.send(resumedWithholding("PRACTICE_PAGE", "names-things", namesThings));
+	assert.deepEqual(resumed.stored(), ["PRACTICE_PAGE:names-things"]);
+	assert.deepEqual(resumed.undecided(), []);
+
+	// The unused conversation can carry the open practice instead.
+	const other = resumePrivately(resumedAdmission([handlesErrors], { page: 1, conversation: 0 }));
+	await other.send(resumedConversation("names-things", [namesThings]));
+	assert.deepEqual(other.stored(), ["CONVERSATION:names-things"]);
+	assert.deepEqual(other.undecided(), []);
+});
+
+void test("a conversation an earlier attempt prepared leaves the page open for the other practice", async () => {
+	const resumed = resumePrivately(resumedAdmission([handlesErrors], { page: 0, conversation: 1 }));
+	assert.deepEqual(resumed.request.destinations, {
+		PRACTICE_PAGE: { maxPieces: 1 },
+		CONVERSATION: { maxPieces: 0 },
+	});
+	assert.match(
+		await resumed.send(resumedConversation("names-things", [namesThings])),
+		/CONVERSATION holds at most 0/u,
+	);
+	await resumed.send(resumedCard("names-things", namesThings));
+	assert.deepEqual(resumed.stored(), ["PRACTICE_PAGE:names-things"]);
+	assert.deepEqual(resumed.undecided(), []);
+});
+
+void test("a review whose private practices are all decided composes nothing privately and records no failure", () => {
+	for (const routing of ["complete", "unread"] as const) {
+		const resumed = resumePrivately(
+			resumedAdmission([handlesErrors, namesThings], { page: 1, conversation: 1 }, routing),
+		);
+		assert.deepEqual(resumed.routes.get("handles-errors"), [], routing);
+		assert.deepEqual(resumed.routes.get("names-things"), [], routing);
+		assert.deepEqual(resumed.undecided(), [], routing);
+		// Routing an attempt no longer needs is not read as a failure of that attempt.
+		assert.deepEqual(resumed.feedback.compositionFailures, [], routing);
+	}
+});
+
+void test("pieces of the same attempt do not close each other's destinations", async () => {
+	const fresh = resumePrivately(resumedAdmission([], { page: 0, conversation: 0 }));
+	assert.deepEqual(fresh.request.destinations, {
+		PRACTICE_PAGE: { maxPieces: 1 },
+		CONVERSATION: { maxPieces: 1 },
+	});
+	await fresh.send(resumedCard("handles-errors", handlesErrors));
+	await fresh.send(resumedConversation("handles-errors", [handlesErrors]));
+	assert.deepEqual(fresh.stored(), ["PRACTICE_PAGE:handles-errors", "CONVERSATION:handles-errors"]);
+	assert.deepEqual(fresh.undecided(), ["names-things"]);
 });
 
 void test("the server's private history makes only its delivered witness and queued target usable", async () => {
@@ -1018,7 +1246,6 @@ void test("only composition the run stopped is owed: the review on the work from
 		"LOOP",
 		"NO_DECISION",
 		"SERVER_REFUSED",
-		"PRIVATE_NOT_RECOVERED",
 		"PUBLIC_DELIVERY_UNRESOLVED",
 		"PUBLIC_HISTORY_CHANGED",
 	] as const) {

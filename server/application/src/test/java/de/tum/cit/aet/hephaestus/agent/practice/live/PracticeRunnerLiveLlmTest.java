@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedProblemDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedResultDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrivateProgressDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.ProjectedCitationDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
@@ -427,7 +428,7 @@ class PracticeRunnerLiveLlmTest {
                         false));
             }
             return MAPPER.valueToTree(new AdmissionResponseDTO(
-                    SandboxLayout.PRACTICE_CONTRACT_VERSION,
+                    AdmissionResponseDTO.CONTRACT_VERSION,
                     submitted.reviewId(),
                     submitted.jobId(),
                     submitted.attempt(),
@@ -438,7 +439,7 @@ class PracticeRunnerLiveLlmTest {
                     null,
                     null,
                     false,
-                    false));
+                    new PrivateProgressDTO(List.of(), 0, 0)));
         }
 
         private static String outcomeOf(JsonNode candidate) {
