@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.94.7
+
+### Patch Changes
+
+- The practice review overview no longer reports missing comments or finished reviews when only their timing is unavailable. Comment timing covers feedback posted without approval.
+- Review evidence on a pull request or merge request now names the captured file that each quoted line of the change was checked against. Before, a citation of one changed file could name another changed file as its source, although its quote was checked against the right file.
+- When a review's time limit or a stall stops its public review before it is written, Hephaestus now composes the feedback once more in a new attempt from the same admitted results, instead of ending the review without it. Such reviews take one more sandbox run, so they can finish later and cost more. The existing retry limit still applies, and the new attempt does not guarantee that feedback is written. Each feedback request also asks for no more output than its turn has left.
+- Private feedback reviews can now read recent feedback already delivered to the same developer, and conversation feedback still waiting for them, on each private destination open for that practice. This restores the context needed to avoid repeating guidance or to replace a queued concern. Earlier words still count as said after their claim became outdated, but only feedback whose claim still holds can show that nothing has changed since. Withdrawn words are excluded, and unavailable history is distinguished from an empty history.
+- A review that continues its feedback composition in a new attempt no longer fails at once. Before, the new attempt stopped with exit 42 before any model call, so its feedback was never composed. When the agent cannot use its task, the server log now says that the task was missing, unreadable, from another version or invalid. It no longer always tells you to rebuild the agent image.
+- A practice review no longer assesses a practice whose saved settings do not fit the work, such as an older pull request practice about the author that is set to review on a submitted review. Hephaestus now withholds that practice and says why, and the other practices in the review still run. A workspace admin can correct the practice's Review on or About settings.
+- When a review's time limit or a stall stops private feedback after some of it is prepared, the next attempt now writes private feedback for the practices that are still undecided, instead of dropping them. Prepared practice-page cards and conversation notes stay as they are and are not written again, and a practice-page card that was already prepared still uses the page's room. A review whose private feedback was already complete no longer reports private feedback as not recovered.
+- When a practice review's AI model sends its result in a form that Hephaestus does not accept, the correction it gets back now contains only the result fields that Hephaestus reads. It also names the facts that the model must copy from its original answer. Before, the correction could repeat the field that was not accepted, so a corrected result could still be refused.
+- Review instructions now consistently require the quoted evidence used to support an observation.
+- Practice reviews show total time from request to completion separately from the latest attempt. Continued reviews no longer count earlier work as queue time or present incomplete timing samples as whole-review measurements.
+- Practice reviews of a pull request or merge request now see which capture rule left out the comment that a reply links to: a recorded Hephaestus delivery, or the Hephaestus marker in its words. A practice review of a conversation now names the participant it is about. Practice reviews are also asked to keep a premise that the evidence leaves open as an open question.
+- A review stopped by the sandbox time limit can now continue unfinished private feedback from its original admitted inputs. It uses the same review and the existing retry and retention limits.
+- Practice reviews give each model call only the work time that remains. Long streamed review calls no longer stop at the proxy's fixed 10-minute limit; existing connection and idle limits still apply. Calls made after the review's time ends are refused before reaching the provider. Results can still be uploaded during their existing grace period.
+
+  Streaming responses keep one request thread in charge of status, headers and bytes. A stream that ends after reporting usage keeps that usage, and traces distinguish a typed stream timeout from other failures.
+
+- A practice review no longer loops on a citation of a changed line that names the line's side but no source. Such a citation is checked against the change and stored when its quote is that changed line; otherwise the review gets a line of the change it can cite.
+- Feedback that a workspace admin withdrew while it was still waiting to be delivered now reads "Ready, then withdrawn" in the practice review lists and on its sheet. Before, it still read as ready for the next conversation, the practice pages or the work, although it is not delivered while the withdrawal stands. Feedback withdrawn after delivery keeps its delivery record and now also shows that it was withdrawn in the Feedback list.
+
 ## 0.94.6
 
 ### Patch Changes
