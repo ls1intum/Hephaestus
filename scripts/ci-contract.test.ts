@@ -3219,6 +3219,24 @@ void describe("CI contract", () => {
 		assert.deepEqual(invalid, [], "External uses must match @<40 lowercase hex>");
 	});
 
+	void test("selects the supported Cosign release at every installer site", async () => {
+		const installers = new Set<string>();
+		for (const [file, source] of await readSources(
+			await posixGlob(".github/{actions,workflows}/**/*.{yml,yaml}"),
+		)) {
+			visit(parseDocument(source), {
+				Map(_key, declaration) {
+					if (!String(declaration.get("uses")).startsWith("sigstore/cosign-installer@")) {
+						return;
+					}
+					installers.add(file);
+					assert.equal(stepInputs(declaration).get("cosign-release"), "v3.1.4", file);
+				},
+			});
+		}
+		assert.ok(installers.size > 0, "Workflow and composite installers must be checked");
+	});
+
 	void test("centralises dependency installation and browser setup", async () => {
 		const sources = await workflowSources();
 		for (const [file, source] of sources) {

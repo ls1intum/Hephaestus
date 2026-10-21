@@ -79,7 +79,14 @@ for (const site of verificationSites) {
 	const failures =
 		site.job === "tag-unchanged-images"
 			? exitCodes
-			: { ...exitCodes, publication: 11, changedDigest: 1, emptyTags: 4, invalidMetadata: 5 };
+			: {
+					...exitCodes,
+					...(site.job === "build" ? { signing: 6 } : {}),
+					publication: 11,
+					changedDigest: 1,
+					emptyTags: 4,
+					invalidMetadata: 5,
+				};
 	for (const [failure, exitCode] of Object.entries(failures)) {
 		void test(
 			`${site.job}: ${failure === "none" ? "success" : `${failure} rejection`} preserves immutable-image verification`,
@@ -130,6 +137,7 @@ const fs = require('node:fs');
 const tool = require('node:path').basename(process.argv[1]);
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.CALL_LOG, JSON.stringify([tool, ...args]) + '\\n');
+if (tool === 'cosign' && args[0] === 'sign' && process.env.FAILURE === 'signing') process.exit(6);
 if (tool === 'cosign' && args[0] === 'verify' && process.env.FAILURE === 'signature') process.exit(7);
 if (tool === 'gh' && process.env.FAILURE === 'attestation') process.exit(9);
 if (tool === 'docker' && args.includes('create')) {
@@ -173,6 +181,12 @@ if (tool === 'docker' && args.includes('inspect')) process.stdout.write(process.
 				});
 				const recorded = await readFile(log, "utf8");
 				const calls = recorded.trim().split("\n");
+				if (failure === "signing") {
+					assert.equal(step.get("continue-on-error"), undefined);
+					assert.deepEqual(calls, [JSON.stringify(["cosign", "sign", "--yes", immutable])]);
+					assert.equal(result.status, exitCode, result.stderr);
+					return;
+				}
 				const expected = [];
 				if (site.job === "build") {
 					expected.push(["cosign", "sign", "--yes", immutable]);
