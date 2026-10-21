@@ -201,19 +201,40 @@ export const ReplyInThread: Story = {
 	},
 };
 
+/** Read, with no message yet: the greeting, and the composer to start with. */
 export const Empty: Story = {
 	args: { state: ready({ entries: [] }) },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("textbox", { name: "Message Heph" })).toBeVisible();
+	},
 };
 
+/**
+ * The messages are still on their way. The story passes a composer, and none shows: a message sent
+ * now would have no page to land in. The composer comes with the messages.
+ */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Loading the conversation…")).toBeVisible();
+		await expect(canvas.queryByRole("textbox", { name: "Message Heph" })).toBeNull();
+		await expect(canvas.queryByText(/^Heph can make mistakes/u)).toBeNull();
+	},
 };
 
 const retryLoad = fn();
 
+/**
+ * The messages could not be read. The story passes a composer, and none shows: a message sent now
+ * would not appear until Retry reads the messages. The words say nothing of which scope failed, as
+ * the conversation and a thread both show them.
+ */
 export const LoadError: Story = {
 	args: { state: { status: "error", onRetry: retryLoad } },
 	play: async ({ canvas, userEvent }) => {
+		await expect(canvas.getByText("We could not load these messages")).toBeVisible();
+		await expect(canvas.queryByRole("textbox", { name: "Message Heph" })).toBeNull();
+		await expect(canvas.queryByText(/^Heph can make mistakes/u)).toBeNull();
 		await userEvent.click(await canvas.findByRole("button", { name: "Retry" }));
 		await expect(retryLoad).toHaveBeenCalledOnce();
 	},

@@ -113,6 +113,11 @@ export interface HephTimelineProps {
 	lead?: ReactNode;
 	/** Shown when the scope has no message yet. */
 	empty?: ReactNode;
+	/**
+	 * Below the messages once they are read. While the first read loads or has failed, a message sent
+	 * then has no page to land in, so it would not show; the skeleton or Retry stands in. A composer
+	 * with a `draftKey` keeps its words, so it gives them back once the messages are read.
+	 */
 	composer?: ReactNode;
 	/** The live stream keeps failing and is reconnecting. */
 	livePaused?: boolean;
@@ -277,8 +282,11 @@ function LeaveNote({ turn }: { turn: MentorTurn | undefined }) {
  * The status lines and the composer below the scroller. When this area grows, such as a composer
  * that wraps to more lines, the scroller's view shrinks: a reader at the end stays at the end, and a
  * reader further up keeps their place.
+ *
+ * It measures from the moment the messages are `read`. The composer arrives with them, in the commit
+ * that also places the opening view; counted as growth, it would pull that view to the end.
  */
-function KeepsEndInView({ children }: { children: ReactNode }) {
+function KeepsEndInView({ read, children }: { read: boolean; children: ReactNode }) {
 	const { scrollToEnd } = useMessageScroller();
 	const { end: canScrollToEnd } = useMessageScrollerScrollable();
 	const atEnd = useRef(!canScrollToEnd);
@@ -288,7 +296,7 @@ function KeepsEndInView({ children }: { children: ReactNode }) {
 	}, [canScrollToEnd]);
 	useEffect(() => {
 		const element = area.current;
-		if (element === null) {
+		if (!read || element === null) {
 			return;
 		}
 		let { height } = element.getBoundingClientRect();
@@ -301,7 +309,7 @@ function KeepsEndInView({ children }: { children: ReactNode }) {
 		});
 		observer.observe(element);
 		return () => observer.disconnect();
-	}, [scrollToEnd]);
+	}, [read, scrollToEnd]);
 	return (
 		<div ref={area} className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 pb-2">
 			{children}
@@ -371,7 +379,7 @@ function TimelineError({ onRetry }: { onRetry: () => void }) {
 				<EmptyMedia variant="icon">
 					<MessageSquareWarningIcon />
 				</EmptyMedia>
-				<EmptyTitle>We could not load your conversation</EmptyTitle>
+				<EmptyTitle>We could not load these messages</EmptyTitle>
 				<EmptyDescription>Try again. If it keeps failing, reload the page.</EmptyDescription>
 			</EmptyHeader>
 			<EmptyContent>
@@ -400,7 +408,8 @@ function TimelineError({ onRetry }: { onRetry: () => void }) {
  * status line speaks from its own live region outside the log, so the finished answer is read once.
  */
 export function HephTimeline(props: HephTimelineProps) {
-	const { label, state, developer, lead, empty, composer, livePaused = false, jumpTo } = props;
+	const { label, state, developer, lead, empty, livePaused = false, jumpTo } = props;
+	const composer = state.status === "ready" ? props.composer : undefined;
 	const [deleting, setDeleting] = useState<MentorEntry | null>(null);
 	const rows = state.status === "ready" ? timelineRows(state) : [];
 	const subjects = subjectsOf(rows, developer);
@@ -479,7 +488,7 @@ export function HephTimeline(props: HephTimelineProps) {
 					{statusLabel}
 				</p>
 				<LeaveNote turn={liveTurn} />
-				<KeepsEndInView>
+				<KeepsEndInView read={state.status === "ready"}>
 					<div role="status">
 						{livePaused && (
 							<Marker>

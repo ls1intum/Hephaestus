@@ -163,7 +163,7 @@ export function ThreadConversation({
 	const actions = useHephActions(workspaceSlug);
 	switch (thread.status) {
 		case "loading": {
-			return <HephTimelineSkeleton rows={2} />;
+			return <HephTimelineSkeleton rows={2} label="Loading the thread…" />;
 		}
 		case "missing": {
 			return <ThreadGone />;

@@ -13,12 +13,18 @@ const LINES = [
 /**
  * A conversation while it loads, in the shape `HephTimeline` gives it: left-aligned rows with an
  * avatar, a name line and the words. `rows` comes from the region: the page fills its height, a
- * thread panel shows fewer.
+ * thread panel shows fewer. `label` is what a screen reader hears loads.
  */
-export function HephTimelineSkeleton({ rows = 4 }: { rows?: number }) {
+export function HephTimelineSkeleton({
+	rows = 4,
+	label = "Loading the conversation…",
+}: {
+	rows?: number;
+	label?: string;
+}) {
 	return (
 		<div aria-busy="true">
-			<span className="sr-only">Loading the conversation…</span>
+			<span className="sr-only">{label}</span>
 			<div
 				className="mx-auto flex w-full max-w-3xl flex-col gap-6 overflow-hidden px-4 py-6"
 				aria-hidden

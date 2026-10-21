@@ -1,11 +1,20 @@
 import { MessageSquareOffIcon, XIcon } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+	type ComponentProps,
+	type KeyboardEvent,
+	type ReactNode,
+	useEffect,
+	useId,
+	useRef,
+	useState,
+} from "react";
 
 import { useArrived } from "@/components/layout/detail-drawer/use-arrived";
 import { Button } from "@/components/ui/button";
 import {
 	Drawer,
 	DrawerBody,
+	DrawerClose,
 	DrawerContent,
 	DrawerHeader,
 	DrawerTitle,
@@ -73,9 +82,10 @@ export function ThreadPanel({
 	);
 }
 
-function CloseButton({ onClick }: { onClick?: () => void }) {
+/** Takes the props of `DrawerClose` when it renders it, so the drawer's own close runs. */
+function CloseButton(props: ComponentProps<typeof Button>) {
 	return (
-		<Button variant="ghost" size="icon" aria-label="Close thread" onClick={onClick}>
+		<Button variant="ghost" size="icon" aria-label="Close thread" {...props}>
 			<XIcon />
 		</Button>
 	);
@@ -142,20 +152,35 @@ function ThreadDrawer({
 	children,
 }: Omit<ThreadPanelProps, "focusHeading" | "availableRem">) {
 	const arrived = useArrived();
+	// A cached thread can focus its reply field in the mount commit, before the drawer captures it.
+	const [opener] = useState(() =>
+		document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+			? document.activeElement
+			: null,
+	);
+	// Every way out (Close, Escape, a press on the page, a swipe) shuts the drawer first, and the
+	// thread leaves the address once the drawer has left, as a detail drawer level does. Leaving the
+	// address first would unmount the drawer mid-exit, before it hands focus back.
+	const [closing, setClosing] = useState(false);
 	return (
 		<Drawer
-			open={arrived}
+			open={arrived && !closing}
 			swipeDirection="right"
 			onOpenChange={(open) => {
 				if (!open) {
+					setClosing(true);
+				}
+			}}
+			onOpenChangeComplete={(open) => {
+				if (!open && closing) {
 					onClose();
 				}
 			}}
 		>
-			<DrawerContent id={id} size="panel">
+			<DrawerContent id={id} size="panel" finalFocus={() => opener}>
 				<DrawerHeader className="flex-row items-center justify-between gap-2 px-4 py-2">
 					<DrawerTitle>Thread</DrawerTitle>
-					<CloseButton onClick={onClose} />
+					<DrawerClose render={<CloseButton />} />
 				</DrawerHeader>
 				{/* Not a tab stop of its own: the thread inside is the scroll region, and it is one. */}
 				<DrawerBody className="flex flex-col p-0" tabIndex={-1}>

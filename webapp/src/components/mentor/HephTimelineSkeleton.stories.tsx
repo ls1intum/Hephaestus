@@ -18,3 +18,12 @@ export const Default: Story = {
 		await expect(canvas.getByText("Loading the conversation…")).toBeVisible();
 	},
 };
+
+/** A thread loading in its panel: fewer stand-in turns, and the screen reader hears it is the thread. */
+export const Thread: Story = {
+	args: { rows: 2, label: "Loading the thread…" },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Loading the thread…")).toBeVisible();
+		await expect(canvas.queryByText("Loading the conversation…")).toBeNull();
+	},
+};

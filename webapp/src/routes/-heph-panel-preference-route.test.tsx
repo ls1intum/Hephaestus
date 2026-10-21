@@ -244,8 +244,9 @@ it("keeps Heph's answer streaming when the Heph page opens mid-turn, and never a
 	const { router } = renderRouteAtWithRouter("/w/acme/teams");
 	const panelStream = await openStream(acme);
 	await user.click(screen.getByRole("button", { name: "Open Heph, AI mentor" }));
+	// The composer comes with the conversation's first page, which the panel reads as it opens.
 	await user.type(
-		screen.getByRole("textbox", { name: "Message Heph" }),
+		await screen.findByRole("textbox", { name: "Message Heph" }),
 		"How did my week go?{Enter}",
 	);
 	await waitFor(() => expect(acme.turns).toHaveLength(1));

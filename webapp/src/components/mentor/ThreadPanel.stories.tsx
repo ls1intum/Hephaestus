@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { cn } from "cn";
 import { useState } from "react";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import { Button } from "@/components/ui/button";
 import { expectSettledVisible } from "@/stories/overlay";
@@ -22,7 +22,7 @@ const OWN_REPLY = entry({
 	parentEntryId: SLACK_QUESTION.id,
 });
 
-function thread() {
+function thread(focusOnMount = false) {
 	return (
 		<HephTimeline
 			label="Thread"
@@ -32,7 +32,12 @@ function thread() {
 			onCopy={fn()}
 			lead={<HephMessage message={SLACK_QUESTION} developer={DEVELOPER} />}
 			composer={
-				<HephComposer label="Reply in thread" placeholder="Reply in thread" onSend={fn()} />
+				<HephComposer
+					label="Reply in thread"
+					placeholder="Reply in thread"
+					focusOnMount={focusOnMount}
+					onSend={fn()}
+				/>
 			}
 		/>
 	);
@@ -127,14 +132,20 @@ export const NotMeasuredYet: Story = {
 /**
  * Regions the page measures on an 820px and a 1000px window at 16px text, with the sidebar open or
  * collapsed to its icons. Only a region that leaves the conversation 24rem beside the 26rem column
- * gets the column, whatever the window: this canvas is 1440px wide. A drawer still closes with Close.
+ * gets the column, whatever the window: this canvas is 1440px wide. A drawer still closes with
+ * Close, and leaves as every drawer does before the page drops the thread: its exit, a fade under
+ * reduced motion, is still running when Close returns.
  */
 const opensAsDrawer: Story["play"] = async ({ args, userEvent }) => {
 	const panel = await screen.findByRole("dialog", { name: "Thread" });
 	await expectSettledVisible(panel);
 	await expect(screen.queryByRole("complementary", { name: "Thread" })).toBeNull();
 	await userEvent.click(within(panel).getByRole("button", { name: "Close thread" }));
-	await expect(args.onClose).toHaveBeenCalledOnce();
+	await expect(args.onClose).not.toHaveBeenCalled();
+	await waitFor(async () => {
+		await expect(args.onClose).toHaveBeenCalledOnce();
+	});
+	await expect(screen.queryByRole("dialog", { name: "Thread" })).toBeNull();
 };
 
 /** 820px, sidebar open: 564px (35.25rem) for both, a column would leave the conversation 148px. */
@@ -145,6 +156,95 @@ export const TabletSidebarCollapsed: Story = { args: { availableRem: 48.25 }, pl
 
 /** 1000px, sidebar open: 744px (46.5rem), a column would leave the conversation 328px. */
 export const LaptopSidebarOpen: Story = { args: { availableRem: 46.5 }, play: opensAsDrawer };
+
+type PlayUser = Parameters<NonNullable<Story["play"]>>[0]["userEvent"];
+
+/** Opens the drawer from its control, closes it with `close`, and expects focus back on the control. */
+function returnsFocusFromDrawer(
+	close: (panel: HTMLElement, userEvent: PlayUser) => Promise<void>,
+): Story["play"] {
+	return async ({ args, canvas, userEvent }) => {
+		const opener = canvas.getByRole("button", { name: "3 replies" });
+		await userEvent.click(opener);
+		const panel = await screen.findByRole("dialog", { name: "Thread" });
+		await expectSettledVisible(panel);
+		await close(panel, userEvent);
+		await waitFor(async () => {
+			await expect(args.onClose).toHaveBeenCalledOnce();
+		});
+		await expect(screen.queryByRole("dialog", { name: "Thread" })).toBeNull();
+		await waitFor(async () => {
+			await expect(opener).toHaveFocus();
+		});
+	};
+}
+
+/** As a drawer, Close hands focus back to the control that opened the thread once the drawer has left. */
+export const DrawerReturnsFocus: Story = {
+	args: { availableRem: 46.5 },
+	render: (args) => <OpensFromButton {...args} />,
+	play: returnsFocusFromDrawer(async (panel, userEvent) => {
+		await userEvent.click(within(panel).getByRole("button", { name: "Close thread" }));
+	}),
+};
+
+/** A cached thread mounts its reply field focused and still closes back to its opener. */
+export const DrawerReplyReturnsFocus: Story = {
+	args: { availableRem: 46.5, children: thread(true) },
+	render: (args) => <OpensFromButton {...args} />,
+	play: async ({ args, canvas, userEvent }) => {
+		const opener = canvas.getByRole("button", { name: "3 replies" });
+		await userEvent.click(opener);
+		const panel = await screen.findByRole("dialog", { name: "Thread" });
+		await expectSettledVisible(panel);
+		await expect(within(panel).getByRole("textbox", { name: "Reply in thread" })).toHaveFocus();
+		await userEvent.click(within(panel).getByRole("button", { name: "Close thread" }));
+		await waitFor(async () => {
+			await expect(args.onClose).toHaveBeenCalledOnce();
+		});
+		await expect(screen.queryByRole("dialog", { name: "Thread" })).toBeNull();
+		await waitFor(async () => {
+			await expect(opener).toHaveFocus();
+		});
+	},
+};
+
+/** A thread opened directly has no opener; closing it does not focus an unrelated page control. */
+export const DrawerColdLoadFocus: Story = {
+	args: { availableRem: 46.5 },
+	beforeEach: () => {
+		if (document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
+	},
+	render: (args) => (
+		<div className="flex h-dvh">
+			<Button variant="link">An unrelated page action</Button>
+			<ThreadPanel {...args} />
+		</div>
+	),
+	play: async ({ args, userEvent }) => {
+		const panel = await screen.findByRole("dialog", { name: "Thread" });
+		await expectSettledVisible(panel);
+		await userEvent.click(within(panel).getByRole("button", { name: "Close thread" }));
+		await waitFor(async () => {
+			await expect(args.onClose).toHaveBeenCalledOnce();
+		});
+		await expect(screen.queryByRole("dialog", { name: "Thread" })).toBeNull();
+		await waitFor(async () => {
+			await expect(document.activeElement).toBe(document.body);
+		});
+	},
+};
+
+/** Escape closes the drawer the same way, and focus lands on the same control. */
+export const DrawerEscapeReturnsFocus: Story = {
+	args: { availableRem: 46.5 },
+	render: (args) => <OpensFromButton {...args} />,
+	play: returnsFocusFromDrawer(async (_panel, userEvent) => {
+		await userEvent.keyboard("{Escape}");
+	}),
+};
 
 /**
  * A region drawn `pixels` wide, converted to `rem` the way the page converts its measurement: at
@@ -207,7 +307,11 @@ export const LargerTextWithRoom: Story = {
 };
 
 export const Loading: Story = {
-	args: { children: <HephTimelineSkeleton rows={2} /> },
+	args: { children: <HephTimelineSkeleton rows={2} label="Loading the thread…" /> },
+	play: async ({ canvas }) => {
+		const panel = canvas.getByRole("complementary", { name: "Thread" });
+		await expect(within(panel).getByText("Loading the thread…")).toBeVisible();
+	},
 };
 
 /** No thread on that message is the developer's, such as from a wrong link. */
