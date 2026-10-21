@@ -195,6 +195,23 @@ export const WithLinkableProvider: Story = {
 	},
 };
 
+/** An offered provider without a registration cannot unlock the last sign-in account. */
+export const UnavailableSignInProvider: Story = {
+	args: {
+		identities: [github],
+		linkedProviders: [githubLinked],
+		providers: [githubProvider, { ...gitlabProvider, registrationId: "" }],
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: /connect gitlab/iu })).toBeDisabled();
+		await expect(
+			canvas.getByText(
+				"This is your only sign-in method. To remove it, delete your account in Danger zone.",
+			),
+		).toBeVisible();
+	},
+};
+
 /**
  * Outline connect CTA. Outline is configured but unlinked, so a dedicated row offers it — and with
  * TWO Outline instances configured, BOTH are offered, each named by its display name.

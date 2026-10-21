@@ -199,8 +199,10 @@ export function LinkedAccountsSection({
 
 	const signInCount = identities.filter(signsIn).length;
 	// A GitHub or GitLab offered below would let the last one go; Slack and Outline would not.
-	const canConnectSignIn = signInProviders.some((provider) =>
-		SIGN_IN_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? ""),
+	const canConnectSignIn = signInProviders.some(
+		(provider) =>
+			SIGN_IN_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? "") &&
+			hasText(provider.registrationId),
 	);
 
 	return (
