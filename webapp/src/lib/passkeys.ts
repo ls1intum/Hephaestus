@@ -34,6 +34,22 @@ export function passkeysSupported(): boolean {
 		typeof PublicKeyCredential.prototype.toJSON === "function"
 	);
 }
+/** The browser reports a dismissed, timed-out or refused passkey prompt as one of these. */
+export function passkeyPromptCanceled(error: unknown): boolean {
+	return (
+		error instanceof DOMException &&
+		(error.name === "NotAllowedError" || error.name === "AbortError")
+	);
+}
+
+/**
+ * A name the developer can recognize later, so naming never stands between them and the prompt.
+ * The time to the second keeps a primary and a backup passkey added on one day apart.
+ */
+export function defaultPasskeyLabel(addedAt: Date): string {
+	return `Passkey added ${addedAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" })}`;
+}
+
 export async function createPasskey(optionsJson: string): Promise<string> {
 	const options = creationSchema.parse(JSON.parse(optionsJson));
 	const credential = await navigator.credentials.create({

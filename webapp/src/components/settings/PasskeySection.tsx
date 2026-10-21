@@ -32,6 +32,23 @@ export interface PasskeySectionProps {
 	onRecover: (code: string) => void;
 }
 
+/** The instance policy, scoped as it applies: instance administration and workspace administration differ. */
+function passkeyRequirement({
+	instanceAdminRequired,
+	workspaceAdminRequired,
+}: PasskeyStatus): string | undefined {
+	if (instanceAdminRequired && workspaceAdminRequired) {
+		return "This instance requires one for instance and workspace administration.";
+	}
+	if (instanceAdminRequired) {
+		return "This instance requires one for instance administration.";
+	}
+	if (workspaceAdminRequired) {
+		return "This instance requires one for workspace administration.";
+	}
+	return undefined;
+}
+
 export function PasskeySection({
 	status,
 	loading = false,
@@ -79,26 +96,23 @@ export function PasskeySection({
 		);
 	} else {
 		const { credentials } = status;
-		let verificationStatus = status.verified
-			? "Your passkey was verified. Sensitive actions can require another verification."
-			: "Passkey verification is required for protected changes.";
+		let verificationStatus = "";
 		if (pending && pendingAction === "protection") {
 			verificationStatus = "Saving personal protection…";
+		} else if (status.verified) {
+			// `verified` is a recent check, fresh enough for sensitive actions, not a session-long grant.
+			verificationStatus = "Recently confirmed.";
+		} else if (credentials.length > 0) {
+			verificationStatus =
+				"Verify a passkey to change protection, remove a passkey, or replace recovery codes.";
 		}
+		const requirement = passkeyRequirement(status);
 		content = (
 			<>
 				<p className="text-sm text-muted-foreground">
-					Passkeys protect admin access. Instance and workspace requirements take precedence over
-					your personal choice.
+					A passkey confirms it’s you before administration.
+					{requirement !== undefined && ` ${requirement}`}
 				</p>
-				{status.instanceAdminRequired && (
-					<p className="text-sm">This instance requires passkeys for instance administration.</p>
-				)}
-				{status.workspaceAdminRequired && (
-					<p className="text-sm">
-						This instance requires passkeys for all workspace administration.
-					</p>
-				)}
 				{status.recoveryRequired && (
 					<p role="alert">
 						Recovery is active. Register and verify a new passkey before you use admin access.
@@ -141,11 +155,17 @@ export function PasskeySection({
 						id={`${id}-label`}
 						value={label}
 						maxLength={100}
+						aria-describedby={`${id}-label-hint`}
 						onChange={(event) => setLabel(event.target.value)}
 						placeholder="Personal device"
 					/>
+					<p id={`${id}-label-hint`} className="text-sm text-muted-foreground">
+						Optional. Without a name, the passkey shows the date you added it.
+					</p>
 					<Button
-						disabled={pending || !supported || label.trim().length === 0}
+						// Once a passkey exists, verifying it is the primary action.
+						variant={credentials.length > 0 ? "outline" : "default"}
+						disabled={pending || !supported}
 						onClick={() => onRegister(label.trim())}
 					>
 						{showSpinner && pendingAction === "register" && <Spinner />}
@@ -197,15 +217,11 @@ export function PasskeySection({
 				<p role="status" className="text-sm text-muted-foreground">
 					{verificationStatus}
 				</p>
-				{credentials.length > 0 && !status.verified && (
+				{credentials.length === 1 && (
 					<p className="text-sm text-muted-foreground">
-						Verify a passkey before you change protection, remove a passkey, or replace recovery
-						codes.
+						Add a second passkey on another device. You cannot remove your last passkey.
 					</p>
 				)}
-				<p className="text-sm text-muted-foreground">
-					Keep a second passkey on another device. You cannot remove your last passkey.
-				</p>
 				{recoveryCodes && (
 					<div className="space-y-2">
 						<p>

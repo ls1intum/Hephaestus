@@ -22,6 +22,7 @@ import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedVerifyPasskeyRouteImport } from './routes/_authenticated/verify-passkey'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AuthErrorRouteImport } from './routes/auth/error'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -150,6 +151,12 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedVerifyPasskeyRoute =
+  AuthenticatedVerifyPasskeyRouteImport.update({
+    id: '/verify-passkey',
+    path: '/verify-passkey',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
@@ -533,6 +540,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/integrations': typeof AuthenticatedIntegrationsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/verify-passkey': typeof AuthenticatedVerifyPasskeyRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/w/$workspaceSlug': typeof AuthenticatedWWorkspaceSlugRouteRouteWithChildren
@@ -608,6 +616,7 @@ export interface FileRoutesByTo {
   '/unsubscribe': typeof UnsubscribeRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/verify-passkey': typeof AuthenticatedVerifyPasskeyRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/w/$workspaceSlug': typeof WWorkspaceSlugIndexRoute
@@ -680,6 +689,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/verify-passkey': typeof AuthenticatedVerifyPasskeyRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/_authenticated/w/$workspaceSlug': typeof AuthenticatedWWorkspaceSlugRouteRouteWithChildren
@@ -758,6 +768,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/integrations'
     | '/settings'
+    | '/verify-passkey'
     | '/auth/callback'
     | '/auth/error'
     | '/w/$workspaceSlug'
@@ -833,6 +844,7 @@ export interface FileRouteTypes {
     | '/unsubscribe'
     | '/integrations'
     | '/settings'
+    | '/verify-passkey'
     | '/auth/callback'
     | '/auth/error'
     | '/w/$workspaceSlug'
@@ -904,6 +916,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/integrations'
     | '/_authenticated/settings'
+    | '/_authenticated/verify-passkey'
     | '/auth/callback'
     | '/auth/error'
     | '/_authenticated/w/$workspaceSlug'
@@ -1076,6 +1089,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/verify-passkey': {
+      id: '/_authenticated/verify-passkey'
+      path: '/verify-passkey'
+      fullPath: '/verify-passkey'
+      preLoaderRoute: typeof AuthenticatedVerifyPasskeyRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/auth/callback': {
@@ -1757,6 +1777,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedVerifyPasskeyRoute: typeof AuthenticatedVerifyPasskeyRoute
   AuthenticatedWWorkspaceSlugRouteRoute: typeof AuthenticatedWWorkspaceSlugRouteRouteWithChildren
   AuthenticatedWWorkspaceSlugViewAsRoute: typeof AuthenticatedWWorkspaceSlugViewAsRoute
   AuthenticatedWorkspacesNewGithubRoute: typeof AuthenticatedWorkspacesNewGithubRoute
@@ -1768,6 +1789,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedVerifyPasskeyRoute: AuthenticatedVerifyPasskeyRoute,
   AuthenticatedWWorkspaceSlugRouteRoute:
     AuthenticatedWWorkspaceSlugRouteRouteWithChildren,
   AuthenticatedWWorkspaceSlugViewAsRoute:

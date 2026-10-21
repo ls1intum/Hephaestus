@@ -122,6 +122,23 @@ describe("usePasskeySettings", () => {
 		expect(get).not.toHaveBeenCalled();
 		expect(result.current.section.error).toBeUndefined();
 	});
+	it("names a passkey added without a name by the date it was added", async () => {
+		let registration: unknown;
+		server.use(
+			http.post("*/user/passkeys/registration-options", () =>
+				HttpResponse.json({ challengeId, optionsJson: JSON.stringify(creation) }),
+			),
+			http.post("*/user/passkeys", async ({ request }) => {
+				registration = await request.json();
+				return new HttpResponse(null, { status: 204 });
+			}),
+		);
+		const { result } = setup();
+		await waitFor(() => expect(result.current.section.loading).toBe(false));
+		act(() => result.current.section.onRegister("  "));
+		await waitFor(() => expect(result.current.completed).toBe("register"));
+		expect(registration).toHaveProperty("label", expect.stringMatching(/^Passkey added \S/u));
+	});
 	it("verifies only on an explicit action and locks the cookie-changing completion", async () => {
 		let verifications = 0;
 		server.use(

@@ -14,16 +14,35 @@ import {
 } from "@/api/sdk.gen";
 import type { ConfirmAccessDialogProps } from "@/components/auth/ConfirmAccessDialog";
 import { useConfirmAccess } from "@/hooks/use-confirm-access";
-import { assertPasskey, createPasskey, passkeysSupported } from "@/lib/passkeys";
+import {
+	assertPasskey,
+	createPasskey,
+	defaultPasskeyLabel,
+	passkeyPromptCanceled,
+	passkeysSupported,
+} from "@/lib/passkeys";
 import { type StepUpChallenge, stepUpChallengeOf, problemDetailOf } from "@/lib/problem-detail";
+import { hasText } from "@/lib/text";
 import { withSessionLock } from "@/runtime/auth/session-lock";
 
 import type { PasskeyAction, PasskeySectionProps } from "@/components/settings/PasskeySection";
 
-export function usePasskeySettings() {
+// The browser reports a closed, timed-out or declined prompt alike, so the copy blames none of them.
+const PROMPT_CANCELED = "The passkey check did not finish. Try again when you’re ready.";
+
+/**
+ * The one owner of passkey enrollment, verification and management, for settings and for the
+ * challenge page alike. `onVerified` runs only after the server accepted a verification the
+ * developer started; nothing that the server refused before is sent again. `signInReturnTo` is
+ * where a recent sign-in, asked for before a first passkey, comes back to; by default this page.
+ */
+export function usePasskeySettings({
+	onVerified,
+	signInReturnTo,
+}: { onVerified?: () => void; signInReturnTo?: string } = {}) {
 	const queryClient = useQueryClient();
 	const [challenge, setChallenge] = useState<StepUpChallenge>();
-	const confirmation = useConfirmAccess(challenge !== undefined);
+	const confirmation = useConfirmAccess(challenge !== undefined, signInReturnTo);
 	const status = useQuery(getPasskeyStatusOptions());
 	const [recoveryCodes, setRecoveryCodes] = useState<string[]>();
 	const [ceremony, setCeremony] = useState<PasskeyAction>();
@@ -47,6 +66,7 @@ export function usePasskeySettings() {
 	const register = async (label: string) => {
 		setCeremony("register");
 		setCeremonyError(undefined);
+		const name = hasText(label.trim()) ? label.trim() : defaultPasskeyLabel(new Date());
 		try {
 			const { data } = await getPasskeyRegistrationOptions({ throwOnError: true });
 			const credentialJson = await createPasskey(data.optionsJson);
@@ -55,7 +75,7 @@ export function usePasskeySettings() {
 				execute: async () => {
 					await withSessionLock(async () =>
 						registerPasskey({
-							body: { challengeId: data.challengeId, credentialJson, label },
+							body: { challengeId: data.challengeId, credentialJson, label: name },
 							throwOnError: true,
 						}),
 					);
@@ -87,11 +107,16 @@ export function usePasskeySettings() {
 		} catch (error) {
 			setCeremonyError(error);
 			setChallenge(stepUpChallengeOf(error));
+			setCeremony(undefined);
+			return;
 		}
 		setCeremony(undefined);
+		onVerified?.();
 	};
 	let error: string | undefined;
-	if (ceremonyError !== undefined) {
+	if (passkeyPromptCanceled(ceremonyError)) {
+		error = PROMPT_CANCELED;
+	} else if (ceremonyError !== undefined) {
 		error = problemDetailOf(ceremonyError, "The passkey operation did not complete. Try again.");
 	} else if (mutation.isError) {
 		error = problemDetailOf(
@@ -102,6 +127,8 @@ export function usePasskeySettings() {
 		error = problemDetailOf(status.error);
 	}
 	return {
+		/** The action the server last accepted in this visit, such as a registration just finished. */
+		completed: mutation.isSuccess ? mutation.variables.kind : undefined,
 		section: {
 			status: status.data,
 			loading: status.isPending,
