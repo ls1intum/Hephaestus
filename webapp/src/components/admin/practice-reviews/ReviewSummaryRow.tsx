@@ -13,11 +13,12 @@ import {
 } from "@/components/practice-vocabulary/review-status-defs";
 import { TableCell } from "@/components/ui/table";
 import { formatDayTime } from "@/lib/dates";
-import { hasText } from "@/lib/text";
 
 import { RecordRowActions, ROW_OPEN_COLUMN, rowActionsColumn } from "./RecordRowActions";
 import type { RowReviewRequest } from "./RequestReviewAction";
+import { requesterAsPerson } from "./review-format";
 import { reviewLevel } from "./review-levels";
+import { ReviewPerson } from "./ReviewPerson";
 import { useTracked } from "./use-tracked";
 
 export const REVIEW_SUMMARY_COLUMNS: readonly ReviewColumn[] = [
@@ -83,10 +84,16 @@ function ReviewMarkers({ review }: { review: ReviewSummary }) {
 	));
 }
 
+/** A requested review names its requester as the result tables name a developer; any other its origin. */
 function StartedBy({ review }: { review: ReviewSummary }) {
-	const requester = review.requestedBy?.displayName;
-	if (review.origin === "REQUEST" && hasText(requester)) {
-		return <span className="break-words">{requester}</span>;
-	}
-	return <StatusBadge def={REVIEW_ORIGIN_DEFS[review.origin]} />;
+	// One line height for both, so a face (24 px) and a badge (20 px) center on the same line.
+	return (
+		<span className="flex min-h-6 items-center">
+			{review.origin === "REQUEST" && review.requestedBy ? (
+				<ReviewPerson person={requesterAsPerson(review.requestedBy)} />
+			) : (
+				<StatusBadge def={REVIEW_ORIGIN_DEFS[review.origin]} />
+			)}
+		</span>
+	);
 }
