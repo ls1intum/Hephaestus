@@ -1,6 +1,7 @@
 -- Heph chat history and conversation copies as the previous release keeps them, for the release upgrade to the Heph
 -- ledger. Run once on the previous release's database after its workspace exists; scripts/release-upgrade-test.ts.
--- Timestamps are fixed, so that assert-upgraded.sql can compare them exactly.
+-- Delivery and claim timestamps are fixed for exact comparison. The unclaimed READY piece is created now
+-- so normal conversation expiry does not turn migration preservation into an expiry test.
 DO $$
 DECLARE
  ws bigint;
@@ -40,7 +41,7 @@ BEGIN
   ('00000000-0000-0000-0000-000000990042',ws,'00000000-0000-0000-0000-000000990011',item_id,developer,
    'CONVERSATION','UNCONFIRMED','DELIVERY_UNCONFIRMED','Name the risk.','2026-01-02 03:04:05+00',NULL),
   ('00000000-0000-0000-0000-000000990045',ws,'00000000-0000-0000-0000-000000990011',item_id,developer,
-   'CONVERSATION','READY',NULL,'Link the issue.','2026-01-02 03:04:05+00',NULL);
+   'CONVERSATION','READY',NULL,'Link the issue.',now(),NULL);
  INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_key,write_started_at,posted_at,
    chat_message_id,body,stop_reason,readback)
  VALUES
