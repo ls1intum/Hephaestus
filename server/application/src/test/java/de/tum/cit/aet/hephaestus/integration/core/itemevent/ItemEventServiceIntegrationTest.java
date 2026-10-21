@@ -222,12 +222,13 @@ class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
     void shouldExpireOnlyPendingEventsAndKeepTheirNativeFacts(ItemEventState pendingState) {
         transactions.executeWithoutResult(status -> {
             var pending = input();
+            var now = pending.occurredAt();
             var old = new ItemEventInput(
                     pending.workspaceId(),
                     pending.itemId(),
                     pending.name(),
                     Objects.requireNonNull(pending.itemVersion()),
-                    Instant.parse("2000-01-01T00:00:00Z"),
+                    now.minus(properties.pendingLapseAfter()).minusSeconds(1),
                     pending.foundBy(),
                     null,
                     null);
@@ -243,7 +244,6 @@ class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
             }
             var current = input();
             UUID currentId = writer.record(current);
-            var now = Instant.now();
             events.expire(
                     now.minus(properties.pendingLapseAfter()), now, ReviewRequestReason.PENDING_DEADLINE_EXCEEDED);
             var expired =
