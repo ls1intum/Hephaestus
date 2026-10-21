@@ -144,8 +144,8 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         metadata.put("source_branch", "feature/auth-fix");
         metadata.put("target_branch", "main");
         metadata.put("base_ref_oid", BASE);
-        // PullRequestReviewHandler retains the words the pull request had when the job was
-        // admitted.
+        // ScmItemService reads these words at capture, after it verified them against the pinned
+        // version.
         metadata.put("title", "Fix authentication bug");
         metadata.put("body", "This PR fixes the login issue");
         return metadata;
@@ -226,17 +226,17 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldStateTheAdmittedRepositoryAndOnlyItsOwnProviderWhenTheMirrorStillHoldsIt() throws Exception {
+        void shouldStateThePinnedRepositoryAndOnlyItsOwnProviderWhenTheMirrorStillHoldsIt() throws Exception {
             var provider9 = new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.example");
             provider9.setId(9L);
-            var admitted = new Repository();
-            admitted.setId(123L);
-            admitted.setProvider(provider9);
+            var pinned = new Repository();
+            pinned.setId(123L);
+            pinned.setProvider(provider9);
             var moved = new Repository();
             moved.setId(124L);
             moved.setProvider(provider9);
 
-            for (var repository : List.of(admitted, moved)) {
+            for (var repository : List.of(pinned, moved)) {
                 PullRequest pr = pullRequest();
                 pr.setRepository(repository);
                 mirroredPullRequest = pr;
@@ -246,9 +246,8 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                         .get("context/metadata.json"));
 
                 assertThat(metadataJson.get("repository_id").asLong()).isEqualTo(123L);
-                assertThat(metadataJson.path("basis").path("admission_fields").toString())
-                        .contains("\"repository_id\"");
-                if (Objects.equals(repository.getId(), admitted.getId())) {
+                assertThat(metadataJson.path("basis").has("admission_fields")).isFalse();
+                if (Objects.equals(repository.getId(), pinned.getId())) {
                     assertThat(metadataJson.get("provider_id").asLong()).isEqualTo(9L);
                 } else {
                     assertThat(metadataJson.has("provider_id")).isFalse();
@@ -257,7 +256,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldStageTheAdmittedWordsBesideCurrentStatusWhenTheMirrorChangedSinceAdmission() throws Exception {
+        void shouldStageTheCapturedWordsBesideSyncedStatusAndDateEachToItsRead() throws Exception {
             PullRequest pr = pullRequest();
             pr.setTitle("Current title");
             pr.setBody("CURRENT-BODY-SENTINEL");
@@ -273,7 +272,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                     original.request(),
                     original.work(),
                     original.preparation(),
-                    Instant.parse("2026-04-09T12:00:00Z"));
+                    Instant.parse("2026-04-10T10:05:00Z"));
 
             var captured = provider.capture(job, Set.of(CORE));
 
@@ -285,17 +284,16 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                     .isEqualTo("This PR fixes the login issue");
             assertThat(new String(captured.files().get("context/metadata.json"), StandardCharsets.UTF_8))
                     .doesNotContain("CURRENT-BODY-SENTINEL", "Current title");
-            // Status stays the mirror's at capture, and says so; admission is dated as admission,
-            // not as the event.
+            // Status stays the mirror's as last synced. The record dates its read to the capture and
+            // claims no admission or event time.
             assertThat(metadataJson.get("state").asString()).isEqualTo("CLOSED");
             assertThat(metadataJson.get("is_merged").asBoolean()).isTrue();
             assertThat(metadataJson.get("review_decision").asString()).isEqualTo("APPROVED");
             JsonNode basis = metadataJson.get("basis");
-            assertThat(basis.get("admission_fields").valueStream().map(JsonNode::asString))
-                    .contains("title", "body", "commit_sha")
-                    .doesNotContain("state", "review_decision", "head_checks");
-            assertThat(basis.get("admitted_at").asString()).isEqualTo("2026-04-09T12:00:00Z");
+            assertThat(basis.propertyNames())
+                    .containsExactlyInAnyOrder("other_fields", "captured_at", "mirror_synced_at");
             assertThat(basis.get("other_fields").asString()).isEqualTo("CAPTURE");
+            assertThat(basis.get("captured_at").asString()).isEqualTo("2026-04-10T10:05:00Z");
             assertThat(basis.get("mirror_synced_at").asString()).isEqualTo("2026-04-10T10:00:00Z");
             assertThat(captured.completeness()).containsEntry(CORE, SourceCompleteness.COMPLETE);
             assertThat(captured.observedAt()).doesNotContainKey(CORE);

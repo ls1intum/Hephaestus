@@ -88,6 +88,36 @@ function contractShape(value: unknown): unknown {
 	return kept;
 }
 
+const WORK_RECORD = path.join(
+	import.meta.dirname,
+	"../../../../server/application/src/test/resources/practice-results/work-records/scm.pull_request.json",
+);
+
+void test("a pull request record dated at capture parses beside a retained record that names admission fields", () => {
+	const fixture: unknown = JSON.parse(readFileSync(WORK_RECORD, "utf8"));
+	const { work } = z.object({ work: z.record(z.string(), z.unknown()) }).parse(fixture);
+	const retained = pullRequestRecordSchema.parse(work);
+	assert.equal(retained.basis.admission_fields?.includes("body"), true);
+	assert.equal(retained.basis.captured_at, undefined);
+
+	const captured = pullRequestRecordSchema.parse({
+		...work,
+		basis: {
+			other_fields: "CAPTURE",
+			captured_at: "2026-10-01T09:05:00Z",
+			mirror_synced_at: "2026-10-01T09:00:00Z",
+		},
+	});
+	assert.equal(captured.basis.captured_at, "2026-10-01T09:05:00Z");
+	assert.equal(captured.basis.admission_fields, undefined);
+
+	const untimed = pullRequestRecordSchema.safeParse({
+		...work,
+		basis: { other_fields: "CAPTURE", captured_at: 1_759_309_500_000 },
+	});
+	assert.equal(untimed.success, false);
+});
+
 for (const [file, schema] of PAIRS) {
 	void test(`the kit preserves the server's nested types, enums and required fields for ${file}`, () => {
 		const contract: unknown = JSON.parse(readFileSync(path.join(CONTRACTS, file), "utf8"));

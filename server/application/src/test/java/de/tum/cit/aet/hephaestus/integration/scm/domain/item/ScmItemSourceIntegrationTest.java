@@ -1197,6 +1197,65 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(ResultEndReason.WORK_CHANGED);
     }
 
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldDatePullRequestWordsToTheirCaptureWithoutClaimingAdmission(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var pull = new PullRequest();
+        pull.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+        pull.setProvider(fixture.provider());
+        pull.setRepository(fixture.repository());
+        pull.setNumber(21);
+        pull.setTitle("A bounded change");
+        pull.setBody("The description before the edit.");
+        pull.setState(Issue.State.OPEN);
+        pull.setAuthor(fixture.author());
+        pull.setHtmlUrl(fixture.repository().getHtmlUrl() + "/pull/21");
+        pull.setCreatedAt(Instant.now());
+        pull.setUpdatedAt(Instant.now());
+        pull.setHeadRefOid("c".repeat(40));
+        pull.setBaseRefOid("d".repeat(40));
+        pull.setHeadRefName("topic");
+        pull.setBaseRefName("main");
+        long pullId = pulls.saveAndFlush(pull).getId();
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(
+                new ItemRegistration(holder.workspaceId(), ScmItemEvents.PULL_REQUEST, pullId, holder.itemId(), null));
+        var pinned = sources.pin(item, null);
+        var request = new CaptureRequest(
+                UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(PullRequestContentSource.CORE), "2.0.0", 3);
+
+        var before = Instant.now();
+        var captured = sources.capture(pinned, request);
+        var after = Instant.now();
+        var staged = sources.record(pinned, captured.files());
+
+        // The pin retains only a version digest, and capture reads the words from the verified mirror.
+        var basis = staged.path("basis");
+        assertThat(basis.propertyNames())
+                .contains("other_fields", "captured_at")
+                .isSubsetOf("other_fields", "captured_at", "mirror_synced_at");
+        assertThat(basis.path("other_fields").asString()).isEqualTo("CAPTURE");
+        assertThat(Instant.parse(basis.path("captured_at").asString())).isBetween(before, after);
+        assertThat(staged.path("body").asString()).isEqualTo("The description before the edit.");
+        assertThat(staged.path("commit_sha").asString()).isEqualTo("c".repeat(40));
+
+        var edited = pulls.findById(pullId).orElseThrow();
+        edited.setBody("The description after the edit.");
+        pulls.saveAndFlush(edited);
+        assertThatThrownBy(() -> sources.capture(pinned, request))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+    }
+
     private List<Map<String, @Nullable Object>> sourcePublications(ItemRef item) {
         return jdbc.queryForList(
                 "SELECT id,status FROM event_publication WHERE event_type=?"

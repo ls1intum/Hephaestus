@@ -1158,6 +1158,55 @@ void test("the record says when each part was read, and an unknown description i
 	assert.doesNotMatch(other, /admitted_at|states no description/u);
 });
 
+void test("a record read whole at capture states its capture time and no admission", (t) => {
+	const roots: string[] = [];
+	t.after(() => {
+		for (const root of roots) {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+	const contextOf = (basis: Record<string, unknown>) => {
+		const root = workspace({
+			"context/metadata.json": JSON.stringify({
+				title: "Add login",
+				body: "Adds the login screen.",
+				pr_url: "https://gitlab.example/group/repo/-/merge_requests/7",
+				repository_full_name: "group/repo",
+				pr_number: 7,
+				state: "OPEN",
+				basis,
+			}),
+		});
+		roots.push(root);
+		return buildSameWorkContext(
+			root,
+			"context",
+			pullRequestIndex({ availability: "AVAILABLE", completeness: "COMPLETE" }),
+			FRAMING,
+		);
+	};
+	const captured = contextOf({
+		other_fields: "CAPTURE",
+		captured_at: "2026-10-01T09:45:00Z",
+		mirror_synced_at: "2026-10-01T09:30:00Z",
+	});
+	const shown = shownRecord(captured);
+	assert.ok(isRecord(shown), captured);
+	assert.deepEqual(shown.basis, {
+		other_fields: "CAPTURE",
+		captured_at: "2026-10-01T09:45:00Z",
+		mirror_synced_at: "2026-10-01T09:30:00Z",
+	});
+	assert.doesNotMatch(captured, /admission_fields|admitted_at/u);
+
+	// A capture time that is not a time stays unstated; the rest of the basis keeps its own times.
+	const malformed = contextOf({ other_fields: "CAPTURE", captured_at: "sometime-captured" });
+	const unstated = shownRecord(malformed);
+	assert.ok(isRecord(unstated), malformed);
+	assert.deepEqual(unstated.basis, { other_fields: "CAPTURE" });
+	assert.doesNotMatch(malformed, /sometime-captured|captured_at/u);
+});
+
 void test("a record that is not shown is named with why, never cut or read as empty", (t) => {
 	const roots: string[] = [];
 	const captured = (files: Record<string, string>) => {

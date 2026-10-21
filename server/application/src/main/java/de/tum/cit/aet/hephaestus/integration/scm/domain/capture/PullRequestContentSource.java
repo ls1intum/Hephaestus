@@ -148,9 +148,9 @@ public class PullRequestContentSource {
         if (selectedKinds.contains(CORE)) {
             ObjectNode staged = workRecord(pullRequest, metadata, capture.capturedAt());
             storeMetadata(files, staged);
-            // The words the job was admitted with. A body known to be absent stages an empty
-            // description; a body the job does not carry as text stays unknown, so no description
-            // is staged rather than the current one.
+            // The words of the verified pinned version, read at capture. A body known to be absent
+            // stages an empty description; a body the record does not carry as text stays unknown,
+            // so no description is staged.
             JsonNode body = staged.get("body");
             if (body != null) {
                 files.put(DESCRIPTION_FILE, (body.isNull() ? "" : body.asString()).getBytes(StandardCharsets.UTF_8));
@@ -160,9 +160,9 @@ public class PullRequestContentSource {
             if (body == null) unknown.add("RETAINED_BODY_UNKNOWN");
             completeness.put(CORE, unknown.isEmpty() ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL);
             if (!unknown.isEmpty()) limitations.put(CORE, unknown);
-            // No observedAt: the record mixes words retained at admission with status as last
-            // synced, and the sync time would date the words to a moment they were not read.
-            // metadata.json dates each field.
+            // No observedAt: the record mixes words read at capture with status as last synced,
+            // and the sync time would date the words to a moment they were not read.
+            // metadata.json dates each part.
         }
         if (selectedKinds.contains(COMMENTS)) {
             CommentCapture comments = loadComments(capture.workspaceId(), pullRequestId);
@@ -308,39 +308,25 @@ public class PullRequestContentSource {
         }
     }
 
-    private static final List<String> ADMISSION_FIELDS = List.of(
-            "pr_number",
-            "pr_url",
-            "repository_id",
-            "repository_full_name",
-            "source_branch",
-            "target_branch",
-            "commit_sha",
-            "subject_role",
-            "title",
-            "body");
-
     /**
      * The pull request's work record, {@code context/metadata.json}, as the practice runner reads
-     * it ({@code WORK_RECORDS["scm.pull_request"]} in {@code lib/contract.ts}): the words the job
-     * was admitted with and the status the mirror last synced.
+     * it ({@code WORK_RECORDS["scm.pull_request"]} in {@code lib/contract.ts}): the mirror as read
+     * at capture, after the capture verified it against the pinned version.
      */
-    public static ObjectNode workRecord(PullRequest pullRequest, ScmCapturedWork work, @Nullable Instant admittedAt) {
+    public static ObjectNode workRecord(PullRequest pullRequest, ScmCapturedWork work, @Nullable Instant capturedAt) {
         ObjectNode result = JsonNodeFactory.instance.objectNode();
-        // Which time each field describes. Admission is when the job was accepted, not when the
-        // provider event happened; the mirror sync time dates the status fields only. No status is
-        // reconstructed for admission.
+        // Which time each part describes. Every field is read at capture: that time is neither the
+        // provider event time nor the admission time, and it recovers no earlier snapshot. The
+        // mirror sync time dates the status fields only.
         ObjectNode basis = result.putObject("basis");
-        ArrayNode admitted = basis.putArray("admission_fields");
-        ADMISSION_FIELDS.forEach(admitted::add);
-        putInstant(basis, "admitted_at", admittedAt);
         basis.put("other_fields", "CAPTURE");
+        putInstant(basis, "captured_at", capturedAt);
         putInstant(basis, "mirror_synced_at", pullRequest.getLastSyncAt());
         result.put("pr_number", work.number());
         result.put("pr_url", work.url());
         result.put("repository_full_name", work.repositoryPath());
-        // Preserve admission identity; the mirror supplies its provider only while it still
-        // matches.
+        // Preserve the pinned repository identity; the mirror supplies its provider only while it
+        // still matches.
         result.put("repository_id", work.repositoryId());
         var repository = pullRequest.getRepository();
         if (repository != null && Objects.equals(repository.getId(), work.repositoryId()))
@@ -351,7 +337,7 @@ public class PullRequestContentSource {
         result.put("commit_sha", reviewedHead);
         result.put("subject_role", work.reviewSourceId() == null ? "AUTHOR" : "REVIEWER");
 
-        // An absent admission key means unknown text; current words cannot replace it.
+        // Equal to the pinned version's words: the capture refuses a version whose title or body changed.
         result.put("title", work.title());
         result.put("body", work.body());
         if (pullRequest.getState() != null) {
