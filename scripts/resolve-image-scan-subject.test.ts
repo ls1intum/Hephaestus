@@ -266,12 +266,14 @@ if (process.env.STALLED_LOOKUP === 'fallback' && args.includes('--raw')) {
  process.stdout.write(JSON.stringify({ config: {}, layers: [] }));
  process.exit(0);
 }
-fs.writeFileSync(process.env.PID_FILE, String(process.pid));
 process.on('SIGTERM', () => {
  fs.writeFileSync(process.env.TERMINATED, 'SIGTERM');
  process.exit(0);
 });
+fs.writeFileSync(process.env.PID_FILE, String(process.pid));
 setInterval(() => {}, 1000);
+// The resolver can abort once this child can record and handle the signal.
+process.kill(Number(process.env.RESOLVER_DEADLINE_PID), 'SIGUSR2');
 `,
 			);
 			chmodSync(docker, 0o755);
@@ -280,11 +282,13 @@ setInterval(() => {}, 1000);
 				String.raw`import assert from 'node:assert/strict';
 import { appendFileSync } from 'node:fs';
 import { mock } from 'node:test';
-const nativeTimeout = AbortSignal.timeout.bind(AbortSignal);
+const deadline = new AbortController();
+process.env.RESOLVER_DEADLINE_PID = String(process.pid);
+process.once('SIGUSR2', () => deadline.abort(new DOMException('deadline', 'TimeoutError')));
 mock.method(AbortSignal, 'timeout', (milliseconds) => {
  assert.equal(milliseconds, 120000);
  appendFileSync(process.env.DEADLINE_LOG, 'deadline\n');
- return nativeTimeout(500);
+ return deadline.signal;
 });
 `,
 			);
