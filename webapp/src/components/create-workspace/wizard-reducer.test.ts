@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { GitLabGroup, GitLabPreflightResponse } from "@/api/types.gen";
 import {
 	createInitialWizardState,
+	hasProjectChoice,
+	isForCurrentGroup,
+	projectSelectionOf,
 	type WizardState,
 	wizardReducer,
 } from "@/components/create-workspace/wizard-context";
@@ -224,6 +227,114 @@ describe("wizardReducer", () => {
 			// Groups and selectedGroup preserved
 			expect(result.groups).toStrictEqual(sampleGroups);
 			expect(result.selectedGroup).toStrictEqual(sampleGroup);
+		});
+	});
+
+	describe("project choice", () => {
+		/** Step 3 with selected projects chosen: `ids`, in the order they were chosen. */
+		function choosing(...ids: number[]): WizardState {
+			let state = wizardReducer(stateAt(3), { type: "SET_PROJECT_SCOPE", scope: "SELECTED" });
+			for (const projectId of ids) {
+				state = wizardReducer(state, { type: "SET_PROJECT_SELECTED", projectId, selected: true });
+			}
+			return state;
+		}
+
+		it("starts at all projects, which sends no project IDs", () => {
+			const state = stateAt(3);
+			expect(state.projectScope).toBe("ALL");
+			expect(hasProjectChoice(state)).toBe(true);
+			expect(projectSelectionOf(state)).toStrictEqual({ repositorySelection: "ALL" });
+		});
+
+		it("sends the chosen IDs only while selected projects is the choice, and keeps them across a switch", () => {
+			const chosen = choosing(11, 12);
+			expect(projectSelectionOf(chosen)).toStrictEqual({
+				repositorySelection: "SELECTED",
+				selectedProjectIds: [11, 12],
+			});
+
+			const all = wizardReducer(chosen, { type: "SET_PROJECT_SCOPE", scope: "ALL" });
+			expect(projectSelectionOf(all)).toStrictEqual({ repositorySelection: "ALL" });
+
+			const again = wizardReducer(all, { type: "SET_PROJECT_SCOPE", scope: "SELECTED" });
+			expect(projectSelectionOf(again)).toStrictEqual({
+				repositorySelection: "SELECTED",
+				selectedProjectIds: [11, 12],
+			});
+		});
+
+		it("cannot send selected projects until one is chosen, and again once the last is unchosen", () => {
+			const none = choosing();
+			expect(hasProjectChoice(none)).toBe(false);
+
+			const one = choosing(11);
+			expect(hasProjectChoice(one)).toBe(true);
+			const unchosen = wizardReducer(one, {
+				type: "SET_PROJECT_SELECTED",
+				projectId: 11,
+				selected: false,
+			});
+			expect(unchosen.selectedProjectIds).toStrictEqual([]);
+			expect(hasProjectChoice(unchosen)).toBe(false);
+		});
+
+		it("keeps one entry per project when it is chosen twice", () => {
+			const twice = wizardReducer(choosing(11), {
+				type: "SET_PROJECT_SELECTED",
+				projectId: 11,
+				selected: true,
+			});
+			expect(twice.selectedProjectIds).toStrictEqual([11]);
+		});
+
+		it("refuses a project ID the server would refuse", () => {
+			const state = choosing(11);
+			for (const projectId of [0, -3]) {
+				expect(
+					wizardReducer(state, { type: "SET_PROJECT_SELECTED", projectId, selected: true }),
+				).toBe(state);
+			}
+		});
+
+		it("chooses projects only on the configure step", () => {
+			const state = stateAt(2);
+			expect(wizardReducer(state, { type: "SET_PROJECT_SCOPE", scope: "SELECTED" })).toBe(state);
+			expect(
+				wizardReducer(state, { type: "SET_PROJECT_SELECTED", projectId: 11, selected: true }),
+			).toBe(state);
+		});
+
+		it("forgets the projects when the user goes back to choose a group or a token", () => {
+			const toGroups = wizardReducer(choosing(11), { type: "GO_BACK" });
+			expect(toGroups.step).toBe(2);
+			expect(toGroups.projectScope).toBe("ALL");
+			expect(toGroups.selectedProjectIds).toStrictEqual([]);
+
+			const toToken = wizardReducer(stateAt(2, { selectedProjectIds: [11] }), { type: "GO_BACK" });
+			expect(toToken.selectedProjectIds).toStrictEqual([]);
+
+			const newToken = wizardReducer(stateAt(1, { selectedProjectIds: [11] }), {
+				type: "SET_PAT",
+				value: "glpat-other",
+			});
+			expect(newToken.projectScope).toBe("ALL");
+			expect(newToken.selectedProjectIds).toStrictEqual([]);
+		});
+
+		it("takes a project list only for the current token and group", () => {
+			const state = stateAt(3, { personalAccessToken: "glpat-now" });
+			const current = {
+				personalAccessToken: "glpat-now",
+				groupFullPath: sampleGroup.fullPath,
+			};
+			expect(isForCurrentGroup(state, current)).toBe(true);
+			expect(isForCurrentGroup(state, { ...current, personalAccessToken: "glpat-then" })).toBe(
+				false,
+			);
+			expect(isForCurrentGroup(state, { ...current, groupFullPath: "ls1intum/artemis" })).toBe(
+				false,
+			);
 		});
 	});
 

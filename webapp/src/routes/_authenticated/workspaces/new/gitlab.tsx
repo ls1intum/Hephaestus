@@ -8,17 +8,25 @@ import {
 	createWorkspaceMutation,
 	getProvidersOptions,
 	listGitLabGroupsMutation,
+	listGitLabProjectsMutation,
 	listIdentityProvidersOptions,
 	listWorkspacesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type { WorkspaceListItem } from "@/api/types.gen";
 import { ConfigureWorkspaceStep } from "@/components/create-workspace/ConfigureWorkspaceStep";
 import { ConnectGitLabStep } from "@/components/create-workspace/ConnectGitLabStep";
+import {
+	type ProjectChoices,
+	ProjectScopeField,
+} from "@/components/create-workspace/ProjectScopeField";
 import { workspaceDetailsSchema } from "@/components/create-workspace/schemas";
 import { SelectGroupStep } from "@/components/create-workspace/SelectGroupStep";
 import {
 	createInitialWizardState,
+	hasProjectChoice,
+	isForCurrentGroup,
 	isForCurrentToken,
+	projectSelectionOf,
 	WizardContext,
 	type WizardStep,
 	wizardReducer,
@@ -43,7 +51,10 @@ const STEP_META: Record<WizardStep, { title: string; description: string }> = {
 		description: "Enter an access token for the GitLab instance you will monitor.",
 	},
 	2: { title: "Select a group", description: "Choose the GitLab group to monitor." },
-	3: { title: "Configure workspace", description: "Set a name and URL slug for your workspace." },
+	3: {
+		title: "Configure workspace",
+		description: "Name your workspace and choose which projects it monitors.",
+	},
 };
 
 interface GitLabProvider {
@@ -240,6 +251,45 @@ function GitLabWizard({ serverUrl }: { serverUrl: string }) {
 	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step].title}`;
 
 	const listGroups = useMutation(listGitLabGroupsMutation());
+	// A POST, so the token travels in the body and never in a URL or a cache key.
+	const listProjects = useMutation(listGitLabProjectsMutation());
+
+	const readProjects = (page: number, search: string) => {
+		if (!state.selectedGroup) {
+			return;
+		}
+		listProjects.mutate({
+			body: {
+				personalAccessToken: state.personalAccessToken,
+				serverUrl: state.serverUrl,
+				groupFullPath: state.selectedGroup.fullPath,
+			},
+			query: hasText(search) ? { page, search } : { page },
+		});
+	};
+
+	// Only a list read with the current token and group stands for this choice; an answer for an
+	// earlier one lends it no projects.
+	const projectsRead =
+		listProjects.variables !== undefined && isForCurrentGroup(state, listProjects.variables.body)
+			? listProjects.variables
+			: undefined;
+	let projectChoices: ProjectChoices = { status: "loading" };
+	if (projectsRead !== undefined && listProjects.isError) {
+		projectChoices = {
+			status: "error",
+			error: listProjects.error,
+			onRetry: () => listProjects.mutate(projectsRead),
+		};
+	} else if (projectsRead !== undefined && listProjects.isSuccess) {
+		projectChoices = {
+			status: "ready",
+			projects: listProjects.data.projects,
+			page: projectsRead.query?.page ?? 1,
+			nextPage: listProjects.data.nextPage,
+			search: projectsRead.query?.search ?? "",
+		};
+	}
 
 	const createWorkspace = useMutation({
 		...createWorkspaceMutation(),
@@ -268,6 +318,7 @@ function GitLabWizard({ serverUrl }: { serverUrl: string }) {
 	const canSubmit =
 		state.step === 3 &&
 		state.selectedGroup !== null &&
+		hasProjectChoice(state) &&
 		workspaceDetailsSchema.safeParse({
 			displayName: state.displayName,
 			workspaceSlug: state.workspaceSlug,
@@ -301,6 +352,10 @@ function GitLabWizard({ serverUrl }: { serverUrl: string }) {
 		if (state.step === 2) {
 			listGroups.reset();
 		}
+		// The projects belong to the group being left; a list still on its way is dropped with them.
+		if (state.step === 3) {
+			listProjects.reset();
+		}
 		dispatch({ type: "GO_BACK" });
 	};
 
@@ -317,6 +372,7 @@ function GitLabWizard({ serverUrl }: { serverUrl: string }) {
 				kind: "GITLAB",
 				personalAccessToken: state.personalAccessToken,
 				serverUrl: state.serverUrl,
+				...projectSelectionOf(state),
 			},
 		});
 	};
@@ -352,7 +408,29 @@ function GitLabWizard({ serverUrl }: { serverUrl: string }) {
 				<WizardContext.Provider value={wizardContextValue}>
 					{state.step === 1 && <ConnectGitLabStep />}
 					{state.step === 2 && <SelectGroupStep />}
-					{state.step === 3 && <ConfigureWorkspaceStep />}
+					{state.step === 3 && (
+						<ConfigureWorkspaceStep
+							projects={
+								<ProjectScopeField
+									scope={state.projectScope}
+									onScopeChange={(scope) => {
+										dispatch({ type: "SET_PROJECT_SCOPE", scope });
+										// The list is read on first need; all projects needs none.
+										if (scope === "SELECTED" && projectsRead === undefined) {
+											readProjects(1, "");
+										}
+									}}
+									selectedIds={state.selectedProjectIds}
+									onSelectedChange={(projectId, selected) =>
+										dispatch({ type: "SET_PROJECT_SELECTED", projectId, selected })
+									}
+									choices={projectChoices}
+									onSearch={(search) => readProjects(1, search)}
+									onPageChange={(page) => readProjects(page, projectsRead?.query?.search ?? "")}
+								/>
+							}
+						/>
+					)}
 				</WizardContext.Provider>
 			</div>
 

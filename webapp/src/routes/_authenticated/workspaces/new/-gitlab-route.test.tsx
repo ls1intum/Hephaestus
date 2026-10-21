@@ -7,6 +7,8 @@ import type {
 	CreateWorkspaceRequest,
 	GitLabPreflightRequest,
 	GitLabPreflightResponse,
+	GitLabProject,
+	GitLabProjectPage,
 } from "@/api/types.gen";
 import { identityProviders } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
@@ -30,17 +32,55 @@ function created(body: CreateWorkspaceRequest) {
 	};
 }
 
+const project = (id: number, name: string, group: string): GitLabProject => ({
+	id,
+	name,
+	fullPath: `${group}/${name.toLowerCase()}`,
+});
+
+/** The projects each group's token can read, in path order. */
+const PROJECTS: Record<string, GitLabProject[]> = {
+	"ls1intum/hephaestus": [
+		project(11, "API", "ls1intum/hephaestus"),
+		project(12, "Docs", "ls1intum/hephaestus"),
+		project(13, "Web", "ls1intum/hephaestus"),
+	],
+	"ls1intum/artemis": [project(21, "Server", "ls1intum/artemis")],
+};
+
+/** Small pages, so a test can step through them. */
+const PROJECT_PAGE_SIZE = 2;
+
+/** The server's rule for a GitLab request's project choice: IDs exactly with SELECTED, each positive. */
+function consistentSelection({ repositorySelection, selectedProjectIds }: CreateWorkspaceRequest) {
+	if (repositorySelection !== "SELECTED") {
+		return selectedProjectIds === undefined;
+	}
+	return (
+		selectedProjectIds !== undefined &&
+		selectedProjectIds.length > 0 &&
+		selectedProjectIds.every((id) => id > 0)
+	);
+}
+
 /**
  * The server creates GitLab workspaces on `instance`. Every token validates; the first validation
- * answers only once `firstPreflightHeld` settles.
+ * answers only once `firstPreflightHeld` settles, and the first project list once
+ * `firstProjectsHeld` does.
  */
 function serveGitLab({
 	instance = lrz,
 	firstPreflightHeld,
-}: { instance?: string; firstPreflightHeld?: Promise<void> } = {}) {
+	firstProjectsHeld,
+}: {
+	instance?: string;
+	firstPreflightHeld?: Promise<void>;
+	firstProjectsHeld?: Promise<void>;
+} = {}) {
 	const requests = {
 		preflight: [] as GitLabPreflightRequest[],
 		groups: [] as GitLabPreflightRequest[],
+		projects: [] as { body: GitLabPreflightRequest; url: URL }[],
 		create: [] as CreateWorkspaceRequest[],
 	};
 	server.use(
@@ -67,18 +107,68 @@ function serveGitLab({
 			"*/workspaces/gitlab/groups",
 			async ({ request }) => {
 				requests.groups.push(await request.json());
-				return HttpResponse.json([{ id: 1, name: "Hephaestus", fullPath: "ls1intum/hephaestus" }]);
+				return HttpResponse.json([
+					{ id: 1, name: "Hephaestus", fullPath: "ls1intum/hephaestus" },
+					{ id: 2, name: "Artemis", fullPath: "ls1intum/artemis" },
+				]);
+			},
+		),
+		http.post<PathParams, GitLabPreflightRequest>(
+			"*/workspaces/gitlab/projects",
+			async ({ request }) => {
+				const body = await request.json();
+				const url = new URL(request.url);
+				requests.projects.push({ body, url });
+				if (requests.projects.length === 1) {
+					await firstProjectsHeld;
+				}
+				const page = Number(url.searchParams.get("page") ?? "1");
+				const search = (url.searchParams.get("search") ?? "").toLowerCase();
+				const matching = (PROJECTS[body.groupFullPath ?? ""] ?? []).filter((candidate) =>
+					candidate.name.toLowerCase().includes(search),
+				);
+				const end = page * PROJECT_PAGE_SIZE;
+				return HttpResponse.json({
+					projects: matching.slice(end - PROJECT_PAGE_SIZE, end),
+					...(matching.length > end ? { nextPage: page + 1 } : {}),
+				} satisfies GitLabProjectPage);
 			},
 		),
 		http.post<PathParams, CreateWorkspaceRequest>("*/workspaces", async ({ request }) => {
 			const body = await request.json();
 			requests.create.push(body);
+			if (!consistentSelection(body)) {
+				return HttpResponse.json(
+					{ title: "Bad Request", status: 400, detail: "Inconsistent project choice." },
+					{ status: 400, headers: { "Content-Type": "application/problem+json" } },
+				);
+			}
 			return HttpResponse.json(created(body), { status: 201 });
 		}),
 		// The list the wizard refreshes once the workspace exists.
 		http.get("*/workspaces", () => HttpResponse.json(requests.create.map(created))),
 	);
 	return requests;
+}
+
+/** A provider cursor may name a page other than the next integer. */
+function serveNoncontiguousProjectPages() {
+	const pages: (string | null)[] = [];
+	server.use(
+		http.post("*/workspaces/gitlab/projects", ({ request }) => {
+			const page = new URL(request.url).searchParams.get("page");
+			pages.push(page);
+			return HttpResponse.json(
+				page === "1"
+					? {
+							projects: [project(11, "API", "ls1intum/hephaestus")],
+							nextPage: 3,
+						}
+					: { projects: [project(13, "Web", "ls1intum/hephaestus")] },
+			);
+		}),
+	);
+	return pages;
 }
 
 describe("GitLab workspace wizard", () => {
@@ -240,5 +330,210 @@ describe("GitLab workspace wizard", () => {
 		);
 
 		await screen.findByText(detail);
+	});
+});
+
+/** Validates a token, chooses `group` and arrives at the configure step. */
+async function configure(user: ReturnType<typeof userEvent.setup>, group = /Hephaestus/u) {
+	await user.type(
+		await screen.findByLabelText("Access token", {}, ROUTE_RENDER_WAIT),
+		"glpat-secret",
+	);
+	await user.click(screen.getByRole("button", { name: "Validate token" }));
+	await screen.findByText("Token valid");
+	await user.click(screen.getByRole("button", { name: "Next" }));
+	await user.click(await screen.findByRole("radio", { name: group }));
+	await user.click(screen.getByRole("button", { name: "Next" }));
+	await screen.findByRole("radio", { name: /^All projects/u });
+}
+
+function createButton() {
+	return within(screen.getByRole("main")).getByRole<HTMLButtonElement>("button", {
+		name: "Create workspace",
+	});
+}
+
+describe("GitLab workspace wizard: projects to monitor", () => {
+	it("creates a workspace for all projects without listing them or sending project IDs", async () => {
+		const user = userEvent.setup();
+		const requests = serveGitLab();
+		renderRouteAt("/workspaces/new/gitlab");
+		await configure(user);
+
+		expect(screen.getByRole("radio", { name: /^All projects/u }).getAttribute("aria-checked")).toBe(
+			"true",
+		);
+		await user.click(createButton());
+
+		await screen.findByText("Workspace “Hephaestus” created");
+		expect(requests.projects).toStrictEqual([]);
+		expect(requests.create).toHaveLength(1);
+		expect(requests.create[0]?.repositorySelection).toBe("ALL");
+		expect(requests.create[0]).not.toHaveProperty("selectedProjectIds");
+	});
+
+	it("creates a workspace for projects chosen across pages and a search, with the token only in the body", async () => {
+		const user = userEvent.setup();
+		const requests = serveGitLab();
+		renderRouteAt("/workspaces/new/gitlab");
+		await configure(user);
+
+		await user.click(screen.getByRole("radio", { name: /^Selected projects/u }));
+		await user.click(await screen.findByRole("checkbox", { name: "API" }));
+		await user.click(screen.getByRole("button", { name: "Next page" }));
+		await user.click(await screen.findByRole("checkbox", { name: "Web" }));
+
+		// A search reads its first page again, and what was chosen on other pages stays chosen.
+		await user.type(screen.getByRole("searchbox", { name: "Search projects" }), "api");
+		await user.click(screen.getByRole("button", { name: "Search" }));
+		await waitFor(() => {
+			expect(screen.queryByRole("checkbox", { name: "Web" })).toBeNull();
+		});
+		const api = await screen.findByRole("checkbox", { name: "API" });
+		expect(api.getAttribute("aria-checked")).toBe("true");
+		screen.getByText("2 projects selected");
+
+		await user.click(createButton());
+		await screen.findByText("Workspace “Hephaestus” created");
+
+		expect(requests.create[0]).toMatchObject({
+			repositorySelection: "SELECTED",
+			selectedProjectIds: [11, 13],
+		});
+		expect(
+			requests.projects.map(({ body, url }) => ({
+				token: body.personalAccessToken,
+				group: body.groupFullPath,
+				page: url.searchParams.get("page"),
+				search: url.searchParams.get("search"),
+			})),
+		).toStrictEqual([
+			{ token: "glpat-secret", group: "ls1intum/hephaestus", page: "1", search: null },
+			{ token: "glpat-secret", group: "ls1intum/hephaestus", page: "2", search: null },
+			{ token: "glpat-secret", group: "ls1intum/hephaestus", page: "1", search: "api" },
+		]);
+		expect(requests.projects.some(({ url }) => url.href.includes("glpat"))).toBe(false);
+	});
+
+	it("asks for the page the server names next, not the one after the current page", async () => {
+		const user = userEvent.setup();
+		serveGitLab();
+		const pages = serveNoncontiguousProjectPages();
+		renderRouteAt("/workspaces/new/gitlab");
+		await configure(user);
+
+		await user.click(screen.getByRole("radio", { name: /^Selected projects/u }));
+		await screen.findByRole("checkbox", { name: "API" });
+		await user.click(screen.getByRole("button", { name: "Next page" }));
+
+		await screen.findByRole("checkbox", { name: "Web" });
+		expect(pages).toStrictEqual(["1", "3"]);
+		// The server named no page after this one.
+		expect(screen.getByRole<HTMLButtonElement>("button", { name: "Next page" }).disabled).toBe(
+			true,
+		);
+	});
+
+	it("waits for a chosen project before it creates, and sends none once all projects is chosen again", async () => {
+		const user = userEvent.setup();
+		const requests = serveGitLab();
+		renderRouteAt("/workspaces/new/gitlab");
+		await configure(user);
+
+		await user.click(screen.getByRole("radio", { name: /^Selected projects/u }));
+		await screen.findByRole("checkbox", { name: "API" });
+		screen.getByText("Choose at least one project, or monitor all projects.");
+		expect(createButton().disabled).toBe(true);
+
+		await user.click(screen.getByRole("checkbox", { name: "API" }));
+		expect(createButton().disabled).toBe(false);
+
+		// Back to all projects and to selected projects again: the choice and its list are still there.
+		await user.click(screen.getByRole("radio", { name: /^All projects/u }));
+		expect(screen.queryByRole("checkbox", { name: "API" })).toBeNull();
+		await user.click(screen.getByRole("radio", { name: /^Selected projects/u }));
+		expect(screen.getByRole("checkbox", { name: "API" }).getAttribute("aria-checked")).toBe("true");
+		expect(requests.projects).toHaveLength(1);
+
+		await user.click(screen.getByRole("radio", { name: /^All projects/u }));
+		await user.click(createButton());
+		await screen.findByText("Workspace “Hephaestus” created");
+		expect(requests.create[0]?.repositorySelection).toBe("ALL");
+		expect(requests.create[0]).not.toHaveProperty("selectedProjectIds");
+	});
+
+	it("shows no projects that answer for a group the user has left", async () => {
+		const user = userEvent.setup();
+		const hephaestusAnswer = deferred();
+		const requests = serveGitLab({ firstProjectsHeld: hephaestusAnswer.promise });
+		renderRouteAt("/workspaces/new/gitlab");
+		try {
+			await configure(user);
+			await user.click(screen.getByRole("radio", { name: /^Selected projects/u }));
+			await waitFor(() => expect(requests.projects).toHaveLength(1));
+
+			await user.click(screen.getByRole("button", { name: "Back to previous step" }));
+			await user.click(await screen.findByRole("radio", { name: /Artemis/u }));
+			await user.click(screen.getByRole("button", { name: "Next" }));
+			await user.click(await screen.findByRole("radio", { name: /^Selected projects/u }));
+			// The left group's list answers first, then the current one.
+			hephaestusAnswer.resolve();
+			await screen.findByRole("checkbox", { name: "Server" });
+
+			expect(screen.queryByRole("checkbox", { name: "API" })).toBeNull();
+			expect(requests.projects.map(({ body }) => body.groupFullPath)).toStrictEqual([
+				"ls1intum/hephaestus",
+				"ls1intum/artemis",
+			]);
+		} finally {
+			hephaestusAnswer.resolve();
+		}
+	});
+
+	it("keeps selected projects on a failed list, says why, and lists them on retry", async () => {
+		const user = userEvent.setup();
+		const requests = serveGitLab();
+		const detail = "GitLab did not answer. Try again in a moment.";
+		server.use(
+			http.post(
+				"*/workspaces/gitlab/projects",
+				() =>
+					HttpResponse.json(
+						{ title: "Bad Gateway", status: 502, detail },
+						{ status: 502, headers: { "Content-Type": "application/problem+json" } },
+					),
+				{ once: true },
+			),
+		);
+		renderRouteAt("/workspaces/new/gitlab");
+		await configure(user);
+
+		await user.click(screen.getByRole("radio", { name: /^Selected projects/u }));
+		await screen.findByText("We could not load the group’s projects");
+		screen.getByText(detail, { exact: false });
+		// No quiet fallback to every project: the choice stays, and nothing can be created yet.
+		expect(
+			screen.getByRole("radio", { name: /^Selected projects/u }).getAttribute("aria-checked"),
+		).toBe("true");
+		expect(createButton().disabled).toBe(true);
+
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByRole("checkbox", { name: "API" });
+		expect(requests.create).toStrictEqual([]);
+	});
+
+	it("says when no project matches a search, and still waits for a chosen project", async () => {
+		const user = userEvent.setup();
+		serveGitLab();
+		renderRouteAt("/workspaces/new/gitlab");
+		await configure(user);
+
+		await user.click(screen.getByRole("radio", { name: /^Selected projects/u }));
+		await screen.findByRole("checkbox", { name: "API" });
+		await user.type(screen.getByRole("searchbox", { name: "Search projects" }), "zzz");
+		await user.click(screen.getByRole("button", { name: "Search" }));
+
+		await screen.findByText("No matching projects on this page.");
+		expect(createButton().disabled).toBe(true);
 	});
 });

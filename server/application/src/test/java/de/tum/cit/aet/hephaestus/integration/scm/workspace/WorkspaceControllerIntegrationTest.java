@@ -106,6 +106,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                 owner.getId(),
                 IntegrationKind.GITLAB,
                 null,
+                null,
+                null,
                 null);
 
         // Anonymous state-changing request: the double-submit CSRF gate (ADR 0017) rejects it 403
@@ -137,6 +139,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                 owner.getId(),
                 IntegrationKind.GITHUB,
                 "ghp_dummy_token_for_test",
+                null,
+                null,
                 null);
 
         webTestClient
@@ -166,6 +170,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                 owner.getId(),
                 IntegrationKind.GITHUB,
                 "ghp_dummy_token_for_test",
+                null,
+                null,
                 null);
 
         WorkspaceDTO created = webTestClient
@@ -411,6 +417,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                 owner.getId(),
                 IntegrationKind.GITHUB,
                 "ghp_dummy_token_for_test",
+                null,
+                null,
                 null);
 
         ProblemDetail problem = webTestClient

@@ -34,8 +34,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuedependency.GitLabIssueDependencySyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.GitLabLabelSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.GitLabMilestoneSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectSyncService;
@@ -68,6 +71,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1106,6 +1110,211 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(monitors.findById(monitor.getId())).isEmpty();
         assertThat(repositories.findById(first.getId())).isPresent();
         assertThat(repositories.findById(second.getId())).isPresent();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"SELECTED,false", "SELECTED,true", "ALL,false"})
+    void shouldRelateOnlyTheLinkedProjectsIssueAndOnlyWhenTheWorkspaceMayReferToIt(
+            RepositorySelection selection, boolean monitorsLinkedProject) {
+        User owner = persistUser("links-owner");
+        Workspace own = workspace("links-own", owner);
+        own.setRepositorySelection(selection);
+        workspaces.saveAndFlush(own);
+        Workspace holder = workspace("links-holder", owner);
+        IdentityProvider source = provider("https://links.example.test");
+        connect(own, source);
+        connect(holder, source);
+        Repository ownRepository = repository(source, 8101L, "shared-org/links-own");
+        Repository linkedRepository = repository(source, 8102L, "shared-org/links-linked");
+        monitorOf(own, ownRepository);
+        monitorOf(holder, linkedRepository);
+        if (monitorsLinkedProject) monitorOf(own, linkedRepository);
+        // Both projects number their issues from 1, so #5 and #6 exist in each.
+        Issue linking = numberedIssue(ownRepository, 1, 810_101L);
+        Issue ownFive = numberedIssue(ownRepository, 5, 810_105L);
+        Issue ownSix = numberedIssue(ownRepository, 6, 810_106L);
+        Issue linkedFive = numberedIssue(linkedRepository, 5, 810_205L);
+        Issue linkedSix = numberedIssue(linkedRepository, 6, 810_206L);
+        linkedSix.getBlockedBy().add(linkedFive);
+        issues.saveAndFlush(linkedSix);
+        GitLabProjectAdmission.ProjectRead read =
+                projectAdmission.capture(own.getId(), ownRepository).orElseThrow();
+        GitLabTokenService tokens = mock(GitLabTokenService.class);
+        when(tokens.resolveServerUrl(own.getId())).thenReturn(source.getServerUrl());
+        when(tokens.getAccessToken(own.getId())).thenReturn("glpat-test");
+        String links = """
+                [{"iid":5,"project_id":8102,"link_type":"is_blocked_by"},
+                 {"iid":6,"project_id":8102,"link_type":"blocks"}]
+                """;
+        // GitLab answers only for #1; the other issues fail their read and stay as they are.
+        var dependencies = new GitLabIssueDependencySyncService(
+                issues,
+                repositories,
+                tokens,
+                mock(GitLabRateLimitTracker.class),
+                WebClient.builder()
+                        .exchangeFunction(request -> Mono.just(
+                                request.url().getPath().endsWith("/projects/8101/issues/1/links")
+                                        ? ClientResponse.create(HttpStatus.OK)
+                                                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                                                .body(links)
+                                                .build()
+                                        : ClientResponse.create(HttpStatus.NOT_FOUND)
+                                                .build())),
+                projectAdmission);
+
+        dependencies.syncDependenciesForRepository(own.getId(), ownRepository, null, read);
+
+        boolean related = selection == RepositorySelection.ALL || monitorsLinkedProject;
+        assertSoftly(softly -> {
+            softly.assertThat(blockerIds(linking))
+                    .containsExactlyInAnyOrderElementsOf(related ? List.of(linkedFive.getId()) : List.of());
+            softly.assertThat(blockerIds(linkedSix))
+                    .containsExactlyInAnyOrderElementsOf(
+                            related ? List.of(linkedFive.getId(), linking.getId()) : List.of(linkedFive.getId()));
+            softly.assertThat(blockerIds(ownFive)).isEmpty();
+            softly.assertThat(blockerIds(ownSix)).isEmpty();
+            softly.assertThat(issues.findAllIssuesByRepositoryId(linkedRepository.getId()))
+                    .extracting(Issue::getId)
+                    .containsExactlyInAnyOrder(linkedFive.getId(), linkedSix.getId());
+            softly.assertThat(monitors.findByWorkspaceIdAndNameWithOwner(
+                            holder.getId(), linkedRepository.getNameWithOwner()))
+                    .isPresent();
+        });
+    }
+
+    @ParameterizedTest
+    @CsvSource({"SELECTED,REPORTED", "SELECTED,EMPTY", "SELECTED,NO_BODY", "ALL,REPORTED", "ALL,EMPTY", "ALL,NO_BODY"})
+    void shouldKeepAnOutOfScopeEdgeAnotherWorkspaceStoredWhileClearingStaleInScopeEdges(
+            RepositorySelection selection, String answer) {
+        User owner = persistUser("edges-owner");
+        Workspace own = workspace("edges-own", owner);
+        own.setRepositorySelection(selection);
+        workspaces.saveAndFlush(own);
+        Workspace holder = workspace("edges-holder", owner);
+        holder.setRepositorySelection(RepositorySelection.ALL);
+        workspaces.saveAndFlush(holder);
+        IdentityProvider source = provider("https://edges.example.test");
+        connect(own, source);
+        connect(holder, source);
+        Repository sourceA = repository(source, 8201L, "shared-org/edges-a");
+        Repository sourceB = repository(source, 8202L, "shared-org/edges-b");
+        monitorOf(own, sourceA);
+        monitorOf(holder, sourceA);
+        monitorOf(holder, sourceB);
+        Issue blocked = numberedIssue(sourceA, 1, 820_101L);
+        Issue ownBlocker = numberedIssue(sourceA, 5, 820_105L);
+        Issue sharedBlocker = numberedIssue(sourceB, 5, 820_205L);
+        Issue sharedBlocked = numberedIssue(sourceB, 6, 820_206L);
+        GitLabTokenService tokens = mock(GitLabTokenService.class);
+        for (Workspace reader : List.of(own, holder)) {
+            when(tokens.resolveServerUrl(reader.getId())).thenReturn(source.getServerUrl());
+            when(tokens.getAccessToken(reader.getId())).thenReturn("glpat-test");
+        }
+
+        // The workspace that follows both projects stores the edges GitLab reports for A#1.
+        dependencyLinks(tokens, 8201L, """
+                        [{"iid":5,"project_id":8202,"link_type":"is_blocked_by"},
+                         {"iid":5,"project_id":8201,"link_type":"is_blocked_by"},
+                         {"iid":6,"project_id":8202,"link_type":"blocks"}]
+                        """)
+                .syncDependenciesForRepository(
+                        holder.getId(),
+                        sourceA,
+                        null,
+                        projectAdmission.capture(holder.getId(), sourceA).orElseThrow());
+        assertThat(blockerIds(blocked)).containsExactlyInAnyOrder(sharedBlocker.getId(), ownBlocker.getId());
+        assertThat(blockerIds(sharedBlocked)).containsExactly(blocked.getId());
+
+        // GitLab later drops A#1's link to A#5 and still reports B#5, or reports no links, or answers without a body.
+        String links =
+                switch (answer) {
+                    case "REPORTED" -> "[{\"iid\":5,\"project_id\":8202,\"link_type\":\"is_blocked_by\"}]";
+                    case "EMPTY" -> "[]";
+                    case "NO_BODY" -> null;
+                    default -> throw new IllegalArgumentException(answer);
+                };
+        dependencyLinks(tokens, 8201L, links)
+                .syncDependenciesForRepository(
+                        own.getId(),
+                        sourceA,
+                        null,
+                        projectAdmission.capture(own.getId(), sourceA).orElseThrow());
+
+        // No body says nothing, so both edges stay. A workspace that may not refer to B cannot tell whether B's edge
+        // is gone, so it stays; one that may, and every stale in-scope edge, follow GitLab.
+        List<Long> expected =
+                switch (answer) {
+                    case "NO_BODY" -> List.of(sharedBlocker.getId(), ownBlocker.getId());
+                    case "EMPTY" ->
+                        selection == RepositorySelection.SELECTED ? List.of(sharedBlocker.getId()) : List.of();
+                    default -> List.of(sharedBlocker.getId());
+                };
+        assertSoftly(softly -> {
+            softly.assertThat(blockerIds(blocked)).containsExactlyInAnyOrderElementsOf(expected);
+            softly.assertThat(blockerIds(sharedBlocked)).containsExactly(blocked.getId());
+            softly.assertThat(issues.findAllIssuesByRepositoryId(sourceB.getId()))
+                    .extracting(Issue::getId)
+                    .containsExactlyInAnyOrder(sharedBlocker.getId(), sharedBlocked.getId());
+            softly.assertThat(monitors.findByWorkspaceIdAndNameWithOwner(holder.getId(), sourceA.getNameWithOwner()))
+                    .isPresent();
+            softly.assertThat(monitors.findByWorkspaceIdAndNameWithOwner(holder.getId(), sourceB.getNameWithOwner()))
+                    .isPresent();
+        });
+    }
+
+    /**
+     * The dependency sync over a GitLab that answers only for issue #1 of {@code projectId}: with {@code links}, or
+     * with 204 and no body when {@code links} is null.
+     */
+    private GitLabIssueDependencySyncService dependencyLinks(
+            GitLabTokenService tokens, long projectId, @Nullable String links) {
+        return new GitLabIssueDependencySyncService(
+                issues,
+                repositories,
+                tokens,
+                mock(GitLabRateLimitTracker.class),
+                WebClient.builder()
+                        .exchangeFunction(request -> Mono.just(
+                                !request.url().getPath().endsWith("/projects/" + projectId + "/issues/1/links")
+                                        ? ClientResponse.create(HttpStatus.NOT_FOUND)
+                                                .build()
+                                        : links == null
+                                                ? ClientResponse.create(HttpStatus.NO_CONTENT)
+                                                        .build()
+                                                : ClientResponse.create(HttpStatus.OK)
+                                                        .header(
+                                                                HttpHeaders.CONTENT_TYPE,
+                                                                MediaType.APPLICATION_JSON_VALUE)
+                                                        .body(links)
+                                                        .build())),
+                projectAdmission);
+    }
+
+    private List<Long> blockerIds(Issue issue) {
+        return issues.findByIdWithBlockedBy(issue.getId()).orElseThrow().getBlockedBy().stream()
+                .map(Issue::getId)
+                .toList();
+    }
+
+    private RepositoryToMonitor monitorOf(Workspace workspace, Repository repository) {
+        RepositoryToMonitor monitor = new RepositoryToMonitor();
+        monitor.setWorkspace(workspace);
+        monitor.setNameWithOwner(repository.getNameWithOwner());
+        monitor.setNativeId(repository.getNativeId());
+        return monitors.saveAndFlush(monitor);
+    }
+
+    private Issue numberedIssue(Repository repository, int number, long nativeId) {
+        Issue issue = new Issue();
+        issue.setProvider(repository.getProvider());
+        issue.setRepository(repository);
+        issue.setNativeId(nativeId);
+        issue.setNumber(number);
+        issue.setTitle("Issue " + number);
+        issue.setState(Issue.State.OPEN);
+        issue.setHtmlUrl(repository.getHtmlUrl() + "/issues/" + number);
+        return issues.saveAndFlush(issue);
     }
 
     private Workspace workspace(String slug, User owner) {

@@ -1328,6 +1328,14 @@ export type CreateWorkspaceRequest = {
      */
     personalAccessToken?: string;
     /**
+     * GitLab only. ALL monitors every project of the group, including ones created later; SELECTED monitors only selectedProjectIds. Omitted means ALL.
+     */
+    repositorySelection?: 'ALL' | 'SELECTED';
+    /**
+     * GitLab project IDs to monitor. Required, and only allowed, when repositorySelection is SELECTED. The server checks each with the token.
+     */
+    selectedProjectIds?: Array<number>;
+    /**
      * For GitLab, the default GitLab instance this server reads from, which is also used when omitted; any other instance is refused.
      */
     serverUrl?: string;
@@ -1822,6 +1830,42 @@ export type GitLabPreflightResponse = {
      * Whether the token is valid
      */
     valid: boolean;
+};
+
+/**
+ * GitLab project of a group that the provided PAT can read
+ */
+export type GitLabProject = {
+    /**
+     * Full project path including its groups
+     */
+    fullPath: string;
+    /**
+     * GitLab project numeric ID
+     */
+    id: number;
+    /**
+     * Project display name
+     */
+    name: string;
+    /**
+     * Project web URL
+     */
+    webUrl?: string;
+};
+
+/**
+ * One page of the projects of a GitLab group that the provided PAT can read
+ */
+export type GitLabProjectPage = {
+    /**
+     * The page that follows this one; absent on the last page
+     */
+    nextPage?: number;
+    /**
+     * Projects on this page, ordered by path
+     */
+    projects: Array<GitLabProject>;
 };
 
 /**
@@ -9966,6 +10010,25 @@ export type GitLabPreflightResponses = {
 };
 
 export type GitLabPreflightResponse2 = GitLabPreflightResponses[keyof GitLabPreflightResponses];
+
+export type ListGitLabProjectsData = {
+    body: GitLabPreflightRequest;
+    path?: never;
+    query?: {
+        page?: number;
+        search?: string;
+    };
+    url: '/workspaces/gitlab/projects';
+};
+
+export type ListGitLabProjectsResponses = {
+    /**
+     * One page of projects; nextPage is absent on the last page
+     */
+    200: GitLabProjectPage;
+};
+
+export type ListGitLabProjectsResponse = ListGitLabProjectsResponses[keyof ListGitLabProjectsResponses];
 
 export type GetProvidersData = {
     body?: never;

@@ -11,11 +11,15 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.connection.identity.GitLabWorkspaceInstance;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryIdentityLookup.RepositoryIdentity;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SelectedRepositoryVerifier;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceSlugConflictException;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -41,6 +45,7 @@ public class WorkspaceService {
 
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final CurrentAccountUsers currentAccountUsers;
     private final GitLabWorkspaceInstance gitLabWorkspaceInstance;
 
@@ -49,27 +54,32 @@ public class WorkspaceService {
     private final WorkspaceSettingsService workspaceSettingsService;
     private final MembershipService workspaceMembershipService;
     private final ConnectionService connectionService;
+    private final List<SelectedRepositoryVerifier> repositoryVerifiers;
 
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
     public WorkspaceService(
             WorkspaceRepository workspaceRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
             CurrentAccountUsers currentAccountUsers,
             GitLabWorkspaceInstance gitLabWorkspaceInstance,
             WorkspaceSlugService workspaceSlugService,
             WorkspaceSettingsService workspaceSettingsService,
             MembershipService workspaceMembershipService,
             ConnectionService connectionService,
+            List<SelectedRepositoryVerifier> repositoryVerifiers,
             ApplicationEventPublisher eventPublisher,
             PlatformTransactionManager transactionManager) {
         this.workspaceRepository = workspaceRepository;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.currentAccountUsers = currentAccountUsers;
         this.gitLabWorkspaceInstance = gitLabWorkspaceInstance;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
         this.workspaceMembershipService = workspaceMembershipService;
         this.connectionService = connectionService;
+        this.repositoryVerifiers = repositoryVerifiers;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
@@ -118,15 +128,47 @@ public class WorkspaceService {
      * Creates a workspace from a DTO and provisions the matching {@link IntegrationKind}
      * Connection. The PAT travels through {@code ConnectionService.rotateBearerToken} which
      * encrypts at rest under the registry's AES-256-GCM converter.
+     *
+     * <p>Selected GitLab projects are checked with GitLab before the creation transaction opens, so
+     * no provider request holds it open and a refused project creates nothing.
      */
-    @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
-        return createWorkspaceInTransaction(request);
+        @Nullable List<RepositoryIdentity> selected = verifiedSelection(request);
+        return Objects.requireNonNull(
+                transactionTemplate.execute(status -> createWorkspaceInTransaction(request, selected)));
+    }
+
+    /**
+     * The projects a GitLab request selected, as GitLab reports them to the request's token, or
+     * {@code null} when the workspace follows every project of its group.
+     */
+    private @Nullable List<RepositoryIdentity> verifiedSelection(CreateWorkspaceRequestDTO request) {
+        if (!request.hasConsistentRepositorySelection()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Choose all projects without project IDs, or choose SELECTED with at least one project ID."
+                            + " Only GitLab workspaces choose projects.");
+        }
+        List<Long> projectIds = request.selectedProjectIds();
+        if (request.repositorySelection() != RepositorySelection.SELECTED || projectIds == null) {
+            return null;
+        }
+        SelectedRepositoryVerifier verifier = repositoryVerifiers.stream()
+                .filter(candidate -> candidate.kind() == IntegrationKind.GITLAB)
+                .findFirst()
+                .orElseThrow(
+                        () -> new IllegalStateException("GitLab project selection is not available on this server"));
+        return verifier.verify(
+                Objects.requireNonNull(request.personalAccessToken(), "personalAccessToken is required"),
+                request.serverUrl(),
+                Objects.requireNonNull(request.accountLogin(), "accountLogin is required"),
+                new LinkedHashSet<>(projectIds));
     }
 
     // Trusted in-process provisioners still supply an owner without an HTTP authentication context.
     @SuppressWarnings("removal")
-    private Workspace createWorkspaceInTransaction(CreateWorkspaceRequestDTO request) {
+    private Workspace createWorkspaceInTransaction(
+            CreateWorkspaceRequestDTO request, @Nullable List<RepositoryIdentity> selected) {
         String workspaceSlug = Objects.requireNonNull(request.workspaceSlug(), "workspaceSlug is required");
         String displayName = Objects.requireNonNull(request.displayName(), "displayName is required");
         String accountLogin = Objects.requireNonNull(request.accountLogin(), "accountLogin is required");
@@ -172,9 +214,18 @@ public class WorkspaceService {
                 createWorkspaceInTransaction(workspaceSlug, displayName, accountLogin, accountType, ownerUserId);
 
         if (isGitLab) {
-            // GitLab PAT workspaces monitor all repositories in the group by default.
-            workspace.setRepositorySelection(RepositorySelection.ALL);
+            // GitLab PAT workspaces monitor all repositories in the group by default. Initialization
+            // starts once the connection's ACTIVE transition commits, so a selection is in place first.
+            workspace.setRepositorySelection(selected == null ? RepositorySelection.ALL : RepositorySelection.SELECTED);
             workspaceRepository.save(workspace);
+            for (RepositoryIdentity project : selected == null ? List.<RepositoryIdentity>of() : selected) {
+                RepositoryToMonitor monitor = new RepositoryToMonitor();
+                monitor.setNameWithOwner(project.fullPath());
+                monitor.setNativeId(project.nativeId());
+                monitor.setWorkspace(workspace);
+                repositoryToMonitorRepository.save(monitor);
+                workspace.getRepositoriesToMonitor().add(monitor);
+            }
 
             connectionService.provisionPatConnection(
                     workspace,
@@ -213,8 +264,7 @@ public class WorkspaceService {
      * @return the created workspace
      */
     public Workspace createWorkspaceWithInitialization(CreateWorkspaceRequestDTO request) {
-        Workspace workspace =
-                Objects.requireNonNull(transactionTemplate.execute(status -> createWorkspaceInTransaction(request)));
+        Workspace workspace = createWorkspace(request);
 
         eventPublisher.publishEvent(new WorkspaceCreatedEvent(
                 workspace.getId(), Objects.requireNonNull(request.kind(), "kind is required")));

@@ -3351,6 +3351,42 @@ paths:
       summary: Validate a GitLab PAT before workspace creation
       tags:
       - git-lab-preflight
+  /workspaces/gitlab/projects:
+    post:
+      operationId: listGitLabProjects
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 1
+          exclusiveMinimum: 0
+      - in: query
+        name: search
+        required: false
+        schema:
+          type: string
+          maxLength: 255
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitLabPreflightRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitLabProjectPage"
+          description: One page of projects; nextPage is absent on the last page
+      summary: List one page of the projects in a GitLab group and its subgroups that
+        a PAT can read
+      tags:
+      - git-lab-preflight
   /workspaces/providers:
     get:
       description: Returns available workspace providers with their configuration.
@@ -14824,6 +14860,23 @@ components:
           example: glpat-...
           maxLength: 512
           minLength: 0
+        repositorySelection:
+          type: string
+          description: "GitLab only. ALL monitors every project of the group, including\
+            \ ones created later; SELECTED monitors only selectedProjectIds. Omitted\
+            \ means ALL."
+          enum:
+          - ALL
+          - SELECTED
+        selectedProjectIds:
+          type: array
+          description: "GitLab project IDs to monitor. Required, and only allowed,\
+            \ when repositorySelection is SELECTED. The server checks each with the\
+            \ token."
+          items:
+            type: integer
+            format: int64
+            exclusiveMinimum: 0
         serverUrl:
           type: string
           description: "For GitLab, the default GitLab instance this server reads\
@@ -16116,6 +16169,44 @@ components:
           description: Whether the token is valid
       required:
       - valid
+    GitLabProject:
+      type: object
+      description: GitLab project of a group that the provided PAT can read
+      properties:
+        fullPath:
+          type: string
+          description: Full project path including its groups
+          example: my-org/my-team/my-project
+        id:
+          type: integer
+          format: int64
+          description: GitLab project numeric ID
+        name:
+          type: string
+          description: Project display name
+        webUrl:
+          type: string
+          description: Project web URL
+      required:
+      - fullPath
+      - id
+      - name
+    GitLabProjectPage:
+      type: object
+      description: One page of the projects of a GitLab group that the provided PAT
+        can read
+      properties:
+        nextPage:
+          type: integer
+          format: int32
+          description: The page that follows this one; absent on the last page
+        projects:
+          type: array
+          description: "Projects on this page, ordered by path"
+          items:
+            $ref: "#/components/schemas/GitLabProject"
+      required:
+      - projects
     GitLabProvider:
       type: object
       description: GitLab provider configuration

@@ -62,6 +62,8 @@ class MembershipAutoSeederIntegrationTest extends AbstractWorkspaceIntegrationTe
                 owner.getId(),
                 IntegrationKind.GITHUB,
                 "ghp-auto-seed",
+                null,
+                null,
                 null));
         membershipRepository.deleteAll(membershipRepository.findByWorkspace_Id(workspace.getId()));
         MembershipAutoSeeder seeder =

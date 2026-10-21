@@ -73,8 +73,9 @@ public class GitLabRepositoryMonitors {
     }
 
     /**
-     * Brings the workspace's monitors of {@code repositories} in line with them and monitors every one it does not
-     * monitor yet, as when the workspace is first set up; returns how many monitors were created.
+     * Brings the workspace's monitors of {@code repositories} in line with them and, unless the workspace selected its
+     * projects, monitors every one it does not monitor yet, as when the workspace is first set up; returns how many
+     * monitors were created.
      */
     @Transactional
     public int monitorAll(Workspace workspace, Collection<Repository> repositories) {
@@ -125,9 +126,9 @@ public class GitLabRepositoryMonitors {
                     .sorted(Comparator.comparing(RepositoryToMonitor::getId))
                     .toList();
             if (same.isEmpty()) {
-                if (createAll
-                        || (policy.getRepositorySelection() != RepositorySelection.SELECTED
-                                && workspaceScopeFilter.isGroupRepositoryAllowed(group, path))) {
+                // A workspace that selected its projects monitors only those it already monitors.
+                if (policy.getRepositorySelection() != RepositorySelection.SELECTED
+                        && (createAll || workspaceScopeFilter.isGroupRepositoryAllowed(group, path))) {
                     RepositoryToMonitor monitor = new RepositoryToMonitor();
                     monitor.setNameWithOwner(path);
                     monitor.setNativeId(nativeId);
