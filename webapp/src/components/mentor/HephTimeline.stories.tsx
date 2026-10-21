@@ -329,24 +329,35 @@ export const FollowUpsQueued: Story = {
 
 /**
  * Presses Next and checks that `row` took the change in place while the view stayed where the reader
- * was: the scroller sees no new row, so it has nothing to scroll to.
+ * was: the scroller sees no new row, so it has nothing to scroll to. `anchor` is the sent question
+ * that the opening view puts at its peek; the scroller can still be moving it there after the first
+ * scroll, so the view is read only once it is in place.
  */
 async function expectViewKept(
 	viewport: HTMLElement,
 	row: HTMLElement,
 	pressNext: () => Promise<void>,
 	changed: () => Promise<void>,
+	anchor?: HTMLElement,
 ) {
 	await waitFor(async () => {
 		await expect(viewport.scrollTop).toBeGreaterThan(0);
 	});
-	const { scrollTop } = viewport;
+	if (anchor !== undefined) {
+		await waitFor(async () => {
+			const anchorOffset =
+				anchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+			await expect(Math.round(anchorOffset)).toBe(PEEK);
+		});
+	}
+	const rowOffset = row.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
 	await pressNext();
 	await waitFor(changed);
 	await nextFrame();
 	await nextFrame();
 	await expect(row).toBeVisible();
-	await expect(viewport.scrollTop).toBeGreaterThanOrEqual(scrollTop - 1);
+	const nextOffset = row.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+	await expect(Math.abs(nextOffset - rowOffset)).toBeLessThanOrEqual(1);
 }
 
 const SHORT_VIEW: Decorator[] = [
@@ -688,6 +699,7 @@ export const FollowUpQueued: Story = {
 			row,
 			async () => userEvent.click(canvas.getByRole("button", { name: "Next" })),
 			async () => expect(row).toHaveTextContent("Queued. Heph answers this next."),
+			row,
 		);
 	},
 };
@@ -710,6 +722,7 @@ export const AnswerStored: Story = {
 			row,
 			async () => userEvent.click(canvas.getByRole("button", { name: "Next" })),
 			async () => expect(row).toHaveTextContent("What made you pick the time-based cache?"),
+			rowOf(canvas.getByText(FOLLOW_UP.text)),
 		);
 	},
 };

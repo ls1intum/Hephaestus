@@ -1,7 +1,11 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 
-import { horizontalScrollParentOf } from "@/stories/reflow";
+import {
+	expectNoPageOverflow,
+	expectTablesScrollInPlace,
+	horizontalScrollParentOf,
+} from "@/stories/reflow";
 import { levelsOpenedBy } from "@/test/detail-stack";
 
 import {
@@ -177,7 +181,7 @@ export const OwnProviderAbsent: Story = {
 export const UnpricedReviews: Story = {
 	decorators: [
 		(Story) => (
-			<div className="w-312">
+			<div className="w-312 max-w-full">
 				<Story />
 			</div>
 		),
@@ -196,16 +200,39 @@ export const UnpricedReviews: Story = {
 			},
 		},
 	},
-	play: async ({ canvas }) => {
+	play: async ({ canvas, canvasElement, userEvent }) => {
 		const table = within(await tableIn(canvas));
 		const header = table.getByRole("columnheader", { name: "Unavailable cost" });
 		await expect(header).toHaveAttribute("rowspan", "2");
-		const scroller = horizontalScrollParentOf(await tableIn(canvas));
-		await expect(scroller.scrollWidth).toBeLessThanOrEqual(scroller.clientWidth + 1);
 		const cells = cellTexts(await rowNamed(canvas, /small-pull-requests/u));
 		await expect(cells[7]).toBe("2");
 		await expect(cells[3]).toBe("—");
-		await expect(cellTexts(await rowNamed(canvas, /^Total/u))[6]).toBe("2");
+		const total = await rowNamed(canvas, /^Total/u);
+		await expect(cellTexts(total)[6]).toBe("2");
+
+		// The extra column can make the table wider than this box with some system fonts. The table
+		// then scrolls inside its own box and the page does not, as SC 1.4.10 allows.
+		await expectNoPageOverflow();
+		await expect(canvasElement.scrollWidth).toBeLessThanOrEqual(canvasElement.clientWidth + 1);
+
+		// The native scroller takes keyboard focus, so a keyboard reader can scroll it.
+		const scroller = horizontalScrollParentOf(await tableIn(canvas));
+		await userEvent.tab();
+		await expect(scroller).toHaveFocus();
+
+		// At the far end of that scroll, the rightmost column is inside the scroller's content box.
+		await expectTablesScrollInPlace(canvasElement);
+		const contentLeft = scroller.getBoundingClientRect().left + scroller.clientLeft;
+		const contentRight = contentLeft + scroller.clientWidth;
+		const rightmost = [
+			table.getByRole("columnheader", { name: "Calls" }),
+			within(total).getByRole("cell", { name: "433" }),
+		];
+		for (const element of rightmost) {
+			const { left, right } = element.getBoundingClientRect();
+			await expect(left).toBeGreaterThanOrEqual(contentLeft - 1);
+			await expect(right).toBeLessThanOrEqual(contentRight + 1);
+		}
 	},
 };
 
