@@ -111,6 +111,49 @@ export const ByJobType: Story = {
 	},
 };
 
+/** A month of the run types a workspace records now: practice reviews and Heph turns. */
+export const CurrentRunTypes: Story = {
+	args: {
+		purses: ["SHARED"],
+		report: report({
+			byJobType: [
+				{
+					...pullRequestReviewRow,
+					jobType: "PRACTICE_REVIEW",
+					events: 23,
+					totalCalls: 138,
+					instanceTotalCostUsd: 4.6,
+				},
+				{
+					jobType: "MENTOR_TURN",
+					events: 7,
+					inputTokens: 84_000,
+					outputTokens: 12_600,
+					cacheReadTokens: 0,
+					cacheWriteTokens: 0,
+					totalCalls: 19,
+					instanceTotalCostUsd: 0.42,
+					ownProviderTotalCostUsd: 0,
+					unpricedEventCount: 0,
+				},
+			],
+		}),
+	},
+	play: async ({ canvas }) => {
+		const table = within(await canvas.findByRole("table", { name: "AI spend by run type" }));
+		const runs = [/^Practice review/u, /^Heph turn/u].map((name) => {
+			const cells = within(table.getByRole("row", { name }))
+				.getAllByRole("cell")
+				.map((cell) => cell.textContent);
+			return [cells[0], cells[1], cells[3], cells.at(-1)];
+		});
+		await expect(runs).toStrictEqual([
+			["Practice review", "$4.60", "23", "138"],
+			["Heph turn", "$0.42", "7", "19"],
+		]);
+	},
+};
+
 export const AllRunsPriced: Story = {
 	args: { report: report({ byJobType: [pullRequestReviewRow] }) },
 	play: async ({ canvas }) => {

@@ -5,6 +5,7 @@ import { asDate, type DateLike } from "@/lib/dates";
 export type LlmJobType = LlmUsageByJobType["jobType"];
 
 export const JOB_TYPE_LABELS: Record<LlmJobType, string> = {
+	PRACTICE_REVIEW: "Practice review",
 	PULL_REQUEST_REVIEW: "Pull request review",
 	ISSUE_REVIEW: "Issue review",
 	CONVERSATION_REVIEW: "Conversation review",

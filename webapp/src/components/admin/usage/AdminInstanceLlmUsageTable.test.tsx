@@ -285,6 +285,27 @@ describe("AdminInstanceLlmUsageTable", () => {
 		).toStrictEqual(["Jul 5", "$4.25", "$1.75", "1"]);
 	});
 
+	it("names the expanded workspace's practice reviews beside its Heph turns", () => {
+		renderTable([workspace], {
+			expandedWorkspaceSlug: workspace.workspaceSlug,
+			detailReport: {
+				...detailReport,
+				byJobType: detailReport.byJobType.flatMap((row) => [
+					{ ...row, jobType: "PRACTICE_REVIEW", events: 23, totalCalls: 46 },
+					row,
+				]),
+			},
+		});
+
+		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
+		const reviews = within(byJobType).getByRole("row", { name: /^Practice review/u });
+		const cells = within(reviews)
+			.getAllByRole("cell")
+			.map((cell) => cell.textContent);
+		expect([cells[0], cells[5], cells.at(-1)]).toStrictEqual(["Practice review", "23", "46"]);
+		within(byJobType).getByRole("row", { name: /^Heph turn/u });
+	});
+
 	it("projects a near-cap month in the panel, in the third person the host is reading in", () => {
 		renderTable([workspace], {
 			expandedWorkspaceSlug: workspace.workspaceSlug,
