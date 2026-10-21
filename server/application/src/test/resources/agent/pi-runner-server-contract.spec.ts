@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { after, test } from "node:test";
@@ -36,7 +44,7 @@ const PRACTICES = [
 	{ slug: "zz-invalid-meta", program: INVALID_META_PROGRAM },
 ] as const;
 
-const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-runner-server-contract-"));
+const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-runner-server-contract-")));
 after(() => {
 	rmSync(cwd, { recursive: true, force: true });
 });

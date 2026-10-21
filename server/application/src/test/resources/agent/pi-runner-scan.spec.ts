@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -122,7 +130,7 @@ for (const [basis, explicitCommit, incremental = false] of [
 	["introduced", true, true],
 ] as const) {
 	void test(`SCAN ${basis === "state" ? "admits state with complete pinned-file receipts" : "rejects introduced basis"} through tool validation (explicit commit=${explicitCommit}, incremental=${incremental})`, async () => {
-		const cwd = mkdtempSync(path.join(tmpdir(), "pi-runner-scan-"));
+		const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "pi-runner-scan-")));
 		try {
 			const commit = stageScan(cwd);
 			const candidate = {
@@ -232,7 +240,7 @@ for (const [readContext, collision] of [
 	[true, true],
 ] as const) {
 	void test(`scan MET needs a complete read of cited context (read=${readContext}, same-named session file=${collision})`, async (t) => {
-		const cwd = mkdtempSync(path.join(tmpdir(), "pi-scan-context-coverage-"));
+		const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "pi-scan-context-coverage-")));
 		t.after(() => rmSync(cwd, { recursive: true, force: true }));
 		const commit = stageScan(cwd, true);
 		if (collision) {
@@ -290,7 +298,7 @@ for (const [fieldName, value] of [
 	["repositoryId", "2"],
 ] as const) {
 	void test(`scan refuses a conflicting captured ${fieldName} (${value}) before a model session starts`, async (t) => {
-		const cwd = mkdtempSync(path.join(tmpdir(), "pi-scan-conflict-"));
+		const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "pi-scan-conflict-")));
 		t.after(() => rmSync(cwd, { recursive: true, force: true }));
 		stageScan(cwd);
 		const record: unknown = JSON.parse(readFileSync(path.join(cwd, SOURCE_PATH), "utf8"));
@@ -308,7 +316,7 @@ for (const [fieldName, value] of [
 }
 
 void test("a scan script receives the pinned tree and returns a citation without Git metadata", async (t) => {
-	const cwd = mkdtempSync(path.join(tmpdir(), "pi-scan-script-"));
+	const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "pi-scan-script-")));
 	t.after(() => rmSync(cwd, { recursive: true, force: true }));
 	const commit = stageScan(cwd);
 	writeFileSync(

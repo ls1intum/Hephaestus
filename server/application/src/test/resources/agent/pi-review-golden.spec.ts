@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -71,7 +72,7 @@ async run(ctx) {
 }
 
 function runScenario(name: string): Map<string, string> {
-	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-golden-"));
+	const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-golden-")));
 	try {
 		stageGoldenWorkspace(
 			cwd,

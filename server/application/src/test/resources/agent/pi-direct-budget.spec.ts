@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { after, test } from "node:test";
@@ -36,7 +36,7 @@ const standIn = await startStandIn(JOB_TOKEN, async () => ({
 	...chatMessage("yes"),
 	usage: { prompt_tokens: 1500, completion_tokens: 500, total_tokens: CALL_TOKENS },
 }));
-const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-direct-budget-"));
+const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-direct-budget-")));
 after(async () => {
 	await standIn.close();
 	rmSync(cwd, { recursive: true, force: true });

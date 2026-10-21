@@ -324,7 +324,7 @@ void describe("one review at a time", () => {
 });
 
 void describe("what a program's process may do", () => {
-	void test("it has no environment, reads only through the context, and cannot write or start a program", async () => {
+	void test("it inherits no host environment, reads only through the context, and cannot write or start a program", async () => {
 		const ws = await workspace({ probe: null });
 		const escape = path.join(tmpdir(), "practice-program-escape");
 		await writeFile(
@@ -337,7 +337,7 @@ const attempt = (action) => { try { action(); return "allowed"; } catch (error) 
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		ctx.log("environment " + Object.keys(process.env).length);
+		ctx.log("environment " + JSON.stringify(Object.keys(process.env).sort()));
 		ctx.log("repository " + attempt(() => readFileSync(${JSON.stringify(path.join(ws.repo, "notes.txt"))})));
 		ctx.log("system " + attempt(() => readFileSync("/etc/hostname")));
 		ctx.log("write " + attempt(() => writeFileSync(${JSON.stringify(escape)}, "x")));
@@ -349,8 +349,14 @@ export default definePracticeScript({
 `,
 		);
 		const { outcome, logs, reviews } = await run(ws, "probe");
+		// macOS can initialize this CoreFoundation marker even when fork receives an empty environment.
+		const allowedEnvironments =
+			process.platform === "darwin" ? [[], ["__CF_USER_TEXT_ENCODING"]] : [[]];
+		assert.ok(
+			allowedEnvironments.some((keys) => logs.includes(`environment ${JSON.stringify(keys)}`)),
+			`expected only platform environment keys in:\n${logs.join("\n")}`,
+		);
 		for (const line of [
-			"environment 0",
 			"repository ERR_ACCESS_DENIED",
 			"system ERR_ACCESS_DENIED",
 			"write ERR_ACCESS_DENIED",

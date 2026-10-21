@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { test } from "node:test";
@@ -25,7 +25,7 @@ async function run(
 	prepared = false,
 	changed = false,
 ) {
-	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-citation-"));
+	const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-citation-")));
 	stagePractices(cwd, [
 		{
 			slug: "test-practice",

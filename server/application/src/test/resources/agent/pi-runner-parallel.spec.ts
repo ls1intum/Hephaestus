@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { test } from "node:test";
@@ -25,7 +25,7 @@ function resultsOf(cwd: string) {
 }
 
 void test("three isolated model sessions overlap, retain each candidate and receipt, and submit in practice order", async () => {
-	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-"));
+	const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-")));
 	try {
 		stagePractices(cwd, [{ slug: "z-last" }, { slug: "a-first" }, { slug: "m-middle" }]);
 		const exit = await runRunner(
@@ -85,7 +85,7 @@ for (const ownership of ["opening", "native-read", "sibling-only", "claimed-only
 	void test(`swapped completion orders preserve candidates and non-results with change evidence owned by ${ownership}`, async () => {
 		const admissions: unknown[] = [];
 		for (const earlier of ["sibling", "native"] as const) {
-			const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-evidence-"));
+			const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-evidence-")));
 			try {
 				const program = directProgram(`await ctx.evidence.record("change.json");`).replace(
 					'consulted: ["scm.pull-request.core"]',
@@ -168,7 +168,7 @@ for (const ownership of ["opening", "native-read", "sibling-only", "claimed-only
 
 for (const limit of ["calls", "tokens"]) {
 	void test(`concurrent sessions reserve disjoint group ${limit} and cannot starve a sibling`, async () => {
-		const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-budget-"));
+		const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-budget-")));
 		try {
 			stagePractices(cwd, [{ slug: "greedy-one" }, { slug: "greedy-two" }, { slug: "finished" }]);
 			const exit = await runRunner(
@@ -219,7 +219,7 @@ for (const limit of ["calls", "tokens"]) {
 }
 
 void test("the deadline admits finished practices and reports running and queued practices as not reached", async () => {
-	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-deadline-"));
+	const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-deadline-")));
 	try {
 		stagePractices(
 			cwd,
@@ -283,7 +283,7 @@ void test("group reservations sum to the original budget, including a small grou
 });
 
 void test("a free slot starts the next practice across groups while another practice is still running", async () => {
-	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-slots-"));
+	const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-slots-")));
 	try {
 		const slugs = ["slow", "quick-one", "quick-two", "quick-three"];
 		stagePractices(
@@ -351,7 +351,7 @@ function recordOf(value: unknown): Record<string, unknown> {
 }
 
 void test("a custom program's repeated review sessions spend only its reservation", async () => {
-	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-custom-"));
+	const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-custom-")));
 	try {
 		const program = `import { definePracticeScript } from "../lib/core/practice-script.ts";
 export default definePracticeScript({ meta: {}, async run(ctx) {
@@ -384,7 +384,7 @@ export default definePracticeScript({ meta: {}, async run(ctx) {
 });
 
 void test("a session stop failure preserves completed siblings for admission and starts no further practice", async () => {
-	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-stop-"));
+	const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-stop-")));
 	try {
 		stagePractices(
 			cwd,

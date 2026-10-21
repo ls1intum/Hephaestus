@@ -7,6 +7,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -3906,7 +3907,7 @@ if (scenario !== undefined && scenario !== "") {
 				"compose-null-outcome": "refuses an admitted result without an outcome before composing",
 			}[fixture] ?? fixture,
 			async () => {
-				const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-orchestration-"));
+				const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-orchestration-")));
 				try {
 					mkdirSync(nodePath.join(cwd, "catalog/practices"), { recursive: true });
 					mkdirSync(nodePath.join(cwd, "evidence"), { recursive: true });

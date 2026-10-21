@@ -431,37 +431,51 @@ void test("an empty numbered search is neither a failed read nor complete file c
 	assert.equal(reads.coverage().failedReads, 0);
 });
 
-void test("native bash output receives receipts for each supported single-file form", async (t) => {
+void test("native bash output receives receipts for complete single-file reads and numbered searches", async (t) => {
 	const root = mkdtempSync(path.join(tmpdir(), "native-bash-coverage-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
-	writeFileSync(path.join(root, "file.ts"), "one\ntwo\nthree");
 	const tool = createBashTool(root);
-	for (const command of [
-		"cat file.ts",
-		"head -n 3 file.ts",
-		"tail -n 3 file.ts",
-		"sed -n '1,3p' file.ts",
-		"nl file.ts",
-		// The review sandbox ships ripgrep; a host without it still covers the other forms.
-		...(spawnSync("rg", ["--version"]).status === 0 ? ["rg -n '.' file.ts"] : []),
-		"grep -n '.' file.ts",
+	for (const { source, commands } of [
+		{
+			// Native nl differs across platforms on an unterminated last line; use a POSIX text file.
+			source: "one\ntwo\nthree\n",
+			commands: [
+				"cat file.ts",
+				"head -n 3 file.ts",
+				"tail -n 3 file.ts",
+				"sed -n '1,3p' file.ts",
+				"nl file.ts",
+			],
+		},
+		{
+			// A numbered search proves only its matched lines, not a trailing empty logical line.
+			source: "one\ntwo\nthree",
+			commands: [
+				// The review sandbox ships ripgrep; a host without it still covers the other forms.
+				...(spawnSync("rg", ["--version"]).status === 0 ? ["rg -n '.' file.ts"] : []),
+				"grep -n '.' file.ts",
+			],
+		},
 	]) {
-		const reads = new SessionReads(root, { required: ["file.ts"] });
-		reads.note({
-			type: "tool_execution_start",
-			toolCallId: "native",
-			toolName: "bash",
-			args: { command },
-		});
-		const result = await tool.execute("native", { command });
-		reads.note({
-			type: "tool_execution_end",
-			toolCallId: "native",
-			toolName: "bash",
-			result,
-			isError: false,
-		});
-		assert.equal(reads.coverage().complete, true, `${command}: ${JSON.stringify(result)}`);
+		writeFileSync(path.join(root, "file.ts"), source);
+		for (const command of commands) {
+			const reads = new SessionReads(root, { required: ["file.ts"] });
+			reads.note({
+				type: "tool_execution_start",
+				toolCallId: "native",
+				toolName: "bash",
+				args: { command },
+			});
+			const result = await tool.execute("native", { command });
+			reads.note({
+				type: "tool_execution_end",
+				toolCallId: "native",
+				toolName: "bash",
+				result,
+				isError: false,
+			});
+			assert.equal(reads.coverage().complete, true, `${command}: ${JSON.stringify(result)}`);
+		}
 	}
 });
 
