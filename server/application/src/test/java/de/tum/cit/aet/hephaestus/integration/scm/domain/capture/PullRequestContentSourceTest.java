@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -50,6 +51,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.nio.charset.StandardCharsets;
@@ -62,6 +64,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -485,6 +488,65 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(comments.get(1).get("author").asString()).isEqualTo("project_7_bot_a1b2");
             assertThat(comments.get(1).get("bot").asBoolean()).isTrue();
             assertThat(comments.get(2).has("author")).isFalse();
+        }
+
+        @Test
+        void shouldGiveEachBundledReviewerPracticeTheReviewersInlineWordsInTheCommentsSource() {
+            PullRequestReviewComment ownWords = new PullRequestReviewComment();
+            ownWords.setNativeId(91L);
+            ownWords.setPath("src/Main.java");
+            ownWords.setLine(10);
+            ownWords.setBody("Could this loop stop at the first match?");
+            ownWords.setCreatedAt(Instant.parse("2025-06-01T12:00:00Z"));
+            var reviewer = user("reviewer");
+            ReflectionTestUtils.setField(reviewer, "id", 32L);
+            reviewer.setNativeId(33L);
+            ownWords.setAuthor(reviewer);
+            stubGit();
+            mirroredComments = List.of(ownWords);
+            ObjectNode metadata = sampleMetadata();
+            metadata.put("subject_role", "REVIEWER");
+            metadata.put("review_id", 31L);
+            metadata.put("about_user_id", 32L);
+            ScmCaptureContext reviewItem = request(metadata);
+
+            var reviewerPractices = ScmCaptureFixtures.bundledPractices().entrySet().stream()
+                    .filter(entry -> entry.getValue().definition().about() == AboutRole.REVIEWER)
+                    .toList();
+
+            assertThat(reviewerPractices)
+                    .extracting(Map.Entry::getKey)
+                    .containsExactlyInAnyOrder(
+                            "leaves-useful-specific-review-comments",
+                            "reviews-respectfully-asks-rather-than-demands",
+                            "reviews-substantively-with-understanding");
+            for (var entry : reviewerPractices) {
+                var practice = entry.getValue();
+                assertThat(practice.kind())
+                        .as(entry.getKey())
+                        .isEqualTo(reviewItem.pinned().item().kind());
+                var reads = practice.definition().reads().sources();
+                assertThat(reads).as(entry.getKey()).anySatisfy(read -> {
+                    assertThat(read.source()).isEqualTo(COMMENTS);
+                    assertThat(read.need()).isEqualTo(ReadNeed.COMPLETE);
+                });
+                var captured = provider.capture(
+                        reviewItem, reads.stream().map(read -> read.source()).collect(Collectors.toSet()));
+
+                JsonNode core = objectMapper.readTree(captured.files().get("context/metadata.json"));
+                assertThat(core.path("subject_role").asString())
+                        .as(entry.getKey())
+                        .isEqualTo("REVIEWER");
+                JsonNode comments = objectMapper.readTree(captured.files().get("context/comments.json"));
+                assertThat(comments).as(entry.getKey()).singleElement().satisfies(comment -> {
+                    assertThat(comment.path("author").asString()).isEqualTo("reviewer");
+                    assertThat(comment.path("author_id").asLong()).isEqualTo(33L);
+                    assertThat(comment.path("body").asString()).isEqualTo(ownWords.getBody());
+                });
+                assertThat(captured.completeness())
+                        .as(entry.getKey())
+                        .containsEntry(COMMENTS, SourceCompleteness.COMPLETE);
+            }
         }
 
         @Test

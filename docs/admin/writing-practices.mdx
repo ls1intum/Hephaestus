@@ -68,6 +68,46 @@ It is available only for practices with a valid repository-state form.
 A duty at a change event cannot gain a scan form by ignoring that event.
 A scan result concerns the file and has no developer.
 
+## Write a practice for a technology
+
+A practice has no technology field.
+The Hephaestus defaults use three patterns for a standard that depends on a technology.
+
+### Gate one platform by changed paths
+
+The practices of the **Building iOS apps well** group concern Swift code only.
+Each one applies when a changed path matches `**/*.swift`.
+A complete change with no Swift file gets Does not apply.
+Incomplete change evidence keeps the practice eligible.
+
+### Share one practice with leads for each language
+
+**Handle errors instead of swallowing them** applies to code in every language.
+Its script has a table of constructs for each language that it names.
+A match is a lead for the review, not a result.
+A file in another language gets no lead, and the review still decides.
+The [script guide](./practice-scripts.mdx#test-a-script-locally) owns how to test these tables.
+
+### Make a course standard stricter in the workspace
+
+Adopt the default practice in the workspace.
+Then edit its criteria and save it.
+For example, a course can require a unit test for each changed function.
+Saving creates a new practice version, as [Save or reset](#save-or-reset) describes.
+Later catalog changes arrive as offers that you can accept or decline.
+
+### No practice variants
+
+Do not create a copy of one practice for each technology.
+Copies of one standard drift apart, and their results stop being comparable.
+[ADR 0050](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0050-one-practice-standard-one-outcome.md) keeps one standard for each practice.
+Hephaestus also does not detect the technology stack of a repository.
+
+Reopen this decision only when one of these conditions occurs:
+
+- One standard needs different criteria for each technology, and neither a path gate nor per-language leads can state the difference.
+- Workspaces keep several local copies of one default practice, one for each technology.
+
 ## Write guidance
 
 Why it matters explains the practice's purpose.

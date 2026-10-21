@@ -4,7 +4,9 @@ import test from "node:test";
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/kits/scm/types.ts";
 import {
 	leadKeys,
+	REVIEWED,
 	runBundled,
+	runBundledReview,
 } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 function added(file: string, lines: string[]): [string, DiffFile] {
@@ -296,6 +298,65 @@ void test("a fixed URL remains a lead, not proof of an unhandled runtime failure
 	const directions = (result.directions ?? []).join(" ");
 	assert.match(directions, /A valid fixed URL has no runtime-dependent parse failure/u);
 	assert.match(directions, /already recorded by its handler/u);
+});
+
+void test("the error practice finds a written construct in each other language it names", async () => {
+	const change = new Map([
+		added("app/src/main/kotlin/Settings.kt", [
+			"val port = runCatching { text.toInt() }.getOrNull()",
+		]),
+		added("cmd/clean.go", ["func clean(path string) {", "\t_ = os.Remove(path)", "}"]),
+		added("lib/importer.rb", ["begin", "  import_rows", "rescue => error", "end"]),
+		added("server/jobs.py", ["try:", "    load()", "except ValueError:", "    pass"]),
+		added("src/cache.rs", ["fn clear(path: &Path) {", "    fs::remove_file(path).ok();", "}"]),
+		added("src/main/java/app/Loader.java", [
+			"try {",
+			"    load();",
+			"} catch (IOException e) { e.printStackTrace(); }",
+		]),
+		added("web/sync.js", ["try {", "  sync();", "} catch (error) {}"]),
+	]);
+	const result = await runBundled("handles-errors-instead-of-swallowing-them", { change });
+	const keyOf = await leadKeys("handles-errors-instead-of-swallowing-them");
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts]),
+		[
+			[
+				{ file: "app/src/main/kotlin/Settings.kt", line: 1, endLine: 1 },
+				"run-catching-get-or-null",
+				{ language: "kotlin" },
+			],
+			[
+				{ file: "cmd/clean.go", line: 2, endLine: 2 },
+				"blank-identifier-assignment",
+				{ language: "go" },
+			],
+			[
+				{ file: "lib/importer.rb", line: 3, endLine: 3 },
+				"rescue-unused-binding",
+				{ language: "ruby" },
+			],
+			[{ file: "server/jobs.py", line: 3, endLine: 4 }, "except-pass", { language: "python" }],
+			[{ file: "src/cache.rs", line: 2, endLine: 2 }, "ok-discards-err", { language: "rust" }],
+			[
+				{ file: "src/main/java/app/Loader.java", line: 3, endLine: 3 },
+				"catch-print-stack-trace-only",
+				{ language: "java" },
+			],
+			[{ file: "web/sync.js", line: 3, endLine: 3 }, "empty-catch", { language: "javascript" }],
+		],
+	);
+});
+
+void test("the error practice reads no language it does not name, and still asks for the review", async () => {
+	const { review, candidate } = await runBundledReview(
+		"handles-errors-instead-of-swallowing-them",
+		{ change: new Map([added("scripts/save.lua", ["local ok = pcall(save)"])]) },
+	);
+	assert.deepEqual(review.leads ?? [], []);
+	assert.deepEqual(review.facts, { errorSwallowCandidates: 0, filesScanned: 0, linesSelected: 0 });
+	// The review decides: an unread file is no proof that the practice does not apply.
+	assert.deepEqual(candidate, REVIEWED);
 });
 
 void test("public, private and unknown credential-named values remain inspection leads", async () => {

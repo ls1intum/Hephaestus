@@ -77,6 +77,31 @@ A scan form declares include, exclude and context selections explicitly.
 
 Bundled scan context includes all repository files to retain cross-file evidence dependencies.
 
+### Accept a bundled change
+
+A bundled change ships only after its mechanical checks pass.
+This rule applies to every proposed change, from a person or from an AI assistant.
+
+Mechanical checks prove the contract.
+CI runs them on each pull request.
+They include these checks:
+
+- The catalog loader and the definition validator accept every bundled definition.
+- `ScmCapturedApplicabilityTest` has fixtures for each bundled Applies when gate. Its fixtures cover when the gate applies, does not apply, and cannot decide.
+- The error-handling script finds a written construct in each language that it names. A file in another language gets no lead, and the review still runs.
+- Each bundled practice about a reviewer captures their identity and inline comments from its declared sources. It also captures their review decision with its body.
+
+A passing check does not prove a judgment.
+[ADR 0050](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0050-one-practice-standard-one-outcome.md) records that structural validation does not prove an assessment accurate.
+Judgment evidence is a set of held-out cases with references that a person adjudicated.
+Record it in the pull request, apart from the CI results.
+A maintainer accepts it before the change ships.
+
+A change to a field in the [review digest](#review-identity) needs this judgment evidence.
+A change to name, guidance or group does not.
+The expected outcomes in `criteria-cases.json` help during development.
+They are not held-out evidence, and a passing staging test does not make them so.
+
 ### Bundled visuals and guides
 
 Guidance owns whyItMatters, whatGoodLooksLike, goingWell, visual and guide.
