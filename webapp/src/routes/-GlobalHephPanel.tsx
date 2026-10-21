@@ -64,12 +64,18 @@ function usePageName(): string | undefined {
 	});
 }
 
+/** The thread pushed over the conversation, and where opening it put focus until the next open. */
+interface PanelThread {
+	parentEntryId: string;
+	focus?: ThreadFocus;
+}
+
 function WorkspaceHephPanel({ workspaceSlug }: { workspaceSlug: string }) {
 	const navigate = useNavigate();
 	// The stream runs while the launcher shows, so an answer that lands with the panel closed marks it.
 	const livePaused = useHephLive(workspaceSlug, true);
 	const unread = useHephUnread(workspaceSlug);
-	const [thread, setThread] = useState<{ parentEntryId: string; focus: ThreadFocus }>();
+	const [thread, setThread] = useState<PanelThread>();
 	// The control that opened the thread, which Back gives focus back to.
 	const opener = useRef<HTMLElement>(null);
 	// A new page closes the panel, so a link followed from an answer opens its page in front of the
@@ -85,7 +91,14 @@ function WorkspaceHephPanel({ workspaceSlug }: { workspaceSlug: string }) {
 	return (
 		<HephPanel
 			open={open}
-			onOpenChange={setOpen}
+			onOpenChange={(next) => {
+				setOpen(next);
+				// The thread stays open, but where Reply in thread put focus applied once: opening the panel
+				// again is an ordinary open, which raises no keyboard on a touch screen.
+				if (next) {
+					setThread((kept) => kept && { parentEntryId: kept.parentEntryId });
+				}
+			}}
 			unread={unread}
 			onOpenInMentor={() => {
 				void navigate({
@@ -127,7 +140,7 @@ function HephPanelConversation({
 }: {
 	workspaceSlug: string;
 	livePaused: boolean;
-	thread: { parentEntryId: string; focus: ThreadFocus } | undefined;
+	thread: PanelThread | undefined;
 	onOpenThread: (parentEntryId: string, focus: ThreadFocus) => void;
 }) {
 	const panelId = useId();
@@ -176,6 +189,7 @@ function HephPanelConversation({
 						parentEntryId={thread.parentEntryId}
 						readOnly={false}
 						canAsk
+						livePaused={livePaused}
 						focusComposer={thread.focus === "composer"}
 					/>
 				</div>

@@ -1,4 +1,4 @@
-import { act, cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { assert, expect, it, vi } from "vitest";
@@ -540,4 +540,115 @@ it("closes the panel when a link in an answer opens another page, which is then 
 	await user.click(screen.getByRole("button", { name: "Open Heph, AI mentor" }));
 	await screen.findByText("One thing stands out.");
 	expect(FakeEventSource.latest()).toBe(stream);
+});
+
+/** What the developer can see and reach in the panel: the conversation under an open thread is inert. */
+function reachable(elements: HTMLElement[]): HTMLElement[] {
+	return elements.filter((element) => element.closest("[inert]") === null);
+}
+
+/** The reviews of the work an answer's feedback link opens. */
+function serveReviews() {
+	server.use(
+		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/reviews", () =>
+			HttpResponse.json({
+				content: [detailReview],
+				number: 0,
+				size: 10,
+				totalElements: 1,
+				totalPages: 1,
+				last: true,
+			}),
+		),
+	);
+}
+
+it.each([
+	{
+		closing: "closing the panel",
+		close: async (user: ReturnType<typeof userEvent.setup>) => {
+			await user.keyboard("{Escape}");
+			// Closing hands focus back to the launcher, and nothing in the closing panel takes it.
+			await waitFor(() =>
+				expect(document.activeElement).toBe(
+					screen.getByRole("button", { name: "Open Heph, AI mentor" }),
+				),
+			);
+		},
+	},
+	{
+		closing: "following a link in the thread",
+		close: async (user: ReturnType<typeof userEvent.setup>) => {
+			serveReviews();
+			const [link] = reachable(screen.getAllByRole("link", { name: "Your feedback on this work" }));
+			assert.isDefined(link);
+			await user.click(link);
+			await screen.findByRole("list", { name: "Reviews" }, ROUTE_RENDER_WAIT);
+		},
+	},
+])(
+	"reopens the thread the developer replied in without raising a touch keyboard, after $closing",
+	async ({ close }) => {
+		const media = window.matchMedia.bind(window);
+		using _pointerMedia = vi
+			.spyOn(window, "matchMedia")
+			.mockImplementation((text) =>
+				Object.assign(media(text), { matches: text === "(pointer: coarse)" }),
+			);
+		const user = userEvent.setup();
+		const { acme } = mockHephPanel(hephReady());
+		const answer = acme.add({
+			kind: "HEPH",
+			text: "One thing stands out.",
+			links: [
+				{
+					id: "f8000000-0000-4000-8000-000000000002",
+					kind: "FEEDBACK",
+					text: "Add one line on the trade-off before you merge.",
+					itemId: 433,
+				},
+			],
+		});
+		acme.lastReadAt = answer.createdAt;
+		renderRouteAtWithRouter("/w/acme/teams");
+		await user.click(
+			await screen.findByRole("button", { name: "Open Heph, AI mentor" }, ROUTE_RENDER_WAIT),
+		);
+		// Reply in thread is the developer asking to write, so it raises the keyboard once.
+		await user.click(await screen.findByRole("button", { name: /^Reply in thread \(/u }));
+		const replying = await screen.findByRole("textbox", { name: "Reply in thread" });
+		await waitFor(() => expect(document.activeElement).toBe(replying));
+
+		await close(user);
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+		await user.click(screen.getByRole("button", { name: "Open Heph, AI mentor" }));
+		const panel = await screen.findByRole("dialog");
+		// The thread stays open across closes, but opening the panel again is an ordinary open.
+		const reply = await within(panel).findByRole("textbox", { name: "Reply in thread" });
+		await waitFor(() => expect(panel.contains(document.activeElement)).toBe(true));
+		expect(document.activeElement).not.toBe(reply);
+	},
+);
+
+const PAUSED = "Live updates paused. Reconnecting…";
+
+it("says in an open thread that live updates are paused, where the conversation under it is hidden", async () => {
+	const user = userEvent.setup();
+	const { acme } = mockHephPanel(hephReady());
+	const parent = acme.add({ kind: "HEPH", text: "Three pull requests left the reason out." });
+	acme.lastReadAt = parent.createdAt;
+	acme.add({ kind: "USER", text: "Which ones?", parentEntryId: parent.id });
+	renderRouteAtWithRouter("/w/acme/teams");
+	const stream = await openStream(acme);
+	await user.click(screen.getByRole("button", { name: "Open Heph, AI mentor" }));
+	await user.click(await screen.findByRole("button", { name: /^1 reply/u }));
+	const panel = screen.getByRole("dialog");
+	await within(panel).findByText("Which ones?");
+
+	act(() => stream.error());
+	act(() => stream.error());
+	await waitFor(() => expect(reachable(within(panel).queryAllByText(PAUSED))).toHaveLength(1));
+	act(() => stream.open());
+	await waitFor(() => expect(within(panel).queryAllByText(PAUSED)).toStrictEqual([]));
 });

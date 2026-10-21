@@ -143,6 +143,7 @@ export function MainConversation({
 export interface ThreadConversationProps extends ConversationAccess {
 	workspaceSlug: string;
 	parentEntryId: string;
+	livePaused: boolean;
 	/** The thread opened to reply in, so its composer takes focus. */
 	focusComposer: boolean;
 	jumpTo?: string;
@@ -153,6 +154,7 @@ export function ThreadConversation({
 	parentEntryId,
 	readOnly,
 	canAsk,
+	livePaused,
 	focusComposer,
 	jumpTo,
 }: ThreadConversationProps) {
@@ -174,6 +176,7 @@ export function ThreadConversation({
 					state={thread}
 					developer={developer}
 					onCopy={copy}
+					livePaused={livePaused}
 				/>
 			);
 		}
@@ -191,6 +194,7 @@ export function ThreadConversation({
 					state={timeline}
 					developer={developer}
 					onCopy={copy}
+					livePaused={livePaused}
 					jumpTo={jumpTo}
 					lead={
 						<div className="flex flex-col gap-4">
