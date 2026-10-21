@@ -4,6 +4,7 @@ import { expect, fn, within } from "storybook/test";
 import type { ReviewOverview } from "@/api/types.gen";
 import type { ReviewRange } from "@/components/admin/practice-reviews/review-range";
 import { ReviewReadinessBanner } from "@/components/admin/practices/review/ReviewReadinessBanner";
+import { forgetSectionFold } from "@/components/layout/section-folds";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
@@ -368,5 +369,46 @@ export const OverviewFailed: Story = {
 		await expect(canvas.queryByRole("heading", { name: "Delivery" })).not.toBeInTheDocument();
 		canvas.getByRole("link", { name: /^Review \d+ (?:piece|pieces) of feedback$/u });
 		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};
+
+const FOLDABLE = ["queue", "what-the-reviews-did", "delivery", "practices"].map(
+	(part) => `practice-reviews-overview:${part}`,
+);
+
+function forgetFoldable() {
+	for (const key of FOLDABLE) {
+		forgetSectionFold(key);
+	}
+}
+
+/**
+ * The overview's long sections fold, one choice per viewer and section; "Needs you" never does, since
+ * it is what an admin must not miss.
+ */
+export const FoldsItsLongSections: Story = {
+	beforeEach: () => {
+		forgetFoldable();
+		return forgetFoldable;
+	},
+	play: async ({ canvas, userEvent }) => {
+		for (const title of ["Queue", "What the reviews did", "Delivery", "Practices"]) {
+			await expect(canvas.getByRole("button", { name: title })).toHaveAttribute(
+				"aria-expanded",
+				"true",
+			);
+		}
+		await expect(canvas.queryByRole("button", { name: "Needs you" })).toBeNull();
+		await userEvent.click(canvas.getByRole("button", { name: "Delivery" }));
+		await expect(canvas.getByRole("button", { name: "Delivery" })).toHaveAttribute(
+			"aria-expanded",
+			"false",
+		);
+		await expect(canvas.queryByRole("region", { name: "Delivered and withheld" })).toBeNull();
+		// The other sections stay as they were.
+		await expect(canvas.getByRole("button", { name: "Practices" })).toHaveAttribute(
+			"aria-expanded",
+			"true",
+		);
 	},
 };

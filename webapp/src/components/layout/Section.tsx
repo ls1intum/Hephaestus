@@ -1,9 +1,12 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import { ChevronRight } from "lucide-react";
 import { type ComponentProps, type ReactElement, type ReactNode, useId } from "react";
 
 import { cn } from "cn";
-
+import { FOCUS_RING } from "@/components/common/focus";
 import { rendersContent } from "@/lib/react-node";
+
+import { useSectionOpen } from "./section-folds";
 
 const sectionTitleVariants = cva("text-foreground", {
 	variants: {
@@ -31,6 +34,12 @@ export interface SectionProps
 	 * described by them — a `role="radiogroup"` is not named by an enclosing heading.
 	 */
 	id?: string;
+	/**
+	 * Lets the reader fold the section away: the heading becomes a button and the choice is kept in
+	 * this browser under this key, one per page and section ("practice-reviews-overview:queue").
+	 * Only for admin pages; a developer's practice surface never hides its feedback.
+	 */
+	foldKey?: string;
 }
 
 const HEADINGS = { 2: "h2", 3: "h3", 4: "h4" } as const;
@@ -47,12 +56,14 @@ export function Section({
 	size,
 	className,
 	id,
+	foldKey,
 	children,
 	...props
 }: SectionProps) {
 	const generatedId = useId();
 	const base = id ?? generatedId;
 	const Heading = HEADINGS[level];
+	const [open, setOpen] = useSectionOpen(foldKey);
 
 	return (
 		<section
@@ -67,7 +78,27 @@ export function Section({
 						id={`${base}-title`}
 						className={cn(sectionTitleVariants({ size }), "break-words")}
 					>
-						{title}
+						{foldKey === undefined ? (
+							title
+						) : (
+							// The heading keeps its level; the button inside it folds what the section holds.
+							<button
+								type="button"
+								aria-expanded={open}
+								aria-controls={`${base}-content`}
+								onClick={() => setOpen(!open)}
+								className={cn("inline-flex items-center gap-1.5 rounded-sm text-left", FOCUS_RING)}
+							>
+								{title}
+								<ChevronRight
+									aria-hidden
+									className={cn(
+										"size-4 shrink-0 text-muted-foreground transition-transform",
+										open && "rotate-90",
+									)}
+								/>
+							</button>
+						)}
 					</Heading>
 					{rendersContent(description) && (
 						<p id={`${base}-description`} className="max-w-2xl text-sm text-muted-foreground">
@@ -77,7 +108,13 @@ export function Section({
 				</div>
 				{actions}
 			</div>
-			{children}
+			{foldKey === undefined ? (
+				children
+			) : (
+				<div id={`${base}-content`} hidden={!open} className="space-y-3">
+					{children}
+				</div>
+			)}
 		</section>
 	);
 }
