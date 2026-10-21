@@ -93,10 +93,10 @@ export const Busy: Story = {
 		await expect(opens("2 reviews running").get("queueState")).toBe("RUNNING");
 		await expect(opens("2 reviews running").getAll("status")).toStrictEqual([]);
 		await expect(opens("2 reviews running").get("from")).toBeNull();
-		// The whole figure is the link; its number is black and bold, its label muted.
+		// Number and word are one link, as the outcome counts are; the number is black, the word muted.
 		const running = canvas.getByRole("link", { name: "2 reviews running" });
-		await expect(running).toHaveTextContent("2 running");
-		const number = running.querySelector("[data-figure-value]") ?? now;
+		await expect(running.textContent).toBe("2 running");
+		const number = figureValue(canvas, "running") ?? now;
 		await expect(getComputedStyle(number).color).toBe(getComputedStyle(now).color);
 		await expect(getComputedStyle(number).fontWeight).toBe("600");
 		await expect(getComputedStyle(running).color).not.toBe(getComputedStyle(number).color);

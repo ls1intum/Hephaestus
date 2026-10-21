@@ -16,7 +16,7 @@ const EMPTY_STAGE = { count: 0, medianSeconds: null, p90Seconds: null };
 function figureOf(canvas: Canvas, key: string) {
 	return canvas
 		.getByLabelText("Review time figures")
-		.querySelector(`[data-figure="${key}"] > span`);
+		.querySelector(`[data-figure="${key}"] [data-figure-value]`);
 }
 
 /** The typical review's stages as "label value", in their order. */
@@ -166,6 +166,10 @@ export const FinishedInTheRange: Story = {
 				(figure) => figure.textContent,
 			),
 		).toEqual(["34 finished", "9 finished after merge"]);
+		// The whole figure is the link, number and word, as the outcome counts are.
+		await expect(canvas.getByRole("link", { name: "34 reviews finished" }).textContent).toBe(
+			"34 finished",
+		);
 		const link = new URL(
 			canvas.getByRole<HTMLAnchorElement>("link", { name: "34 reviews finished" }).href,
 		);

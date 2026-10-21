@@ -5,7 +5,6 @@ import { cn } from "cn";
 import type { ReviewTiming } from "@/api/types.gen";
 import { STALE } from "@/components/activity/activity-tones";
 import { InfoLines, InfoTip } from "@/components/common/InfoTip";
-import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -268,23 +267,20 @@ function finishedFigure(workspaceSlug: string, { state, list }: FinishedInRange)
 		value = null;
 	} else if (state.status === "loading") {
 		value = <Skeleton className="h-5 w-8" />;
-	} else if (state.total === 0) {
-		value = 0;
 	} else {
-		value = (
-			<InlineLink
-				tone="count"
-				aria-label={`${state.total} ${state.total === 1 ? "review" : "reviews"} finished`}
-				render={<ReviewListLink workspaceSlug={workspaceSlug} destination={list} />}
-			>
-				{state.total}
-			</InlineLink>
-		);
+		value = state.total;
 	}
+	const counted = state.status === "ready" && state.total > 0;
 	return {
 		key: "finished",
 		term: state.status === "error" ? "finished: not loaded" : "finished",
 		value,
-		none: state.status !== "ready" || state.total === 0,
+		none: !counted,
+		link: counted
+			? {
+					render: <ReviewListLink workspaceSlug={workspaceSlug} destination={list} />,
+					label: `${state.total} ${state.total === 1 ? "review" : "reviews"} finished`,
+				}
+			: undefined,
 	};
 }
