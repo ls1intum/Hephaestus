@@ -50,8 +50,7 @@ public class ScanCallGuard {
     public Optional<Lease> acquire(ProxyRouting route, byte[] body) {
         var attempt = route.attempt();
         Long workspace = route.workspaceId();
-        if (attempt == null || workspace == null || attempt.sourceType() == UsageSourceType.MENTOR_TURN)
-            return Optional.empty();
+        if (workspace == null || attempt.sourceType() == UsageSourceType.MENTOR_TURN) return Optional.empty();
         var job = jobs.findByIdAndWorkspaceId(attempt.sourceId(), workspace).orElseThrow(ScanCallGuard::refused);
         var review = reviews.find(workspace, job.getReviewId()).orElseThrow(ScanCallGuard::refused);
         if (review.kind() != ReviewKind.SCAN) return Optional.empty();

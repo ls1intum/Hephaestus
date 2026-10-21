@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.context.RecentAuthoredWorkConte
 import de.tum.cit.aet.hephaestus.integration.scm.context.ScmMentorWorkQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.HashMap;
@@ -40,21 +42,22 @@ class MentorPersonalContextFreshnessTest extends BaseUnitTest {
         var queries = mock(MentorWorkQuery.class);
         var accounts = mock(AccountSummaryQuery.class);
         var mapper = new ObjectMapper();
+        var actorSelector = mock(WorkspaceActorSelector.class);
+        lenient().when(actorSelector.connectedProviderId(1L)).thenReturn(Optional.of(5L));
         ContentSource source =
                 switch (kind) {
                     case USER -> {
                         when(queries.fetchUserCounts(
                                         eq(1L), eq(2L), any(Instant.class), any(Instant.class), any(Instant.class)))
                                 .thenReturn(new MentorUserCounts(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L));
-                        yield new UserContentSource(accounts, queries, mapper);
+                        yield new UserContentSource(accounts, queries, actorSelector, mapper);
                     }
                     case WORKSPACE -> {
                         var workspaces = mock(WorkspaceRepository.class);
                         var workspace = new Workspace();
                         workspace.setWorkspaceSlug("context-freshness");
                         when(workspaces.findById(1L)).thenReturn(Optional.of(workspace));
-                        yield new WorkspaceContentSource(
-                                accounts, workspaces, queries, mock(MentorConversationQueryRepository.class), mapper);
+                        yield new WorkspaceContentSource(accounts, workspaces, queries, actorSelector, mapper);
                     }
                     case AUTHORED_WORK ->
                         new RecentAuthoredWorkContentSource(

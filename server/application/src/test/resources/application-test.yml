@@ -69,7 +69,7 @@ hephaestus:
     # Worker role off in tests: the worker capability is the Docker sandbox
     # (DockerSandboxConfiguration + AgentImagePullBootstrapper), which has no Docker daemon in
     # CI. Disabling the role keeps those beans out of the context — mentor beans still wire
-    # (they're unconditional) and mock InteractiveSandboxService where they need it.
+    # (they're unconditional); tests build the worker's Heph host beans by hand where they need them.
     runtime:
         worker:
             enabled: false
@@ -79,6 +79,15 @@ hephaestus:
     # bean a second candidate and let it settle signals before the test does.
     agent:
         enabled: false
+    # Tests take expired Heph turn leases back themselves; a background sweep would race them.
+    mentor:
+        turn:
+            lease-reaper-delay: P1D
+        # Slack is on suite-wide; the Heph Slack projector would take Slack turns before the tests that build their
+        # own projector.
+        slack:
+            projector:
+                enabled: false
     # Loud enforcement under test: any unguarded scoped-table query throws.
     # Production runs in 'log' mode for the staging canary period; this override
     # ensures tenancy bugs surface in CI rather than being masked.

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
+import de.tum.cit.aet.hephaestus.core.event.AgentContextChangedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -84,6 +85,8 @@ final class ConnectionLifecycleEffects {
         } else if (previous == IntegrationState.ACTIVE) {
             eventPublisher.publishEvent(
                     new ConnectionLifecycleEvent.Deactivated(connection.getId(), workspaceId, connection.getKind()));
+            // GitHub, GitLab, Slack or Outline: a running Heph turn may hold what the connection made readable.
+            eventPublisher.publishEvent(new AgentContextChangedEvent(workspaceId));
         }
     }
 }

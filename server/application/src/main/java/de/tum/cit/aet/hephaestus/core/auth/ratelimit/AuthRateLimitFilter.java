@@ -73,7 +73,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         // GDPR Art. 20 export: cap POST /user/exports (the async assembly). Account-scoped (JWT sub)
         // with IP fallback — the route requires isAuthenticated(), so sub is normally present.
         EXPORT("export", true, false),
-        MENTOR_CHAT("mentor-chat", true, false),
+        MENTOR_TURNS("mentor-turns", true, false),
         REVIEW_REQUEST("review-request", true, false),
         SYNC_TRIGGER("sync-trigger", true, false),
         PUBLIC_ACTIVITY("public-activity", false, false);
@@ -109,7 +109,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         String key = resolveBucketKey(endpoint, request);
         ConsumptionProbe probe = bucketResolver.tryConsume(key, limit.bucketConfiguration(), e -> {
             metrics.recordRateLimitBackendError();
-            log.warn("Rate limit backend error: endpoint={} key={}", endpoint, key, e);
+            log.warn("Rate limit backend error: endpoint={}", endpoint, e);
         });
         if (probe == null) {
             if (endpoint.failOpen) {
@@ -126,8 +126,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         }
 
         long retryAfterSeconds = RateLimitResponse.retryAfterSeconds(probe);
-        // key is namespaced (no raw account-id PII beyond what already exists in auth logs); safe at WARN.
-        log.warn("Rate limit exceeded: endpoint={} key={} retryAfterSeconds={}", endpoint, key, retryAfterSeconds);
+        // The bucket key names the account or client IP, so the log carries only the endpoint.
+        log.warn("Rate limit exceeded: endpoint={} retryAfterSeconds={}", endpoint, retryAfterSeconds);
         // Tag by bucket namespace — bounded, no PII.
         metrics.recordRateLimitBlocked(endpoint.namespace);
         RateLimitResponse.writeTooManyRequests(request, response, retryAfterSeconds, objectMapper);
@@ -183,8 +183,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         if ("POST".equals(method) && path.equals("/user/exports")) {
             return Endpoint.EXPORT;
         }
-        if ("POST".equals(method) && path.matches("/workspaces/[^/]+/mentor/chat")) {
-            return Endpoint.MENTOR_CHAT;
+        if ("POST".equals(method) && path.matches("/workspaces/[^/]+/mentor/turns")) {
+            return Endpoint.MENTOR_TURNS;
         }
         if ("POST".equals(method) && path.matches("/workspaces/[^/]+/practices/review-requests")) {
             return Endpoint.REVIEW_REQUEST;
@@ -204,7 +204,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             case USER_VIEW -> properties.userView();
             case DELETE_USER -> properties.deleteUser();
             case EXPORT -> properties.export();
-            case MENTOR_CHAT -> properties.mentorChat();
+            case MENTOR_TURNS -> properties.mentorTurns();
             case REVIEW_REQUEST -> properties.reviewRequest();
             case SYNC_TRIGGER -> properties.syncTrigger();
             case PUBLIC_ACTIVITY -> properties.publicActivity();

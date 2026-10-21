@@ -117,13 +117,11 @@ services:
         MARKER=$$(PGPASSWORD="$$POSTGRES_PASSWORD" psql -h "$$TARGET" -U hephaestus -d hephaestus \
           -tAX -c "SELECT coalesce(to_regclass('public.hephaestus_preview_seeded')::text, '')")
         if [ -n "$$MARKER" ]; then
-          if [ "$$PREVIEW_FRESH_REVIEW_ENABLED" = "true" ]; then
-            POLICY=$$(PGPASSWORD="$$POSTGRES_PASSWORD" psql -h "$$TARGET" -U hephaestus -d hephaestus \
-              -tAX -v ON_ERROR_STOP=1 -c "SELECT coalesce(obj_description('public.hephaestus_preview_seeded'::regclass, 'pg_class'), '')")
-            if [ "$$POLICY" != "owned-review-policy-v1" ]; then
-              echo "This preview predates the owned-review seed policy; tear it down and recreate it"
-              exit 1
-            fi
+          POLICY=$$(PGPASSWORD="$$POSTGRES_PASSWORD" psql -h "$$TARGET" -U hephaestus -d hephaestus \
+            -tAX -v ON_ERROR_STOP=1 -c "SELECT coalesce(obj_description('public.hephaestus_preview_seeded'::regclass, 'pg_class'), '')")
+          if [ "$$POLICY" != "owned-review-policy-v2" ]; then
+            echo "This preview predates the current seed policy; tear it down and recreate it"
+            exit 1
           fi
           echo "Skipping seed-loader: this preview has already been seeded"
           exit 0
@@ -194,7 +192,7 @@ services:
         UPDATE workspace_agent_binding
            SET enabled = FALSE,
                updated_at = NOW()
-         WHERE purpose = 'PRACTICE_REVIEW';
+         WHERE purpose IN ('PRACTICE_REVIEW', 'MENTOR');
 
         DO 'BEGIN
           IF to_regclass(''public.review_job'') IS NOT NULL THEN
@@ -269,6 +267,17 @@ services:
           END IF;
         END';
 
+        -- Park cloned Heph work before any server scheduler or opted-in worker can take it.
+        -- This is a clone policy, not an attempt ending: keep usage, admission and dates unchanged.
+        DO 'BEGIN
+          IF to_regclass(''public.mentor_turn'') IS NOT NULL THEN
+            UPDATE mentor_turn
+               SET status = ''STOPPED'', worker_id = NULL, leased_until = NULL
+             WHERE status IN (''QUEUED'', ''RUNNING'')
+                OR (status = ''STOPPED'' AND leased_until IS NOT NULL);
+          END IF;
+        END';
+
         UPDATE sync_job
            SET status = 'CANCELLED',
                cancel_requested = TRUE,
@@ -318,7 +327,7 @@ services:
                    WHERE NOT silent_mode_engaged
                       OR coalesce(to_jsonb(settings)->>'public_activity_allowed', 'false') = 'true')
                + CASE WHEN EXISTS (SELECT 1 FROM instance_settings WHERE id = 1) THEN 0 ELSE 1 END
-               + (SELECT count(*) FROM workspace_agent_binding WHERE enabled AND purpose = 'PRACTICE_REVIEW')
+               + (SELECT count(*) FROM workspace_agent_binding WHERE enabled AND purpose IN ('PRACTICE_REVIEW', 'MENTOR'))
                + ((xpath('/row/live/text()', query_to_xml(
                    CASE WHEN to_regclass('public.review_job') IS NOT NULL THEN
                      'SELECT (SELECT count(*) FROM review_schedule WHERE enabled)
@@ -341,6 +350,12 @@ services:
                  + (SELECT count(*) FROM agent_job
                      WHERE job_token NOT LIKE ''cleared-by-preview-clone:%'' OR job_token_hash IS NOT NULL) AS live'
                    END, FALSE, TRUE, '')))[1]::text)::bigint
+               + ((xpath('/row/live/text()', query_to_xml(
+                   CASE WHEN to_regclass('public.mentor_turn') IS NOT NULL THEN
+                     'SELECT count(*) AS live FROM mentor_turn
+                       WHERE status IN (''QUEUED'', ''RUNNING'')
+                          OR (status = ''STOPPED'' AND leased_until IS NOT NULL)'
+                   ELSE 'SELECT 0 AS live' END, FALSE, TRUE, '')))[1]::text)::bigint
                + (SELECT count(*) FROM sync_job WHERE status IN ('PENDING', 'RUNNING'))
                + (SELECT count(*) FROM login_provider)
                + (SELECT count(*) FROM jwt_signing_key)
@@ -358,7 +373,7 @@ services:
 
         psql -h "$$TARGET" -U hephaestus -d hephaestus -v ON_ERROR_STOP=1 \
           -c "CREATE TABLE hephaestus_preview_seeded (seeded_at timestamptz NOT NULL DEFAULT now());
-              COMMENT ON TABLE hephaestus_preview_seeded IS 'owned-review-policy-v1';"
+              COMMENT ON TABLE hephaestus_preview_seeded IS 'owned-review-policy-v2';"
         echo "Seed loaded; reviews are paused and the preview owns its login apps and signing key"
     security_opt:
       - no-new-privileges:true

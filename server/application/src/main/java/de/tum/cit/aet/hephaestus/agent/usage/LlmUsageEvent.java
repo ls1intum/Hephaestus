@@ -25,10 +25,10 @@ import org.jspecify.annotations.Nullable;
  * Records the LLM usage of review jobs and mentor turns for spending totals and budget caps.
  * Source identity, model, funding source, rates and date stay frozen; an operator can price an unpriced row. A
  * review job attempt's rows project its measurement: a call that returns after the attempt ended replaces their
- * measurement ({@link LlmUsageRecorder#project}). A mentor turn's row is never replaced.
+ * measurement ({@link LlmUsageRecorder#project}). A Heph turn attempt's row projects its measurement the same way.
  *
  * <p>{@code sourceId} is a soft reference (no FK) to the originating {@code review_job.id} or
- * {@code chat_message.id}: accounting must survive source-row deletion. Source kind, id, and
+ * {@code mentor_turn.id}: accounting must survive source-row deletion. Source kind, id, and
  * attempt form the idempotency key, so retries are billed once each without collapsing distinct
  * provider calls.
  */

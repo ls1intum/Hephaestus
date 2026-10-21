@@ -65,7 +65,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -135,7 +134,6 @@ class FeedbackAdmissionReasonsTest {
             mock(RepeatedSummaryCheck.class),
             mock(FeedbackResponseSuppressionFilter.class),
             mock(FeedbackSupersession.class),
-            mock(ApplicationEventPublisher.class),
             support,
             composition);
 

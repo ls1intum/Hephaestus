@@ -42,7 +42,6 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
     private final WorkerCapacityState state;
     private final WorkerProperties properties;
     private final Optional<ReviewJobExecutor> executor;
-    private final Optional<WorkerMentorSessions> mentorSessions;
     private final ApplicationEventPublisher events;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean draining = new AtomicBoolean(false);
@@ -52,14 +51,12 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
             WorkerCapacityState state,
             WorkerProperties properties,
             Optional<ReviewJobExecutor> executor,
-            Optional<WorkerMentorSessions> mentorSessions,
             ApplicationEventPublisher events,
             MeterRegistry meterRegistry) {
         this.client = client;
         this.state = state;
         this.properties = properties;
         this.executor = executor;
-        this.mentorSessions = mentorSessions;
         this.events = events;
         Gauge.builder(AgentMetrics.WORKER_DRAIN_ACTIVE, draining, b -> b.get() ? 1.0 : 0.0)
                 .description("1 while the worker is draining, 0 otherwise")
@@ -73,40 +70,62 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
 
     @Override
     public void stop() {
-        stop(() -> {});
+        if (stopAccepting()) {
+            awaitDrain();
+        }
     }
 
+    /**
+     * Refuses new jobs on the calling thread, then waits for the jobs in flight on a thread of its own. Spring calls
+     * this for every bean of the phase before it waits for their callbacks, so the Heph drain of the same phase stops
+     * claiming at once and runs alongside this one, and the web server's phase still starts only after both ended.
+     */
     @Override
     public void stop(Runnable callback) {
-        try {
-            if (running.compareAndSet(true, false)) {
-                draining.set(true);
-                Duration timeout = properties.drain().timeout();
-                log.info("Worker drain starting (timeout={})…", timeout);
-
-                AvailabilityChangeEvent.publish(events, this, ReadinessState.REFUSING_TRAFFIC);
-                safeSend(new Heartbeat(true));
-                CapacityReport snap = state.snapshot();
-                safeSend(new CapacityReport(
-                        snap.reviewMax(), snap.mentorMax(), snap.inFlightReview(), snap.inFlightMentor(), 0, 0));
-
-                mentorSessions.ifPresent(WorkerMentorSessions::stop);
-                boolean complete = executor.map(e -> drainExecutor(e, timeout)).orElse(true);
-                if (complete) {
-                    log.info("Worker drain finished: owned job states settled and container stop calls returned.");
-                } else {
-                    log.warn("Worker drain incomplete: a job state was not settled, or a container stop failed or"
-                            + " did not return.");
-                }
-            }
-        } finally {
+        if (!stopAccepting()) {
             callback.run();
+            return;
+        }
+        Thread.ofPlatform().name("worker-drain").start(() -> {
+            try {
+                awaitDrain();
+            } catch (RuntimeException e) {
+                log.warn("Worker drain failed: {}", e.getClass().getSimpleName());
+            } finally {
+                callback.run();
+            }
+        });
+    }
+
+    /** Readiness flip, final heartbeat and capacity report, then no new job; false when the drain already began. */
+    private boolean stopAccepting() {
+        if (!running.compareAndSet(true, false)) {
+            return false;
+        }
+        draining.set(true);
+        log.info("Worker drain starting (timeout={})…", properties.drain().timeout());
+
+        AvailabilityChangeEvent.publish(events, this, ReadinessState.REFUSING_TRAFFIC);
+        safeSend(new Heartbeat(true));
+        CapacityReport snap = state.snapshot();
+        safeSend(new CapacityReport(snap.reviewMax(), snap.inFlightReview(), 0));
+        executor.ifPresent(ReviewJobExecutor::stopAcceptingNewJobs);
+        return true;
+    }
+
+    private void awaitDrain() {
+        Duration timeout = properties.drain().timeout();
+        boolean complete = executor.map(e -> drainExecutor(e, timeout)).orElse(true);
+        if (complete) {
+            log.info("Worker drain finished: owned job states settled and container stop calls returned.");
+        } else {
+            log.warn("Worker drain incomplete: a job state was not settled, or a container stop failed or"
+                    + " did not return.");
         }
     }
 
     /** Drains the executor; false if a job was left unsettled or a container stop did not return. */
     private boolean drainExecutor(ReviewJobExecutor exec, Duration timeout) {
-        exec.stopAcceptingNewJobs();
         if (timeout.isZero()) {
             log.info("Drain mode IMMEDIATE — cancelling in-flight jobs without waiting.");
             return exec.cancelInFlight(ReviewJobCancellationReason.DRAIN_IMMEDIATE);

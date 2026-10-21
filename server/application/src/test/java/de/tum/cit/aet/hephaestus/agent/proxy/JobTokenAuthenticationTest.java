@@ -11,12 +11,7 @@ class JobTokenAuthenticationTest extends BaseUnitTest {
 
     @Test
     void shouldRedactCredentials() {
-        var auth = new JobTokenAuthentication(
-                new ProxyIdentity(
-                        null,
-                        null,
-                        new MentorProxyCredentialRegistry.AuthenticatedSession(UUID.randomUUID(), "test-hash")),
-                Set.of("llm_proxy"));
+        var auth = new JobTokenAuthentication(ProxyIdentity.hostSession(UUID.randomUUID()), Set.of("llm_proxy"), null);
 
         // The default AbstractAuthenticationToken credential is whatever was passed in; this override
         // is what keeps a proxy bearer token out of every log line that prints the Authentication.

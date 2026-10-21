@@ -30,6 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 class SandboxGatewayRateLimitFilterTest extends BaseUnitTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String TURN_BOOKKEEPING = "/internal/llm/turn/bookkeeping";
 
     @Mock
     private ProxyBudgetGate budgetGate;
@@ -58,7 +59,7 @@ class SandboxGatewayRateLimitFilterTest extends BaseUnitTest {
         MockHttpServletResponse exhausted = new MockHttpServletResponse();
         filter.doFilter(new MockHttpServletRequest("POST", "/internal/llm/responses"), exhausted, this::serve);
 
-        authenticate("mentor-session:" + UUID.randomUUID());
+        authenticate("host-session:" + UUID.randomUUID());
         MockHttpServletResponse other = new MockHttpServletResponse();
         filter.doFilter(new MockHttpServletRequest(), other, this::serve);
 
@@ -110,6 +111,20 @@ class SandboxGatewayRateLimitFilterTest extends BaseUnitTest {
                 .isEqualTo(1);
     }
 
+    /** A Heph host reports its turn's progress several times a second; that bookkeeping is never throttled. */
+    @Test
+    void shouldServeExemptRequestsWhenThePrincipalsBudgetIsSpent() throws Exception {
+        var filter = filterAllowing(1);
+        authenticate("job:1");
+        filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), this::serve);
+
+        MockHttpServletResponse exempt = new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("POST", TURN_BOOKKEEPING), exempt, this::serve);
+
+        assertThat(served).hasValue(2);
+        assertThat(exempt.getStatus()).isEqualTo(200);
+    }
+
     /** Authentication is the chain's decision, not the limiter's: it must not answer for it. */
     @Test
     void shouldPassAnUnauthenticatedRequestOnToTheAuthorizationRules() throws Exception {
@@ -137,14 +152,14 @@ class SandboxGatewayRateLimitFilterTest extends BaseUnitTest {
                 resolver,
                 OBJECT_MAPPER,
                 new ProxyAccounting(
-                        budgetGate, usageAccumulator, mentorTurnUsageAccumulator, meterRegistry, OBJECT_MAPPER));
+                        budgetGate, usageAccumulator, mentorTurnUsageAccumulator, meterRegistry, OBJECT_MAPPER),
+                request -> TURN_BOOKKEEPING.equals(request.getRequestURI()));
     }
 
     private void authenticate(String principalDescription) {
-        var session = new MentorProxyCredentialRegistry.AuthenticatedSession(
-                UUID.nameUUIDFromBytes(principalDescription.getBytes(StandardCharsets.UTF_8)), "test-hash");
+        var session = UUID.nameUUIDFromBytes(principalDescription.getBytes(StandardCharsets.UTF_8));
         SecurityContextHolder.getContext()
-                .setAuthentication(new TestingAuthenticationToken(new ProxyIdentity(null, null, session), null));
+                .setAuthentication(new TestingAuthenticationToken(ProxyIdentity.hostSession(session), null));
     }
 
     private void serve(ServletRequest request, ServletResponse response) {

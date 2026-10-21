@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.collection;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.event.AgentContextChangedEvent;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
@@ -194,6 +195,9 @@ public class OutlineCollectionAdminService {
             if (targetState == MirrorState.ENABLED) {
                 row.setSyncStatus(SyncStatus.PENDING);
                 eventPublisher.publishEvent(new OutlineCollectionResumedEvent(workspaceId, collectionId));
+            } else {
+                // A running Heph turn may hold the collection's documents in its context folder.
+                eventPublisher.publishEvent(new AgentContextChangedEvent(workspaceId));
             }
             row = collectionRepository.save(row);
         }
@@ -221,6 +225,7 @@ public class OutlineCollectionAdminService {
         long erased = documentRepository.deleteByWorkspaceIdAndConnectionIdAndCollectionId(
                 workspaceId, install.connectionId(), collectionId);
         collectionRepository.delete(row);
+        eventPublisher.publishEvent(new AgentContextChangedEvent(workspaceId));
         log.info(
                 "outline.audit: collection erase — actor={} removed collectionId={} from the mirror for workspaceId={} ({} mirrored document(s) erased)",
                 LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),

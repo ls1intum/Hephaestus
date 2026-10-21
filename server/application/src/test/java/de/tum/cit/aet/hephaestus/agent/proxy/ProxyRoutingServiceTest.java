@@ -20,11 +20,15 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorTurnAdmission;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.TurnJwt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurn;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -47,9 +51,9 @@ import tools.jackson.databind.json.JsonMapper;
 class ProxyRoutingServiceTest extends BaseUnitTest {
     private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
     private final JsonMapper mapper = new JsonMapper();
+    private final MentorTurnRepository turns = mock(MentorTurnRepository.class);
     private final ReviewAttemptUsageService attemptUsage = mock(ReviewAttemptUsageService.class);
-    private final ProxyRoutingService routing =
-            new ProxyRoutingService(jobs, mapper, new MentorProxyCredentialRegistry(), attemptUsage);
+    private final ProxyRoutingService routing = new ProxyRoutingService(jobs, turns, mapper, attemptUsage);
     private final ReviewJob job = new ReviewJob();
     private final Instant workDeadline = Instant.now().plusSeconds(30);
     private ProxyIdentity identity;
@@ -75,10 +79,9 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
                 Map.of(ModelKind.EMBEDDING, model(LlmApiProtocol.OPENAI_EMBEDDINGS, UsageFundingSource.WORKSPACE)));
         job.setConfigSnapshot(snapshot.toJson(mapper));
         var now = Instant.now();
-        identity = new ProxyIdentity(
+        identity = ProxyIdentity.of(
                 new JobJwt(job.getId(), 7L, 2, Set.of("llm_proxy"), "id", now, now.plusSeconds(60), workDeadline),
-                "worker",
-                null);
+                "worker");
         lenient().when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
     }
 
@@ -128,6 +131,16 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void refusesAReviewCallItsAttemptCannotRegister() {
+        when(attemptUsage.registerCall(any(), anyLong(), anyInt(), any(), any(), any()))
+                .thenReturn(false);
+        assertThatThrownBy(() -> routing.resolve(identity, request("/internal/llm/responses")))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        failure -> assertThat(failure.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
+    }
+
+    @Test
     void missingSlotIsA404AndDoesNotQueryUsage() {
         assertThatThrownBy(() -> routing.resolve(identity, request("/internal/llm/practice-script/reranking/rerank")))
                 .isInstanceOfSatisfying(
@@ -138,14 +151,93 @@ class ProxyRoutingServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void mentorCredentialsCannotAcquireScriptModelRouting() {
-        var mentor = new ProxyIdentity(
-                null, null, new MentorProxyCredentialRegistry.AuthenticatedSession(UUID.randomUUID(), "test-hash"));
-        assertThatThrownBy(() -> routing.resolve(mentor, request("/internal/llm/practice-script/chat/responses")))
+    void turnCredentialsCannotAcquireScriptModelRouting() {
+        var turn = ProxyIdentity.of(turnJwt(3), "worker");
+        assertThatThrownBy(() -> routing.resolve(turn, request("/internal/llm/practice-script/chat/responses")))
                 .isInstanceOfSatisfying(
                         ResponseStatusException.class,
                         failure -> assertThat(failure.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
-        verifyNoInteractions(jobs);
+        verifyNoInteractions(jobs, turns, attemptUsage);
+    }
+
+    @Test
+    void turnRoutingBillsTheLeasedAttemptAtTheRatesItWasAdmittedWith() {
+        var jwt = turnJwt(3);
+        var row = leasedTurn(jwt, 3, "worker");
+        when(row.getInputTokens()).thenReturn(2_000_000L);
+
+        var route = routing.resolve(ProxyIdentity.of(jwt, "worker"), request("/internal/llm/responses"));
+
+        assertThat(route.principalDescription()).isEqualTo("mentor-turn:" + jwt.turnId());
+        assertThat(route.baseUrl()).isEqualTo("https://models.example/v1");
+        assertThat(route.workspaceId()).isEqualTo(7L);
+        assertThat(route.attempt().sourceType()).isEqualTo(UsageSourceType.MENTOR_TURN);
+        assertThat(route.attempt().sourceId()).isEqualTo(jwt.turnId());
+        assertThat(route.attempt().number()).isEqualTo(3);
+        assertThat(route.attempt().workerId()).isEqualTo("worker");
+        assertThat(route.attempt().spentUsd()).isEqualByComparingTo("2");
+        verifyNoInteractions(jobs, attemptUsage);
+    }
+
+    @Test
+    void turnRoutingOfAnAttemptThatNoLongerHoldsItsLeaseIsAConflict() {
+        var jwt = turnJwt(3);
+        leasedTurn(jwt, 4, "worker");
+        assertThatThrownBy(() -> routing.resolve(ProxyIdentity.of(jwt, "worker"), request("/internal/llm/responses")))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        failure -> assertThat(failure.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    private static TurnJwt turnJwt(int attempt) {
+        var now = Instant.now();
+        return new TurnJwt(
+                UUID.randomUUID(),
+                7L,
+                11L,
+                UUID.randomUUID(),
+                attempt,
+                Set.of("llm_proxy"),
+                "id",
+                now,
+                now.plusSeconds(60));
+    }
+
+    private MentorTurn leasedTurn(TurnJwt jwt, int attempt, String worker) {
+        var row = mock(MentorTurn.class);
+        // A turn that lost its lease is refused before its rates are read.
+        lenient().when(row.getId()).thenReturn(jwt.turnId());
+        lenient().when(row.getWorkspaceId()).thenReturn(jwt.workspaceId());
+        lenient().when(row.isLeased()).thenReturn(true);
+        lenient().when(row.getAttempt()).thenReturn(attempt);
+        lenient().when(row.getWorkerId()).thenReturn(worker);
+        lenient().when(row.getConversationId()).thenReturn(jwt.conversationId());
+        var price = new LlmPriceSnapshot(
+                UsageFundingSource.WORKSPACE,
+                UsagePricingState.PRICED,
+                1L,
+                null,
+                BigDecimal.ONE,
+                BigDecimal.ONE,
+                null,
+                null);
+        lenient()
+                .when(row.getAdmission())
+                .thenReturn(new MentorTurnAdmission(
+                                "model-1",
+                                price,
+                                new MentorTurnAdmission.Route(
+                                        "openai-responses",
+                                        "https://models.example/v1",
+                                        UsageFundingSource.WORKSPACE,
+                                        1L,
+                                        2L),
+                                null,
+                                null,
+                                null)
+                        .toJson());
+        when(turns.findByIdAndWorkspaceId(jwt.turnId(), jwt.workspaceId())).thenReturn(Optional.of(row));
+        return row;
     }
 
     private static FrozenModel model(LlmApiProtocol protocol, UsageFundingSource purse) {

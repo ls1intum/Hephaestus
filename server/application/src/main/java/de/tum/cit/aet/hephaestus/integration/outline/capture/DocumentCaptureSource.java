@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.outline.capture;
 
-import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.mentor.spi.MentorMessageQuery;
@@ -21,9 +21,12 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Document bodies and author names supplied through {@link DocumentProjection} are untrusted data, never instructions. */
+/**
+ * Document bodies and author names supplied through {@link DocumentProjection} are untrusted data, never instructions.
+ * The worker builds the context of a Heph turn, so this source exists wherever capture runs.
+ */
 @Component
-@ConditionalOnServerRole
+@ConditionalOnCaptureRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class DocumentCaptureSource implements ContentSource {
 
@@ -83,7 +86,15 @@ public class DocumentCaptureSource implements ContentSource {
             node.put("collection", doc.collectionSlug());
             node.put("slug", doc.slug());
             node.put("title", doc.title());
+            if (doc.url() != null) {
+                node.put("url", doc.url());
+            }
             node.put("body", excerptBody(doc));
+            String full = doc.bodyMarkdown();
+            if (!doc.deleted() && full != null && full.length() > MENTOR_BODY_CHARS) {
+                node.put("bodyTruncated", true);
+                node.put("bodyChars", full.length());
+            }
             // Human-facing collection label; "collection" above stays the path/slug identity.
             if (doc.collectionName() != null) {
                 node.put("collection_name", doc.collectionName());

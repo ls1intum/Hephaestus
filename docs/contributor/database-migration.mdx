@@ -104,6 +104,9 @@ if history never changes underneath an instance that already ran part of it.
    Release *N* stops reads and writes, and migrates data if necessary.
    Release *N+1* drops it. A single
    release must stay bootable against the schema left behind by the previous one.
+   An ADR can grant an exception: see [Practice model cutover](#practice-model-cutover)
+   and [Heph conversation ledger](#heph-conversation-ledger).
+   Such a release tells operators to stop every role before the upgrade.
 
 CI enforces 1 and 2 mechanically (see below). 3 is a review responsibility. The sole archival
 transition is the verified v0.77.4 baseline: archived files remain byte-identical and test-only.
@@ -203,6 +206,18 @@ The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/bl
 | `workspace.practice_skip_drafts` | Reviews include draft work when a practice's `reviewOn` declaration permits it. `practice_skip_drafts` is removed. The migration preserves each pinned practice version. |
 | `consent_decision.notice_sha256` | The duplicate hash is removed. Each decision keeps its immutable `notice_version`. The referenced `consent_notice` keeps the exact notice text and hash. |
 | Legacy job diagnostics: `container_logs`, `prompt_digest`, `inputs_digest`, `model_labels`, and unmapped `metadata` | These database values are not copied into the new practice records. Retain the pre-upgrade backup when this diagnostic history is needed. |
+
+## Heph conversation ledger
+
+The Heph conversation ledger is a second maintainer-approved exception to rule 3 of the [immutability policy](#changelog-immutability-policy).
+One changelog, `1792397538973_changelog.xml`, drops the released Heph chat tables and creates the ledger.
+It clears and renames the message link of earlier conversation copies.
+Rules 1 and 2 still apply.
+Stop every role before the upgrade.
+[ADR 0057](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0057-one-heph-conversation-per-developer.md) owns the decision and what the upgrade drops.
+
+On the upgrade from the previous stable release, `scripts/release-upgrade-test.ts` seeds Heph chat history and conversation copies.
+After the upgrade, it checks them (`server/application/src/test/resources/db/heph-upgrade/`).
 
 ## Prove the released-state upgrade
 

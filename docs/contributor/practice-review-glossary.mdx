@@ -101,7 +101,7 @@ The event stays on its pull request with its original name, revision and times. 
 | Term                           | Meaning                                                                                                   | Identifier                     |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------ |
 | **Job**                        | Execution of a review in a sandbox, with attempts and costs.                                              | review_job                     |
-| **Agent**                      | The sandboxed runtime that executes a review or a mentor session.                                         | agent runtime                  |
+| **Agent**                      | The sandboxed runtime that executes a review, or the Heph host.                                           | agent runtime                  |
 | **Attempt**                    | One claimed execution of a job, protected by its execution fence.                                         | attempt                        |
 | **Model assignment**           | A workspace's choice of a model for an execution purpose and AI tier.                                     | workspace model configuration  |
 | **Model for practice scripts** | A decision, embedding or reranking model that a script can call through its host.                         | script model purposes          |
@@ -114,6 +114,16 @@ The event stays on its pull request with its original name, revision and times. 
 | **Composition**                | The preparation of feedback from admitted and eligible results.                                           | feedback composition           |
 | **Send**                       | One leased provider write or retraction of on-work feedback, with its reconciliation state.               | feedback_send                  |
 | **Review digest**              | The digest of the definition inputs that can change a result from the same evidence.                      | practice_version.review_digest |
+| **Heph host**                  | The one long-lived sandboxed process on a worker that runs Heph turns.                      | heph-host.ts, HephHost         |
+| **Turn**                       | One run of Heph for one question, with its attempts, lease, partial answer and usage.       | mentor_turn                    |
+| **Context folder**             | The read-only files that one agent may read for one person, in one workspace, for one purpose. | INDEX.md, inputs/context/, repos/ |
+| **Context document**           | One JSON document about the developer or the workspace in Heph's context folder.            | inputs/context/*.json          |
+| **Context loader**             | The integration part that stages a heavy item, such as a repository, into a context folder on request. | ContextLoader, load_context |
+| **Turn sandbox**               | The sandbox that holds Heph's context folder for one turn attempt, with no network and no credentials. | TurnSandboxes               |
+
+The job folder of a review is the context folder of that review.
+The [Heph runtime](./unified-pi-runtime.mdx) owns turns, the Heph host, context documents, context loaders and turn sandboxes.
+A turn is not a job: it has no job row and no review.
 
 A job can expire without removing its review or results.
 The [runtime guide](./practice-review-runtime.mdx) owns execution, retries and retention.

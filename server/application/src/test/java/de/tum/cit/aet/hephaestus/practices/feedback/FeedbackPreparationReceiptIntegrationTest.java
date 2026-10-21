@@ -343,7 +343,7 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
         store.prepareAll(workspace.getId(), reviewId, List.of(next));
         assertThat(feedback.findById(previous.id()).orElseThrow().getState()).isEqualTo(FeedbackState.REPLACED);
         assertThat(feedback.findById(nextId).orElseThrow().getReplacesId()).isEqualTo(previous.id());
-        assertThat(store.claimConversationCopy(workspace.getId(), previous.id(), UUID.randomUUID()))
+        assertThat(store.claimConversationCopy(workspace.getId(), previous.id(), runningTurn(developerId), 1))
                 .isEmpty();
         var retained = reviews.findById(reviewId)
                 .orElseThrow()
@@ -605,6 +605,25 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
         return Arrays.stream(results)
                 .map(result -> new FeedbackCompositionTrace.Support(result.getId(), null))
                 .toList();
+    }
+
+    /** A running first attempt of a Heph turn in the developer's main conversation. */
+    private UUID runningTurn(long developer) {
+        UUID conversationId = UUID.randomUUID(), turnId = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO mentor_conversation(id,workspace_id,account_id,created_at,last_activity_at)"
+                        + " VALUES (?,?,?,now(),now())",
+                conversationId,
+                workspace.getId(),
+                developer);
+        jdbc.update(
+                "INSERT INTO mentor_turn(id,workspace_id,conversation_id,request_id,status,surface,attempt,started_at,"
+                        + "created_at) VALUES (?,?,?,?,'RUNNING','APP',1,now(),now())",
+                turnId,
+                workspace.getId(),
+                conversationId,
+                turnId.toString());
+        return turnId;
     }
 
     private FeedbackDraft conversation(long developer) {

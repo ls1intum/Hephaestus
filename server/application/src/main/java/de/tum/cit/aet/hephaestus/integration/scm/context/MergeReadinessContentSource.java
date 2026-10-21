@@ -5,12 +5,15 @@ import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextPaths;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.RequestedReviewer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
@@ -19,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -71,7 +75,7 @@ public class MergeReadinessContentSource implements ContentSource {
 
     public static final String OUTPUT_KEY = MentorContextPaths.MERGE_READINESS;
 
-    /** Mirrored by {@code MERGE_READINESS_ITEM} in {@code pi-mentor-protocol.ts}. */
+    /** One item path, which a {@code read} of the turn's context folder stages on demand. */
     private static final Pattern ITEM_KEY = Pattern.compile("inputs/context/merge_readiness/([1-9][0-9]{0,18})\\.json");
 
     private static final int MAX_DETAILED = 5;
@@ -83,6 +87,10 @@ public class MergeReadinessContentSource implements ContentSource {
     private static final int MAX_THREADS = 5;
     private static final int MAX_THREAD_COMMENTS = 3;
     private static final int MAX_CLOSING_ISSUES = 5;
+    private static final int MAX_COMMITS = 20;
+    private static final int MAX_FILES = 50;
+    private static final int MAX_FILE_CHANGES_READ = 500;
+    private static final int MAX_HUNK_CHARS = 1_500;
 
     /** What a closing issue is to the pull request: the provider records it as closed by a merge, nothing more. */
     private static final String CLOSING_RELATION = "PROVIDER_RECORDED_CLOSING_CANDIDATE";
@@ -124,7 +132,7 @@ public class MergeReadinessContentSource implements ContentSource {
 
     /** The on-demand key of one pull request's detail, published as the {@code resource} of its entries. */
     public static String resourceOf(long pullRequestId) {
-        return OUTPUT_PREFIX + "merge_readiness/" + pullRequestId + ".json";
+        return MentorContextPaths.mergeReadiness(pullRequestId);
     }
 
     @Override
@@ -168,7 +176,7 @@ public class MergeReadinessContentSource implements ContentSource {
                                 + "of an entry in recent_authored_work.json or merge_readiness.json.");
                 return;
             }
-            root.putArray("pullRequests").add(describe(workspaceId, developerId, providerId, pr.get()));
+            root.putArray("pullRequests").add(describe(workspaceId, developerId, providerId, pr.get(), true));
             root.putArray("notLoaded");
         });
     }
@@ -184,7 +192,7 @@ public class MergeReadinessContentSource implements ContentSource {
             ArrayNode notLoaded = root.putArray("notLoaded");
             for (int i = 0; i < Math.min(open.size(), MAX_DETAILED + MAX_LISTED); i++) {
                 if (i < MAX_DETAILED) {
-                    detailed.add(describe(workspaceId, developerId, providerId, open.get(i)));
+                    detailed.add(describe(workspaceId, developerId, providerId, open.get(i), false));
                 } else {
                     notLoaded.add(indexEntry(open.get(i)));
                 }
@@ -238,7 +246,8 @@ public class MergeReadinessContentSource implements ContentSource {
                 .put("pullRequestId", pr.getId())
                 .put("resource", resourceOf(pr.getId()))
                 .put("number", pr.getNumber())
-                .put("title", pr.getTitle());
+                .put("title", pr.getTitle())
+                .put("url", pr.getHtmlUrl());
     }
 
     private ObjectNode indexEntry(JsonNode detail) {
@@ -247,10 +256,15 @@ public class MergeReadinessContentSource implements ContentSource {
                 .put("pullRequestId", detail.path("pullRequestId").asLong())
                 .put("resource", resourceOf(detail.path("pullRequestId").asLong()))
                 .put("number", detail.path("number").asInt())
-                .put("title", detail.path("title").asString());
+                .put("title", detail.path("title").asString())
+                .put("url", detail.path("url").asString(null));
     }
 
-    private ObjectNode describe(long workspaceId, long developerId, long providerId, PullRequest pr) {
+    /**
+     * @param change whether to add what changed — reviewers asked, labels, refs, commits and files — as one detail
+     *     does
+     */
+    private ObjectNode describe(long workspaceId, long developerId, long providerId, PullRequest pr, boolean change) {
         ObjectNode node = objectMapper.createObjectNode();
         node.put("pullRequestId", pr.getId());
         node.put("resource", resourceOf(pr.getId()));
@@ -287,6 +301,9 @@ public class MergeReadinessContentSource implements ContentSource {
         node.put("checksObserved", checksObserved(pr));
         Instant checkedAt = pr.getHeadCheckObservedAt();
         node.put("checksObservedAt", checkedAt == null ? "UNKNOWN" : checkedAt.toString());
+        if (change) {
+            putChange(node, pr);
+        }
 
         List<PullRequestReview> recent = reviewRepository.findRecentByPullRequestIdWithAuthor(
                 pr.getId(), Set.of(PullRequestReview.State.PENDING), PageRequest.of(0, MAX_REVIEWS_READ));
@@ -319,6 +336,7 @@ public class MergeReadinessContentSource implements ContentSource {
             if (submittedAt != null) {
                 entry.put("submittedAt", submittedAt.toString());
             }
+            entry.put("url", review.getHtmlUrl());
             entry.put("commit", review.getCommitId());
             entry.put(
                     "commitFor",
@@ -350,7 +368,13 @@ public class MergeReadinessContentSource implements ContentSource {
         // Newest first from the query; listed oldest first.
         for (IssueComment note :
                 notes.subList(0, Math.min(notes.size(), MAX_NOTES)).reversed()) {
-            notesCut |= putComment(noteArray, pr.getAuthor(), note.getAuthor(), note.getBody(), note.getCreatedAt());
+            notesCut |= putComment(
+                    noteArray,
+                    pr.getAuthor(),
+                    note.getAuthor(),
+                    note.getBody(),
+                    note.getCreatedAt(),
+                    note.getHtmlUrl());
         }
         node.put("generalNotesStatus", notesCut ? "TRUNCATED" : "COMPLETE");
 
@@ -397,12 +421,22 @@ public class MergeReadinessContentSource implements ContentSource {
             if (repliedTo.contains(thread)) {
                 entry.put("repliesToHephaestusNote", true);
             }
+            String hunk = comments.isEmpty() ? null : comments.getFirst().getDiffHunk();
+            if (change && hunk != null && !hunk.isBlank()) {
+                // The lines the thread's first comment was written on, as the provider stored them.
+                putText(entry, "diffHunk", hunk, MAX_HUNK_CHARS);
+            }
             threadsCut |= comments.size() > MAX_THREAD_COMMENTS;
             ArrayNode shown = entry.putArray("comments");
             for (PullRequestReviewComment comment :
                     comments.subList(0, Math.min(comments.size(), MAX_THREAD_COMMENTS))) {
                 threadsCut |= putComment(
-                        shown, pr.getAuthor(), comment.getAuthor(), comment.getBody(), comment.getCreatedAt());
+                        shown,
+                        pr.getAuthor(),
+                        comment.getAuthor(),
+                        comment.getBody(),
+                        comment.getCreatedAt(),
+                        comment.getHtmlUrl());
             }
         }
         node.put("threadsStatus", threadsCut ? "TRUNCATED" : "COMPLETE");
@@ -429,6 +463,91 @@ public class MergeReadinessContentSource implements ContentSource {
         }
         node.put("closingIssuesStatus", closingCut ? "TRUNCATED" : "COMPLETE");
         return node;
+    }
+
+    /**
+     * What one pull request changes and who it waits for, from the stored copy: requested reviewers and whether each
+     * still owes a verdict, requested teams, labels, refs, the commits the provider associates with it, and the files
+     * those commits touched. File changes exist only for commits whose details were captured, so {@code filesCoverage}
+     * says whether the list can be whole; an absent file is never inferred. Sums per file over the commits, not the
+     * provider's diff, and no code.
+     */
+    private void putChange(ObjectNode node, PullRequest pr) {
+        RecentAuthoredWorkContentSource.putRepository(node, pr);
+        node.put("baseRef", pr.getBaseRefName());
+        node.put("headRef", pr.getHeadRefName());
+        RecentAuthoredWorkContentSource.putDates(node, pr);
+        RecentAuthoredWorkContentSource.putLabels(node, pr);
+        Set<Long> awaiting = queryRepository.findAwaitingReviewerIds(pr.getId());
+        ArrayNode reviewers = node.putArray("requestedReviewers");
+        pr.getRequestedReviewers().stream()
+                .sorted(Comparator.comparing(request -> request.getUser().getLogin()))
+                .forEach(request -> {
+                    ObjectNode entry = reviewers.addObject();
+                    entry.put("login", request.getUser().getLogin());
+                    entry.put(
+                            "awaitingVerdict",
+                            awaiting.contains(request.getUser().getId()));
+                    RequestedReviewer.ReviewState state = request.getReviewState();
+                    if (state != null) {
+                        entry.put("reviewState", state.name());
+                    }
+                });
+        ArrayNode teams = node.putArray("requestedTeams");
+        pr.getRequestedTeams().stream()
+                .map(request -> request.getTeam().getName())
+                .sorted()
+                .forEach(teams::add);
+        Instant reviewersObservedAt = pr.getReviewersObservedAt();
+        node.put("reviewersObservedAt", reviewersObservedAt == null ? "UNKNOWN" : reviewersObservedAt.toString());
+
+        node.put("commitsOnProvider", pr.getCommits());
+        List<Commit> commits = queryRepository.findCommitsOfPullRequest(pr.getId(), PageRequest.of(0, MAX_COMMITS + 1));
+        ArrayNode commitArray = node.putArray("commits");
+        for (Commit commit : commits.subList(0, Math.min(commits.size(), MAX_COMMITS))) {
+            ObjectNode entry = commitArray.addObject();
+            entry.put(
+                    "sha",
+                    commit.getSha().substring(0, Math.min(7, commit.getSha().length())));
+            entry.put("headline", commit.getMessage());
+            entry.put("url", commit.getHtmlUrl());
+            Instant authoredAt = commit.getAuthoredAt();
+            entry.put("authoredAt", authoredAt == null ? null : authoredAt.toString());
+        }
+        node.put("commitsTruncated", commits.size() > MAX_COMMITS);
+
+        MentorContextQueryRepository.CommitCoverage coverage = queryRepository.countCommitsOfPullRequest(pr.getId());
+        Map<String, ObjectNode> files = new LinkedHashMap<>();
+        List<CommitFileChange> changes = coverage.getCaptured() == 0
+                ? List.of()
+                : queryRepository.findFileChangesOfPullRequest(
+                        pr.getId(), PageRequest.of(0, MAX_FILE_CHANGES_READ + 1));
+        boolean filesCut = changes.size() > MAX_FILE_CHANGES_READ;
+        for (CommitFileChange fileChange : changes.subList(0, Math.min(changes.size(), MAX_FILE_CHANGES_READ))) {
+            ObjectNode file = files.computeIfAbsent(
+                    fileChange.getFilename(),
+                    path -> objectMapper
+                            .createObjectNode()
+                            .put("path", path)
+                            .put("additions", 0)
+                            .put("deletions", 0));
+            file.put("changeType", fileChange.getChangeType().name());
+            file.put("additions", file.path("additions").asInt() + fileChange.getAdditions());
+            file.put("deletions", file.path("deletions").asInt() + fileChange.getDeletions());
+        }
+        ArrayNode fileArray = node.putArray("files");
+        files.values().stream().limit(MAX_FILES).forEach(fileArray::add);
+        filesCut |= files.size() > MAX_FILES;
+        node.put("changedFilesOnProvider", pr.getChangedFiles());
+        node.put(
+                "filesCoverage",
+                coverage.getCaptured() == 0
+                        ? "NOT_CAPTURED"
+                        : coverage.getCaptured() == coverage.getStored()
+                                        && coverage.getStored() >= pr.getCommits()
+                                        && !filesCut
+                                ? "COMPLETE"
+                                : "PARTIAL");
     }
 
     /**
@@ -462,12 +581,13 @@ public class MergeReadinessContentSource implements ContentSource {
     }
 
     /** @return whether the body was clipped */
-    private static boolean putComment(
+    static boolean putComment(
             ArrayNode into,
             @Nullable User workAuthor,
             @Nullable User author,
             String body,
-            @Nullable Instant createdAt) {
+            @Nullable Instant createdAt,
+            @Nullable String url) {
         ObjectNode c = into.addObject();
         c.put("author", author == null ? null : author.getLogin());
         c.put("authorRelation", authorRelation(workAuthor, author));
@@ -475,6 +595,7 @@ public class MergeReadinessContentSource implements ContentSource {
             c.put("bot", true);
         }
         c.put("createdAt", createdAt == null ? null : createdAt.toString());
+        c.put("url", url);
         // Not in the ledger yet carrying the marker: Hephaestus's note under an unmatched ref, or a person quoting one.
         if (body.contains(WorkspaceScmProjection.HEPHAESTUS_MARKER)) {
             c.put("quotesHephaestusMarker", true);
@@ -483,7 +604,7 @@ public class MergeReadinessContentSource implements ContentSource {
     }
 
     /** Whether {@code author} wrote the work itself, by stored identity; unknown when either identity is missing. */
-    private static String authorRelation(@Nullable User workAuthor, @Nullable User author) {
+    static String authorRelation(@Nullable User workAuthor, @Nullable User author) {
         Long workAuthorId = workAuthor == null ? null : workAuthor.getId();
         Long authorId = author == null ? null : author.getId();
         if (workAuthorId == null || authorId == null) {
@@ -497,18 +618,22 @@ public class MergeReadinessContentSource implements ContentSource {
         return putText(entry, "body", body);
     }
 
+    private static boolean putText(ObjectNode entry, String key, String text) {
+        return putText(entry, key, text, MAX_BODY_CHARS);
+    }
+
     /**
-     * Puts {@code text} under {@code key}, clipped at {@link #MAX_BODY_CHARS} without splitting a surrogate pair, and
-     * marks a clipped one with {@code <key>Truncated}.
+     * Puts {@code text} under {@code key}, clipped at {@code max} without splitting a surrogate pair, and marks a
+     * clipped one with {@code <key>Truncated}.
      *
      * @return whether the text was clipped — a condition past the cut is then unseen
      */
-    private static boolean putText(ObjectNode entry, String key, String text) {
-        if (text.length() <= MAX_BODY_CHARS) {
+    static boolean putText(ObjectNode entry, String key, String text, int max) {
+        if (text.length() <= max) {
             entry.put(key, text);
             return false;
         }
-        int end = Character.isHighSurrogate(text.charAt(MAX_BODY_CHARS - 1)) ? MAX_BODY_CHARS - 1 : MAX_BODY_CHARS;
+        int end = Character.isHighSurrogate(text.charAt(max - 1)) ? max - 1 : max;
         entry.put(key, text.substring(0, end));
         entry.put(key + "Truncated", true);
         return true;

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.account;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,12 +15,15 @@ public class AccountPreferencesService {
 
     @Transactional(readOnly = true)
     public UserSettingsDTO getUserSettings(long accountId) {
-        return new UserSettingsDTO(accounts.find(accountId).orElseThrow().feedbackDeliveryEnabled());
+        return new UserSettingsDTO(
+                accounts.find(accountId).orElseThrow().feedbackDeliveryEnabled(),
+                accounts.timeZone(accountId).map(ZoneId::getId).orElse(null));
     }
 
     @Transactional
     public UserSettingsDTO updateUserSettings(long accountId, UserSettingsDTO settings) {
         accounts.setFeedbackDeliveryEnabled(accountId, settings.practiceFeedbackDeliveryEnabled());
-        return new UserSettingsDTO(settings.practiceFeedbackDeliveryEnabled());
+        accounts.setTimeZone(accountId, settings.timeZone());
+        return new UserSettingsDTO(settings.practiceFeedbackDeliveryEnabled(), settings.timeZone());
     }
 }

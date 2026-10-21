@@ -177,6 +177,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
             // Vendor-neutral names on the SPI; the vendor prefix stays on the entity columns.
             assertThat(projected.createdAt()).isEqualTo(CREATED);
             assertThat(projected.updatedAt()).isEqualTo(UPDATED);
+            assertThat(projected.url()).isEqualTo(SERVER_URL + "/doc/design-doc");
         });
     }
 
@@ -192,6 +193,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
             assertThat(projected.deleted()).isTrue();
             assertThat(projected.bodyMarkdown()).isNull();
             assertThat(projected.slug()).isEqualTo("removed-doc");
+            assertThat(projected.url()).as("a deleted document has no link").isNull();
         });
     }
 

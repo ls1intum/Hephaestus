@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
-
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorAttemptUsageService;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorAttemptUsageService.CallSettlement;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
-import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnUsage;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -15,70 +15,68 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-// Commit accounting independently of passthrough so a worker failure cannot erase measured spend.
+/**
+ * Adds one proxied call's token usage to the Heph turn attempt that made it — the mentor's counterpart to
+ * {@link ProxyUsageAccumulator}. Runs in its own {@code REQUIRES_NEW} transaction: the proxy servlet thread has no
+ * ambient transaction, and the accounting write must commit independently of the passthrough.
+ *
+ * <p>The call lands on the attempt's usage measurement ({@link MentorAttemptUsageService#settleCall}), also when it
+ * returns after the attempt ended or the turn started its next attempt; that attempt's ledger row is then projected
+ * again. While the attempt holds its lease, the turn row takes the call too, because the turn credential reads the
+ * attempt's spend from it on every call. {@link LlmProxyService} settles a forwarded call at most once.
+ *
+ * <p>A dropped call is money lost: the turn is gone, or the attempt has no measurement because it was admitted before
+ * the measurement existed or an erasure removed it. A non-zero rate on {@code llm.proxy.usage.mentor.superseded} or
+ * {@code llm.proxy.usage.mentor.failure} means the ledger is under-billing.
+ */
 @Service
 @ConditionalOnWorkerRole
 public class MentorTurnUsageAccumulator {
 
     private static final Logger log = LoggerFactory.getLogger(MentorTurnUsageAccumulator.class);
 
-    private final ChatMessageRepository chatMessageRepository;
-    private final MentorProxyCredentialRegistry credentialRegistry;
+    private final MentorAttemptUsageService attemptUsage;
     private final MeterRegistry meterRegistry;
 
-    MentorTurnUsageAccumulator(
-            ChatMessageRepository chatMessageRepository,
-            MentorProxyCredentialRegistry credentialRegistry,
-            MeterRegistry meterRegistry) {
-        this.chatMessageRepository = chatMessageRepository;
-        this.credentialRegistry = credentialRegistry;
+    MentorTurnUsageAccumulator(MentorAttemptUsageService attemptUsage, MeterRegistry meterRegistry) {
+        this.attemptUsage = attemptUsage;
         this.meterRegistry = meterRegistry;
     }
 
     /** Never throws, so accounting can never break the proxied response. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void accumulate(@Nullable BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
-        if (attempt == null || usage == null) {
+    public void accumulate(BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
+        if (usage == null) {
             return;
         }
         UUID turnId = attempt.sourceId();
         try {
-            int rows = chatMessageRepository.accumulateLlmUsage(
+            CallSettlement settled = attemptUsage.settleCall(
                     turnId,
-                    usage.billableInputTokens(),
-                    usage.outputTokens(),
-                    usage.reasoningTokens(),
-                    usage.cacheReadTokens(),
-                    usage.cacheWriteTokens());
-            if (rows == 0) {
-                recordSuperseded(turnId);
-                return;
+                    attempt.number(),
+                    new MentorTurnUsage(
+                            usage.billableInputTokens(),
+                            usage.outputTokens(),
+                            usage.cacheReadTokens(),
+                            usage.cacheWriteTokens(),
+                            usage.reasoningTokens(),
+                            1));
+            if (settled == CallSettlement.OWNER_GONE || settled == CallSettlement.UNREGISTERED) {
+                recordDropped(turnId, settled);
             }
-            mirrorOntoMeterAfterCommit(turnId, usage);
         } catch (RuntimeException e) {
-            log.warn("Lost proxy usage accounting for mentor turn {} — this call may go unbilled", turnId, e);
+            log.warn("Lost proxy usage accounting for Heph turn {} — this call may go unbilled", turnId, e);
             meterRegistry.counter(AgentMetrics.LLM_PROXY_USAGE_MENTOR_FAILURE).increment();
         }
     }
 
-    /**
-     * A transaction that fails at commit must not leave the meter holding spend the row never got,
-     * which would refuse calls the workspace had headroom for. A miss is not an error: the turn has
-     * stopped owning its sandbox, and the money is already on the row.
-     */
-    private void mirrorOntoMeterAfterCommit(UUID turnId, ProxyTokenUsage usage) {
-        afterCommit(() -> credentialRegistry.accumulate(turnId, usage));
-    }
-
-    /**
-     * The turn went terminal after this call was authenticated, so its totals have already been billed.
-     * Adding now would double-bill; dropping under-bills by one call, the lesser error.
-     */
-    private void recordSuperseded(UUID turnId) {
+    /** The call has no attempt to land on; creating one for it would bring back what an erasure removed. */
+    private void recordDropped(UUID turnId, CallSettlement reason) {
         log.warn(
-                "Dropping proxy usage from a finished mentor turn — turn {} is no longer in flight; "
-                        + "this call goes unbilled rather than being added to a turn that has already been billed",
-                turnId);
+                "Dropping proxy usage of Heph turn {} with no attempt measurement to settle on ({}); this call goes"
+                        + " unbilled",
+                turnId,
+                reason);
         meterRegistry.counter(AgentMetrics.LLM_PROXY_USAGE_MENTOR_SUPERSEDED).increment();
     }
 }

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ActiveConnectionGuard;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -24,6 +25,9 @@ class SlackWorkspaceResolverIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private ConnectionService connections;
+
+    @Autowired
+    private ActiveConnectionGuard activeConnections;
 
     @Test
     void shouldResolveNothingWhenTeamHasNoActiveConnection() {
@@ -57,7 +61,7 @@ class SlackWorkspaceResolverIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     private SlackWorkspaceResolver resolver() {
-        return new SlackWorkspaceResolver(connections);
+        return new SlackWorkspaceResolver(connections, activeConnections);
     }
 
     private static String uniqueTeam() {

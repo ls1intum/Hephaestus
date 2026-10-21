@@ -258,6 +258,7 @@ class DocumentItemSourceTest extends BaseUnitTest {
                         false,
                         null,
                         null,
+                        null,
                         null)));
         var pinned = source.pin(item, null);
         var capture = source.capture(pinned, request());

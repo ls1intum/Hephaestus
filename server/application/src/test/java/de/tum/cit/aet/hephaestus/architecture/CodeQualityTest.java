@@ -53,9 +53,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  */
 class CodeQualityTest extends HephaestusArchitectureTest {
-    private static final Map<String, Integer> CONTRACT_INTERFACE_METHODS = Map.of(
-            "de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor", 9,
-            "de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel", 9);
+    private static final Map<String, Integer> CONTRACT_INTERFACE_METHODS =
+            Map.of("de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor", 9);
 
     @Nested
     class GodClassTests {
@@ -73,8 +72,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "GitHubPullRequestSyncService", // Coordinates review, review comment, and project item sub-sync
                     // services
                     "WorkspaceProvisioningService", // Orchestrates provisioning across GitHub and GitLab providers
-                    "MentorChatService", // Coordinates persistence, SSE, runner, lock, metrics, executor, llm config,
-                    // context build
                     // Full provider-lifecycle orchestrators with broad ConnectionService usage —
                     // splitting them further scatters related logic without reducing coupling.
                     "GitLabWorkspaceInitializationService",
@@ -131,7 +128,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "ActivityRecorder.record",
                     // @Bean factory wiring Spring dependencies — not business logic complexity
                     "DockerSandboxConfiguration.dockerSandboxAdapter",
-                    "DockerSandboxConfiguration.dockerInteractiveSandboxAdapter");
+                    "DockerSandboxConfiguration.dockerHostSandbox");
 
             // Repository native SQL methods require individual @Param annotations and cannot use
             // parameter objects. These are atomic upsert operations that map directly to DB columns.
@@ -165,6 +162,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "SyncJobRepository.completeActiveJob",
                     // Each atomic ledger update binds its immutable scope, receipt and lease facts individually.
                     "FeedbackCopyRepository.confirmPosted",
+                    "FeedbackCopyRepository.recordConversationDelivered",
                     "FeedbackCopyRepository.recordConversationOutcome",
                     "FeedbackRepository.recordFirstRead",
                     "FeedbackSendRepository.settle",
@@ -455,11 +453,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "WorkspaceScopedTables", // EntityManagerFactory is consumed transitively by
                     // HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy
                     // startup cycle (see WorkspaceScopedTables javadoc)
-                    "MentorChatService", // InteractiveSandboxService is part of the worker capability
-                    // (DockerSandboxConfiguration, gated on the worker role); absent on non-worker
-                    // pods — resolved lazily at attach time
-                    "MentorSandboxPreparer", // the same worker-capability InteractiveSandboxService; a pod
-                    // without it prepares nothing
                     "OutlineWorkspacePurgeAdapter", // OutlineWebhookRegistrar is optional (gated by
                     // @ConditionalOnProperty(hephaestus.integration.outline.enabled));
                     // the always-on purge contributor resolves it lazily so it still
@@ -480,6 +473,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // optional-bean break as the GitLab provider
                     "SecurityConfig", // InstalledClientRegistry is server-role only; the CORS configuration
                     // it contributes origins to is built on every runtime role
+                    "TurnContextFolder", // Context loaders are capture-role beans of each integration; a worker
+                    // without one, or with Git mirrors off, still serves the folder's documents
                     "InstanceLlmSettingsService" // LlmSettingsAudit's sole impl is @ConditionalOnServerRole, but this
                     // service is also consumed by the ungated Workspace{Llm}Service pair
                     // (BYO gate check) which load on every runtime role

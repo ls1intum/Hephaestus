@@ -73,6 +73,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         Account account = new Account("Ada Lovelace");
         setId(account, ACCOUNT_ID);
         account.setPrimaryEmail("ada@example.com");
+        account.setTimeZone("Europe/Berlin");
         account.setAppRole(Account.AppRole.USER);
         account.setStatus(Account.Status.ACTIVE);
         account.setCreatedAt(clock.instant());
@@ -126,7 +127,8 @@ class AccountExportServiceTest extends BaseUnitTest {
                 gitProviderRegistry,
                 clock,
                 accountId -> new AccountAiChoiceExport.Choice("NO_AI", clock.instant()),
-                accountId -> new NotificationPreferencesExportQuery.Preferences(false, false, false, false, false),
+                accountId ->
+                        new NotificationPreferencesExportQuery.Preferences(false, false, false, false, false, false),
                 research,
                 passkeys,
                 passkeyJson);
@@ -136,6 +138,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         assertThat(bundle.schemaVersion()).isEqualTo("2.1");
         assertThat(bundle.account().id()).isEqualTo(ACCOUNT_ID.toString());
         assertThat(bundle.account().primaryEmail()).isEqualTo("ada@example.com");
+        assertThat(bundle.account().timeZone()).isEqualTo("Europe/Berlin");
         assertThat(bundle.account().passkeyProtectionEnabled()).isEqualTo(participating);
         assertThat(bundle.passkeys())
                 .containsExactly(new ExportBundle.Passkey(

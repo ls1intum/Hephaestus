@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmTokenSource;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,19 +47,39 @@ public class ReviewRepositoryPreparer {
 
     @Transactional(readOnly = true)
     public List<Repository> permittedRepositories(long workspaceId) {
-        var kind = connections.findActiveProviderKind(workspaceId).orElse(null);
-        if (kind == null) return List.of();
-        var source = tokenSources.stream()
-                .filter(candidate -> candidate.kind() == kind)
-                .findFirst()
-                .orElse(null);
+        var source = activeTokenSource(workspaceId).orElse(null);
         if (source == null) return List.of();
+        var kind = source.kind();
         var origin = source.serverUrl(workspaceId).flatMap(ScmOrigin::of);
         if (origin.isEmpty()) return List.of();
         return repositories.findAllByWorkspaceMonitors(workspaceId).stream()
                 .filter(repository -> repository.getProvider().kind() == kind
                         && ScmOrigin.of(repository.getProvider().getServerUrl()).equals(origin))
                 .toList();
+    }
+
+    /** The credential source of the workspace's active SCM connection. */
+    Optional<ScmTokenSource> activeTokenSource(long workspaceId) {
+        return connections
+                .findActiveProviderKind(workspaceId)
+                .flatMap(kind -> tokenSources.stream()
+                        .filter(candidate -> candidate.kind() == kind)
+                        .findFirst());
+    }
+
+    /** The clone URL of {@code repositoryPath} on {@code serverUrl}; empty for a path that is not a provider path. */
+    static Optional<String> cloneUrl(String serverUrl, String repositoryPath) {
+        String[] segments = repositoryPath.split("/", -1);
+        if (segments.length < 2
+                || Arrays.stream(segments)
+                        .anyMatch(segment -> segment.isBlank() || segment.equals(".") || segment.equals("..")))
+            return Optional.empty();
+        segments[segments.length - 1] += ".git";
+        return Optional.of(UriComponentsBuilder.fromUriString(serverUrl)
+                .pathSegment(segments)
+                .build()
+                .encode()
+                .toUriString());
     }
 
     private Authorized authorized(ScmCaptureContext capture) {
@@ -98,17 +119,9 @@ public class ReviewRepositoryPreparer {
                         .equals(ScmOrigin.of(repository.getProvider().getServerUrl())))
             throw new ItemCaptureException(
                     ItemCaptureCode.ITEM_NOT_VISIBLE, "Repository belongs to another provider instance");
-        String[] segments = work.repositoryPath().split("/", -1);
-        if (segments.length < 2
-                || Arrays.stream(segments)
-                        .anyMatch(segment -> segment.isBlank() || segment.equals(".") || segment.equals("..")))
-            throw new ItemCaptureException(ItemCaptureCode.CAPTURE_FAILED, "Repository has an invalid provider path");
-        segments[segments.length - 1] += ".git";
-        String cloneUrl = UriComponentsBuilder.fromUriString(serverUrl)
-                .pathSegment(segments)
-                .build()
-                .encode()
-                .toUriString();
+        String cloneUrl = cloneUrl(serverUrl, work.repositoryPath())
+                .orElseThrow(() -> new ItemCaptureException(
+                        ItemCaptureCode.CAPTURE_FAILED, "Repository has an invalid provider path"));
         return new Authorized(new RepositoryKey(workspaceId, work.repositoryId()), cloneUrl, source, work.number());
     }
 

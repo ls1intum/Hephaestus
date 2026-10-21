@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.page;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
-import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackItemReferences;
@@ -48,9 +48,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 
+/** The weekly digest that Heph reads on a worker counts waiting Practice page feedback, so this lives on both. */
 @Service
 @RequiredArgsConstructor
-@ConditionalOnServerRole
+@ConditionalOnCaptureRole
 public class PracticePageFeedbackService {
 
     static final int MAX_CARDS = 20;
@@ -140,6 +141,20 @@ public class PracticePageFeedbackService {
                             .count());
         }
         return counts;
+    }
+
+    /**
+     * When each unread card on the developer's Practice page was created: the page would show it now, it is
+     * {@code READY} and it is not withdrawn. The weekly digest counts these as waiting.
+     */
+    @Transactional(readOnly = true)
+    public List<Instant> unreadCreatedAt(long workspaceId, long developerId) {
+        var feedback =
+                eligibleReady(feedbackRepository.findReadablePracticePage(workspaceId, List.of(developerId)), false);
+        return page(workspaceId, feedback, clock.instant()).stream()
+                .filter(card -> !card.withdrawn() && card.feedback().getState() == FeedbackState.READY)
+                .map(card -> card.feedback().getCreatedAt())
+                .toList();
     }
 
     private record Card(

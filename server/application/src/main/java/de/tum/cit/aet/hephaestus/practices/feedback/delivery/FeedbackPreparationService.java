@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
-import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackPreparedEvent;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
@@ -39,7 +38,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -58,7 +56,6 @@ public class FeedbackPreparationService {
     private final RepeatedSummaryCheck repeated;
     private final FeedbackResponseSuppressionFilter suppression;
     private final FeedbackSupersession replacements;
-    private final ApplicationEventPublisher events;
     private final PracticePageSupportReader pageSupport;
     private final FeedbackCompositionContextService composition;
 
@@ -298,8 +295,6 @@ public class FeedbackPreparationService {
                 && row.getState() == FeedbackState.READY
                 && !replacements.replaceOpen(row.getWorkspaceId(), preparation.replacesId(), row.getId()))
             throw conflict("The queued feedback could not be replaced.");
-        if (row.getDestination() == FeedbackDestination.CONVERSATION && row.getState() == FeedbackState.READY)
-            events.publishEvent(new ConversationFeedbackPreparedEvent(row.getWorkspaceId(), row.getDeveloperId(), 1));
     }
 
     private static @Nullable String clean(@Nullable String text) {

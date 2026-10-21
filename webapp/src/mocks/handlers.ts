@@ -60,11 +60,6 @@ export const handlers = [
 			instanceRequired: false,
 		} satisfies Wire<WorkspacePasskeyPolicy>),
 	),
-	// Opening Heph prepares the member's sandbox; the server accepts and answers with no body.
-	http.post(
-		"*/workspaces/:workspaceSlug/mentor/sandbox",
-		() => new HttpResponse(null, { status: 202 }),
-	),
 	http.get("*/workspaces/:workspaceSlug/onboarding/me", () =>
 		HttpResponse.json(workspaceOnboarding()),
 	),
@@ -90,6 +85,8 @@ export const handlers = [
 			researchSurveys: false,
 			emailAvailable: true,
 			deliveryConfigured: true,
+			weeklyDigest: false,
+			weeklyDigestAvailable: false,
 			etag: '"0-0-0"',
 		}),
 	),

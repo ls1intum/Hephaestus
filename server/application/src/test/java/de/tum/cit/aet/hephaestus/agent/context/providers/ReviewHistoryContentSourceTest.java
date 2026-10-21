@@ -197,6 +197,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
                 delivered,
                 List.of(),
                 List.of(),
+                List.of(),
                 null,
                 null,
                 List.of(UUID.randomUUID()),

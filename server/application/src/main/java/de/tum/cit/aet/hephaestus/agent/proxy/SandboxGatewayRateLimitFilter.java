@@ -14,11 +14,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
 // Authorize before consuming rate limits, and key buckets by principal to isolate sandboxes.
 // An unavailable bucket store permits the call; authentication and budget checks still apply.
+// The exempt requests are a Heph host's turn bookkeeping, which it sends several times a second.
 public final class SandboxGatewayRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxGatewayRateLimitFilter.class);
@@ -30,16 +32,24 @@ public final class SandboxGatewayRateLimitFilter extends OncePerRequestFilter {
     private final BucketResolver bucketResolver;
     private final ObjectMapper objectMapper;
     private final ProxyAccounting accounting;
+    private final RequestMatcher exempt;
 
     SandboxGatewayRateLimitFilter(
             AuthRateLimitProperties.Limit limit,
             BucketResolver bucketResolver,
             ObjectMapper objectMapper,
-            ProxyAccounting accounting) {
+            ProxyAccounting accounting,
+            RequestMatcher exempt) {
         this.bucketConfiguration = limit.bucketConfiguration();
         this.bucketResolver = bucketResolver;
         this.objectMapper = objectMapper;
         this.accounting = accounting;
+        this.exempt = exempt;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return exempt.matches(request);
     }
 
     @Override

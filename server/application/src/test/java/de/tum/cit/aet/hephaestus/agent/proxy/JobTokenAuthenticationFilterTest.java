@@ -1,21 +1,23 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.TurnJwt;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtInvalidException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurn;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -36,9 +38,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
+    private final MentorTurnRepository turns = mock(MentorTurnRepository.class);
+    private final SandboxGatewaySessions sessions = mock(SandboxGatewaySessions.class);
     private final WorkerJwtVerifier verifier = mock(WorkerJwtVerifier.class);
     private final JobTokenAuthenticationFilter filter =
-            new JobTokenAuthenticationFilter(jobs, verifier, new MentorProxyCredentialRegistry(), "worker-1");
+            new JobTokenAuthenticationFilter(jobs, turns, sessions, verifier, "worker-1");
 
     @AfterEach
     void clearContext() {
@@ -69,31 +73,180 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     }
 
     @Test
-    void mentorAuthenticationDoesNotRequireTurnPricing() throws Exception {
-        var registry = new MentorProxyCredentialRegistry();
-        var session = UUID.randomUUID();
-        var token = registry.mint(
-                session,
-                new MentorProxyCredentialRegistry.Route(
-                        "openai-responses", "https://models.example/v1", null, null, null, null));
-        var meter = spy(new MentorTurnMeter(UUID.randomUUID(), LlmPriceSnapshot.unpricedInstance()));
-        var pricingFailure = new IllegalStateException("Pricing unavailable");
-        doThrow(pricingFailure).when(meter).spentUsd();
-        assertThat(registry.bindTurn(session, meter)).isTrue();
-        var authFilter = new JobTokenAuthenticationFilter(jobs, verifier, registry, "worker-1");
-        var response = new MockHttpServletResponse();
+    void turnModelCallAuthenticatesWhileItsAttemptHoldsTheLeaseOnThisWorker() throws Exception {
+        var jwt = turnJwt();
+        when(verifier.verify("turn-token")).thenReturn(jwt);
+        var turn = leased(jwt);
+        when(turns.findByIdAndWorkspaceId(jwt.turnId(), jwt.workspaceId())).thenReturn(Optional.of(turn));
         var principal = new AtomicReference<Authentication>();
-        authFilter.doFilter(
-                request("/internal/llm/responses", "Bearer " + token),
+        var response = new MockHttpServletResponse();
+        filter.doFilter(
+                request("/internal/llm/responses", "Bearer turn-token"),
                 response,
                 (incoming, outgoing) -> principal.set(Objects.requireNonNull(
                         SecurityContextHolder.getContext().getAuthentication())));
         assertThat(response.getStatus()).isEqualTo(200);
-        var sessionIdentity = Objects.requireNonNull(
-                ((JobTokenAuthentication) principal.get()).getPrincipal().mentor());
-        assertThat(sessionIdentity.sessionId()).isEqualTo(session);
-        assertThatThrownBy(() -> registry.resolve(sessionIdentity)).isSameAs(pricingFailure);
-        verifyNoInteractions(jobs, verifier);
+        var authenticated = (JobTokenAuthentication) principal.get();
+        assertThat(authenticated.getPrincipal().turn()).isEqualTo(jwt);
+        assertThat(authenticated.getPrincipal().description()).isEqualTo("mentor-turn:" + jwt.turnId());
+        assertThat(authenticated.getDetails()).isEqualTo(jwt);
+        verifyNoInteractions(jobs);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"attempt", "worker", "conversation", "released"})
+    void turnModelCallOfAnAttemptThatLostItsLeaseGetsConflict(String mismatch) throws Exception {
+        var jwt = turnJwt();
+        when(verifier.verify("turn-token")).thenReturn(jwt);
+        var turn = leased(jwt);
+        if (mismatch.equals("attempt")) when(turn.getAttempt()).thenReturn(jwt.attempt() + 1);
+        if (mismatch.equals("worker")) when(turn.getWorkerId()).thenReturn("other-worker");
+        if (mismatch.equals("conversation")) when(turn.getConversationId()).thenReturn(UUID.randomUUID());
+        if (mismatch.equals("released")) when(turn.isLeased()).thenReturn(false);
+        when(turns.findByIdAndWorkspaceId(jwt.turnId(), jwt.workspaceId())).thenReturn(Optional.of(turn));
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request("/internal/llm/responses", "Bearer turn-token"), response, (incoming, outgoing) -> {
+            throw new AssertionError("Lost attempt served");
+        });
+        assertThat(response.getStatus()).isEqualTo(409);
+    }
+
+    @Test
+    void turnModelCallOfAnUnknownTurnIsUnauthorized() throws Exception {
+        var jwt = turnJwt();
+        when(verifier.verify("turn-token")).thenReturn(jwt);
+        when(turns.findByIdAndWorkspaceId(jwt.turnId(), jwt.workspaceId())).thenReturn(Optional.empty());
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request("/internal/llm/responses", "Bearer turn-token"), response, (incoming, outgoing) -> {
+            throw new AssertionError("Unknown turn served");
+        });
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void turnTokenReachesItsOwnTurnEndpointWithoutReadingTheTurn() throws Exception {
+        var jwt = turnJwt();
+        when(verifier.verify("turn-token")).thenReturn(jwt);
+        var served = new AtomicBoolean();
+        var response = new MockHttpServletResponse();
+        filter.doFilter(
+                request("/internal/llm/turn/" + jwt.turnId() + "/end", "Bearer turn-token"),
+                response,
+                (incoming, outgoing) -> served.set(true));
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(served).isTrue();
+        verifyNoInteractions(turns, jobs);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"other-turn", "runtime", "commands"})
+    void turnTokenReachesNoOtherTurnAndNoSandboxRuntime(String target) throws Exception {
+        var jwt = turnJwt();
+        when(verifier.verify("turn-token")).thenReturn(jwt);
+        var path =
+                switch (target) {
+                    case "other-turn" -> "/internal/llm/turn/" + UUID.randomUUID() + "/end";
+                    case "runtime" -> "/internal/llm/runtime/" + jwt.turnId();
+                    default -> "/internal/llm/runtime/" + jwt.turnId() + "/commands";
+                };
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request(path, "Bearer turn-token"), response, (incoming, outgoing) -> {
+            throw new AssertionError("Turn token served outside its turn");
+        });
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"turn", "commands"})
+    void jobTokenReachesNoTurnEndpointAndNoCommandChannel(String target) throws Exception {
+        var job = running();
+        when(verifier.verify("valid-token")).thenReturn(jwt(job.getId(), job.getWorkspaceId(), job.getAttempt()));
+        var path = target.equals("turn")
+                ? "/internal/llm/turn/" + UUID.randomUUID() + "/end"
+                : "/internal/llm/runtime/" + job.getId() + "/commands";
+        var request = request(path, "Bearer valid-token");
+        request.setMethod("GET");
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request, response, (incoming, outgoing) -> {
+            throw new AssertionError("Job token served outside its job");
+        });
+        assertThat(response.getStatus()).isEqualTo(401);
+        verifyNoInteractions(jobs);
+    }
+
+    @Test
+    void hostSessionTokenReachesOnlyItsOwnRuntimeReadsAndCommandChannel() throws Exception {
+        UUID host = UUID.randomUUID();
+        when(verifier.verify("session-token")).thenThrow(new WorkerJwtInvalidException("not signed", "malformed"));
+        when(sessions.unsignedSessionFor("session-token"))
+                .thenReturn(Optional.of(
+                        new SandboxGatewaySessions.UnsignedSession(host, SandboxGatewaySessions.Kind.HEPH_HOST)));
+        // The host's workspace initializer reads discovery and the workspace archive before the host starts.
+        for (var path : new String[] {
+            "/internal/llm/runtime/" + host,
+            "/internal/llm/runtime/" + host + "/workspace",
+            "/internal/llm/runtime/" + host + "/commands"
+        }) {
+            var principal = new AtomicReference<Authentication>();
+            var own = request(path, "Bearer session-token");
+            own.setMethod("GET");
+            var response = new MockHttpServletResponse();
+            filter.doFilter(
+                    own,
+                    response,
+                    (incoming, outgoing) -> principal.set(Objects.requireNonNull(
+                            SecurityContextHolder.getContext().getAuthentication())));
+            assertThat(response.getStatus()).as(path).isEqualTo(200);
+            var identity = ((JobTokenAuthentication) principal.get()).getPrincipal();
+            assertThat(identity.hostSession()).isEqualTo(host);
+            assertThat(principal.get().getAuthorities()).as("no model scope").isEmpty();
+            SecurityContextHolder.clearContext();
+        }
+        UUID other = UUID.randomUUID();
+        for (var path : new String[] {
+            "/internal/llm/runtime/" + other + "/commands",
+            "/internal/llm/runtime/" + other,
+            "/internal/llm/runtime/" + other + "/workspace",
+            "/internal/llm/runtime/" + host + "/result",
+            "/internal/llm/turn/" + host + "/end",
+            "/internal/llm/responses"
+        }) {
+            var refused = request(path, "Bearer session-token");
+            refused.setMethod(
+                    path.endsWith("/commands") || path.endsWith("/workspace") || path.endsWith(other.toString())
+                            ? "GET"
+                            : "POST");
+            var response = new MockHttpServletResponse();
+            filter.doFilter(refused, response, (incoming, outgoing) -> {
+                throw new AssertionError("Session token served outside its own runtime: " + path);
+            });
+            assertThat(response.getStatus()).as(path).isEqualTo(401);
+        }
+    }
+
+    private static TurnJwt turnJwt() {
+        var now = Instant.now();
+        return new TurnJwt(
+                UUID.randomUUID(),
+                7L,
+                11L,
+                UUID.randomUUID(),
+                2,
+                Set.of("llm_proxy"),
+                UUID.randomUUID().toString(),
+                now,
+                now.plusSeconds(60));
+    }
+
+    /** The turn row as this worker's attempt holds it. */
+    private static MentorTurn leased(TurnJwt jwt) {
+        var turn = mock(MentorTurn.class);
+        // The check stops at the first mismatch, so a case reads only some of these.
+        lenient().when(turn.isLeased()).thenReturn(true);
+        lenient().when(turn.getAttempt()).thenReturn(jwt.attempt());
+        lenient().when(turn.getWorkerId()).thenReturn("worker-1");
+        lenient().when(turn.getConversationId()).thenReturn(jwt.conversationId());
+        return turn;
     }
 
     @ParameterizedTest

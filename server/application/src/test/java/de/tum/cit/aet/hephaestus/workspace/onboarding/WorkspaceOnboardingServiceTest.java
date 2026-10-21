@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.spi.MemberMentorReadiness;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceAiAvailability;
 import java.time.Instant;
 import java.util.HashMap;
@@ -59,6 +60,9 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
     private WorkspaceAiAvailability availability;
 
     @Mock
+    private MemberMentorReadiness mentorReadiness;
+
+    @Mock
     private ConfigAuditPort audit;
 
     private static final Instant NOW = Instant.parse("2026-09-01T12:00:00Z");
@@ -75,7 +79,7 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new WorkspaceOnboardingService(
-                workspaces, settings, members, choices, memberships, links, availability, audit);
+                workspaces, settings, members, choices, memberships, links, availability, mentorReadiness, audit);
         lenient().when(choices.find(anyLong())).thenAnswer(invocation -> {
             var row = savedChoices.get(invocation.<Long>getArgument(0));
             return row == null

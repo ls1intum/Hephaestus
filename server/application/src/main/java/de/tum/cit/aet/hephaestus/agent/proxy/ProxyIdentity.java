@@ -1,22 +1,46 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry.AuthenticatedSession;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.TurnJwt;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 
-/** Verified job attempt or mentor execution. Contains no bearer credential or frozen configuration. */
+/**
+ * A verified sandbox caller: a review job attempt, a Heph turn attempt, or a Heph host's gateway session. Contains no
+ * bearer credential or frozen configuration.
+ *
+ * @param workerId the worker that runs the job or the turn attempt; {@code null} for a host session
+ * @param hostSession the gateway session of a Heph host, which reaches only its own command channel
+ */
 record ProxyIdentity(
         @Nullable JobJwt job,
-        @Nullable String workerId,
-        @Nullable AuthenticatedSession mentor) {
+        @Nullable TurnJwt turn,
+        @Nullable UUID hostSession,
+        @Nullable String workerId) {
     ProxyIdentity {
-        if ((job == null) == (mentor == null))
+        if (Stream.of(job, turn, hostSession).filter(Objects::nonNull).count() != 1)
             throw new IllegalArgumentException("Exactly one proxy identity is required");
-        if (job != null) Objects.requireNonNull(workerId, "workerId");
+        if (hostSession == null) Objects.requireNonNull(workerId, "workerId");
     }
 
+    static ProxyIdentity of(JobJwt job, String workerId) {
+        return new ProxyIdentity(job, null, null, workerId);
+    }
+
+    static ProxyIdentity of(TurnJwt turn, String workerId) {
+        return new ProxyIdentity(null, turn, null, workerId);
+    }
+
+    static ProxyIdentity hostSession(UUID session) {
+        return new ProxyIdentity(null, null, session, null);
+    }
+
+    /** Names the caller for logs and rate limits, never with its credential. */
     String description() {
-        return job == null ? "mentor-session:" + Objects.requireNonNull(mentor).sessionId() : "job:" + job.jobId();
+        if (job != null) return "job:" + job.jobId();
+        if (turn != null) return "mentor-turn:" + turn.turnId();
+        return "gateway-session:" + hostSession;
     }
 }

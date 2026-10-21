@@ -23,9 +23,7 @@ export const Enabled: Story = {
 		isLoading: false,
 	},
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("switch", { name: "Comments and Slack reminders" }),
-		).toBeChecked();
+		await expect(canvas.getByRole("switch", { name: "Comments on your work" })).toBeChecked();
 		await expect(canvas.getByText(/This choice applies in every workspace\./u)).toBeVisible();
 	},
 };

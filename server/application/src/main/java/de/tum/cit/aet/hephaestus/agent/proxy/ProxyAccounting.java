@@ -91,16 +91,6 @@ public class ProxyAccounting {
         return refused;
     }
 
-    /**
-     * A credential authenticated but named no execution to bill. The rate is a defect signal, not a
-     * usage statistic: a sandbox is calling outside the window its turn owns.
-     */
-    public void recordUnbillableRefusal(String apiProtocol) {
-        meterRegistry
-                .counter(AgentMetrics.LLM_PROXY_UNBILLABLE_REFUSED, "apiProtocol", apiProtocol)
-                .increment();
-    }
-
     // Every direct call must name a valid practice so its spend can be attributed.
     public void recordUnattributedPracticeScript() {
         practiceScriptUnattributed.increment();
@@ -213,6 +203,13 @@ public class ProxyAccounting {
     public void recordError(String apiProtocol) {
         meterRegistry
                 .counter(AgentMetrics.LLM_PROXY_ERRORS, "apiProtocol", apiProtocol)
+                .increment();
+    }
+
+    /** An upstream call sent no byte for its idle bound, so the proxy cut it. */
+    public void recordUpstreamStalled(String apiProtocol) {
+        meterRegistry
+                .counter(AgentMetrics.LLM_PROXY_UPSTREAM_STALLED, "apiProtocol", apiProtocol)
                 .increment();
     }
 

@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,12 +69,23 @@ public class SandboxGatewaySessions {
     private static final String BEARER_PREFIX = "Bearer ";
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
 
-    public Session register(String token, Path inputTar, String outputRoot) throws IOException {
-        return register(UUID.randomUUID(), token, inputTar, outputRoot);
+    /** What a session serves: its credential is the signed job token of a review, or a random token of a Heph host. */
+    public enum Kind {
+        REVIEW,
+        HEPH_HOST,
     }
 
+    /** A session that a random token names, with what it serves. */
+    public record UnsignedSession(UUID id, Kind kind) {}
+
+    /** A review job's session, registered with its signed job token. */
     public Session register(UUID id, String token, Path inputTar, String outputRoot) throws IOException {
-        return register(id, token, inputTar, outputRoot, List.of());
+        return register(id, Kind.REVIEW, token, inputTar, outputRoot, List.of());
+    }
+
+    /** A Heph host's session, registered with a random token that no signed claim backs. */
+    public Session registerHost(UUID id, String token, Path inputTar, String outputRoot) throws IOException {
+        return register(id, Kind.HEPH_HOST, token, inputTar, outputRoot, List.of());
     }
 
     /**
@@ -93,13 +105,18 @@ public class SandboxGatewaySessions {
                         exception.getClass().getSimpleName());
             }
         }
-        return register(jobId, token, inputTar, outputRoot, bound);
+        return register(jobId, Kind.REVIEW, token, inputTar, outputRoot, bound);
     }
 
     private Session register(
-            UUID id, String token, Path inputTar, String outputRoot, List<Consumer<Map<String, byte[]>>> admitted)
+            UUID id,
+            Kind kind,
+            String token,
+            Path inputTar,
+            String outputRoot,
+            List<Consumer<Map<String, byte[]>>> admitted)
             throws IOException {
-        var session = new Session(id, token, inputTar, outputRoot, admitted);
+        var session = new Session(id, kind, token, inputTar, outputRoot, admitted);
         if (sessions.putIfAbsent(id, session) != null) {
             throw new IllegalStateException("Gateway session already exists for this job");
         }
@@ -114,6 +131,20 @@ public class SandboxGatewaySessions {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         return session;
+    }
+
+    /**
+     * The session of a Heph host that a bare token was registered for. A review
+     * session's credential is a signed job token, which the job token check alone decides, so a revoked or expired job
+     * token never names a session here.
+     */
+    public Optional<UnsignedSession> unsignedSessionFor(String token) {
+        byte[] hash = tokenHash(token);
+        return sessions.values().stream()
+                .filter(session -> session.kind != Kind.REVIEW)
+                .filter(session -> MessageDigest.isEqual(session.tokenHash, hash))
+                .map(session -> new UnsignedSession(session.id, session.kind))
+                .findFirst();
     }
 
     private static @Nullable String bearerToken(String authorization) {
@@ -133,6 +164,7 @@ public class SandboxGatewaySessions {
 
     public final class Session implements AutoCloseable {
         private final UUID id;
+        private final Kind kind;
         private final byte[] tokenHash;
         private final Path inputTar;
         private final String outputRoot;
@@ -141,15 +173,20 @@ public class SandboxGatewaySessions {
         private long downloadedBytes;
         private boolean closed;
         private boolean uploading;
-        private @Nullable GatewayInteractiveChannel interactive;
         private @Nullable Map<String, byte[]> result;
         private byte @Nullable [] resultDigest;
         private final List<Consumer<Map<String, byte[]>>> admitted;
 
         private Session(
-                UUID id, String token, Path inputTar, String outputRoot, List<Consumer<Map<String, byte[]>>> admitted)
+                UUID id,
+                Kind kind,
+                String token,
+                Path inputTar,
+                String outputRoot,
+                List<Consumer<Map<String, byte[]>>> admitted)
                 throws IOException {
             this.id = id;
+            this.kind = kind;
             this.admitted = List.copyOf(admitted);
             this.tokenHash = tokenHash(token);
             this.inputTar = inputTar;
@@ -165,25 +202,6 @@ public class SandboxGatewaySessions {
 
         public long inputBytes() {
             return inputBytes;
-        }
-
-        public synchronized GatewayInteractiveChannel enableInteractive(int maxFrameBytes) throws IOException {
-            if (interactive != null || closed) {
-                throw new IllegalStateException("Interactive session already initialized or closed");
-            }
-            interactive = new GatewayInteractiveChannel(maxFrameBytes);
-            return interactive;
-        }
-
-        public synchronized GatewayInteractiveChannel interactive() {
-            if (interactive == null || closed) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-            }
-            return interactive;
-        }
-
-        public synchronized @Nullable Integer frameByteBudget() {
-            return interactive == null ? null : interactive.maxFrameBytes();
         }
 
         public synchronized InputStream download() throws IOException {
@@ -347,15 +365,9 @@ public class SandboxGatewaySessions {
             closed = true;
             sessions.remove(id, this);
             try {
-                if (interactive != null) {
-                    interactive.close();
-                }
+                for (Path selection : selections.values()) Files.deleteIfExists(selection);
             } finally {
-                try {
-                    for (Path selection : selections.values()) Files.deleteIfExists(selection);
-                } finally {
-                    Files.deleteIfExists(inputTar);
-                }
+                Files.deleteIfExists(inputTar);
             }
         }
     }

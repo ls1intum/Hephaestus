@@ -4,10 +4,13 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.math.BigDecimal;
 
 /**
@@ -36,6 +39,16 @@ public final class LlmCatalogTestFixtures {
         connection.setApiProtocol(LlmApiProtocol.OPENAI_COMPLETIONS);
         connection.setEnabled(true);
         return connection;
+    }
+
+    /** An enabled Heph binding of {@code model} in {@code workspace}, so Heph accepts questions there. */
+    public static WorkspaceAgentBinding mentorBinding(Workspace workspace, LlmModel model) {
+        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
+        binding.setWorkspace(workspace);
+        binding.setPurpose(AgentPurpose.MENTOR);
+        binding.setInstanceModel(model);
+        binding.setEnabled(true);
+        return binding;
     }
 
     public static LlmModel model(LlmConnection connection, String slug, String upstreamModelId) {
@@ -84,7 +97,6 @@ public final class LlmCatalogTestFixtures {
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO),
-                false,
                 600);
     }
 }

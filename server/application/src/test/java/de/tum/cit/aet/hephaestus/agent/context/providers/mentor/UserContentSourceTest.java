@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.UserContentSource.ActivityInsights;
@@ -12,11 +14,14 @@ import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MentorUserCounts;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -33,11 +38,32 @@ class UserContentSourceTest extends BaseUnitTest {
     @Mock
     MentorWorkQuery queryRepository;
 
+    @Mock
+    WorkspaceActorSelector actorSelector;
+
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     UserContentSource provider;
+
+    @BeforeEach
+    void connectedInstance() {
+        lenient().when(actorSelector.connectedProviderId(1L)).thenReturn(Optional.of(5L));
+    }
+
+    @Test
+    void shouldSayUnavailableAndCountNothingWithoutAConnectedInstance() {
+        when(userRepository.findAllByIds(List.of(2L))).thenReturn(Map.of(2L, new AccountSummary(2L, "Octo", null)));
+        when(actorSelector.connectedProviderId(1L)).thenReturn(Optional.empty());
+
+        JsonNode root = provider.buildPayload(1L, 2L);
+
+        assertThat(root.get("status").asString()).isEqualTo("UNAVAILABLE");
+        assertThat(root.at("/user/name").asString()).isEqualTo("Octo");
+        assertThat(root.has("thisWeek")).isFalse();
+        verifyNoInteractions(queryRepository);
+    }
 
     @Test
     void writesUserJson() throws Exception {

@@ -8,11 +8,13 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +36,9 @@ class AccountControllerIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private HephaestusJwtIssuer issuer;
+
+    @Autowired
+    private AccountDirectory accountDirectory;
 
     @Test
     void shouldReadAccountSettingsWhenNoProviderMirrorHasBeenSynced() {
@@ -59,13 +64,18 @@ class AccountControllerIntegrationTest extends RealAuthIntegrationTest {
                 .uri("/user/settings")
                 .headers(headers -> headers.setBearerAuth(token(account)))
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UserSettingsDTO(false))
+                .bodyValue(new UserSettingsDTO(false, "Europe/Berlin"))
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
                 .jsonPath("$.practiceFeedbackDeliveryEnabled")
-                .isEqualTo(false);
+                .isEqualTo(false)
+                .jsonPath("$.timeZone")
+                .isEqualTo("Europe/Berlin");
+        assertThat(accountDirectory.timeZone(Objects.requireNonNull(account.getId())))
+                .as("the time zone is the account's, for every workspace")
+                .contains(ZoneId.of("Europe/Berlin"));
         assertThat(accounts.findById(Objects.requireNonNull(account.getId()))
                         .orElseThrow()
                         .isFeedbackDeliveryEnabled())
@@ -74,6 +84,42 @@ class AccountControllerIntegrationTest extends RealAuthIntegrationTest {
                         .orElseThrow()
                         .isFeedbackDeliveryEnabled())
                 .isTrue();
+    }
+
+    @Test
+    void shouldRejectAnUnknownTimeZoneAndClearTheTimeZoneWhenNull() {
+        var account = accounts.save(new Account("Time zone developer"));
+        long accountId = Objects.requireNonNull(account.getId());
+        accountDirectory.setTimeZone(accountId, "Europe/Berlin");
+        client.post()
+                .uri("/user/settings")
+                .headers(headers -> headers.setBearerAuth(token(account)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UserSettingsDTO(false, "Mars/Olympus"))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(Void.class);
+        assertThat(accountDirectory.timeZone(accountId)).contains(ZoneId.of("Europe/Berlin"));
+        client.post()
+                .uri("/user/settings")
+                .headers(headers -> headers.setBearerAuth(token(account)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UserSettingsDTO(false, null))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+        client.get()
+                .uri("/user/settings")
+                .headers(headers -> headers.setBearerAuth(token(account)))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.timeZone")
+                .doesNotExist();
+        assertThat(accountDirectory.timeZone(accountId)).isEmpty();
     }
 
     private void link(Account account, IdentityProviderType type, String url, String key) {

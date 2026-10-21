@@ -50,9 +50,11 @@ class GitHubAccountRenameRepositoryIdentityIntegrationTest extends BaseIntegrati
         String newPath = newLogin + "/target";
         long nativeId = 100_000_000L + Integer.toUnsignedLong(UUID.randomUUID().hashCode()) % 900_000_000L;
         long installationId = nativeId + 1;
+        // Another test can clean the database, so the provider row is created here when it is missing.
         var github = providers
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-                .orElseThrow();
+                .orElseGet(() -> providers.saveAndFlush(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         var gitlab = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://" + suffix + ".gitlab.example.test"));
         var workspace = WorkspaceTestFixtures.persistInstallationWorkspace(

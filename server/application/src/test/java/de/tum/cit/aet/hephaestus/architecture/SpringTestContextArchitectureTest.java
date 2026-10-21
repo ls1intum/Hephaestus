@@ -29,9 +29,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Map<String, String> FULL_CONTEXT_ASSIGNMENTS = Map.ofEntries(
             assignment("workspace.RepositoryProviderScopeIntegrationTest", "repository-provider-scope"),
             assignment("StartupBudgetIntegrationTest", "startup"),
-            assignment("agent.mentor.chat.MentorWorkerSplitIntegrationTest", "mentor-worker-split"),
-            assignment("agent.mentor.chat.MentorChatControllerAuthIntegrationTest", "mentor-http"),
-            assignment("mentor.MentorAccessIntegrationTest", "mentor-http"),
+            assignment("agent.mentor.live.HephTurnLiveTest", "heph-live"),
+            assignment("agent.mentor.weeklydigest.WeeklyDigestIntegrationTest", "review-evidence"),
             assignment("agent.practice.live.PracticeScriptLiveLlmTest", "practice-script-live"),
             assignment("core.auth.clientsession.ClientSessionConcurrencyIntegrationTest", "dev-login"),
             assignment("core.auth.clientsession.ClientSessionIntegrationTest", "dev-login"),
@@ -135,13 +134,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "gitlab-token-lifecycle",
                     "real credential storage, lifecycle locks and attention with only"
                             + " irreversible upstream token rotation mocked"),
-            Map.entry(
-                    "mentor-worker-split",
-                    "server-only role with authenticated worker transport and controlled"
-                            + " runner, routing and admission boundaries"),
-            Map.entry(
-                    "mentor-http",
-                    "shared mentor HTTP authorization context with only asynchronous turn" + " transport spied"),
+            Map.entry("heph-live", "worker role with a real Heph host container, the agent image and a live model"),
             Map.entry("outline-enabled", "enabled Outline integration wiring"),
             Map.entry(
                     "practice-upgrade-history",
@@ -236,6 +229,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
     private static final Set<String> DYNAMIC_PROPERTY_TESTS = names(
             "StartupBudgetIntegrationTest",
+            "agent.mentor.live.HephTurnLiveTest",
             "agent.practice.live.PracticeScriptLiveLlmTest",
             "core.auth.clientsession.ClientSessionMigratedSchemaTest",
             "integration.schema.ProductionSchemaContractIntegrationTest",
@@ -247,7 +241,6 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Set<String> PROPERTY_SOURCE_TESTS = names(
             "core.auth.webauthn.PasskeyLifecycleIntegrationTest",
             "core.database.PracticeV1ReviewJobsIntegrationTest",
-            "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
             "core.auth.clientsession.ClientSessionConcurrencyIntegrationTest",
             "core.auth.clientsession.ClientSessionIntegrationTest",
             "core.auth.consent.ConsentSignInBootstrapIntegrationTest",
@@ -276,9 +269,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Set<String> MOCKITO_BEAN_TESTS = names(
             "core.database.PracticeV1ReviewJobsIntegrationTest",
             "agent.adapter.EvidenceDeliveryAuthorizationIntegrationTest",
+            "agent.mentor.weeklydigest.WeeklyDigestIntegrationTest",
             "agent.handler.PublicReviewEligibilityIntegrationTest",
             "practices.result.MigratedHistoryReadIntegrationTest",
-            "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
             "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest",
             "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
             "integration.slack.SlackConsentLifecycleE2EIntegrationTest",

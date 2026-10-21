@@ -48,7 +48,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.server.ResponseStatusException;
 
 @Tag("unit")
@@ -74,7 +73,6 @@ class FeedbackPreparationServiceTest {
             mock(RepeatedSummaryCheck.class),
             suppression,
             mock(FeedbackSupersession.class),
-            mock(ApplicationEventPublisher.class),
             support,
             composition);
 

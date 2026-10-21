@@ -35,6 +35,7 @@ oauth_config:
       - channels:read
       - channels:join
       - groups:read
+      - reactions:write
       - users:read
     user:
       - openid
@@ -57,12 +58,13 @@ settings:
       - group_left
       - group_rename
       - app_home_opened
-      - app_context_changed
       - app_uninstalled
       - tokens_revoked
   interactivity:
     is_enabled: true
-    request_url: https://<webhook-host>/webhooks/slack/interactivity
+    # Served by the application server, which commits consent before Slack is acknowledged; the
+    # compose stack routes this exact path there on the public host.
+    request_url: https://<host>/webhooks/slack/interactivity
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false

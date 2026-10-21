@@ -14,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class AccountPreferencesServiceTest extends BaseUnitTest {
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void shouldChangeAccountDeliveryChoiceWhenSettingsAreSaved(boolean enabled) {
@@ -21,8 +22,9 @@ class AccountPreferencesServiceTest extends BaseUnitTest {
         var account = new Account("Octocat");
         account.setId(42L);
         when(accounts.findByIdForUpdate(42L)).thenReturn(Optional.of(account));
-        var result = new AccountPreferencesService(new AccountDirectoryService(accounts, Clock.systemUTC()))
-                .updateUserSettings(42L, new UserSettingsDTO(enabled));
+        var result = new AccountPreferencesService(
+                        new AccountDirectoryService(accounts, Clock.systemUTC(), event -> {}))
+                .updateUserSettings(42L, new UserSettingsDTO(enabled, null));
         assertThat(result.practiceFeedbackDeliveryEnabled()).isEqualTo(enabled);
         assertThat(account.isFeedbackDeliveryEnabled()).isEqualTo(enabled);
     }

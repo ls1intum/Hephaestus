@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -17,6 +19,7 @@ import org.springframework.security.web.util.matcher.IpAddressMatcher;
 public final class JobTokenAuthenticationFilter extends AuthenticationFilter {
     static final String PRACTICE_SCRIPT_PATH = "/internal/llm/practice-script/";
     private static final String RUNTIME_PATH = "/internal/llm/runtime/";
+    private static final String TURN_PATH = "/internal/llm/turn/";
     public static final String PRACTICE_SCRIPT_PRACTICE_HEADER = "x-hephaestus-practice";
 
     private static final BearerTokenAuthenticationConverter CONVERTER = converter();
@@ -32,11 +35,12 @@ public final class JobTokenAuthenticationFilter extends AuthenticationFilter {
 
     JobTokenAuthenticationFilter(
             ReviewJobRepository jobs,
+            MentorTurnRepository turns,
+            SandboxGatewaySessions sessions,
             WorkerJwtVerifier verifier,
-            MentorProxyCredentialRegistry mentors,
             String workerId) {
         super(
-                new ProviderManager(new JobTokenAuthenticationProvider(jobs, verifier, mentors, workerId)),
+                new ProviderManager(new JobTokenAuthenticationProvider(jobs, turns, sessions, verifier, workerId)),
                 JobTokenAuthenticationFilter::convert);
         setSuccessHandler((request, response, authentication) -> {});
         setFailureHandler((request, response, failure) -> response.setStatus(
@@ -49,14 +53,17 @@ public final class JobTokenAuthenticationFilter extends AuthenticationFilter {
         var converter = new BearerTokenAuthenticationConverter();
         converter.setAuthenticationDetailsSource(incoming -> {
             String path = incoming.getRequestURI();
-            String runtimeJobId = null;
-            if (path.startsWith(RUNTIME_PATH)) {
-                int end = path.indexOf('/', RUNTIME_PATH.length());
-                runtimeJobId = path.substring(RUNTIME_PATH.length(), end < 0 ? path.length() : end);
-            }
+            String runtimeJobId = segment(path, RUNTIME_PATH);
+            boolean get = "GET".equals(incoming.getMethod());
             return new RequestIdentity(
                     runtimeJobId,
-                    "POST".equals(incoming.getMethod()) && runtimeJobId != null && path.endsWith("/result"));
+                    "POST".equals(incoming.getMethod()) && runtimeJobId != null && path.endsWith("/result"),
+                    segment(path, TURN_PATH),
+                    get && runtimeJobId != null && path.equals(RUNTIME_PATH + runtimeJobId + "/commands"),
+                    get
+                            && runtimeJobId != null
+                            && (path.equals(RUNTIME_PATH + runtimeJobId)
+                                    || path.equals(RUNTIME_PATH + runtimeJobId + "/workspace")));
         });
         return converter;
     }
@@ -68,7 +75,27 @@ public final class JobTokenAuthenticationFilter extends AuthenticationFilter {
         return authentication;
     }
 
-    record RequestIdentity(@Nullable String runtimeJobId, boolean resultUpload) {}
+    /** The path segment after {@code prefix}: the runtime or turn id the request names; {@code null} elsewhere. */
+    private static @Nullable String segment(String path, String prefix) {
+        if (!path.startsWith(prefix)) return null;
+        int end = path.indexOf('/', prefix.length());
+        return path.substring(prefix.length(), end < 0 ? path.length() : end);
+    }
+
+    /**
+     * What the request asks for, which decides what a credential may reach.
+     *
+     * @param turnId the turn a turn endpoint names
+     * @param commands whether this is the Heph host's command channel, {@code GET …/runtime/{id}/commands}
+     * @param workspaceRead whether this reads the runtime's discovery or workspace archive, {@code GET …/runtime/{id}}
+     *     or {@code GET …/runtime/{id}/workspace}
+     */
+    record RequestIdentity(
+            @Nullable String runtimeJobId,
+            boolean resultUpload,
+            @Nullable String turnId,
+            boolean commands,
+            boolean workspaceRead) {}
 
     static boolean isPrivateIp(@Nullable String ip) {
         if (ip == null || (!InetAddressUtils.isIPv4(ip) && !InetAddressUtils.isIPv6(ip))) return false;
