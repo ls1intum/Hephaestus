@@ -15,7 +15,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -27,6 +26,10 @@ import org.jspecify.annotations.Nullable;
  * the exact grant that allowed the release. It exists so that a withdrawal or an erasure can name
  * the key the researchers must remove. It never leaves the instance-admin research boundary except
  * as that key.
+ *
+ * <p>Only its insert goes through this entity. Erasure, a new removal reason and the operator's receipt each
+ * change their own columns with a guarded statement of {@link ResearchDisclosureSubjectRepository}, so a copy
+ * read earlier in a transaction can never write a dropped link or a cleared receipt back.
  */
 @Entity
 @Table(
@@ -131,32 +134,5 @@ public class ResearchDisclosureSubject {
 
     public boolean isRemovalOutstanding() {
         return removalReason != null && removedAt == null;
-    }
-
-    /** The first reason found stays: a later regrant or erasure does not rewrite why removal is owed. */
-    void requireRemoval(RemovalReason reason, Instant at) {
-        if (removalReason == null) {
-            removalReason = reason;
-            removalRequiredAt = at;
-        }
-    }
-
-    /**
-     * Records the operator's attestation and drops the identifying link. The key stays as a receipt
-     * until the disclosure is closed.
-     */
-    void recordRemoved(Instant at) {
-        if (removalReason == null) {
-            throw new IllegalStateException("No removal is owed for this participant");
-        }
-        if (removedAt != null) {
-            return;
-        }
-        if (at.isBefore(Objects.requireNonNull(removalRequiredAt))) {
-            throw new IllegalArgumentException("Removal precedes the obligation");
-        }
-        removedAt = at;
-        accountId = null;
-        grantDecisionId = null;
     }
 }

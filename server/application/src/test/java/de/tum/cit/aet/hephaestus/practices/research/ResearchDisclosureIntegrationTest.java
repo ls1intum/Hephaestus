@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.consent.ConsentService;
 import de.tum.cit.aet.hephaestus.core.auth.consent.ResearchConsentTestSupport;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchDisclosureAudit;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationQuery;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -23,12 +24,16 @@ import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.assertj.core.groups.Tuple;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -651,6 +656,162 @@ class ResearchDisclosureIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(ResearchDisclosure.Closure.DESTROYED);
         purge.verifyQuiescent(workspace);
         assertThat(write(() -> recorder.detectRemovals(Instant.now()))).isEmpty();
+    }
+
+    @Test
+    void shouldKeepAnErasureThatCommitsDuringTheRemovalCheckAndNeverLinkTheAccountAgain() {
+        long participant = Objects.requireNonNull(course.account().getId());
+        long workspace = Objects.requireNonNull(course.workspace().getId());
+        decide(participant, true, at.minus(10, ChronoUnit.DAYS));
+        data.result(course, ResultOutcome.NOT_MET, at);
+        Released released = release(workspace, Instant.now().plus(30, ChronoUnit.DAYS));
+        UUID dataset = released.disclosure().getId();
+        String key = Objects.requireNonNull(released.keys().get(participant));
+        // The check reads a withdrawal; the account is erased before the check writes.
+        decide(participant, false, Instant.now());
+        AtomicReference<String> erased = new AtomicReference<>();
+        var ledger = new CommitAfterStandingRead(consent, () -> {
+            committed(() -> erase(participant));
+            erased.set(subjectRow(dataset));
+        });
+        var checking = new ResearchDisclosureRecorder(disclosures, subjects, ledger, audit);
+
+        var manifest = write(() -> checking.detectRemovals(Instant.now()));
+
+        assertThat(erased.get()).as("the erasure committed while the check ran").isNotNull();
+        assertThat(subjectRow(dataset))
+                .as("the check writes nothing over the erasure")
+                .isEqualTo(erased.get());
+        assertThat(subjects.findForDisclosure(workspace, dataset))
+                .singleElement()
+                .satisfies(s -> {
+                    assertThat(s.getAccountId()).isNull();
+                    assertThat(s.getRemovalReason()).isEqualTo(ResearchDisclosureSubject.RemovalReason.ACCOUNT_ERASED);
+                    assertThat(s.getRemovedAt()).isNull();
+                });
+        assertThat(manifest)
+                .singleElement()
+                .satisfies(open -> assertThat(open.removals())
+                        .extracting(
+                                ResearchDisclosureRecorder.Obligation::participantKey,
+                                ResearchDisclosureRecorder.Obligation::reason)
+                        .containsExactly(Tuple.tuple(key, ResearchDisclosureSubject.RemovalReason.ACCOUNT_ERASED)));
+    }
+
+    @Test
+    void shouldKeepAReceiptThatCommitsDuringTheRemovalCheckWithItsFirstReasonAndNoLink() {
+        long participant = Objects.requireNonNull(course.account().getId());
+        long workspace = Objects.requireNonNull(course.workspace().getId());
+        decide(participant, true, at.minus(10, ChronoUnit.DAYS));
+        data.result(course, ResultOutcome.NOT_MET, at);
+        Released released = release(workspace, Instant.now().plus(30, ChronoUnit.DAYS));
+        UUID dataset = released.disclosure().getId();
+        String key = Objects.requireNonNull(released.keys().get(participant));
+        decide(participant, false, Instant.now());
+        Instant owedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        Instant removedAt = owedAt.plusSeconds(1);
+        // Before this check writes, another check records the withdrawal and the operator records the key as removed.
+        AtomicReference<String> receipted = new AtomicReference<>();
+        var ledger = new CommitAfterStandingRead(consent, () -> {
+            committed(() -> recorder.detectRemovals(owedAt));
+            committed(() -> recorder.recordRemoved(dataset, List.of(key), participant, removedAt));
+            receipted.set(subjectRow(dataset));
+        });
+        var checking = new ResearchDisclosureRecorder(disclosures, subjects, ledger, audit);
+
+        var manifest = write(() -> checking.detectRemovals(removedAt.plusSeconds(1)));
+
+        assertThat(receipted.get())
+                .as("the receipt committed while the check ran")
+                .isNotNull();
+        assertThat(subjects.findForDisclosure(workspace, dataset))
+                .singleElement()
+                .satisfies(s -> {
+                    assertThat(s.getAccountId()).isNull();
+                    assertThat(s.getGrantDecisionId()).isNull();
+                    assertThat(s.getRemovalReason())
+                            .isEqualTo(ResearchDisclosureSubject.RemovalReason.CONSENT_WITHDRAWN);
+                    assertThat(s.getRemovalRequiredAt())
+                            .as("the first date stays")
+                            .isEqualTo(owedAt);
+                    assertThat(s.getRemovedAt()).isEqualTo(removedAt);
+                });
+        assertThat(subjectRow(dataset))
+                .as("the check restores neither the link nor an open removal")
+                .isEqualTo(receipted.get());
+        assertThat(manifest).singleElement().satisfies(open -> {
+            assertThat(open.datasetId()).isEqualTo(dataset);
+            assertThat(open.removals()).isEmpty();
+        });
+    }
+
+    /** One account erasure, as the existing erasure path leaves the ledger, the account and the mapping. */
+    private void erase(long accountId) {
+        jdbc.update("UPDATE consent_decision SET account_id=NULL WHERE account_id=?", accountId);
+        jdbc.update("UPDATE account SET status='DELETED' WHERE id=?", accountId);
+        new ResearchDisclosureAccountErasureAdapter(subjects, disclosures).eraseAccount(accountId);
+    }
+
+    /** Commits on its own connection, as a concurrent request would, while a caller's transaction stays open. */
+    private void committed(Runnable work) {
+        var template = new TransactionTemplate(transactions);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        template.executeWithoutResult(status -> work.run());
+    }
+
+    private String subjectRow(UUID dataset) {
+        return Objects.requireNonNull(jdbc.queryForObject(
+                "SELECT to_jsonb(s)::text FROM research_disclosure_subject s WHERE s.disclosure_id=?",
+                String.class,
+                dataset));
+    }
+
+    /**
+     * The real consent ledger. Right after the first standing read, so between the removal check's read of the
+     * subject rows and its write, one concurrent writer runs and commits.
+     */
+    private static final class CommitAfterStandingRead implements ResearchParticipationQuery {
+        private final ResearchParticipationQuery ledger;
+        private @Nullable Runnable concurrent;
+
+        private CommitAfterStandingRead(ResearchParticipationQuery ledger, Runnable concurrent) {
+            this.ledger = ledger;
+            this.concurrent = concurrent;
+        }
+
+        @Override
+        public Map<Long, GrantStanding> grantStandings(Map<Long, Long> grantDecisionIds) {
+            Map<Long, GrantStanding> standings = ledger.grantStandings(grantDecisionIds);
+            Runnable writer = concurrent;
+            concurrent = null;
+            if (writer != null) writer.run();
+            return standings;
+        }
+
+        @Override
+        public Optional<String> researchOrganization() {
+            return ledger.researchOrganization();
+        }
+
+        @Override
+        public boolean participates(long accountId) {
+            return ledger.participates(accountId);
+        }
+
+        @Override
+        public Optional<ResearchQuestion> currentQuestion() {
+            return ledger.currentQuestion();
+        }
+
+        @Override
+        public Map<Long, Long> currentGrants(Collection<Long> accountIds) {
+            return ledger.currentGrants(accountIds);
+        }
+
+        @Override
+        public Map<Long, Long> lockCurrentGrants(Collection<Long> accountIds) {
+            return ledger.lockCurrentGrants(accountIds);
+        }
     }
 
     @Test

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationQuery.GrantStanding;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.research.ResearchDisclosureSubject.RemovalReason;
+import de.tum.cit.aet.hephaestus.practices.research.ResearchDisclosureSubjectRepository.SubjectState;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -134,37 +135,51 @@ class ResearchDisclosureRecorder {
      * obligation, and lists every open disclosure, including those with no removal owed. An obligation,
      * once recorded, stays: a later regrant does not cancel a removal already owed for data released under
      * the earlier grant.
+     *
+     * <p>Account erasure and receipts change the same rows without this transaction's locks. So the rows are read
+     * as values, each new reason is written only while the row still links the grant that was checked, and the
+     * manifest reports the rows as stored afterwards: an erasure or receipt that committed meanwhile stays.
      */
     @Transactional(timeout = 30)
     public List<OpenDisclosure> detectRemovals(Instant now) {
         List<ResearchDisclosure> open = disclosures.findOpen();
         if (open.isEmpty()) return List.of();
-        Map<UUID, List<ResearchDisclosureSubject>> byDisclosure =
-                subjects
-                        .findForDisclosures(
-                                open.stream().map(ResearchDisclosure::getId).toList())
-                        .stream()
-                        .collect(Collectors.groupingBy(ResearchDisclosureSubject::getDisclosureId));
-        List<OpenDisclosure> manifest = new ArrayList<>();
+        List<UUID> ids = open.stream().map(ResearchDisclosure::getId).toList();
+        Map<UUID, List<SubjectState>> checked =
+                subjects.stateOf(ids).stream().collect(Collectors.groupingBy(SubjectState::disclosureId));
         for (ResearchDisclosure disclosure : open) {
-            List<ResearchDisclosureSubject> rows = byDisclosure.getOrDefault(disclosure.getId(), List.of());
+            List<SubjectState> rows = checked.getOrDefault(disclosure.getId(), List.of());
             // One ledger read per disclosure: an account appears at most once in each, under one grant.
             Map<Long, Long> linked = new HashMap<>();
             for (var row : rows) {
-                if (row.getRemovalReason() == null && row.getAccountId() != null && row.getGrantDecisionId() != null) {
-                    linked.put(row.getAccountId(), row.getGrantDecisionId());
+                Long account = row.accountId();
+                Long grant = row.grantDecisionId();
+                if (row.removalReason() == null && account != null && grant != null) {
+                    linked.put(account, grant);
                 }
             }
             Map<Long, GrantStanding> standings = consent.grantStandings(linked);
-            List<Obligation> owed = new ArrayList<>();
             for (var row : rows) {
-                RemovalReason reason = row.getAccountId() == null ? null : reason(standings.get(row.getAccountId()));
-                if (reason != null) row.requireRemoval(reason, now);
+                Long account = row.accountId();
+                Long grant = row.grantDecisionId();
+                if (row.removalReason() != null || account == null || grant == null) continue;
+                RemovalReason reason = reason(standings.get(account));
+                if (reason != null) {
+                    subjects.requireRemoval(row.workspaceId(), row.id(), account, grant, reason.name(), now);
+                }
+            }
+        }
+        Map<UUID, List<SubjectState>> stored =
+                subjects.stateOf(ids).stream().collect(Collectors.groupingBy(SubjectState::disclosureId));
+        List<OpenDisclosure> manifest = new ArrayList<>();
+        for (ResearchDisclosure disclosure : open) {
+            List<Obligation> owed = new ArrayList<>();
+            for (var row : stored.getOrDefault(disclosure.getId(), List.of())) {
                 if (row.isRemovalOutstanding()) {
                     owed.add(new Obligation(
-                            row.getParticipantKey(),
-                            Objects.requireNonNull(row.getRemovalReason()),
-                            Objects.requireNonNull(row.getRemovalRequiredAt())));
+                            row.participantKey(),
+                            Objects.requireNonNull(row.removalReason()),
+                            Objects.requireNonNull(row.removalRequiredAt())));
                 }
             }
             boolean expired = disclosure.isUseExpired(now);
@@ -179,23 +194,30 @@ class ResearchDisclosureRecorder {
         return List.copyOf(manifest);
     }
 
-    /** The operator's attestation that these participants were removed from the retained copy. */
+    /**
+     * The operator's attestation that these participants were removed from the retained copy. It writes only the
+     * receipt and the dropped link, all of them or none, so the first reason and its date stay as recorded.
+     */
     @Transactional(timeout = 15)
     public int recordRemoved(UUID datasetId, Collection<String> participantKeys, long adminId, Instant now) {
         ResearchDisclosure disclosure = openForUpdate(datasetId);
         Set<String> requested = Set.copyOf(participantKeys);
-        Map<String, ResearchDisclosureSubject> rows =
-                subjects.findForDisclosure(disclosure.getWorkspaceId(), datasetId).stream()
-                        .collect(Collectors.toMap(ResearchDisclosureSubject::getParticipantKey, row -> row));
+        Map<String, SubjectState> rows = subjects.stateOf(List.of(datasetId)).stream()
+                .collect(Collectors.toMap(SubjectState::participantKey, row -> row));
         for (String key : requested) {
-            ResearchDisclosureSubject row = rows.get(key);
+            SubjectState row = rows.get(key);
             if (row == null || !row.isRemovalOutstanding()) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT, "Only participants with an outstanding removal can be marked removed.");
+                throw outstandingOnly();
+            }
+            if (now.isBefore(Objects.requireNonNull(row.removalRequiredAt()))) {
+                throw new IllegalArgumentException("Removal precedes the obligation");
             }
         }
-        requested.forEach(key -> Objects.requireNonNull(rows.get(key)).recordRemoved(now));
-        subjects.flush();
+        int recorded =
+                subjects.recordRemoved(disclosure.getWorkspaceId(), datasetId, requested.toArray(String[]::new), now);
+        if (recorded != requested.size()) {
+            throw outstandingOnly();
+        }
         requireAudited(audit.recordRemoval(adminId, disclosure.getWorkspaceId(), datasetId, requested.size(), null));
         return requested.size();
     }
@@ -220,6 +242,11 @@ class ResearchDisclosureRecorder {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "The dataset is already closed.");
         }
         return disclosure;
+    }
+
+    private static ResponseStatusException outstandingOnly() {
+        return new ResponseStatusException(
+                HttpStatus.CONFLICT, "Only participants with an outstanding removal can be marked removed.");
     }
 
     private static void requireAudited(boolean audited) {
