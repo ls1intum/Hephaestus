@@ -24,6 +24,7 @@ import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { usePasskeySettings } from "@/hooks/use-passkey-settings";
+import { saveBlobFile } from "@/lib/download";
 import { instanceAdminHead } from "@/lib/page-title";
 import {
 	readReleaseReceipt,
@@ -74,12 +75,7 @@ function ResearchRoute() {
 				throw new Error("The server did not return a dataset file.");
 			}
 			const receipt = await readReleaseReceipt(data);
-			const url = URL.createObjectURL(data);
-			const link = document.createElement("a");
-			link.href = url;
-			link.download = releaseFilename(receipt?.datasetId);
-			link.click();
-			URL.revokeObjectURL(url);
+			saveBlobFile(data, releaseFilename(receipt?.datasetId));
 			return receipt;
 		},
 		onMutate: () => {

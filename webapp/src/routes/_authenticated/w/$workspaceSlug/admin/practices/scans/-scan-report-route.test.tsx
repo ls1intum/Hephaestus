@@ -314,6 +314,7 @@ describe("scan report SARIF export", () => {
 		revokeObjectURL: Object.getOwnPropertyDescriptor(URL, "revokeObjectURL"),
 	};
 	afterEach(() => {
+		vi.useRealTimers();
 		vi.restoreAllMocks();
 		for (const [name, descriptor] of Object.entries(originals)) {
 			Reflect.deleteProperty(URL, name);
@@ -344,9 +345,13 @@ describe("scan report SARIF export", () => {
 		const user = userEvent.setup();
 
 		renderRouteAtWithRouter(REPORT_URL);
-		await user.click(
-			await screen.findByRole("button", { name: "Export SARIF" }, ROUTE_RENDER_WAIT),
+		const exportButton = await screen.findByRole(
+			"button",
+			{ name: "Export SARIF" },
+			ROUTE_RENDER_WAIT,
 		);
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
+		await user.click(exportButton);
 
 		await waitFor(() => expect(downloads).toHaveLength(1));
 		expect(exports).toHaveLength(1);
@@ -355,6 +360,8 @@ describe("scan report SARIF export", () => {
 			href: "blob:sarif-1",
 		});
 		await expect(created[0]?.text()).resolves.toBe('{"version":"2.1.0"}');
+		expect(revoked).toStrictEqual([]);
+		await vi.advanceTimersByTimeAsync(40_000);
 		expect(revoked).toStrictEqual(["blob:sarif-1"]);
 	});
 

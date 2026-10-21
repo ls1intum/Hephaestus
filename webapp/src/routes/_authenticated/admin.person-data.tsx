@@ -20,6 +20,7 @@ import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { useConfirmAccess } from "@/hooks/use-confirm-access";
+import { saveBlobFile } from "@/lib/download";
 import { instanceAdminHead } from "@/lib/page-title";
 import { type StepUpChallenge, stepUpChallengeOf } from "@/lib/problem-detail";
 
@@ -76,12 +77,7 @@ function PersonDataRoute() {
 			if (!(data instanceof Blob)) {
 				throw new Error("The export did not return a JSON file.");
 			}
-			const url = URL.createObjectURL(data);
-			const link = document.createElement("a");
-			link.href = url;
-			link.download = "person-data.json";
-			link.click();
-			URL.revokeObjectURL(url);
+			saveBlobFile(data, "person-data.json");
 		},
 		onError,
 	});

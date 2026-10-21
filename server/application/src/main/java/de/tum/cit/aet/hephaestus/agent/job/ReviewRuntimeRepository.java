@@ -50,7 +50,7 @@ public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
 
     default Map<UUID, List<ReviewUsageAttempt>> usageByReview(long workspaceId, Set<UUID> reviewIds) {
         if (reviewIds.isEmpty()) return Map.of();
-        return Map.copyOf(usageRows(workspaceId, reviewIds).stream()
+        return Map.copyOf(usageRows(workspaceId, reviewIds.toArray(UUID[]::new)).stream()
                 .collect(Collectors.groupingBy(
                         UsageRow::reviewId,
                         Collectors.mapping(ReviewRuntimeRepository::usageAttempt, Collectors.toUnmodifiableList()))));
@@ -77,10 +77,10 @@ public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
           CASE WHEN bool_and(cost_usd IS NOT NULL AND pricing_state<>'UNPRICED') THEN SUM(cost_usd) END,
           CASE WHEN bool_or(cost_usd IS NULL OR pricing_state='UNPRICED') THEN 'UNPRICED'
                WHEN bool_and(pricing_state='NO_CHARGE') THEN 'NO_CHARGE' ELSE 'PRICED' END
-        FROM llm_usage_event WHERE workspace_id=:workspaceId AND review_id IN :reviewIds
+        FROM llm_usage_event WHERE workspace_id=:workspaceId AND review_id = ANY(:reviewIds)
         GROUP BY review_id,source_id,source_attempt ORDER BY review_id,source_id,source_attempt
         """, nativeQuery = true)
-    List<UsageRow> usageRows(@Param("workspaceId") long workspaceId, @Param("reviewIds") Set<UUID> reviewIds);
+    List<UsageRow> usageRows(@Param("workspaceId") long workspaceId, @Param("reviewIds") UUID[] reviewIds);
 
     default QueueCounts queueCounts(long workspaceId, Instant asOf) {
         return queueCountsAt(workspaceId, asOf, asOf.minusSeconds(3600), asOf.minusSeconds(86400));

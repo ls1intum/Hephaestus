@@ -87,7 +87,7 @@ function serveResearch(options: {
 }
 
 function captureDownloads() {
-	const downloads: { name: string; size: number }[] = [];
+	const downloads: { name: string; size: number; attached: boolean }[] = [];
 	const revoked: string[] = [];
 	let blob: Blob | undefined;
 	URL.createObjectURL = (created: Blob) => {
@@ -99,7 +99,7 @@ function captureDownloads() {
 	};
 	vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
 		function record(this: HTMLAnchorElement) {
-			downloads.push({ name: this.download, size: blob?.size ?? 0 });
+			downloads.push({ name: this.download, size: blob?.size ?? 0, attached: this.isConnected });
 		},
 	);
 	return { downloads, revoked };
@@ -122,6 +122,7 @@ const originals = {
 	revokeObjectURL: Object.getOwnPropertyDescriptor(URL, "revokeObjectURL"),
 };
 afterEach(() => {
+	vi.useRealTimers();
 	vi.restoreAllMocks();
 	for (const [name, descriptor] of Object.entries(originals)) {
 		Reflect.deleteProperty(URL, name);
@@ -173,6 +174,8 @@ describe("research datasets route", () => {
 		await user.click(
 			screen.getByRole("checkbox", { name: /I give this file only to the research team/u }),
 		);
+		// The file's address is let go on a timer; the clock still runs, and the test can move it on.
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
 		await user.click(screen.getByRole("button", { name: "Export and download" }));
 
 		await screen.findByRole("heading", { name: "Dataset exported" });
@@ -185,11 +188,16 @@ describe("research datasets route", () => {
 				useUntil: "2027-10-01T00:00:00.000Z",
 			},
 		]);
+		expect(downloads[0]?.attached, "Download anchor is connected at click").toBe(true);
 		expect(downloads).toStrictEqual([
-			{ name: `hephaestus-research-${DATASET}.json`, size: JSON.stringify(fileHeader).length },
+			{
+				name: `hephaestus-research-${DATASET}.json`,
+				size: JSON.stringify(fileHeader).length,
+				attached: true,
+			},
 		]);
-		// The page lets go of the file's address once the download started.
-		expect(revoked).toStrictEqual(["blob:research-1"]);
+		// The browser reads the file after the click, so its address is still there.
+		expect(revoked).toStrictEqual([]);
 		screen.getByText("2026-04-01 to 2026-09-30 (UTC)");
 		screen.getByText("2027-09-30 (UTC)");
 		// The release proved a fresh passkey, so the open datasets are read again from the server.
@@ -198,6 +206,9 @@ describe("research datasets route", () => {
 		// Neither the file nor its participant keys are kept by the browser.
 		expect(storedText()).not.toContain(DATASET);
 		expect(storedText()).not.toContain(KEY);
+		// The page lets go of the file's address once, when its timer runs.
+		await vi.advanceTimersByTimeAsync(40_000);
+		expect(revoked).toStrictEqual(["blob:research-1"]);
 	});
 
 	it("never retries a failed release and points to the open datasets instead", async () => {

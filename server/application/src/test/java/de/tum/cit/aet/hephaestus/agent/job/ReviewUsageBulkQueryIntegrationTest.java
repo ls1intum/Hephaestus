@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -178,6 +179,76 @@ class ReviewUsageBulkQueryIntegrationTest extends AbstractWorkspaceIntegrationTe
         assertThat(runtime.usageByReview(other.getId(), Set.of(foreignReview)))
                 .hasEntrySatisfying(
                         foreignReview, usage -> assertThat(usage.calls()).isEqualTo(88));
+    }
+
+    @Test
+    void shouldReadUsageWhenTheRequestedReviewSetExceedsThePostgresqlParameterLimit() {
+        var workspace = workspace("bulk-usage-large");
+        var other = workspace("bulk-usage-large-other");
+        var review = UUID.randomUUID();
+        var foreignReview = UUID.randomUUID();
+        review(workspace, review);
+        review(other, foreignReview);
+        var source = UUID.randomUUID();
+        ledger.saveAllAndFlush(List.of(
+                event(
+                        workspace,
+                        review,
+                        source,
+                        UsageSourceType.REVIEW_JOB,
+                        0,
+                        2,
+                        100,
+                        50,
+                        20,
+                        new BigDecimal("0.25"),
+                        UsagePricingState.PRICED),
+                event(
+                        workspace,
+                        review,
+                        source,
+                        UsageSourceType.REVIEW_JOB,
+                        1,
+                        3,
+                        200,
+                        60,
+                        30,
+                        null,
+                        UsagePricingState.UNPRICED),
+                event(
+                        other,
+                        foreignReview,
+                        UUID.randomUUID(),
+                        UsageSourceType.REVIEW_JOB,
+                        0,
+                        88,
+                        8800,
+                        880,
+                        800,
+                        new BigDecimal("88"),
+                        UsagePricingState.PRICED)));
+        var reviewIds = new HashSet<UUID>();
+        reviewIds.add(review);
+        reviewIds.add(foreignReview);
+        for (long id = 0; id < 65_536; id++) {
+            reviewIds.add(new UUID(0, id));
+        }
+        assertThat(reviewIds).hasSizeGreaterThan(65_535);
+
+        var result = runtime.usageByReview(workspace.getId(), reviewIds);
+
+        assertThat(result).containsOnlyKeys(review);
+        var measured = Objects.requireNonNull(result.get(review));
+        assertThat(measured.calls()).isEqualTo(5);
+        assertThat(measured.inputTokens()).isEqualTo(300);
+        assertThat(measured.outputTokens()).isEqualTo(110);
+        assertThat(measured.priced()).isFalse();
+        assertThat(measured.costUsd()).isNull();
+        assertThat(measured.attempts())
+                .containsExactly(
+                        new ReviewUsageAttempt(
+                                source, 0, 2, 100, 50, 20, 0, 0, new BigDecimal("0.250000"), UsagePricingState.PRICED),
+                        new ReviewUsageAttempt(source, 1, 3, 200, 60, 30, 0, 0, null, UsagePricingState.UNPRICED));
     }
 
     @Test
