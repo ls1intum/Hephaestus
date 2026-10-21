@@ -42,7 +42,6 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { useConfirmAccess } from "@/hooks/use-confirm-access";
 import { filedUnder, pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import {
@@ -250,22 +249,13 @@ function AdminLlmPage() {
 					}}
 				/>
 			);
-		} else if (modelsQuery.isLoading) {
-			modelsSection = (
-				<div
-					className="flex h-32 items-center justify-center"
-					role="status"
-					aria-label="Loading models"
-				>
-					<Spinner className="size-6" />
-				</div>
-			);
 		} else {
 			modelsSection = (
 				<AdminLlmModelsSection
 					connection={selectedConnection}
 					workspaceOptions={workspaceOptions}
 					models={modelsForSelectedConnection}
+					isLoading={modelsQuery.isLoading}
 					mutatingIds={mutatingModelIds}
 					onAdd={() => {
 						setEditingModel(null);

@@ -132,6 +132,22 @@ export const Loading: Story = {
 	},
 };
 
+/** A new search is on its way: the rows already read stay readable, and only the table says it is busy. */
+export const Updating: Story = {
+	args: {
+		updating: true,
+		view: { q: "bob", team: "all", sort: "name", desc: false, page: 0, size: 10 },
+	},
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table", { name: "Workspace members" });
+		await expect(table).toHaveAttribute("aria-busy", "true");
+		await expect(within(rowOf(canvas, "Bob Smith")).getByText("Unclaimed")).toBeVisible();
+		await expect(canvas.queryByText(/^Showing/u)).toBeNull();
+		await canvas.findByText("Updating members…", {}, { timeout: 3000 });
+		await expect(canvas.getByRole("status")).toHaveTextContent("Updating members…");
+	},
+};
+
 export const Empty: Story = {
 	args: {
 		members: [],

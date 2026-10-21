@@ -12,6 +12,7 @@ import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { ownMembership } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
+import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 15_000 });
@@ -92,8 +93,44 @@ function mockMembersRoute(members: Wire<WorkspaceMembership>[] = [ADA, SAM]) {
 		http.get("*/workspaces/:workspaceSlug/members", () =>
 			HttpResponse.json(membershipPage(members)),
 		),
-		http.get("*/workspaces/:workspaceSlug/teams", () => HttpResponse.json([])),
+		http.get("*/workspaces/:workspaceSlug/team", () => HttpResponse.json([])),
 	);
+}
+
+const REVIEWERS = {
+	id: 3,
+	name: "Reviewers",
+	slug: "reviewers",
+	hidden: false,
+	membershipCount: 1,
+	repoPermissionCount: 0,
+	repositories: [],
+	labels: [],
+	members: [],
+};
+
+/**
+ * The members read: Ada and Sam at once, until a read names `param`. That read waits for `held`,
+ * then answers Sam alone. Every read's search params land in `requests`.
+ */
+function holdMembersReadNaming(
+	param: "q" | "team",
+	held: Promise<void>,
+	requests: Record<string, string>[] = [],
+) {
+	return http.get("*/workspaces/:workspaceSlug/members", async ({ request }) => {
+		const params = new URL(request.url).searchParams;
+		requests.push(Object.fromEntries(params));
+		if (params.get(param) === null) {
+			return HttpResponse.json(membershipPage([ADA, SAM]));
+		}
+		await held;
+		return HttpResponse.json(membershipPage([SAM]));
+	});
+}
+
+function membersTable(): HTMLElement {
+	return screen.getByRole("table", { name: "Workspace members" });
 }
 
 function rowOf(name: string): HTMLElement {
@@ -224,21 +261,7 @@ describe("workspace members route", () => {
 			const requests: Record<string, string>[] = [];
 			mockMembersRoute();
 			server.use(
-				http.get("*/workspaces/:workspaceSlug/teams", () =>
-					HttpResponse.json([
-						{
-							id: 3,
-							name: "Reviewers",
-							slug: "reviewers",
-							hidden: false,
-							membershipCount: 1,
-							repoPermissionCount: 0,
-							repositories: [],
-							labels: [],
-							members: [],
-						},
-					]),
-				),
+				http.get("*/workspaces/:workspaceSlug/team", () => HttpResponse.json([REVIEWERS])),
 				http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
 					const params = new URL(request.url).searchParams;
 					requests.push(Object.fromEntries(params));
@@ -323,6 +346,109 @@ describe("workspace members route", () => {
 		expect(router.state.location.search).toStrictEqual(
 			expect.objectContaining({ sort: "username", desc: true }),
 		);
+	});
+
+	it.each([
+		{ scope: "every team", url: "/w/acme/admin/members", team: undefined },
+		{ scope: "one team", url: "/w/acme/admin/members?team=3", team: "3" },
+	])(
+		"keeps the members of $scope on screen while a new search loads, then shows its result",
+		async ({ url, team }) => {
+			const searched = deferred();
+			const requests: Record<string, string>[] = [];
+			mockMembersRoute();
+			server.use(
+				http.get("*/workspaces/:workspaceSlug/team", () => HttpResponse.json([REVIEWERS])),
+				holdMembersReadNaming("q", searched.promise, requests),
+			);
+			// A failed assertion must still answer the held search, or cleanup waits on it.
+			try {
+				renderRouteAt(url);
+				await screen.findByText("Showing 2 of 2 members", undefined, ROUTE_RENDER_WAIT);
+
+				fireEvent.change(screen.getByPlaceholderText("Search by name or username…"), {
+					target: { value: "sam" },
+				});
+				await waitFor(() => expect(requests.some((request) => request.q === "sam")).toBe(true));
+
+				// Same workspace and team: the rows already read stay, marked busy, until the search answers.
+				expect(membersTable().getAttribute("aria-busy")).toBe("true");
+				within(membersTable()).getByText("Ada Lovelace", { selector: "div" });
+				within(membersTable()).getByText("Sam Unclaimed", { selector: "div" });
+
+				searched.resolve();
+				await screen.findByText("Showing 1 of 1 member", undefined, ROUTE_RENDER_WAIT);
+				expect(screen.queryByText("Ada Lovelace", { selector: "div" })).toBeNull();
+				expect(membersTable().getAttribute("aria-busy")).toBeNull();
+				expect(requests.every((request) => request.team === team)).toBe(true);
+			} finally {
+				searched.resolve();
+			}
+		},
+	);
+
+	it("never shows another team's members while the chosen team loads", async () => {
+		const reviewers = deferred();
+		mockMembersRoute();
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/team", () => HttpResponse.json([REVIEWERS])),
+			holdMembersReadNaming("team", reviewers.promise),
+		);
+		try {
+			renderRouteAt("/w/acme/admin/members");
+			await screen.findByText("Showing 2 of 2 members", undefined, ROUTE_RENDER_WAIT);
+			const user = userEvent.setup();
+
+			await user.click(screen.getByRole("combobox", { name: "Filter members by team" }));
+			await user.click(await screen.findByRole("option", { name: "Reviewers" }));
+
+			await waitFor(() =>
+				expect(screen.queryByText("Ada Lovelace", { selector: "div" })).toBeNull(),
+			);
+			expect(screen.queryByText("Sam Unclaimed", { selector: "div" })).toBeNull();
+			expect(screen.queryByText("Showing 2 of 2 members")).toBeNull();
+			expect(membersTable().getAttribute("aria-busy")).toBe("true");
+
+			reviewers.resolve();
+			await screen.findByText("Sam Unclaimed", { selector: "div" }, ROUTE_RENDER_WAIT);
+			screen.getByText("Showing 1 of 1 member");
+		} finally {
+			reviewers.resolve();
+		}
+	});
+
+	it("never shows one workspace's members while another workspace's load", async () => {
+		const tutorsMembers = deferred();
+		const TUTORS = { ...WORKSPACE, id: 2, workspaceSlug: "tutors", displayName: "Tutors" };
+		mockMembersRoute([ADA]);
+		server.use(
+			http.get("*/workspaces", () => HttpResponse.json([WORKSPACE, TUTORS])),
+			http.get("*/workspaces/tutors", () => HttpResponse.json(TUTORS)),
+			http.get("*/workspaces/tutors/members", async () => {
+				await tutorsMembers.promise;
+				return HttpResponse.json(membershipPage([SAM]));
+			}),
+		);
+		try {
+			const { router } = renderRouteAtWithRouter("/w/acme/admin/members");
+			await screen.findByText("Ada Lovelace", { selector: "div" }, ROUTE_RENDER_WAIT);
+
+			await router.navigate({
+				to: "/w/$workspaceSlug/admin/members",
+				params: { workspaceSlug: "tutors" },
+			});
+
+			await waitFor(() =>
+				expect(screen.queryByText("Ada Lovelace", { selector: "div" })).toBeNull(),
+			);
+			expect(membersTable().getAttribute("aria-busy")).toBe("true");
+
+			tutorsMembers.resolve();
+			await screen.findByText("Sam Unclaimed", { selector: "div" }, ROUTE_RENDER_WAIT);
+			expect(screen.queryByText("Ada Lovelace", { selector: "div" })).toBeNull();
+		} finally {
+			tutorsMembers.resolve();
+		}
 	});
 
 	it("hides a member by account id", async () => {

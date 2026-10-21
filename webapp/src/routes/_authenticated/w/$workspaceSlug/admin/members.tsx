@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -24,7 +24,9 @@ import { NoWorkspace } from "@/components/common/NoWorkspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
+import { pageParam, useSearchState } from "@/lib/search-params";
 import { hasText } from "@/lib/text";
+import { keepSameSubject } from "@/runtime/tanstack-query/keep-same-subject";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/members")({
@@ -47,9 +49,21 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/mem
 	component: AdminMembersContainer,
 });
 
+/** The view as the URL holds it: a value at its default leaves the address. */
+function membersSearch(view: WorkspaceMembersTableView) {
+	return {
+		q: hasText(view.q) ? view.q : undefined,
+		team: view.team === "all" ? undefined : view.team,
+		sort: view.sort === "name" ? undefined : view.sort,
+		desc: view.desc ? true : undefined,
+		page: pageParam(view.page),
+		size: view.size === 10 ? undefined : view.size,
+	};
+}
+
 function AdminMembersContainer() {
 	const search = Route.useSearch();
-	const navigate = useNavigate({ from: Route.fullPath });
+	const setSearch = useSearchState();
 	const {
 		adminWorkspaceSlug: workspaceSlug,
 		isLoading: isWorkspaceLoading,
@@ -65,11 +79,12 @@ function AdminMembersContainer() {
 		page: search.page ?? 0,
 		size: search.size ?? 10,
 	};
+	const team = view.team === "all" ? undefined : view.team;
 	const membersQueryOptions = listMembershipsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
 		query: {
 			q: hasText(view.q.trim()) ? view.q.trim() : undefined,
-			team: view.team === "all" ? undefined : view.team,
+			team,
 			page: view.page,
 			size: view.size,
 			sort: [`${view.sort},${view.desc ? "desc" : "asc"}`],
@@ -78,6 +93,9 @@ function AdminMembersContainer() {
 	const membersQuery = useQuery({
 		...membersQueryOptions,
 		enabled: hasText(workspaceSlug),
+		// A new search, sort or page of the same workspace and team keeps the rows on screen until
+		// it answers; another workspace's or team's members never stand in.
+		placeholderData: keepSameSubject({ workspaceSlug: workspaceSlug ?? "", team }),
 	});
 	useQueryReadRefusal(membersQueryOptions.queryKey, membersQuery.isError, membersQuery.error);
 
@@ -157,6 +175,7 @@ function AdminMembersContainer() {
 			rowCount={membersQuery.data?.totalElements ?? 0}
 			teams={teams}
 			isLoading={isLoading || !hasText(workspaceSlug)}
+			updating={membersQuery.isPlaceholderData}
 			error={workspaceError ?? membersQuery.error}
 			onRetry={() => {
 				refetchWorkspace();
@@ -175,9 +194,9 @@ function AdminMembersContainer() {
 			pendingRoleAccountId={assignRole.isPending ? assignRole.variables.body.accountId : undefined}
 			view={view}
 			onViewChange={(patch) => {
-				void navigate({
-					search: (previous) => {
-						const next = {
+				void setSearch(
+					(previous) =>
+						membersSearch({
 							q: "",
 							team: "all",
 							sort: "name" as const,
@@ -186,32 +205,12 @@ function AdminMembersContainer() {
 							size: 10,
 							...previous,
 							...patch,
-						};
-						return {
-							q: next.q || undefined,
-							team: next.team === "all" ? undefined : next.team,
-							sort: next.sort === "name" ? undefined : next.sort,
-							desc: next.desc || undefined,
-							page: next.page || undefined,
-							size: next.size === 10 ? undefined : next.size,
-						};
-					},
-					replace: true,
-				});
+						}),
+					{ replace: true },
+				);
 			}}
 			renderPageLink={(page, props) => (
-				<Link
-					to="."
-					search={{
-						q: view.q || undefined,
-						team: view.team === "all" ? undefined : view.team,
-						sort: view.sort === "name" ? undefined : view.sort,
-						desc: view.desc || undefined,
-						page: page || undefined,
-						size: view.size === 10 ? undefined : view.size,
-					}}
-					{...props}
-				/>
+				<Link to="." search={membersSearch({ ...view, page })} resetScroll={false} {...props} />
 			)}
 		/>
 	);

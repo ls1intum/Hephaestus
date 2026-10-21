@@ -17,6 +17,8 @@ interface WorkspaceMembersPageProps {
 	rowCount: number;
 	teams: TeamInfo[];
 	isLoading: boolean;
+	/** The rows shown are the previous search's while this one loads. */
+	updating?: boolean;
 	error?: unknown;
 	onRetry?: () => void;
 	onToggleHidden?: (accountId: string, hidden: boolean) => void;
@@ -35,6 +37,7 @@ export function WorkspaceMembersPage({
 	rowCount,
 	teams,
 	isLoading,
+	updating,
 	error,
 	onRetry,
 	teamsError,
@@ -69,6 +72,7 @@ export function WorkspaceMembersPage({
 						rowCount={rowCount}
 						teams={teams}
 						isLoading={isLoading}
+						updating={updating}
 						onToggleHidden={onToggleHidden}
 						onRoleChange={onRoleChange}
 						pendingRoleAccountId={pendingRoleAccountId}
