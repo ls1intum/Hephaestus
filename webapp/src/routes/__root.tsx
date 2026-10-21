@@ -530,9 +530,16 @@ function AppSidebarContainer() {
 	} = workspaceAccess;
 	const adminSlug = workspaceAccess.adminWorkspaceSlug;
 	const hasWorkspace = Boolean(chromeWorkspaceSlug);
+	// Admin-only menu data belongs to an admin journey. Ordinary member pages keep static links
+	// without asking protected endpoints for hints or an approval count.
+	const onWorkspaceAdministration =
+		useMatch({
+			from: "/_authenticated/w/$workspaceSlug/admin",
+			shouldThrow: false,
+		}) !== undefined;
 	const integrationCatalogQuery = useQuery({
 		...getIntegrationCatalogOptions({ path: { workspaceSlug: adminSlug ?? "" } }),
-		enabled: workspaceAccess.isAdmin && Boolean(adminSlug),
+		enabled: onWorkspaceAdministration && workspaceAccess.isAdmin && Boolean(adminSlug),
 		placeholderData: (previousData) => previousData,
 	});
 	const integrationCatalog = Array.isArray(integrationCatalogQuery.data)
@@ -548,7 +555,8 @@ function AppSidebarContainer() {
 	const sidebarContext = sidebarContextOf(pathname);
 	const awaitingApproval = useFeedbackAwaitingApproval(
 		adminSlug,
-		workspaceAccess.isAdmin &&
+		onWorkspaceAdministration &&
+			workspaceAccess.isAdmin &&
 			(administrationWorkspace?.practicesEnabled ?? chromeWorkspace?.practicesEnabled) === true &&
 			sidebarContext === "main",
 	);
