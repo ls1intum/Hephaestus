@@ -15,6 +15,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * At most three pieces of READY conversation feedback that Heph may show in this conversation, and how many wait
+ * ({@code waiting}, among the developer's twelve latest pieces). A piece whose
+ * conversation copy is already bound to a mentor conversation shows only there: {@code threadId} is that mentor
+ * conversation's id, the main conversation or one Heph thread, and the request's {@code threadId} is the turn's.
+ */
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
@@ -36,20 +42,24 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         var root = objectMapper.createObjectNode().put("readAt", Instant.now().toString());
         consentGate.writeUntrustedEnvelope(root);
         var rows = root.putArray("preparedConversationFeedback");
+        int waiting = 0;
         for (var entry : feedback.forDeveloper(
                 request.workspaceId(), request.developerId(), Instant.now().minus(90, ChronoUnit.DAYS), 12)) {
-            if (rows.size() == 3) break;
             if (entry.destination() != FeedbackDestination.CONVERSATION
                     || entry.state() != FeedbackState.READY
                     || (entry.threadId() != null && !request.threadId().equals(entry.threadId()))
                     || entry.body() == null
                     || !copies.record(copies.of(entry))) continue;
+            waiting++;
+            if (rows.size() == 3) continue;
             var row = rows.addObject()
                     .put("feedbackId", entry.feedbackId().toString())
                     .put("body", entry.body());
+            row.set("practiceSlugs", objectMapper.valueToTree(entry.practiceSlugs()));
             row.set("resultIds", objectMapper.valueToTree(entry.resultIds()));
             row.set("problemIds", objectMapper.valueToTree(entry.problemIds()));
         }
+        root.put("waiting", waiting);
         files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(root));
     }
 }

@@ -12,8 +12,8 @@ import static com.slack.api.model.block.element.BlockElements.button;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.composition.ConfirmationDialogObject;
 import com.slack.api.model.view.View;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorAdmission;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorRefusal;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackHephaestusUiLinks;
@@ -49,7 +49,7 @@ public class SlackAppHomeService {
     private final SlackParticipantConsentRepository participantConsentRepository;
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
     private final MentorReadinessQuery mentorReadinessQuery;
-    private final MentorTurnRunner mentorTurnRunner;
+    private final MentorAdmission mentorAdmission;
     private final SlackMessageService messageService;
     private final SlackOnboardingService onboardingService;
     private final SlackHephaestusUiLinks uiLinks;
@@ -60,7 +60,7 @@ public class SlackAppHomeService {
             SlackParticipantConsentRepository participantConsentRepository,
             SlackMonitoredChannelRepository monitoredChannelRepository,
             MentorReadinessQuery mentorReadinessQuery,
-            MentorTurnRunner mentorTurnRunner,
+            MentorAdmission mentorAdmission,
             SlackMessageService messageService,
             SlackOnboardingService onboardingService,
             SlackHephaestusUiLinks uiLinks) {
@@ -69,7 +69,7 @@ public class SlackAppHomeService {
         this.participantConsentRepository = participantConsentRepository;
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.mentorReadinessQuery = mentorReadinessQuery;
-        this.mentorTurnRunner = mentorTurnRunner;
+        this.mentorAdmission = mentorAdmission;
         this.messageService = messageService;
         this.onboardingService = onboardingService;
         this.uiLinks = uiLinks;
@@ -96,7 +96,7 @@ public class SlackAppHomeService {
                 identityResolver.resolveDeveloper(workspaceId, teamId, slackUserId);
         Optional<String> login = developer.map(AccountSummaryQuery.AccountSummary::displayName);
         Optional<MentorRefusal> refusal = mentorReady
-                ? developer.flatMap(user -> mentorTurnRunner.refusal(workspaceId, user.id()))
+                ? developer.flatMap(user -> mentorAdmission.refusal(workspaceId, user.id()))
                 : Optional.empty();
         boolean channelMessagesAllowed =
                 !participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(

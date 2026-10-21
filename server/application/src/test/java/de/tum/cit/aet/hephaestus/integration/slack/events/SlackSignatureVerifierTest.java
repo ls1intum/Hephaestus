@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -46,14 +48,41 @@ class SlackSignatureVerifierTest extends BaseUnitTest {
                 .hasMessageContaining("signing-secret is blank");
     }
 
-    @Test
-    @DisplayName("server role can enable Slack without the webhook-only signing secret")
-    void serverRoleDoesNotCreateVerifierOrRequireSigningSecret() {
-        new ApplicationContextRunner()
+    private static ApplicationContextRunner slackEnabledWithRoles(boolean server, boolean webhook) {
+        return new ApplicationContextRunner()
                 .withUserConfiguration(SlackSignatureVerifier.class)
                 .withPropertyValues(
-                        "hephaestus.integration.slack.enabled=true", "hephaestus.runtime.webhook.enabled=false")
-                .run(context -> assertThat(context).doesNotHaveBean(SlackSignatureVerifier.class));
+                        "hephaestus.integration.slack.enabled=true",
+                        RuntimeRole.SERVER_PROPERTY + "=" + server,
+                        RuntimeRole.WORKER_PROPERTY + "=" + !(server || webhook),
+                        RuntimeRole.WEBHOOK_PROPERTY + "=" + webhook);
+    }
+
+    @ParameterizedTest(name = "server={0}, webhook={1}")
+    @CsvSource({"true,false", "false,true", "true,true"})
+    @DisplayName("a process that receives Slack verifies it, on either role")
+    void serverOrWebhookRoleCreatesTheVerifier(boolean server, boolean webhook) {
+        slackEnabledWithRoles(server, webhook)
+                .withPropertyValues("hephaestus.integration.slack.signing-secret=" + SECRET)
+                .run(context -> assertThat(context).hasSingleBean(SlackSignatureVerifier.class));
+    }
+
+    @Test
+    @DisplayName("the server role refuses to boot with Slack enabled and no signing secret")
+    void serverRoleWithoutSigningSecretFailsFast() {
+        slackEnabledWithRoles(true, false)
+                .run(context -> assertThat(context)
+                        .getFailure()
+                        .rootCause()
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("signing-secret is blank"));
+    }
+
+    @Test
+    @DisplayName("a worker-only process can enable Slack without the signing secret")
+    void workerOnlyDoesNotCreateVerifierOrRequireSigningSecret() {
+        slackEnabledWithRoles(false, false)
+                .run(context -> assertThat(context).hasNotFailed().doesNotHaveBean(SlackSignatureVerifier.class));
     }
 
     private static Stream<Arguments> rejectedSignatures() {

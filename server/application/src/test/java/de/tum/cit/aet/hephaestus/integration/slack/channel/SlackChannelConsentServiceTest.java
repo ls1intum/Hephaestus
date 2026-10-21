@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.slack.api.model.block.LayoutBlock;
+import de.tum.cit.aet.hephaestus.core.event.AgentContextChangedEvent;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -208,7 +209,9 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
         service().transition(WS, CHANNEL, ConsentState.PAUSED, null);
 
-        verifyNoInteractions(eventPublisher);
+        verify(eventPublisher, never()).publishEvent(ACTIVATION_KICK);
+        // Running Heph turns drop the channel's threads from their context folders.
+        verify(eventPublisher).publishEvent(new AgentContextChangedEvent(WS));
     }
 
     /** A same-state PATCH is an idempotent no-op — it must not re-fire the kick on every admin double-click. */

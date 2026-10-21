@@ -1,10 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.TurnJwt;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtInvalidException;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import java.io.Serial;
 import java.util.Set;
@@ -13,59 +16,112 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken;
 
+/**
+ * Authenticates the three sandbox credentials. A review job's token reaches its own runtime and the model. A Heph turn
+ * attempt's token reaches the model while this worker holds the attempt's lease, and its own turn endpoints, which
+ * check that the attempt runs here. A Heph host's gateway session token, which no signed claim backs, reaches only its
+ * own runtime: the discovery and workspace its initializer downloads, and its command channel.
+ */
 // Credential checks must not initialize model configuration.
 final class JobTokenAuthenticationProvider implements AuthenticationProvider {
     private final ReviewJobRepository jobs;
+    private final MentorTurnRepository turns;
+    private final SandboxGatewaySessions sessions;
     private final WorkerJwtVerifier verifier;
-    private final MentorProxyCredentialRegistry mentors;
     private final String workerId;
 
     JobTokenAuthenticationProvider(
             ReviewJobRepository jobs,
+            MentorTurnRepository turns,
+            SandboxGatewaySessions sessions,
             WorkerJwtVerifier verifier,
-            MentorProxyCredentialRegistry mentors,
             String workerId) {
         this.jobs = jobs;
+        this.turns = turns;
+        this.sessions = sessions;
         this.verifier = verifier;
-        this.mentors = mentors;
         this.workerId = workerId;
     }
 
     @Override
     public Authentication authenticate(Authentication authentication) {
         var token = (BearerTokenAuthenticationToken) authentication;
-        var mentor = mentors.authenticate(token.getToken());
-        if (mentor.isPresent())
-            return new JobTokenAuthentication(
-                    new ProxyIdentity(null, null, mentor.get()), Set.of(WorkerJwtIssuer.LLM_PROXY_SCOPE));
-        JobJwt jwt;
+        var request = (JobTokenAuthenticationFilter.RequestIdentity) token.getDetails();
+        if (request == null) throw invalid();
+        WorkerJwt verified;
         try {
-            if (!(verifier.verify(token.getToken()) instanceof JobJwt value)) throw invalid();
-            jwt = value;
+            verified = verifier.verify(token.getToken());
         } catch (WorkerJwtInvalidException invalid) {
+            // Only a session registered as a Heph host's takes an unsigned token. A rejected job token is never
+            // read as one, even while its review session is open.
+            var session = sessions.unsignedSessionFor(token.getToken());
+            if (session.isPresent()) return unsignedSession(session.get(), request);
             throw new BadCredentialsException("Invalid or expired credential", invalid);
         }
+        return switch (verified) {
+            case JobJwt job -> job(job, request);
+            case TurnJwt turn -> turn(turn, request);
+            default -> throw invalid();
+        };
+    }
+
+    private Authentication job(JobJwt jwt, JobTokenAuthenticationFilter.RequestIdentity request) {
+        if (request.turnId() != null || request.commands()) throw invalid();
         var job = jobs.findById(jwt.jobId()).orElseThrow(JobTokenAuthenticationProvider::invalid);
         if (job.getStatus() != ReviewJobStatus.RUNNING
                 || job.getWorkspaceId() != jwt.workspaceId()
                 || job.getAttempt() != jwt.attempt()) throw invalid();
-        var request = (JobTokenAuthenticationFilter.RequestIdentity) token.getDetails();
-        if (request != null
-                && request.runtimeJobId() != null
+        if (request.runtimeJobId() != null
                 && !request.runtimeJobId().equals(jwt.jobId().toString())) throw invalid();
         if (!workerId.equals(job.getWorkerId())) {
-            if (request != null && request.resultUpload()) throw new WorkerOwnershipConflict();
+            if (request.resultUpload()) throw new WorkerOwnershipConflict("Job is owned by another worker");
             throw invalid();
         }
-        return new JobTokenAuthentication(new ProxyIdentity(jwt, workerId, null), jwt.scopes());
+        return new JobTokenAuthentication(ProxyIdentity.of(jwt, workerId), jwt.scopes(), null);
     }
 
+    /**
+     * A turn token never reaches a sandbox runtime, and on the turn endpoints only its own turn. A model call needs the
+     * attempt to hold its lease on this worker; an attempt that ended or moved on gets {@code 409}, so its host stops.
+     */
+    private Authentication turn(TurnJwt jwt, JobTokenAuthenticationFilter.RequestIdentity request) {
+        if (request.runtimeJobId() != null) throw invalid();
+        if (request.turnId() != null) {
+            if (!request.turnId().equals(jwt.turnId().toString())) throw invalid();
+        } else {
+            var turn = turns.findByIdAndWorkspaceId(jwt.turnId(), jwt.workspaceId())
+                    .orElseThrow(JobTokenAuthenticationProvider::invalid);
+            if (!turn.isLeased()
+                    || turn.getAttempt() != jwt.attempt()
+                    || !workerId.equals(turn.getWorkerId())
+                    || !turn.getConversationId().equals(jwt.conversationId()))
+                throw new WorkerOwnershipConflict("This turn attempt no longer holds its lease");
+        }
+        return new JobTokenAuthentication(ProxyIdentity.of(jwt, workerId), jwt.scopes(), jwt);
+    }
+
+    /**
+     * A Heph host's session token, which no signed claim backs, reaches only that host's own runtime reads: the
+     * discovery and workspace archive its initializer downloads before the host starts, and its command channel.
+     */
+    private static Authentication unsignedSession(
+            SandboxGatewaySessions.UnsignedSession session, JobTokenAuthenticationFilter.RequestIdentity request) {
+        boolean permitted =
+                switch (session.kind()) {
+                    case HEPH_HOST -> request.commands() || request.workspaceRead();
+                    case REVIEW -> false;
+                };
+        if (!permitted || !session.id().toString().equals(request.runtimeJobId())) throw invalid();
+        return new JobTokenAuthentication(ProxyIdentity.hostSession(session.id()), Set.of(), null);
+    }
+
+    /** Answered {@code 409}: the credential is valid, but another worker or a later attempt now owns the work. */
     static final class WorkerOwnershipConflict extends BadCredentialsException {
         @Serial
         private static final long serialVersionUID = 1L;
 
-        WorkerOwnershipConflict() {
-            super("Job is owned by another worker");
+        WorkerOwnershipConflict(String message) {
+            super(message);
         }
     }
 

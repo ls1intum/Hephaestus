@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionHealth;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
@@ -19,6 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.job.FrozenCharge;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
@@ -36,6 +38,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnRepository;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -46,6 +49,7 @@ import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
 import java.math.BigDecimal;
@@ -92,6 +96,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ReviewJobRepository jobRepository;
+
+    @Autowired
+    private MentorTurnRepository turnRepository;
 
     @Autowired
     private WorkspaceAgentBindingRepository agentBindingRepository;
@@ -141,7 +148,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         SecurityContextHolder.clearContext();
         meterRegistry = new SimpleMeterRegistry();
         filter = new JobTokenAuthenticationFilter(
-                jobRepository, jwtVerifier, new MentorProxyCredentialRegistry(), "worker-1");
+                jobRepository, turnRepository, new SandboxGatewaySessions(), jwtVerifier, "worker-1");
         User owner = persistUser("proxy-owner");
         workspace = createWorkspace("proxy-ws", "Proxy Workspace", "proxy-org", AccountType.ORG, owner);
         for (String slug : List.of(PRACTICE, "test-coverage")) {
@@ -671,8 +678,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         objectMapper),
                 policy,
                 mock(ScanCallGuard.class),
-                new ProxyRoutingService(
-                        jobRepository, objectMapper, new MentorProxyCredentialRegistry(), attemptUsage));
+                new ProxyRoutingService(jobRepository, turnRepository, objectMapper, attemptUsage),
+                new ProxyCallsInFlight(),
+                new LlmConnectionHealth(CircuitBreakerRegistry.ofDefaults()),
+                Duration.ofMinutes(5),
+                Duration.ofMinutes(2));
     }
 
     // The worker role is off here, so the accumulator is built with its own transaction boundary.
@@ -829,7 +839,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private ProxyRouting routingOf(AuthenticationResult result) {
         Authentication authentication = Objects.requireNonNull(result.authentication(), "token did not authenticate");
-        return new ProxyRoutingService(jobRepository, objectMapper, new MentorProxyCredentialRegistry(), attemptUsage)
+        return new ProxyRoutingService(jobRepository, turnRepository, objectMapper, attemptUsage)
                 .resolve(
                         (ProxyIdentity) Objects.requireNonNull(authentication.getPrincipal()),
                         new MockHttpServletRequest("POST", "/internal/llm/chat/completions"));

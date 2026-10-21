@@ -88,7 +88,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
         UPDATE feedback_copy SET state='PLANNED',stop_reason=NULL,last_error=NULL
-        WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND state='WITHHELD' AND stop_reason='RESULT_MARKED_INCORRECT' AND (write_started_at IS NULL OR readback='ABSENT') AND posted_at IS NULL AND external_ref IS NULL AND chat_message_id IS NULL
+        WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND state='WITHHELD' AND stop_reason='RESULT_MARKED_INCORRECT' AND (write_started_at IS NULL OR readback='ABSENT') AND posted_at IS NULL AND external_ref IS NULL AND mentor_turn_id IS NULL
         """, nativeQuery = true)
     int restoreUnsent(@Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId);
 
@@ -143,74 +143,108 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
         """, nativeQuery = true)
     int failUnstarted(@Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId);
 
+    /**
+     * When the running attempt of a Heph turn of {@code developerId} started, or empty when the turn is not running
+     * with that attempt. Shares the turn row, so a claim waits for an end that holds it and then sees the turn ended:
+     * an ended attempt claims nothing.
+     */
     @Query(value = """
-        SELECT EXISTS(SELECT 1 FROM chat_message m JOIN chat_thread t
-          ON t.id=m.thread_id AND t.workspace_id=m.workspace_id
-          WHERE m.id=:messageId AND m.workspace_id=:workspaceId AND t.account_id=:developerId AND m.role='ASSISTANT')
+        SELECT t.started_at FROM mentor_turn t
+        JOIN mentor_conversation mc ON mc.id=t.conversation_id AND mc.workspace_id=t.workspace_id
+        WHERE t.id=:turnId AND t.workspace_id=:workspaceId AND mc.account_id=:developerId
+          AND t.status='RUNNING' AND t.attempt=:attempt AND t.started_at IS NOT NULL
+        FOR SHARE OF t
         """, nativeQuery = true)
-    boolean ownsConversationMessage(
+    Optional<Instant> runningAttemptStartedAt(
             @Param("workspaceId") long workspaceId,
             @Param("developerId") long developerId,
-            @Param("messageId") UUID messageId);
+            @Param("turnId") UUID turnId,
+            @Param("attempt") int attempt);
 
+    /**
+     * Claims the conversation copy for a Heph turn. The database clock stamps the claim, as it stamps the start of the
+     * turn's attempt, so a claim compares with the attempt that made it.
+     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at=:at,chat_message_id=:messageId,
+        UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at=now(),mentor_turn_id=:turnId,
           stop_reason='DELIVERY_UNCONFIRMED',last_error=NULL,readback='UNKNOWN'
         WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND id=:copyId AND kind='CHAT_TURN'
           AND state='PLANNED' AND write_started_at IS NULL AND posted_at IS NULL AND external_ref IS NULL
-          AND chat_message_id IS NULL AND body IS NULL AND write_key IS NOT NULL
+          AND mentor_turn_id IS NULL AND mentor_entry_id IS NULL AND body IS NULL AND write_key IS NOT NULL
         """, nativeQuery = true)
     int claimConversation(
             @Param("workspaceId") long workspaceId,
             @Param("feedbackId") UUID feedbackId,
             @Param("copyId") UUID copyId,
-            @Param("messageId") UUID messageId,
-            @Param("at") Instant at);
+            @Param("turnId") UUID turnId);
 
-    @Query(value = """
-        SELECT string_agg(part.value->>'text','' ORDER BY part.position)
-        FROM chat_message m JOIN chat_thread t ON t.id=m.thread_id AND t.workspace_id=m.workspace_id
-        JOIN LATERAL jsonb_array_elements(m.parts) WITH ORDINALITY AS part(value,position) ON true
-        WHERE m.id=:messageId AND m.workspace_id=:workspaceId AND t.account_id=:developerId
-          AND m.role='ASSISTANT' AND m.status='completed' AND part.value->>'type'='text' GROUP BY m.id
-        """, nativeQuery = true)
+    /**
+     * The words a completed Heph answer showed for one piece of feedback, by the database function
+     * {@code conversation_receipt_words}: the one rule that the receipt guard on this table applies too.
+     */
+    @Query(
+            value = "SELECT conversation_receipt_words(:workspaceId, :feedbackId, :entryId, :turnId)",
+            nativeQuery = true)
     Optional<String> completedConversationText(
             @Param("workspaceId") long workspaceId,
-            @Param("developerId") long developerId,
-            @Param("messageId") UUID messageId);
+            @Param("turnId") UUID turnId,
+            @Param("entryId") UUID entryId,
+            @Param("feedbackId") UUID feedbackId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state='POSTED',posted_at=:at,body=:body,stop_reason=NULL,last_error=NULL,readback=NULL
+        UPDATE feedback_copy SET state='POSTED',posted_at=:at,body=:body,mentor_entry_id=:entryId,
+          stop_reason=NULL,last_error=NULL,readback=NULL
         WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND id=:copyId AND kind='CHAT_TURN'
-          AND chat_message_id=:messageId AND write_started_at IS NOT NULL AND posted_at IS NULL
+          AND mentor_turn_id=:turnId AND write_started_at IS NOT NULL AND posted_at IS NULL
           AND state IN ('WRITE_STARTED','FAILED') AND body IS NULL
         """, nativeQuery = true)
     int recordConversationDelivered(
             @Param("workspaceId") long workspaceId,
             @Param("feedbackId") UUID feedbackId,
             @Param("copyId") UUID copyId,
-            @Param("messageId") UUID messageId,
+            @Param("turnId") UUID turnId,
+            @Param("entryId") UUID entryId,
             @Param("body") String body,
             @Param("at") Instant at);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state=:state,stop_reason=:reason,last_error=:detail,readback=:readback
+        UPDATE feedback_copy SET state=:state,stop_reason=:reason,last_error=:detail,readback=:readback,
+          mentor_entry_id=COALESCE(CAST(:entryId AS uuid),mentor_entry_id)
         WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND id=:copyId AND kind='CHAT_TURN'
-          AND chat_message_id=:messageId AND write_started_at IS NOT NULL AND posted_at IS NULL
+          AND mentor_turn_id=:turnId AND write_started_at IS NOT NULL AND posted_at IS NULL
           AND state IN ('WRITE_STARTED','FAILED')
         """, nativeQuery = true)
     int recordConversationOutcome(
             @Param("workspaceId") long workspaceId,
             @Param("feedbackId") UUID feedbackId,
             @Param("copyId") UUID copyId,
-            @Param("messageId") UUID messageId,
+            @Param("turnId") UUID turnId,
+            @Param("entryId") @Nullable UUID entryId,
             @Param("state") String state,
             @Param("reason") @Nullable String reason,
             @Param("readback") String readback,
             @Param("detail") @Nullable String detail);
+
+    /**
+     * The conversation copies a Heph turn claimed from {@code since} to {@code until} that have no receipt yet. A
+     * receipt sets
+     * {@code posted_at}, the state FAILED, or for an unconfirmed write its reason in {@code last_error}.
+     */
+    @Query(value = """
+        SELECT c.* FROM feedback_copy c
+        WHERE c.workspace_id=:workspaceId AND c.mentor_turn_id=:turnId AND c.kind='CHAT_TURN'
+          AND c.posted_at IS NULL AND c.state='WRITE_STARTED' AND c.last_error IS NULL
+          AND c.write_started_at>=:since AND c.write_started_at<=:until
+        ORDER BY c.write_started_at, c.id
+        """, nativeQuery = true)
+    List<FeedbackCopy> findUnsettledConversationClaims(
+            @Param("workspaceId") long workspaceId,
+            @Param("turnId") UUID turnId,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     @Query(value = """
         SELECT EXISTS(SELECT 1 FROM feedback_copy newer JOIN feedback latest ON latest.id=newer.feedback_id AND latest.workspace_id=newer.workspace_id

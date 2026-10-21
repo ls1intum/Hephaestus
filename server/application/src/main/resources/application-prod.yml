@@ -76,8 +76,9 @@ hephaestus:
     # SCM + SLACK + OUTLINE INTEGRATION (Production)
     #
     # Slack: per-workspace bot tokens are issued via OAuth and encrypted at rest in the
-    # `connection` table — there is no global bot token. Events API and interactivity are
-    # verified with HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET on the webhook-server.
+    # `connection` table — there is no global bot token. HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET
+    # verifies Events API deliveries on the webhook-server and interactivity on the application-server,
+    # which commits a button's consent change before Slack is acknowledged.
     #
     # Outline: per-workspace API key, pasted by a workspace admin and encrypted at rest in the
     # same `connection` table (Outline keys are session-scoped and cannot self-rotate, so there

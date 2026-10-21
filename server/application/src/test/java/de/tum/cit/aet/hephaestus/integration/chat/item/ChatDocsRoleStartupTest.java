@@ -77,7 +77,7 @@ class ChatDocsRoleStartupTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldPublishCaptureWithoutServerErasureOrMentorBeansWhenOnlyTheWorkerRoleStarts() {
+    void shouldPublishCaptureAndMentorContextWithoutServerErasureWhenOnlyTheWorkerRoleStarts() {
         verifyCaptureRole(false);
     }
 
@@ -155,15 +155,10 @@ class ChatDocsRoleStartupTest extends BaseUnitTest {
                     .hasSingleBean(DocumentItemSource.class)
                     .hasSingleBean(OutlineDocumentPermission.class)
                     .hasSingleBean(OutlinePersonSourceIdentityContributor.class)
-                    .hasSingleBean(ThreadCaptureSource.class);
-            if (server)
-                assertThat(context)
-                        .hasSingleBean(SlackPersonErasureService.class)
-                        .hasSingleBean(ConversationCaptureSource.class);
-            else
-                assertThat(context)
-                        .doesNotHaveBean(SlackPersonErasureService.class)
-                        .doesNotHaveBean(ConversationCaptureSource.class);
+                    .hasSingleBean(ThreadCaptureSource.class)
+                    .hasSingleBean(ConversationCaptureSource.class);
+            if (server) assertThat(context).hasSingleBean(SlackPersonErasureService.class);
+            else assertThat(context).doesNotHaveBean(SlackPersonErasureService.class);
         });
     }
 }

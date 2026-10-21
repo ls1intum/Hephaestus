@@ -17,6 +17,7 @@ import {
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
+import { cn } from "cn";
 import {
 	lazy,
 	type ReactNode,
@@ -32,7 +33,6 @@ import { toast } from "sonner";
 import {
 	getIntegrationCatalogOptions,
 	getMemberOnboardingOptions,
-	listThreadsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { SurveyInvitation } from "@/api/types.gen";
 import { UserViewBanner } from "@/components/admin/users/UserViewBanner";
@@ -76,7 +76,7 @@ import { useProductSurveys, useSubmitProductFeedback } from "@/hooks/use-product
 import { useSignInProviders } from "@/hooks/use-sign-in-providers";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useWorkspaceSwitcher } from "@/hooks/use-workspace-switcher";
-import { isMentorSetUp } from "@/lib/mentor-preference";
+import { isMentorOutOfReach } from "@/lib/mentor-preference";
 import { stepUpChallengeOf } from "@/lib/problem-detail";
 import { toScmProviderType } from "@/lib/provider/provider-terms";
 import { useSearchState } from "@/lib/search-params";
@@ -84,14 +84,12 @@ import { WorkProviderContext } from "@/lib/work-provider-context";
 import { type AuthContextType, useAuth } from "@/runtime/auth/AuthContext";
 import { safeReturnTo } from "@/runtime/auth/return-to";
 import { FeatureFlagDevTools } from "@/runtime/feature-flags/FeatureFlagDevTools";
-import { MentorChatProvider } from "@/runtime/mentor/MentorChatProvider";
 import { useProviderColors } from "@/runtime/theme/provider-colors";
 import { exitUserView } from "@/runtime/user-view/session";
 import { workspaceAddressConfig, publicHref } from "@/runtime/workspace-address";
+import { isHephPanelExcludedRoute } from "./-heph-panel-route";
 
-import { isCopilotExcludedRoute } from "./-copilot-route";
-
-const GlobalCopilot = lazy(async () => import("./-GlobalCopilot"));
+const GlobalHephPanel = lazy(async () => import("./-GlobalHephPanel"));
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -118,8 +116,8 @@ function RootLayout() {
 		},
 	});
 	const { isAuthenticated, isLoading, userView } = useAuth();
-	const showCopilot =
-		!userView && !isLoading && isAuthenticated && !isCopilotExcludedRoute(pathname);
+	const showHephPanel =
+		!userView && !isLoading && isAuthenticated && !isHephPanelExcludedRoute(pathname);
 
 	if (surface === "auth") {
 		return (
@@ -135,14 +133,21 @@ function RootLayout() {
 	}
 
 	return (
-		<MentorChatProvider>
+		<>
 			<HeadContent />
 			<SkipToContent />
 			<ProviderColors />
 			<WorkProviderScope>
 				<SidebarProvider>
 					<AppSidebarContainer />
-					<SidebarInset className="mr-[var(--right-sidebar-width,0)] min-w-0">
+					<SidebarInset
+						className={cn(
+							"mr-[var(--right-sidebar-width,0)] min-w-0",
+							// A full-screen page scrolls inside itself: its own scroller follows new messages and
+							// brings a linked one into view, which it cannot do while the page grows past the window.
+							surface === "fullscreen" && "h-svh",
+						)}
+					>
 						<HeaderContainer />
 						{userView && (
 							<UserViewBanner
@@ -179,20 +184,20 @@ function RootLayout() {
 			<Toaster />
 			<PublicLoginOverlay />
 			{userView && <UserViewConfirmAccess />}
-			{showCopilot && (
-				<CatchBoundary getResetKey={() => 0} errorComponent={CopilotUnavailable}>
+			{showHephPanel && (
+				<CatchBoundary getResetKey={() => 0} errorComponent={HephPanelUnavailable}>
 					<Suspense fallback={null}>
-						<GlobalCopilot />
+						<GlobalHephPanel />
 					</Suspense>
 				</CatchBoundary>
 			)}
 			{!userView && <FeatureFlagDevTools />}
-		</MentorChatProvider>
+		</>
 	);
 }
 
-/** The page stays usable without Heph, so a chat that fails renders nothing until the next load. */
-function CopilotUnavailable() {
+/** The page works without Heph, so a failed Heph panel renders nothing until the next load. */
+function HephPanelUnavailable() {
 	return null;
 }
 
@@ -507,9 +512,6 @@ function sidebarContextOf(pathname: string): SidebarContext {
 	if (pathname.startsWith("/admin")) {
 		return "admin";
 	}
-	if (pathname === "/mentor" || /^\/w\/[^/]+\/mentor/u.test(pathname)) {
-		return "mentor";
-	}
 	return "main";
 }
 
@@ -551,17 +553,6 @@ function AppSidebarContainer() {
 			sidebarContext === "main",
 	);
 
-	const {
-		data: mentorThreads,
-		isLoading: mentorThreadsLoading,
-		error: mentorThreadsError,
-	} = useQuery({
-		...listThreadsOptions({
-			path: { workspaceSlug: chromeWorkspaceSlug ?? "" },
-		}),
-		enabled: sidebarContext === "mentor" && isAuthenticated && hasWorkspace,
-	});
-
 	const isMember = workspaceAccess.role !== undefined;
 	// The server refuses this read in a user view, since it carries the signed-in account's own
 	// choice. A view keeps Heph listed, as before, for the viewed member's saved conversations.
@@ -571,7 +562,7 @@ function AppSidebarContainer() {
 	});
 	const showMentor =
 		isMember &&
-		(Boolean(userView) || (onboarding.data !== undefined && isMentorSetUp(onboarding.data)));
+		(Boolean(userView) || (onboarding.data !== undefined && !isMentorOutOfReach(onboarding.data)));
 
 	if (!isAuthenticated || username === undefined) {
 		return null;
@@ -605,13 +596,6 @@ function AppSidebarContainer() {
 			onWorkspaceChange={handleWorkspaceChange}
 			onAddWorkspace={handleAddWorkspace}
 			workspacesLoading={workspaceAccess.isLoading}
-			mentorThreads={sidebarContext === "mentor" ? mentorThreads : undefined}
-			mentorThreadsLoading={sidebarContext === "mentor" ? mentorThreadsLoading : undefined}
-			mentorThreadsError={
-				sidebarContext === "mentor" && mentorThreadsError
-					? "We could not load your conversations. Reload the page to try again."
-					: undefined
-			}
 		/>
 	);
 }

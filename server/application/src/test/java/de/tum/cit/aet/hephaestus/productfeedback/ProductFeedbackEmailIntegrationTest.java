@@ -77,8 +77,14 @@ class ProductFeedbackEmailIntegrationTest extends BaseIntegrationTest {
 
     private final List<Account> createdAccounts = new ArrayList<>();
 
+    /**
+     * The captured mailbox is shared by every test class in this context, and another class may leave its own
+     * messages in it. Each test here asserts on the whole mailbox, so it starts from an empty one.
+     */
     @BeforeEach
-    void releaseSilentMode() {
+    void startFromAnEmptyMailbox() {
+        mail.failWith(null);
+        mail.sent().clear();
         setSilentMode(false);
     }
 
@@ -257,7 +263,7 @@ class ProductFeedbackEmailIntegrationTest extends BaseIntegrationTest {
         var current = subscriptions.get(id);
         subscriptions.update(
                 id,
-                new UpdateNotificationPreferencesDTO(enabled, false, false, false, false),
+                new UpdateNotificationPreferencesDTO(enabled, false, false, false, false, false),
                 EntityTagPrecondition.parse(current.etag()),
                 true);
     }

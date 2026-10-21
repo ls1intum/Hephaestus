@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +55,12 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         return new LlmBudgetHeadroom(null, null, false, BigDecimal.ZERO, ONE_DOLLAR, false);
     }
 
-    private static ProxyRouting routing(@Nullable UsageFundingSource scope, @Nullable String spentSoFarUsd) {
+    private static ProxyRouting.BilledAttempt attempt(BigDecimal spentSoFarUsd) {
+        return new ProxyRouting.BilledAttempt(
+                UsageSourceType.REVIEW_JOB, UUID.randomUUID(), 0, spentSoFarUsd, "worker-1");
+    }
+
+    private static ProxyRouting routing(@Nullable UsageFundingSource scope, String spentSoFarUsd) {
         return new ProxyRouting(
                 "job:test",
                 "openai-completions",
@@ -63,14 +69,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
                 7L,
                 8L,
                 WORKSPACE_ID,
-                spentSoFarUsd == null
-                        ? null
-                        : new ProxyRouting.BilledAttempt(
-                                UsageSourceType.REVIEW_JOB,
-                                UUID.randomUUID(),
-                                0,
-                                new BigDecimal(spentSoFarUsd),
-                                "worker-1"),
+                attempt(new BigDecimal(spentSoFarUsd)),
                 null,
                 null,
                 spentSoFarUsd == null ? null : Instant.now().plusSeconds(60));
@@ -140,11 +139,13 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * A Heph turn has no {@code review_job} row: its credential prices what the turn's row recorded, so a turn is
+     * bounded by its own completed calls like a job attempt.
+     */
     @Nested
-    @DisplayName("a mentor turn is bounded by its own completed calls, exactly like a job attempt")
+    @DisplayName("a Heph turn is bounded by its own completed calls, exactly like a job attempt")
     class AMentorTurn {
-
-        private final MentorProxyCredentialRegistry credentials = new MentorProxyCredentialRegistry();
 
         private static final LlmPriceSnapshot TEN_DOLLARS_PER_MILLION_INPUT = new LlmPriceSnapshot(
                 UsageFundingSource.INSTANCE,
@@ -157,22 +158,22 @@ class ProxyBudgetGateTest extends BaseUnitTest {
                 BigDecimal.ZERO);
 
         private ProxyRouting turnThatHasSpent(int inputTokens) {
-            UUID sessionId = UUID.randomUUID();
-            String token = credentials.mint(
-                    sessionId,
-                    new MentorProxyCredentialRegistry.Route(
-                            "openai-responses",
-                            "https://frozen.example.com/v1",
-                            UsageFundingSource.INSTANCE,
-                            7L,
-                            8L,
-                            WORKSPACE_ID));
-            MentorTurnMeter meter = new MentorTurnMeter(UUID.randomUUID(), TEN_DOLLARS_PER_MILLION_INPUT);
-            credentials.bindTurn(sessionId, meter);
-            if (inputTokens > 0) {
-                credentials.accumulate(meter.turnId(), new ProxyTokenUsage(inputTokens, 0, 0, 0, 0));
-            }
-            return credentials.authenticate(token).flatMap(credentials::resolve).orElseThrow();
+            BigDecimal spent = Objects.requireNonNull(TEN_DOLLARS_PER_MILLION_INPUT
+                    .calculateCost(inputTokens, 0, 0, 0)
+                    .usd());
+            return new ProxyRouting(
+                    "mentor-turn:" + UUID.randomUUID(),
+                    "openai-responses",
+                    "https://frozen.example.com/v1",
+                    UsageFundingSource.INSTANCE,
+                    7L,
+                    8L,
+                    WORKSPACE_ID,
+                    new ProxyRouting.BilledAttempt(
+                            UsageSourceType.MENTOR_TURN, UUID.randomUUID(), 1, spent, "worker-1"),
+                    null,
+                    null,
+                    null);
         }
 
         /** At $10 per million input tokens, 100k tokens is $1.00 — the whole cap; 90k is still under it. */
@@ -190,17 +191,8 @@ class ProxyBudgetGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("routes with nothing to charge")
-    class NothingToCharge {
-
-        @Test
-        @DisplayName("a route with no live execution contributes no in-flight spend")
-        void aRouteWithNoLiveExecutionIsJudgedOnTheLedgerAlone() {
-            when(budgetService.headroom(WORKSPACE_ID)).thenReturn(instanceCapOfOneDollar());
-
-            assertThat(gate.isBlocked(routing(UsageFundingSource.INSTANCE, null)))
-                    .isFalse();
-        }
+    @DisplayName("routes with no workspace")
+    class NoWorkspace {
 
         @Test
         @DisplayName("an unattributable route with no workspace never blocks, and never queries the ledger")
@@ -213,10 +205,10 @@ class ProxyBudgetGateTest extends BaseUnitTest {
                     null,
                     null,
                     null,
+                    attempt(BigDecimal.ZERO),
                     null,
                     null,
-                    null,
-                    null);
+                    Instant.now().plusSeconds(60));
 
             assertThat(gate.isBlocked(noWorkspace)).isFalse();
         }

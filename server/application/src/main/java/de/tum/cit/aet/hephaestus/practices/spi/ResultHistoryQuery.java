@@ -13,5 +13,9 @@ public interface ResultHistoryQuery {
 
     Optional<ResultHistoryEntry> find(long workspaceId, UUID resultId, long viewerAccountId, SourceUsePurpose purpose);
 
+    /** The result one problem belongs to, as {@link #find} reads it for the viewer; empty when the viewer may not. */
+    Optional<ResultHistoryEntry> findOfProblem(
+            long workspaceId, UUID problemId, long viewerAccountId, SourceUsePurpose purpose);
+
     List<ResultHistoryEntry> forAssignment(long workspaceId, ReviewAssignmentId assignment, int limit);
 }

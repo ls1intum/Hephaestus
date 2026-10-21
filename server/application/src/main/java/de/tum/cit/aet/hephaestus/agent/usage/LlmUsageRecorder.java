@@ -65,7 +65,8 @@ public class LlmUsageRecorder {
     }
 
     /**
-     * Writes one ledger row of a review job attempt as the attempt's measurement owner measures it now. The first
+     * Writes one ledger row of a review job attempt or a Heph turn attempt as the attempt's measurement owner
+     * ({@code ReviewAttemptUsageService} or {@code MentorAttemptUsageService}) measures it now. The first
      * projection appends the row like {@link #record}. A later one, after a call of the attempt returned late,
      * replaces only the measurement: tokens, calls, provenance, verification, and the cost and pricing state that
      * follow from them. The source, the model, the funding source, the rates and the date stay as the row froze
@@ -75,9 +76,6 @@ public class LlmUsageRecorder {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void project(Long workspaceId, LlmUsageSample sample) {
-        if (sample.sourceType() == UsageSourceType.MENTOR_TURN) {
-            throw new IllegalArgumentException("A mentor turn is appended once, never projected");
-        }
         LlmUsageEvent row = usageRepository
                 .lockBySource(workspaceId, sample.sourceType(), sample.sourceId(), Math.max(0, sample.sourceAttempt()))
                 .orElse(null);

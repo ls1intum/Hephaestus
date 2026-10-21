@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MentorUserCounts;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ public class UserContentSource implements ContentSource {
 
     private final AccountSummaryQuery accounts;
     private final MentorWorkQuery queryRepository;
+    private final WorkspaceActorSelector actorSelector;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -69,6 +71,14 @@ public class UserContentSource implements ContentSource {
         Instant weekAgo = now.minus(7, ChronoUnit.DAYS);
         Instant twoWeeksAgo = now.minus(14, ChronoUnit.DAYS);
 
+        // A repository path names a repository only on one instance: no counts without the connected one.
+        if (actorSelector.connectedProviderId(workspaceId).isEmpty()) {
+            ObjectNode root = objectMapper.createObjectNode();
+            root.putObject("user").put("name", account.displayName());
+            root.put("status", "UNAVAILABLE");
+            root.put("reason", "The workspace has no connected GitHub or GitLab instance.");
+            return root;
+        }
         MentorUserCounts c = queryRepository.fetchUserCounts(workspaceId, developerId, twoWeeksAgo, weekAgo, now);
         long openPRs = c.openPRs();
         long mergedThisWeek = c.mergedThisWeek();

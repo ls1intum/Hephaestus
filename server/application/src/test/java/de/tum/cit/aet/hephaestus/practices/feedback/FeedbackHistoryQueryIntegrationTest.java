@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,6 +11,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.mentor.MentorConversationService;
+import de.tum.cit.aet.hephaestus.mentor.MentorLedgerFixtures;
+import de.tum.cit.aet.hephaestus.mentor.MentorLinkDTO;
+import de.tum.cit.aet.hephaestus.mentor.MentorTimeline;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurn;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnService;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
@@ -24,6 +31,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -33,6 +41,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTest {
     @Autowired
@@ -43,6 +52,15 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
 
     @MockitoBean
     ResultSourceAuthorization publicPermission;
+
+    @Autowired
+    MentorConversationService conversations;
+
+    @Autowired
+    MentorTurnService turns;
+
+    @Autowired
+    MentorTimeline timeline;
 
     @MockitoBean
     FeedbackVisibilityService visibility;
@@ -296,6 +314,7 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
         var retained = mock(ResultHistoryEntry.class);
         when(retained.copyAuthorityComplete()).thenReturn(true);
         when(retained.resultId()).thenReturn(proof.getId());
+        when(retained.practiceSlug()).thenReturn("regression-tests");
         when(retained.sourceJobIds()).thenReturn(List.of());
         when(retained.copiedIdentities()).thenReturn(List.of());
         when(retained.repositoryIds()).thenReturn(List.of());
@@ -305,6 +324,81 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
                         .getFirst()
                         .body())
                 .isEqualTo(row.getBody());
+    }
+
+    /** The timeline names the work and practice that a problem and shown feedback are about, as the developer reads them. */
+    @Test
+    void shouldNameTheWorkAndPracticeOfAProblemAndOfShownFeedbackInTheTimeline() {
+        var shown = piece(FeedbackDestination.CONVERSATION, FeedbackState.READY, null);
+        var proof = result();
+        bind(shown, proof);
+        authorize(proof);
+        UUID problemId = UUID.randomUUID();
+        var result = mock(ResultHistoryEntry.class);
+        when(result.practiceSlug()).thenReturn("describe-why");
+        when(result.itemId()).thenReturn(itemId);
+        when(permission.findOfProblem(
+                        workspace.getId(), problemId, developerId, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(Optional.of(result));
+        var main = conversations.findOrCreateMain(workspace.getId(), developerId);
+        var asked = turns.submit(
+                workspace.getId(),
+                main.getId(),
+                new MentorTurnService.Question(
+                        MentorTurn.Surface.APP,
+                        "What did the review find?",
+                        UUID.randomUUID().toString(),
+                        null,
+                        null));
+        MentorTurn running = running(asked.turn().getId());
+        turns.end(
+                running.getId(),
+                running.getAttempt(),
+                "worker-history",
+                MentorTurn.Status.DONE,
+                List.of(
+                        MentorLedgerFixtures.toolCall(
+                                MentorLedgerFixtures.piId(),
+                                "call-problem",
+                                "link_problem",
+                                JsonNodeFactory.instance
+                                        .objectNode()
+                                        .put("problemId", problemId.toString())
+                                        .put("text", "The failure case has no test.")),
+                        MentorLedgerFixtures.toolResult(
+                                MentorLedgerFixtures.piId(), "call-problem", "link_problem", "Linked", false),
+                        MentorLedgerFixtures.toolCall(
+                                MentorLedgerFixtures.piId(),
+                                "call-feedback",
+                                "show_feedback",
+                                JsonNodeFactory.instance
+                                        .objectNode()
+                                        .put("feedbackId", shown.getId().toString())
+                                        .put("text", "Say why.")),
+                        MentorLedgerFixtures.toolResult(
+                                MentorLedgerFixtures.piId(), "call-feedback", "show_feedback", "Shown", false)),
+                null);
+
+        List<MentorLinkDTO> links = timeline.entries(workspace.getId(), developerId, null, 10).entries().stream()
+                .flatMap(entry -> entry.links().stream())
+                .toList();
+
+        assertThat(links)
+                .extracting(MentorLinkDTO::kind, MentorLinkDTO::practiceSlug, MentorLinkDTO::itemId)
+                .containsExactly(
+                        tuple(MentorLinkDTO.Kind.PROBLEM, "describe-why", itemId),
+                        tuple(MentorLinkDTO.Kind.FEEDBACK, "regression-tests", itemId));
+    }
+
+    /** Claims turns until this one starts. A turn of another test that starts first is taken along. */
+    private MentorTurn running(UUID turnId) {
+        while (true) {
+            MentorTurn claimed =
+                    turns.claimNext("worker-history", Duration.ofMinutes(5)).orElseThrow();
+            if (claimed.getId().equals(turnId)) {
+                return claimed;
+            }
+        }
     }
 
     @Test
@@ -319,6 +413,7 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
         assertThat(entry.threadId()).isNull();
         assertThat(entry.deliveredAt()).isNull();
         assertThat(entry.copyAuthorityComplete()).isTrue();
+        assertThat(entry.practiceSlugs()).containsExactly("regression-tests");
     }
 
     @Test
@@ -361,21 +456,19 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
         var proof = result();
         bind(row, proof);
         authorize(proof);
-        UUID thread = UUID.randomUUID(), message = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID(), answer = UUID.randomUUID();
         jdbc.update(
-                "INSERT INTO chat_thread(id,workspace_id,account_id,created_at,surface) VALUES"
-                        + " (?,?,?,now(),'WEB')",
-                thread,
+                "INSERT INTO mentor_conversation(id,workspace_id,account_id,created_at,last_activity_at)"
+                        + " VALUES (?,?,?,now(),now())",
+                conversation,
                 workspace.getId(),
                 developerId);
         jdbc.update(
-                "INSERT INTO"
-                        + " chat_message(id,thread_id,workspace_id,role,status,created_at,parts,version)"
-                        + " VALUES (?,?,?,'ASSISTANT','completed',now(),?::jsonb,0)",
-                message,
-                thread,
+                "INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,kind,surface,text,created_at)"
+                        + " VALUES (?,?,?,1,'HEPH','APP','Try a focused test.',now())",
+                answer,
                 workspace.getId(),
-                "[{\"type\":\"text\",\"text\":\"Try a focused test.\"}]");
+                conversation);
         UUID id = FeedbackIds.copy(row.getId(), FeedbackCopyKind.CHAT_TURN, 0);
         copies.saveAndFlush(FeedbackCopy.builder()
                 .id(id)
@@ -387,13 +480,13 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
                 .writeKey(id.toString())
                 .writeStartedAt(AT)
                 .postedAt(AT)
-                .chatMessageId(message)
+                .mentorEntryId(answer)
                 .createdAt(AT)
                 .build());
         var entry = history.forDeveloper(workspace.getId(), developerId, AT.minusSeconds(1), 1)
                 .getFirst();
         assertThat(entry.body()).isEqualTo("Try a focused test.").isNotEqualTo(row.getBody());
-        assertThat(entry.threadId()).isEqualTo(thread);
+        assertThat(entry.threadId()).isEqualTo(conversation);
         assertThat(entry.publicHistory()).isNull();
     }
 
@@ -443,6 +536,9 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
                 .getFirst();
         assertThat(entry.body()).isNull();
         assertThat(entry.state()).isEqualTo(FeedbackState.READY);
+        assertThat(entry.practiceSlugs())
+                .as("an unauthorized result names no practice")
+                .isEmpty();
         verify(permission, never())
                 .find(workspace.getId(), proof.getId(), developerId, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
     }

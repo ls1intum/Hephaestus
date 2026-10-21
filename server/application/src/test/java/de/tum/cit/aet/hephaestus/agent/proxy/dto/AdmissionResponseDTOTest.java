@@ -146,6 +146,7 @@ class AdmissionResponseDTOTest {
                         deliveredAt,
                         List.of(earlier),
                         List.of(),
+                        List.of(),
                         null,
                         null,
                         List.of(),

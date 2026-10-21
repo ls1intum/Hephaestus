@@ -8,10 +8,13 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewAttemptUsageService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ScriptUsage;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorTurnAdmission;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.TurnJwt;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,30 +35,29 @@ import tools.jackson.databind.ObjectMapper;
 @ConditionalOnWorkerRole
 class ProxyRoutingService {
     private final ReviewJobRepository agentJobRepository;
+    private final MentorTurnRepository mentorTurns;
     private final ObjectMapper objectMapper;
-    private final MentorProxyCredentialRegistry mentors;
     private final ReviewAttemptUsageService attemptUsage;
 
     ProxyRoutingService(
             ReviewJobRepository jobs,
+            MentorTurnRepository mentorTurns,
             ObjectMapper mapper,
-            MentorProxyCredentialRegistry mentors,
             ReviewAttemptUsageService attemptUsage) {
         this.agentJobRepository = jobs;
+        this.mentorTurns = mentorTurns;
         this.objectMapper = mapper;
-        this.mentors = mentors;
         this.attemptUsage = attemptUsage;
     }
 
     ProxyRouting resolve(ProxyIdentity identity, HttpServletRequest request) {
-        if (identity.mentor() != null) {
+        if (identity.turn() != null) {
             if (request.getRequestURI().startsWith(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH))
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Review job credential required");
-            return mentors.resolve(identity.mentor())
-                    .orElseThrow(
-                            () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Mentor execution unavailable"));
+            return turnRouting(identity.turn(), Objects.requireNonNull(identity.workerId()));
         }
-        var jwt = Objects.requireNonNull(identity.job());
+        var jwt = identity.job();
+        if (jwt == null) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Model credential required");
         var job = agentJobRepository
                 .findById(jwt.jobId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Review attempt unavailable"));
@@ -94,6 +96,49 @@ class ProxyRoutingService {
                 kind,
                 model == null ? FrozenCharge.UNKNOWN : FrozenCharge.of(model));
         if (!running) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Review attempt unavailable");
+    }
+
+    /**
+     * The routing of a Heph turn attempt while this worker holds its lease: the route frozen at admission, and what the
+     * attempt has spent so far, priced at the admitted rates. An attempt that ended or moved on gets {@code 409}, so its
+     * host stops.
+     */
+    private ProxyRouting turnRouting(TurnJwt jwt, String workerId) {
+        var turn = mentorTurns
+                .findByIdAndWorkspaceId(jwt.turnId(), jwt.workspaceId())
+                .filter(found -> found.isLeased()
+                        && found.getAttempt() == jwt.attempt()
+                        && workerId.equals(found.getWorkerId())
+                        && found.getConversationId().equals(jwt.conversationId()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.CONFLICT, "This turn attempt no longer holds its lease"));
+        var admitted = MentorTurnAdmission.read(turn.getAdmission())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "This turn attempt has no model"));
+        var route = admitted.route();
+        BigDecimal spent = admitted.price()
+                .calculateCost(
+                        turn.getInputTokens(),
+                        turn.getOutputTokens(),
+                        turn.getCachedTokens(),
+                        turn.getCacheWriteTokens())
+                .usd();
+        return new ProxyRouting(
+                "mentor-turn:" + turn.getId(),
+                route.apiProtocol(),
+                route.baseUrl(),
+                route.connectionScope(),
+                route.connectionId(),
+                route.modelId(),
+                turn.getWorkspaceId(),
+                new ProxyRouting.BilledAttempt(
+                        UsageSourceType.MENTOR_TURN,
+                        turn.getId(),
+                        turn.getAttempt(),
+                        spent != null ? spent : BigDecimal.ZERO,
+                        workerId),
+                null,
+                null,
+                null);
     }
 
     private ProxyRouting reviewRouting(ReviewJob job, ConfigSnapshot snapshot, Instant workDeadline) {

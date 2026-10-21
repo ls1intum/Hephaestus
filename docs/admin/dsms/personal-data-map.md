@@ -44,9 +44,10 @@ The self-service account export and cooldown remain separate, narrower operation
 | PostgreSQL product feedback and surveys — `product_feedback`, `product_survey_participation` | Data supplied by the account holder. Instance-admin person export | Purge contributors remove workspace-owned rows: feedback sent from the workspace, surveys targeted at it and participation recorded from it | Account purge removes account-owned rows through `server/application/src/main/java/de/tum/cit/aet/hephaestus/productfeedback/FeedbackAccountErasureAdapter.java`, because the account tombstone leaves the `ON DELETE CASCADE` unfired | No independent time-based expiry. Workspace removal: `server/application/src/test/java/de/tum/cit/aet/hephaestus/workspace/WorkspacePurgeIntegrationTest.java` (`purgeRemovesTheProductRowsTheWorkspaceOwnsAndKeepsInstanceWideSurveys`). Person erasure: `server/application/src/test/java/de/tum/cit/aet/hephaestus/core/auth/AccountHardDeleteSweeperIntegrationTest.java` (`shouldEraseProductSubmissionsWhenAccountIsPurged`). |
 | PostgreSQL contributor profiles — `user` | Mirrored contributor identity. Self-service export plus instance-admin person export | Instance-global rows remain | Instance-admin person contributor anonymizes the exact provider profile. Self-service account deletion does not remove these rows | No independent time-based expiry. The [record of processing](./record-of-processing.md) defines the operator responsibility. Personal settings, such as the AI choice and feedback delivery, are columns of `account`. |
 | PostgreSQL SCM mirror — `organization`, `organization_membership`, `team`, `team_membership`, `team_repository_permission`, `repository`, `repository_collaborator`, `pull_request`, `pull_request_requested_reviewers`, `pull_request_review`, `pull_request_review_comment`, `pull_request_review_thread`, `issue`, `issue_assignee`, `issue_comment`, `milestone`, `discussion`, `discussion_comment`, `git_commit`, `commit_contributor`, `commit_file_change`, `project`, `project_item`, `project_field_value`, `project_status_update` | GitHub/GitLab profiles and authored work. Source-provider export plus instance-admin person export | Last repository/connection removal and workspace purge erase the active mirror | Exact provider instance and native user matching. Authored content is cleared and shared actor roles are detached separately | `server/application/src/test/java/de/tum/cit/aet/hephaestus/workspace/ScmWorkspaceErasureIntegrationTest.java`. |
-| PostgreSQL Slack mirror — `slack_message`, `slack_thread`, `slack_monitored_channel`, `slack_participant_consent`, `slack_channel_consent_event`, `mentor_slack_thread` | Messages, identities and attribution. Instance-admin person export | Disconnect and workspace purge | Slack opt-out and instance-admin person contributors | `server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/slack/retention/SlackRetentionErasureIntegrationTest.java` and `server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/slack/interactivity/SlackAppHomeOptOutErasureIntegrationTest.java`. |
+| PostgreSQL Slack mirror — `slack_message`, `slack_thread`, `slack_monitored_channel`, `slack_participant_consent`, `slack_channel_consent_event` | Messages, identities and attribution. Instance-admin person export | Disconnect and workspace purge | Slack opt-out and instance-admin person contributors | `server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/slack/retention/SlackRetentionErasureIntegrationTest.java` and `server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/slack/interactivity/SlackAppHomeOptOutErasureIntegrationTest.java`. |
 | PostgreSQL Outline mirror — `outline_document`, `outline_collection`, `outline_document_event` | Documents and attribution. Instance-admin person export | Collection removal, disconnect and workspace purge | Instance-admin person contributors | `server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/outline/lifecycle/OutlineWorkspacePurgeAdapterIntegrationTest.java`. |
-| PostgreSQL mentor and practice proof — `chat_thread`, `chat_message`, `result`, `problem`, `result_mark`, `feedback`, `feedback_basis`, `feedback_copy`, `feedback_send`, `feedback_decision`, `feedback_response` | Results, guidance, responses and actual copy receipts | Workspace purge deletes scoped records through their owners | Erasure removes affected feedback and source-person proof before membership | Retention does not erase a referenced result while retained feedback still cites it. Physical receipt custody remains until mounted removal is acknowledged |
+| PostgreSQL Heph conversations — `mentor_conversation`, `mentor_entry`, `mentor_turn` | One main Heph conversation for each account in each workspace (`mentor_conversation.account_id`), with its threads, messages, weekly digests, votes and turn usage. Instance-admin person export of the account's own conversations, without tool results and summaries. Each exported message holds the words that the app shows, including the words of each link that Heph showed. The export also has the Heph messages in other conversations that showed feedback about the person | Workspace purge deletes them. Slack disconnect erases every message written in Slack and the copies of its words. It stops running Slack turns and clears the Slack DM identity of each conversation | Deletes the account's own conversations. Redacts Heph messages in other people's conversations that showed feedback about the person (`MentorFeedbackCopyPersonDataStore`). As the last step, redacts every `read`, `bash` and `load_context` result in the person's workspaces and removes their turn sandboxes (`MentorToolResultCopyPersonDataStore`). After the erasure request, Heph refuses a write for the account with `PERSON_ERASED`, and a turn that ends stores nothing | No independent time-based expiry. Account absorption moves the conversations to the claiming account and merges two main conversations of one workspace |
+| PostgreSQL practice proof — `result`, `problem`, `result_mark`, `feedback`, `feedback_basis`, `feedback_copy`, `feedback_send`, `feedback_decision`, `feedback_response` | Results, guidance, responses and actual copy receipts | Workspace purge deletes scoped records through their owners | Erasure removes affected feedback and source-person proof before membership | Retention does not erase a referenced result while retained feedback still cites it. Physical receipt custody remains until mounted removal is acknowledged |
 | PostgreSQL operation history — `connection_audit`, `sync_job`, `item_event`, `review_batch`, `review_schedule` | Source events, actor/requester attribution and operation history | Workspace-owned records follow their owner purge | Audit actors become null without changing recorded actions. Provider restrictions survive erasure | Unreferenced terminal item events expire after 90 days by default |
 | PostgreSQL instance-administration records — `instance_settings`, `instance_llm_settings`, `product_survey` | The stable account reference of the administrator who changed silent mode or instance LLM policy, and the account that authored a survey | Instance-scoped. Workspace purge does not reach them | Account purge detaches settings actor references. Person erasure also detaches the survey creator. | The upgrade drops old settings display-login attribution without backfill. Settings, survey definitions and change times remain. `server/application/src/main/java/de/tum/cit/aet/hephaestus/core/settings/SettingsAccountErasureAdapter.java`, `server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/catalog/LlmSettingsAccountErasureAdapter.java`, `server/application/src/main/java/de/tum/cit/aet/hephaestus/productfeedback/adapter/ProductfeedbackPersonDataCatalog.java`. |
 | PostgreSQL runtime — `review_job`, script execution, capture receipts and diagnostics | Temporary inputs, output and provenance | Workspace purge queues mounted evidence removal before parent deletion | Erasure removes all source-person dependencies, including another developer’s review | Payloads expire after 14 days and terminal jobs after 90 days by default. Product reviews and results do not depend on retained jobs |
@@ -55,7 +56,7 @@ The self-service account export and cooldown remain separate, narrower operation
 | PostgreSQL `llm_usage_event` | Token/cost accounting with workspace and opaque source identifier. Monthly workspace/admin reports | Retained for accounting until its retention sweep | Person contributors detach the selected job/conversation source identifiers while retaining accounting facts | The window and its operator control are in the [record of processing](./record-of-processing.md). `server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/usage/LlmUsageRetentionIntegrationTest.java` proves the cutoff across workspaces. `server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/usage/LlmUsageRetentionSweeperTest.java` verifies job outcomes. |
 | PostgreSQL account passkeys — `passkey_credential`, `passkey_challenge`, `passkey_recovery_code` | Account-bound public credentials, browser-session challenges, and recovery-code hashes. Self-service export includes names, dates, and the personal protection choice, not credential blobs or recovery codes | Account-global rows remain | Account purge removes all three through `server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/webauthn/PasskeyService.java` | Challenges expire after five minutes and are removed on use or later challenge creation. Recovery invalidates all previous credentials and codes. `server/application/src/test/java/de/tum/cit/aet/hephaestus/core/auth/webauthn/PasskeyLifecycleIntegrationTest.java`. |
 | PostgreSQL installed-client sessions — `client_session`, `client_sign_in_handoff` | Which installed clients (the browser extension) are signed in, and the hashes of their single-use sign-in codes. Refresh-secret hashes live on `issued_jwt` | Account-global rows remain | Account purge removes both through `server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/AccountPurger.java` | A sign-in code expires after 60 seconds. A session ends at its absolute deadline, on sign-out or on revocation. It becomes eligible for deletion with its token rows at absolute expiry or one day after revocation, whichever comes first. The hourly cleanup skips locked rows until a later pass. See `server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/clientsession/ClientSessionPruner.java`. `server/application/src/test/java/de/tum/cit/aet/hephaestus/core/auth/clientsession/ClientSessionIntegrationTest.java`. |
-| PostgreSQL email subscriptions — `notification_subscription` | Native account id, category, opt-in state/time and opaque unsubscribe capability | Account-scoped, not workspace-owned | `NotificationAccountErasureAdapter` removes rows during account purge. Export includes choices but no capability | Retained until account erasure. Each capability only disables one subscription. Unsubscribe does not erase the opt-out, so old links remain valid. |
+| PostgreSQL notification subscriptions — `notification_subscription` | Native account id, category, opt-in state/time and opaque unsubscribe capability. The `MENTOR_DIGEST` category records the weekly digest choice | Account-scoped, not workspace-owned | `NotificationAccountErasureAdapter` removes rows during account purge. Export includes choices but no capability | Retained until account erasure. Each capability only disables one subscription. Unsubscribe does not erase the opt-out, so old links remain valid. |
 | PostgreSQL survey email invitations — `product_survey_email_invitation` | Survey/account/workspace ids, requesting administrator, request/expiry/cancellation and relay-acceptance facts. No address or answers | Workspace purge removes scoped rows. Survey deletion removes its invitations | Account erasure removes recipient rows and clears the erased requesting administrator's reference | Retained with the survey. Separate from in-app participation and never a proxy for opened/read email. |
 | PostgreSQL notification outbox — `event_publication` | The Spring Modulith event publication registry has one row per pending or failed notification listener. It holds the serialized event and its delivery attempts. The event holds source and recipient ids, bounded lifecycle information and timestamps, never an address or report text. Instance-admin person export | Instance-scoped: workspace purge does not directly reach it. Delivery rechecks source and membership | The row holds ids only. The listener resolves the address at send time from `account.primary_email`. Account purge clears that field. A resubmitted notification for a purged account therefore has no recipient and completes as withheld | Completed publications are deleted. Account-deletion confirmations expire at the purge deadline. Other kinds use their bounded lifecycle window (at most seven days). Source erasure, opt-out or lost eligibility completes queued mail without sending on the next attempt. `server/application/src/main/java/de/tum/cit/aet/hephaestus/notification/NotificationRedeliveryJob.java`, `server/application/src/main/java/de/tum/cit/aet/hephaestus/notification/AccountDeletionEmailListener.java`. |
 | NATS JetStream | Buffered webhook, message and document payloads. Not directly included in self-service export | No selective deletion | No selective deletion | Slack/Outline expire after 72 hours. GitHub/GitLab expire after 180 days. Byte ceilings can shorten both. Stream configuration tests enforce these bounds. |
@@ -189,9 +190,9 @@ and native write locks use that same type, origin and native subject, including 
 registered after erasure. Adding an equivalent provider row cannot reset a processing control.
 
 Slack workspace keys still distinguish suppression decisions. Sharing a lock does not merge teams.
-Heph conversation admission and runtime preparation also check these exact processing controls.
+Heph checks these exact processing controls when a question arrives and again when a worker starts its turn.
 An eligible model or a recreated mirrored profile cannot bypass an erased developer identity.
-This entry-point check does not itself remove copies already held by an active runtime.
+This entry-point check does not itself remove copies that a running turn already holds.
 
 The user, workspace and authored-work context sources read their current data for each turn.
 They do not retain formatted personal-content caches. The unrelated practice-catalog cache remains.
@@ -228,8 +229,9 @@ not enough. Shared provider metadata has an explicit empty person selection, not
 | `user`, `organization_membership`, `team_membership`, `repository_collaborator`, `issue_assignee`, `pull_request_requested_reviewers`, `organization`, `team`, `team_repository_permission`, `repository`, `milestone`, `issue_comment`, `pull_request_review`, `pull_request_review_comment`, `discussion_comment`, `issue`, `pull_request_review_thread`, `discussion`, `git_commit`, `commit_contributor`, `commit_file_change`, `project`, `project_item`, `project_status_update`, `project_field_value`, `git_commit_committer`, `git_commit_authored_content`, `issue_merger`, `discussion_answer_actor` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/scm/privacy/ScmPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/scm/privacy/ScmPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
 | `oauth_state_nonce`, `connection_audit`, `sync_job`, `item_event`, `item_event_requester` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/IntegrationCoreConnectionPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/IntegrationCoreConnectionPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
 | `outline_document`, `outline_document_event`, `outline_collection`, `outline_document_editor`, `outline_document_content`, `outline_document_collaborator` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/outline/adapter/IntegrationOutlinePersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/outline/adapter/IntegrationOutlinePersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
-| `slack_thread`, `slack_message`, `mentor_slack_thread`, `slack_participant_consent`, `slack_channel_consent_event`, `slack_monitored_channel` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/slack/adapter/IntegrationSlackPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/slack/adapter/IntegrationSlackPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
-| `chat_message_vote`, `chat_message`, `chat_thread`, `chat_message_feedback_copy`, `chat_thread_feedback_runtime_copy`, `chat_thread_runtime_journal` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
+| `slack_thread`, `slack_message`, `slack_participant_consent`, `slack_channel_consent_event`, `slack_monitored_channel` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/slack/adapter/IntegrationSlackPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/slack/adapter/IntegrationSlackPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
+| `mentor_entry_tool_result_copy`, `mentor_entry_feedback_copy`, `mentor_entry`, `mentor_turn`, `mentor_conversation` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`), `server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorEntryPersonDataStore.java` (the words that the app shows for each message) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
+| `mentor_turn_attempt_usage` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/adapter/MentorAttemptUsagePersonDataCatalog.java`. `select` freezes the person's own Heph turns with their workspaces, also before a measurement exists. `export` gives the counts of each attempt of those turns. | `server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/adapter/MentorAttemptUsagePersonDataCatalog.java`. `prepareErasure` keeps the observed spend, deletes the measurements and detaches the turns' ledger rows. `erase` deletes what is left. The person-data write fence refuses registration after the account's suppression. |
 | `notification_subscription` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/notification/preferences/adapter/NotificationPreferencesPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/notification/preferences/adapter/NotificationPreferencesPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
 | `research_disclosure_subject`, `research_disclosure` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/research/adapter/ResearchDisclosurePersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/research/adapter/ResearchDisclosurePersonDataCatalog.java` (`erase` policy: drop the account link and record the owed removal, `JdbcPersonDataStore.erase`) |
 | `feedback_send`, `feedback_response`, `feedback_copy`, `feedback_basis`, `feedback_decision`, `feedback`, `result_mark`, `review_item`, `problem`, `result`, `result_mark_created_actor`, `result_mark_removed_actor`, `feedback_decision_actor`, `review`, `review_batch`, `review_schedule` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/adapter/PracticesPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/adapter/PracticesPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
@@ -240,7 +242,7 @@ A `HIDE_PUBLIC` row in `identity_restriction` retains only the provider id and p
 It is included in the person export and retained on erasure, like a suppression key. It does not stop internal processing.
 An explicit Show me choice clears only currently owned, linked identities.
 
-### Shared source content and runtime journals
+### Shared source content and Heph tool results
 
 Milestones are selected by their exact creator reference. Commit file-change copies are selected by
 the exact author or co-author reference, never by a path, name or email. Erasure clears milestone
@@ -248,20 +250,41 @@ content and attribution while retaining its operational row, and deletes selecte
 before contributor attribution is detached. A person who only applied another developer's commit
 loses their committer attribution. The other developer's file-change rows remain.
 
-Heph exports the structured conversation messages and their parts. It does not export the internal
-runtime session journal, which can contain tool context rather than only the person's conversation.
-The journal is removed with an erased person's thread.
+Heph exports the person's conversations and threads, their questions, Heph's answers, weekly digest
+entries, votes and turn usage. It does not export
+tool results, summaries or Pi runtime entries: these can contain context about other people rather
+than only the person's conversation. They are deleted with an erased person's conversations.
 
-Another member's journal can hold context Heph read about the person: their membership, conversations,
-documents, authored work or a review whose evidence contained them. The preview freezes each
-workspace holding any of these that has a journal. Erasure clears every conversation's journal in
-those workspaces, including journals written after the preview, and exports none of them. Visible messages stay.
+Another member's Heph conversation can hold tool results that read data about the person. These
+include their membership, conversations, documents, authored work, the reviews and comments they wrote, the
+commits they authored, or a review whose evidence contained them.
 
-A cleared journal stays empty rather than absent. The next turn of that conversation discards any warm Heph runtime and starts a fresh session. A turn that was already running cannot save its session over the cleared journal.
+A `read`, `bash` or `load_context` tool result can copy the data of anyone in its workspace. These tools read
+Heph's context folder.
+A `search_conversation` result quotes the conversation's own entries, and these entries can repeat what a
+context folder result showed. Erasing an entry also erases the `search_conversation` results that quote it.
+Other tool results copy no one's data.
 
-The upgrade clears legacy Heph runtime journals once because they have no complete exact-person
-provenance. Visible conversation messages, titles and times stay. This is a reset of hidden
-conversation memory, not deletion of the conversation a person can read.
+The preview freezes every workspace that holds
+the person's data. Erasure redacts every context folder result in those workspaces, including results
+written after the preview, and exports none of them. This is the last step of the erasure. It runs
+after every step that erases data that a context folder result can read. It also removes the turn
+sandboxes of those workspaces.
+
+Other tool results stay. Heph's messages stay whole, including their stored hidden reasoning and
+tool-call arguments. These can repeat what a context folder result showed.
+
+A Heph turn stores its context folder results when it ends. Its end waits until a running erasure
+finishes. If the last step of an erasure ran after the turn started, the end stores those results
+redacted. That step does not record its workspaces, so this applies to turns in every workspace.
+
+A turn that starts after that step reads only data that the erasure already removed. If an earlier step
+fails, the last step has not run yet. It runs when the erasure resumes and then redacts the results
+that turns wrote in the meantime.
+
+A redacted entry keeps its row and position. Every summary that could have read it is redacted too,
+so Heph's next turn summarizes the conversation again from the remaining entries. A redacted tool
+call and its result keep only their pairing. A redacted question keeps only its Pi entry id.
 
 Content admission and erasure use transaction-scoped native-identity locks through
 `server/application/src/main/java/de/tum/cit/aet/hephaestus/core/privacy/NativePersonDataWriteFence.java`.
@@ -275,9 +298,9 @@ author's profile. Erasure clears the inseparable local content copy and keeps th
 stable attribution and operational facts. Names and email addresses are not used to split content.
 
 Conversation exports contain visible message text and numeric usage facts. Tool input/output,
-arbitrary error metadata and hidden reasoning are excluded: they can contain credentials or copied
-profiles from another person. The projection is implemented in
-`server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorMessagePersonDataStore.java`.
+error text, Pi payloads and hidden reasoning are excluded: they can contain credentials or copied
+profiles from another person. The export columns are declared in
+`server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorPersonDataCatalog.java`.
 Canonical stored messages are not changed by export.
 
 Slack AI projections check the native author and Slack team in SQL. Outline AI projections check
@@ -287,8 +310,8 @@ still mirror upstream records. The controlled rows do not return to these AI inp
 
 Feedback copied into another person's Heph conversation is selected from its exact delivery message
 ID and workspace. The export includes the copied message, not the other person's profile or replies.
-Erasure replaces the linked copy with a neutral notice and clears that thread's hidden runtime journal.
-It preserves replies, parent links and conversation times. A delivery workspace mismatch stops preview.
+Erasure redacts the linked message and every summary that could have read it. It preserves replies,
+message order and conversation times. A delivery workspace mismatch stops preview.
 
 Activity reconciliation acquires one ordered set of native-identity transaction locks before filling
 unresolved commit actors. It updates only admitted authors. An erased author cannot reappear in the activity ledger. This does not prevent reconciliation of other authors in the same batch.
@@ -326,7 +349,7 @@ the deletion state. Person erasure still waits for every selected store to ackno
 
 A person can appear in a review's captured evidence without being its primary developer. The preview
 freezes the exact job IDs from native-identity capture receipts. That job is not exported. Its
-evidence snapshot and diagnostics, its evidence folder and the Heph runtime journals in its workspace
+evidence snapshot and diagnostics, its evidence folder and the Heph tool results in its workspace
 are erased through those IDs. The practice results and feedback it recorded about another developer stay
 and are not exported.
 
@@ -386,8 +409,7 @@ The person-data migration clears these old references:
 - Legacy ADMIN/USER connection-audit actor references and details.
 - Membership-history subject references without an exact contributor ID.
 
-It resets hidden Heph journals once, preserving
-visible conversation messages, titles and times. It also invalidates pending integration authorizations.
+It also invalidates pending integration authorizations.
 No identity is inferred from a display name, login or email. A legacy Outline mirror without an exact
 provider instance stops the upgrade. Before applying the upgrade, complete these steps:
 
@@ -395,3 +417,8 @@ provider instance stops the upgrade. Before applying the upgrade, complete these
 2. Verify recovery.
 
 The shipped migration fragment owns the exact operator procedure.
+
+The Heph conversation store holds no data from releases before it. The upgrade that added it deleted
+every earlier Heph conversation, including the Hephaestus copies of Slack DMs. Slack keeps its own
+copy of each DM. Feedback shown in an earlier conversation keeps its state, but its copy no longer
+names the message that showed it.

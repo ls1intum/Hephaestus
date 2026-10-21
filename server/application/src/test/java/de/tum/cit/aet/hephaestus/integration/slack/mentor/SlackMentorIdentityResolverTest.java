@@ -103,6 +103,16 @@ class SlackMentorIdentityResolverTest extends BaseUnitTest {
         verifyNoInteractions(memberships, users);
     }
 
+    @Test
+    void shouldResolveTheLinkedAccountWithoutStatusOrMembershipWhenItTurnsANotificationOff() {
+        when(providers.resolveProviderId("SLACK", "https://slack.com")).thenReturn(5L);
+        when(identities.resolveAccountId(5L, "U1", "T1")).thenReturn(Optional.of(7L));
+
+        assertThat(resolver.resolveLinkedAccountId("T1", "U1")).contains(7L);
+        assertThat(resolver.resolveLinkedAccountId(null, "U1")).isEmpty();
+        verifyNoInteractions(memberships, users);
+    }
+
     private void givenMembership(long workspaceId) {
         when(providers.resolveProviderId("SLACK", "https://slack.com")).thenReturn(5L);
         when(identities.resolveAccountId(5L, "U1", "T1")).thenReturn(Optional.of(7L));

@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import liquibase.Contexts;
 import liquibase.LabelExpression;
 import liquibase.Liquibase;
@@ -224,6 +225,25 @@ final class PracticeMigrationFixture {
                         DatabaseFactory.getInstance()
                                 .findCorrectDatabaseImplementation(new JdbcConnection(connection)))) {
             liquibase.update(new Contexts(context), new LabelExpression());
+        }
+    }
+
+    /** Applies every pending changeset that comes before the first one of {@code changelog}. */
+    static void upgradeBefore(TestDatabase database, String context, String changelog) throws Exception {
+        try (var connection = dataSource(database).getConnection();
+                var liquibase = new Liquibase(
+                        "db/master.xml",
+                        new ClassLoaderResourceAccessor(),
+                        DatabaseFactory.getInstance()
+                                .findCorrectDatabaseImplementation(new JdbcConnection(connection)))) {
+            var contexts = new Contexts(context);
+            var labels = new LabelExpression();
+            var pending = liquibase.listUnrunChangeSets(contexts, labels);
+            int before = IntStream.range(0, pending.size())
+                    .filter(index -> pending.get(index).getFilePath().endsWith(changelog))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException(changelog + " has no pending changeset"));
+            liquibase.update(before, contexts, labels);
         }
     }
 

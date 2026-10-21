@@ -104,8 +104,13 @@ public class FeedbackCopy {
     @Column(name = "external_url", nullable = true, columnDefinition = "TEXT")
     private @Nullable String externalUrl;
 
-    @Column(name = "chat_message_id", nullable = true, columnDefinition = "UUID")
-    private @Nullable UUID chatMessageId;
+    /** The Heph turn whose attempt claimed this conversation copy ({@code show_feedback}). */
+    @Column(name = "mentor_turn_id", nullable = true, columnDefinition = "UUID")
+    private @Nullable UUID mentorTurnId;
+
+    /** The Heph answer that showed this conversation copy, recorded at settle. */
+    @Column(name = "mentor_entry_id", nullable = true, columnDefinition = "UUID")
+    private @Nullable UUID mentorEntryId;
 
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at", nullable = false, updatable = false)

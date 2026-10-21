@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.workspace.settings;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.event.AgentContextChangedEvent;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -18,6 +19,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,7 @@ public class WorkspaceTeamSettingsService {
     private final RepositoryRepository repositoryRepository;
     private final LabelRepository labelRepository;
     private final WorkspaceTeamScopeResolver workspaceTeamScopeResolver;
+    private final ApplicationEventPublisher eventPublisher;
 
     public WorkspaceTeamSettingsService(
             WorkspaceTeamSettingsRepository teamSettingsRepository,
@@ -43,7 +46,8 @@ public class WorkspaceTeamSettingsService {
             TeamRepository teamRepository,
             RepositoryRepository repositoryRepository,
             LabelRepository labelRepository,
-            WorkspaceTeamScopeResolver workspaceTeamScopeResolver) {
+            WorkspaceTeamScopeResolver workspaceTeamScopeResolver,
+            ApplicationEventPublisher eventPublisher) {
         this.teamSettingsRepository = teamSettingsRepository;
         this.repositorySettingsRepository = repositorySettingsRepository;
         this.labelFilterRepository = labelFilterRepository;
@@ -52,6 +56,7 @@ public class WorkspaceTeamSettingsService {
         this.repositoryRepository = repositoryRepository;
         this.labelRepository = labelRepository;
         this.workspaceTeamScopeResolver = workspaceTeamScopeResolver;
+        this.eventPublisher = eventPublisher;
     }
 
     // Team Visibility (Hidden) Settings
@@ -165,6 +170,7 @@ public class WorkspaceTeamSettingsService {
 
         settings.setHiddenFromContributions(hiddenFromContributions);
         WorkspaceTeamRepositorySettings saved = repositorySettingsRepository.save(settings);
+        eventPublisher.publishEvent(new AgentContextChangedEvent(workspace.getId()));
 
         log.info(
                 "Updated repository visibility: repositoryId={}, teamId={},"

@@ -1959,7 +1959,7 @@ function copiesOf(review: ReviewSpec, spec: FeedbackSpec): FeedbackCopy[] {
 				posted && onWork && hasText(review.item.url)
 					? `${review.item.url}#issuecomment-${ref}`
 					: null,
-			chatMessageId:
+			mentorEntryId:
 				copy.kind === "CHAT_TURN" && copy.state !== "PLANNED"
 					? `${spec.id.slice(0, -3)}f${String(position).padStart(2, "0")}`
 					: null,

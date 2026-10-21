@@ -52,8 +52,11 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
         """;
     private static final String SELECTED_JOBS = SUBJECT_JOBS + " UNION " + COPYING_JOBS;
 
-    /** How an erased ledger row is detached from its source; the ledger store and job preparation share it. */
-    private static final String LEDGER_REDACTION = "source_id=gen_random_uuid(),review_id=NULL";
+    /**
+     * How an erased ledger row is detached from its source; the ledger store, review job preparation and {@code
+     * MentorAttemptUsageService#forgetTurn} share it.
+     */
+    public static final String LEDGER_REDACTION = "source_id=gen_random_uuid(),review_id=NULL";
 
     /** The ledger source kinds of a review job attempt: its own row and one per practice script model kind. */
     private static final Object[] REVIEW_SOURCE_TYPES = Arrays.stream(ModelKind.values())
@@ -90,9 +93,9 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                         "t.source_id IN (" + SELECTED_JOBS
                                 + ") OR t.review_id IN (SELECT review_id FROM review_job WHERE id IN ("
                                 + SELECTED_JOBS
-                                + ")) OR (t.source_type='MENTOR_TURN' AND t.source_id IN (SELECT m.id FROM"
-                                + " chat_message m JOIN chat_thread c ON c.id=m.thread_id WHERE"
-                                + " c.account_id=:account))",
+                                + ")) OR (t.source_type='MENTOR_TURN' AND t.source_id IN (SELECT mt.id FROM"
+                                + " mentor_turn mt JOIN mentor_conversation mc ON mc.id=mt.conversation_id WHERE"
+                                + " mc.account_id=:account))",
                         "id,workspace_id,job_type,source_type,source_id,source_attempt,review_id,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,reasoning_tokens,search_units,total_calls,unreported_calls,cost_usd,pricing_state,funding_source,applied_price_id,applied_workspace_model_id,applied_per_1m_input_usd,applied_per_1m_output_usd,applied_per_1m_cache_read_usd,applied_per_1m_cache_write_usd,occurred_at,usage_provenance",
                         "id,workspace_id",
                         LEDGER_REDACTION,

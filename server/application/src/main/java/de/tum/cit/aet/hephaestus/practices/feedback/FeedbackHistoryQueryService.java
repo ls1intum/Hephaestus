@@ -56,6 +56,17 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
     private final FeedbackSupersession replacements;
 
     @Override
+    public Optional<FeedbackHistoryEntry> find(long workspaceId, UUID feedbackId, long developerAccountId) {
+        if (!memberships.isActiveVisibleMember(workspaceId, developerAccountId)) return Optional.empty();
+        Specification<Feedback> selected = (row, query, cb) -> cb.and(
+                cb.equal(row.get("workspaceId"), workspaceId),
+                cb.equal(row.get("id"), feedbackId),
+                cb.equal(row.get("developerId"), developerAccountId));
+        return read(selected, developerAccountId, 1, SourceUsePurpose.CONVERSATIONAL_MENTORING).stream()
+                .findFirst();
+    }
+
+    @Override
     public List<FeedbackHistoryEntry> forDeveloper(
             long workspaceId, long developerAccountId, Instant since, int limit) {
         if (!memberships.isActiveVisibleMember(workspaceId, developerAccountId)) return List.of();
@@ -279,6 +290,13 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                         .filter(Objects::nonNull)
                         .distinct()
                         .toList(),
+                complete
+                        ? authorized.stream()
+                                .map(FeedbackPublicHistory.AuthorizedSupport::practiceSlug)
+                                .distinct()
+                                .sorted()
+                                .toList()
+                        : List.of(),
                 response == null ? null : response.getResolution(),
                 response == null ? null : response.getUsefulness(),
                 complete

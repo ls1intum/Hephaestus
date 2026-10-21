@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ActiveConnectionGuard;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -17,9 +19,11 @@ import org.springframework.stereotype.Component;
 public class SlackWorkspaceResolver {
 
     private final ConnectionService connectionRepository;
+    private final ActiveConnectionGuard activeConnections;
 
-    public SlackWorkspaceResolver(ConnectionService connectionRepository) {
+    public SlackWorkspaceResolver(ConnectionService connectionRepository, ActiveConnectionGuard activeConnections) {
         this.connectionRepository = connectionRepository;
+        this.activeConnections = activeConnections;
     }
 
     /**
@@ -28,5 +32,15 @@ public class SlackWorkspaceResolver {
      */
     public Optional<Long> resolveWorkspaceId(String teamId) {
         return connectionRepository.findUniqueActiveWorkspaceId(IntegrationKind.SLACK, teamId);
+    }
+
+    /**
+     * Runs {@code work} while the workspace's Slack connection is ACTIVE for {@code teamId}, so a disconnect erases
+     * what it wrote ({@link ActiveConnectionGuard#whileActive}).
+     *
+     * @return what {@code work} returned; empty when the connection ended
+     */
+    public <T> Optional<T> whileConnected(long workspaceId, String teamId, Supplier<T> work) {
+        return activeConnections.whileActive(workspaceId, IntegrationKind.SLACK, teamId, work);
     }
 }

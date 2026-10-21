@@ -589,7 +589,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                 context,
                 purpose,
                 DataHandlingTier.UNDECLARED,
-                new AgentBindingRequestDTO(null, modelId, null, null, null, true));
+                new AgentBindingRequestDTO(null, modelId, null, null, true));
     }
 
     private Practice practice(Workspace workspace, String program) {

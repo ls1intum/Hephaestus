@@ -57,7 +57,7 @@ class ExportGenerationWorkerTest extends BaseUnitTest {
     void shouldSetPayloadExpiryAndReadyWhenGenerationSucceeds() {
         AccountExport export = existingExport();
         ExportBundle.Profile profile =
-                new ExportBundle.Profile(Long.toString(ACCOUNT_ID), "User", null, "ACTIVE", NOW, false);
+                new ExportBundle.Profile(Long.toString(ACCOUNT_ID), "User", null, null, "ACTIVE", NOW, false);
         ExportBundle bundle = new ExportBundle(
                 ExportBundle.SCHEMA_VERSION,
                 NOW,

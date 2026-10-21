@@ -14,7 +14,11 @@ public interface FeedbackStore {
 
     PreparedPackage prepareAll(long workspaceId, UUID reviewId, List<FeedbackDraft> drafts);
 
-    Optional<CopyWriteFence> claimConversationCopy(long workspaceId, UUID feedbackId, UUID chatMessageId);
+    /**
+     * Claims the conversation copy of READY conversation feedback for the running attempt of a Heph turn of its
+     * developer. A repeat by the same attempt returns the fence it already holds; an ended attempt claims nothing.
+     */
+    Optional<CopyWriteFence> claimConversationCopy(long workspaceId, UUID feedbackId, UUID mentorTurnId, int attempt);
 
     void recordConversationReceipt(long workspaceId, CopyWriteFence fence, ConversationCopyReceipt receipt);
 

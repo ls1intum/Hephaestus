@@ -81,7 +81,6 @@ function binding(
 		ready: true,
 		timeoutSeconds: 600,
 		maxConcurrentJobs: 3,
-		allowInternet: false,
 		servedTiers: live ? [...SERVED_ALONE[tier]] : [],
 		...overrides,
 	};
@@ -674,7 +673,6 @@ export const AdvancedDisclosure: Story = {
 		const reviews = row(await openPurpose(canvas, "Practice reviews"), "In-house");
 		await openAdvanced(reviews);
 		await expect(reviews.getByLabelText(/^Max concurrent runs/u)).toHaveValue(3);
-		await expect(reviews.queryByRole("switch", { name: /^Internet access/u })).toBeNull();
 		const mentor = row(await openPurpose(canvas, "Heph"), "In-house");
 		await openAdvanced(mentor);
 		await expect(mentor.queryByLabelText(/^Max concurrent runs/u)).toBeNull();
@@ -684,14 +682,6 @@ export const AdvancedDisclosure: Story = {
 				name: /^Advanced/u,
 			}),
 		).toBeNull();
-	},
-};
-
-export const HephAdvancedOffersInternetAccess: Story = {
-	play: async ({ canvas }) => {
-		const mentor = row(await openPurpose(canvas, "Heph"), "In-house");
-		await openAdvanced(mentor);
-		await expect(mentor.getByRole("switch", { name: /^Internet access/u })).not.toBeChecked();
 	},
 };
 

@@ -17,6 +17,7 @@ import type {
 	PracticeScriptSummary,
 	WorkspaceLlmConnection,
 	WorkspaceLlmModel,
+	WorkspaceOnboarding,
 } from "@/api/types.gen";
 import { SERVED_ALONE } from "@/components/admin/workspace-llm/fixtures";
 import type { Wire } from "@/lib/dates";
@@ -89,7 +90,6 @@ function binding(
 		ready: true,
 		timeoutSeconds: 600,
 		maxConcurrentJobs: 3,
-		allowInternet: false,
 		servedTiers: [...SERVED_ALONE[dataHandlingTier]],
 	};
 }
@@ -657,23 +657,24 @@ it("saves and clears only the selected tier and lists only that tier's models", 
 	expect(pickerOf(row("Practice reviews", "Cloud")).textContent).toContain("Select a model");
 });
 
+/** A member who chose Cloud, answered as the server would for the workspace's `bindings`. */
+function cloudMemberOnboarding(bindings: AgentBinding[]): WorkspaceOnboarding {
+	const mentorReady = bindings.some((entry) => entry.purpose === "MENTOR");
+	return {
+		...workspaceOnboarding(),
+		aiChoice: "CLOUD",
+		...(mentorReady ? {} : { mentorRefusal: "UNAVAILABLE" }),
+		aiOptions: [{ choice: "CLOUD", mentorReady, practiceReviewsReady: true, models: [] }],
+	};
+}
+
 it("lists Heph in the navigation once a Heph model is assigned, and drops it when the assignment is cleared", async () => {
 	const user = userEvent.setup();
 	let bindings: AgentBinding[] = [binding("PRACTICE_REVIEW", 20)];
 	mockModelsRoute(() => bindings);
 	server.use(
 		http.get("*/workspaces/acme/onboarding/me", () =>
-			HttpResponse.json({
-				...workspaceOnboarding(),
-				aiOptions: [
-					{
-						choice: "CLOUD",
-						mentorReady: bindings.some((entry) => entry.purpose === "MENTOR"),
-						practiceReviewsReady: true,
-						models: [],
-					},
-				],
-			}),
+			HttpResponse.json(cloudMemberOnboarding(bindings)),
 		),
 		http.put("*/workspaces/acme/agents/MENTOR", () => {
 			bindings = [...bindings, binding("MENTOR", 20)];

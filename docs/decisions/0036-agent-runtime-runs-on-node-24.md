@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (amended 2026-09-17 — the image installs the SDK with pnpm; 2026-10-09 — each practice script runs in its own process). Supersedes
+Accepted (amended 2026-09-17 — the image installs the SDK with pnpm; 2026-10-09 — each practice script runs in its own process; 2026-10-09 — Heph host replaces the mentor runner, [ADR 0057](0057-one-heph-conversation-per-developer.md)). Supersedes
 [ADR 0030](0030-agent-runtime-is-typescript-on-bun.md) for the sandbox image. Repository tooling is
 governed by [ADR 0037](0037-node-24-and-pnpm-12-are-the-javascript-toolchain.md), which superseded
 [ADR 0033](0033-bun-is-the-javascript-runtime-and-package-manager.md).
@@ -97,3 +97,12 @@ calls models and how its results are admitted.
 owns the current grants and limits.
 [Context and trust](../contributor/practice-script-runner.mdx#context-and-trust) owns the
 threat model.
+
+## Update — 2026-10-09 (Heph host, [ADR 0057](0057-one-heph-conversation-per-developer.md))
+
+The mentor runner is replaced by the Heph host, one long-lived process per worker. It runs with
+`--max-old-space-size=1024` under `--permission`, without `--expose-gc`. It may read `/workspace`,
+`/opt/pi-sdk`, its empty home and the practice-script library at `/opt/practice-scripts`, which the
+shared provider helper imports. It writes only Pi's agent directory and its temporary directory. It
+receives no child-process grant. The container has 2 GiB of memory, 2 CPUs and 256 processes. The
+runtime contract is 8. The practice runner and practice-script rules above are unchanged.

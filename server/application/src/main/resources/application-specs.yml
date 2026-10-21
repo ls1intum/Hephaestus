@@ -42,6 +42,8 @@ hephaestus:
     integration:
         slack:
             enabled: true
+            # This profile exposes the contract only; it never receives real Slack requests.
+            signing-secret: "specification-only"
             client-id: ""
             client-secret: ""
         outline:

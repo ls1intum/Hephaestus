@@ -1,7 +1,7 @@
 /**
  * Mentor content sources — implementations of {@code ContentSource} that materialise JSON
  * context files (user activity, workspace shape, practice catalog, results history) consumed by
- * the Pi mentor agent via {@code fetch_context}.
+ * the Pi mentor agent through the turn's context folder.
  *
  * <p><b>AOP convention for every {@code *ContentSource}:</b>
  * {@code @Transactional(readOnly=true)} sits on {@code contribute(...)} — the external entry

@@ -257,7 +257,8 @@ public class DockerSandboxAdapter implements SandboxManager {
                         true,
                         Duration.between(startTime, Instant.now()));
             }
-            var command = new ArrayList<>(List.of("node", "/opt/pi-sdk/gateway-run.ts"));
+            // The wrapper holds the gateway token: a process of the sandbox must not open its inspector with SIGUSR1.
+            var command = new ArrayList<>(List.of("node", "--disable-sigusr1", "/opt/pi-sdk/gateway-run.ts"));
             command.addAll(spec.command());
             DockerOperations.ContainerSpec containerSpec = attempt.runtime(template, command);
 
@@ -477,7 +478,6 @@ public class DockerSandboxAdapter implements SandboxManager {
                     || !owner.equals(labels.get(SandboxLabels.OWNER))
                     || !jobId.toString().equals(labels.get(SandboxLabels.JOB_ID))
                     || labels.containsKey(SandboxLabels.SESSION_ID)
-                    || SandboxLabels.KIND_INTERACTIVE.equals(labels.get(SandboxLabels.KIND))
                     || recorded == null
                     || !recorded.matches("[0-9]{1,10}")
                     || Long.parseLong(recorded) >= attempt) {

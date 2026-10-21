@@ -83,9 +83,15 @@ public interface PiRunnerProfile {
      * shell-safe and fixed, never built from job data. Both runners use the shared JSON helpers.
      */
     default List<String> setupCommands() {
-        return List.of(
-                "mkdir -p " + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_PREFIX,
-                "ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_TARGET + " " + SandboxLayout.WORKSPACE_ROOT + "/"
-                        + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
+        return PRACTICE_SCRIPT_LIBRARY_SETUP;
     }
+
+    /**
+     * Links the image's practice-script library into the workspace, where {@code pi-provider.ts} and the runners import
+     * the shared JSON helpers from. The Heph host runs it too.
+     */
+    List<String> PRACTICE_SCRIPT_LIBRARY_SETUP = List.of(
+            "mkdir -p " + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_PREFIX,
+            "ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_TARGET + " " + SandboxLayout.WORKSPACE_ROOT + "/"
+                    + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
 }

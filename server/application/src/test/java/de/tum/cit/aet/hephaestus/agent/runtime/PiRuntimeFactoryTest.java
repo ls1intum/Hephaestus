@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
-import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -23,7 +22,29 @@ import tools.jackson.databind.ObjectMapper;
 class PiRuntimeFactoryTest extends BaseUnitTest {
 
     private static final PracticeRunnerProfile PRACTICE = new PracticeRunnerProfile();
-    private static final MentorRunnerProfile MENTOR = new MentorRunnerProfile();
+
+    /** The practice runner's files under the default flags, which run Node under the permission model. */
+    private static final PiRunnerProfile PERMISSIONED = new PiRunnerProfile() {
+        @Override
+        public String runnerScript() {
+            return PRACTICE.runnerScript();
+        }
+
+        @Override
+        public List<String> sidecarScripts() {
+            return PRACTICE.sidecarScripts();
+        }
+
+        @Override
+        public List<String> promptResources() {
+            return PRACTICE.promptResources();
+        }
+
+        @Override
+        public Map<String, String> additionalEnv() {
+            return Map.of();
+        }
+    };
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private PiRuntimeFactory factory;
@@ -33,14 +54,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         factory = new PiRuntimeFactory(objectMapper);
     }
 
-    private PiPlanSpec spec(String apiProtocol, String modelId, boolean allowInternet) {
-        return new PiPlanSpec(
-                apiProtocol, modelId, 200000, 8192, null, "job-token-123", allowInternet, 600, PRACTICE, Map.of());
+    private PiPlanSpec spec(String apiProtocol, String modelId) {
+        return new PiPlanSpec(apiProtocol, modelId, 200000, 8192, null, "job-token-123", 600, PRACTICE, Map.of());
     }
 
     private PiPlanSpec spec(PiRunnerProfile profile) {
         return new PiPlanSpec(
-                "openai-completions", "gpt-5.4-mini", null, null, null, "job-token-123", false, 600, profile, Map.of());
+                "openai-completions", "gpt-5.4-mini", null, null, null, "job-token-123", 600, profile, Map.of());
     }
 
     @Nested
@@ -48,17 +68,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void alwaysForwardsToken() {
-            var policy = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false))
+            var policy = factory.build(spec("azure-openai-responses", "gpt-5.4-mini"))
                     .networkPolicy();
             assertThat(policy.internetAccess()).isFalse();
-            assertThat(policy.llmProxyToken()).isEqualTo("job-token-123");
-        }
-
-        @Test
-        void allowInternetReflectsSpec() {
-            var policy =
-                    factory.build(spec("openai-completions", "gpt-x", true)).networkPolicy();
-            assertThat(policy.internetAccess()).isTrue();
             assertThat(policy.llmProxyToken()).isEqualTo("job-token-123");
         }
     }
@@ -68,7 +80,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void loadsClasspathResources() {
-            var inputs = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false))
+            var inputs = factory.build(spec("azure-openai-responses", "gpt-5.4-mini"))
                     .inputFiles();
             assertThat(inputs.get(SandboxLayout.ORCHESTRATOR_PATH)).isNotNull();
             assertThat(inputs.get(SandboxLayout.ORCHESTRATOR_PATH)).isNotEmpty();
@@ -80,7 +92,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         @DisplayName("stages the runner's relative-import sidecars beside the runner")
         void stagesRunnerSidecars() {
-            var inputs = factory.build(spec("openai-completions", "m", false)).inputFiles();
+            var inputs = factory.build(spec("openai-completions", "m")).inputFiles();
             // pi-runner.ts imports each relatively; unstaged, the sandbox exits 1 with ERR_MODULE_NOT_FOUND.
             for (String sidecar : PRACTICE.sidecarScripts()) {
                 assertThat(inputs).containsKey(sidecar);
@@ -94,10 +106,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         void promptDigest_isStableAcrossBuilds_andIndependentOfModel() {
             // An evaluation groups runs by this digest; settings.json and pi-provider.json are excluded from it.
-            String first =
-                    factory.build(spec("openai-completions", "model-a", false)).promptDigest();
-            String second =
-                    factory.build(spec("openai-completions", "model-b", false)).promptDigest();
+            String first = factory.build(spec("openai-completions", "model-a")).promptDigest();
+            String second = factory.build(spec("openai-completions", "model-b")).promptDigest();
 
             assertThat(first).matches("[0-9a-f]{64}").isEqualTo(second);
         }
@@ -107,7 +117,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             // The digest is exactly the root digest over orchestrator + runner + sidecars + prompt
             // resources — recomputable from the plan's own input files, so a replay can verify it.
             // Insertion order mirrors PiRuntimeFactory: sidecars, then prompts.
-            var plan = factory.build(spec("openai-completions", "m", false));
+            var plan = factory.build(spec("openai-completions", "m"));
             var scaffolding = new LinkedHashMap<String, byte[]>();
             scaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, plan.inputFiles().get(SandboxLayout.ORCHESTRATOR_PATH));
             scaffolding.put(
@@ -132,11 +142,10 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     null,
                     null,
                     "job-token-123",
-                    true,
                     600,
                     PRACTICE,
-                    Map.of(SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH, payload));
-            assertThat(factory.build(spec).inputFiles()).containsKey(SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH);
+                    Map.of(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE, payload));
+            assertThat(factory.build(spec).inputFiles()).containsKey(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE);
         }
     }
 
@@ -191,7 +200,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     4096,
                     ReasoningEffort.MEDIUM,
                     "job-token-123",
-                    false,
                     600,
                     PRACTICE,
                     Map.of());
@@ -209,7 +217,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void sendsNoReasoningEffortWhenTheProviderDefaultApplies() throws Exception {
-            byte[] json = factory.buildProviderConfigJson(spec("openai-completions", "gpt-5", false));
+            byte[] json = factory.buildProviderConfigJson(spec("openai-completions", "gpt-5"));
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
 
             assertThat(root.has("reasoningEffort")).isFalse();
@@ -218,7 +226,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void omitsNullCapabilityFields() throws Exception {
-            byte[] json = factory.buildProviderConfigJson(spec("anthropic-messages", "claude", false));
+            byte[] json = factory.buildProviderConfigJson(spec("anthropic-messages", "claude"));
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.has("contextWindow")).isTrue(); // spec() helper sets 200000
             assertThat(root.has("cacheControlFormat")).isFalse();
@@ -226,7 +234,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void writtenAtWorkspaceRootFilename() {
-            var inputs = factory.build(spec("openai-completions", "m", false)).inputFiles();
+            var inputs = factory.build(spec("openai-completions", "m")).inputFiles();
             assertThat(inputs).containsKey(SandboxLayout.PROVIDER_CONFIG_FILENAME);
         }
     }
@@ -244,7 +252,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     null,
                     null,
                     "job-token-123",
-                    false,
                     timeoutSeconds,
                     PRACTICE,
                     Map.of());
@@ -260,7 +267,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         @DisplayName("HOME / TMPDIR on tmpfs; PI_CODING_AGENT_DIR points into the workspace")
         void writableMounts() {
-            var env = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false))
+            var env = factory.build(spec("azure-openai-responses", "gpt-5.4-mini"))
                     .environment();
             assertThat(env)
                     .containsEntry("HOME", "/home/agent")
@@ -270,7 +277,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void uvThreadpoolNotForced() {
-            var env = factory.build(spec("openai-completions", "gpt-x", false)).environment();
+            var env = factory.build(spec("openai-completions", "gpt-x")).environment();
             assertThat(env).doesNotContainKey("UV_THREADPOOL_SIZE");
         }
 
@@ -279,7 +286,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 "No shell-side credential export — LLM_PROXY_URL/TOKEN come from NetworkPolicy, not AGENT_BUDGET_MS"
                         + " env")
         void noLegacyProviderEnvVars() {
-            var env = factory.build(spec("openai-completions", "gpt-x", false)).environment();
+            var env = factory.build(spec("openai-completions", "gpt-x")).environment();
             assertThat(env)
                     .doesNotContainKeys(
                             "PI_HEPHAESTUS_BASE_URL",
@@ -297,18 +304,16 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CommandAssembly {
 
         @Test
-        @DisplayName("Practice profile permits native tools without granting subprocesses to mentor")
+        @DisplayName("Practice profile permits native tools without the permission model")
         void runtimeFlagsForPractice() {
-            String body = factory.build(spec("openai-completions", "gpt-x", false))
-                    .command()
-                    .get(2);
+            String body =
+                    factory.build(spec("openai-completions", "gpt-x")).command().get(2);
             int nodeIdx = body.indexOf("node ");
             int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
 
             assertThat(body.substring(nodeIdx, scriptIdx))
                     .contains("--max-old-space-size=256")
                     .doesNotContain("--permission", "--allow-child-process", "--allow-fs-");
-            assertThat(MENTOR.runtimeFlags()).doesNotContain("--allow-child-process");
             int lastAmp = body.lastIndexOf("&&", nodeIdx);
             int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
             assertThat(body.substring(sliceStart, nodeIdx)).isBlank();
@@ -319,8 +324,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
          * create first accepts its own {@code mkdir} and denies every write inside it.
          */
         @Test
-        void shouldCreateEveryDirectoryTheMentorIsGrantedBeforeNodeStarts() {
-            PiRunnerProfile profile = MENTOR;
+        void shouldCreateEveryGrantedDirectoryWhenTheCommandStartsNode() {
+            PiRunnerProfile profile = PERMISSIONED;
             String body = factory.build(spec(profile)).command().get(2);
             int runner = body.lastIndexOf("node ");
             int mkdir = body.indexOf("mkdir -p ");
@@ -342,33 +347,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        void mentorProfileContributesMentorFlags() {
-            String body = factory.build(spec(MENTOR)).command().get(2);
-            int nodeIdx = body.indexOf("node ");
-            int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
-
-            assertThat(body.substring(nodeIdx, scriptIdx))
-                    .contains("--max-old-space-size=256")
-                    .contains("--expose-gc")
-                    .contains("--permission");
-            assertThat(body)
-                    .contains("--allow-fs-read=/workspace")
-                    .contains("--allow-fs-read=/home/agent")
-                    .contains("--allow-fs-write=/workspace/.pi")
-                    .contains("--allow-fs-write=/workspace/out");
-        }
-
-        @Test
-        void profilesResolveToDistinctScripts() {
-            PiPlanSpec base = spec("azure-openai-responses", "gpt-5.4-mini", false);
-            byte[] practiceBytes = factory.build(base).inputFiles().get(SandboxLayout.RUNNER_SCRIPT_FILENAME);
-            byte[] mentorBytes = factory.build(spec(MENTOR)).inputFiles().get(SandboxLayout.RUNNER_SCRIPT_FILENAME);
-            assertThat(mentorBytes).isNotEqualTo(practiceBytes);
-        }
-
-        @Test
         void shouldRunTheProfileSetupAfterTheWritableDirectoriesAndBeforeNodeWhenTheProfileHasSetup() {
-            var plan = factory.build(spec("openai-completions", "gpt-x", true));
+            var plan = factory.build(spec("openai-completions", "gpt-x"));
             assertThat(plan.command()).hasSize(3);
             assertThat(plan.command().get(0)).isEqualTo("sh");
             String body = plan.command().get(2);
@@ -390,19 +370,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldMakeSharedJsonHelpersReadableToTheMentor() {
-            String body = factory.build(spec(MENTOR)).command().get(2);
-
-            assertThat(body)
-                    .contains("ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_TARGET)
-                    .contains("--allow-fs-read=" + SandboxLayout.PRACTICE_SCRIPT_IMAGE_ROOT);
-            assertThat(body).doesNotContain(SandboxLayout.PRACTICE_SCRIPT_KITS_TARGET);
-        }
-
-        @Test
         @DisplayName("No shell-side cp/export of Pi config — provider.json + settings.json are the whole contract")
         void noCopyShim() {
-            assertThat(factory.build(spec("openai-completions", "gpt-x", false))
+            assertThat(factory.build(spec("openai-completions", "gpt-x"))
                             .command()
                             .get(2))
                     .doesNotContain(" cp ")

@@ -604,6 +604,11 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
             }
 
             @Override
+            public Optional<FeedbackHistoryEntry> find(long workspaceId, UUID feedbackId, long developer) {
+                return history.find(workspaceId, feedbackId, developer);
+            }
+
+            @Override
             public List<FeedbackHistoryEntry> forItem(long workspaceId, long item, long viewer, int limit) {
                 var entries = history.forItem(workspaceId, item, viewer, limit);
                 page.addAll(entries);

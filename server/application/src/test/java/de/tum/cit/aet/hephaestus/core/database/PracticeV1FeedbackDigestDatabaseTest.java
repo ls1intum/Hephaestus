@@ -51,14 +51,26 @@ class PracticeV1FeedbackDigestDatabaseTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
-    void shouldKeepShownChatWordsSeparateFromThePreparedBrief(String context) throws Exception {
+    void shouldKeepShownConversationWordsSeparateFromThePreparedBrief(String context) throws Exception {
         var database = NativePracticeFixture.feedbackParent(context);
         var prepared = PracticeMigrationFixture.column(database, "SELECT feedback_content_digest('" + CHAT + "')");
         PracticeMigrationFixture.execute(database, """
             UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at=now(),
-                chat_message_id='00000000-0000-0000-0000-000000978052'
+                mentor_turn_id='00000000-0000-0000-0000-000000978053'
             WHERE id='00000000-0000-0000-0000-000000978045';
-            UPDATE feedback_copy SET state='POSTED',posted_at=now(),body='Actual shown words.'
+            UPDATE mentor_entry SET payload='{"type":"message","id":"native-answer","message":{"role":"assistant",
+                "content":[{"type":"toolCall","id":"call-1","name":"show_feedback","arguments":{
+                    "feedbackId":"00000000-0000-0000-0000-000000978044","text":"Actual shown words."}}]}}'::jsonb
+            WHERE id='00000000-0000-0000-0000-000000978052';
+            INSERT INTO mentor_entry(id,workspace_id,conversation_id,seq,kind,surface,text,payload,turn_id,created_at)
+            VALUES('00000000-0000-0000-0000-000000978054',978001,'00000000-0000-0000-0000-000000978051',2,
+                'TOOL_RESULT','APP','','{"type":"message","id":"r1","message":{"role":"toolResult",
+                "toolCallId":"call-1","toolName":"show_feedback","isError":false,
+                "content":[{"type":"text","text":"Shown"}]}}'::jsonb,
+                '00000000-0000-0000-0000-000000978053',now());
+            UPDATE mentor_turn SET status='DONE',finished_at=now() WHERE id='00000000-0000-0000-0000-000000978053';
+            UPDATE feedback_copy SET state='POSTED',posted_at=now(),body='Actual shown words.',
+                mentor_entry_id='00000000-0000-0000-0000-000000978052'
             WHERE id='00000000-0000-0000-0000-000000978045';
             """);
         assertThat(PracticeMigrationFixture.column(database, "SELECT feedback_content_digest('" + CHAT + "')"))

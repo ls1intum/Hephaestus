@@ -163,10 +163,7 @@ export function AgentBindingEditor({
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(() =>
 		String(binding?.maxConcurrentJobs ?? 3),
 	);
-	const [allowInternet, setAllowInternet] = useState(binding?.allowInternet ?? false);
 	const [showAdvanced, setShowAdvanced] = useState(false);
-	// Only Heph may reach the internet; the server rejects the flag for every other purpose.
-	const internetConfigurable = purpose === "MENTOR";
 	const hasRunLimits = purpose === "PRACTICE_REVIEW" || purpose === "MENTOR";
 	const [showErrors, setShowErrors] = useState(false);
 	const limits = runLimitsSchema.safeParse({ timeoutSeconds, maxConcurrentJobs });
@@ -211,7 +208,6 @@ export function AgentBindingEditor({
 			workspaceModelId: selection.scope === "WORKSPACE" ? selection.id : undefined,
 			timeoutSeconds: limits.data.timeoutSeconds,
 			maxConcurrentJobs: limits.data.maxConcurrentJobs,
-			allowInternet: internetConfigurable && allowInternet,
 			enabled,
 		});
 	};
@@ -343,17 +339,6 @@ export function AgentBindingEditor({
 											{hasText(concurrencyError) && (
 												<FieldError id={concurrencyErrorId}>{concurrencyError}</FieldError>
 											)}
-										</Field>
-									)}
-									{internetConfigurable && (
-										<Field orientation="horizontal">
-											<FieldLabel htmlFor={`${rowId}-internet`}>Internet access{forRow}</FieldLabel>
-											<Switch
-												id={`${rowId}-internet`}
-												checked={allowInternet}
-												onCheckedChange={setAllowInternet}
-												disabled={pending}
-											/>
 										</Field>
 									)}
 								</FieldGroup>

@@ -50,6 +50,9 @@ import tools.jackson.databind.json.JsonMapper;
  * The one reader of standings. The Practice profile reads one developer at chosen moments. Practices across the
  * workspace reads many developers at once, through the same selection, visibility and classification, so the two
  * pages cannot disagree about a developer.
+ *
+ * <p>Heph reads a processing-qualified snapshot on the worker, so this service is available wherever reviews are
+ * prepared.
  */
 @Service
 @ConditionalOnCaptureRole

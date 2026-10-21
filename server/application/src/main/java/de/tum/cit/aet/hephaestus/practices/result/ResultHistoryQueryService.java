@@ -62,6 +62,11 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
     @Transactional(readOnly = true)
     public Optional<ResultHistoryEntry> find(
             long workspaceId, UUID resultId, long viewerAccountId, SourceUsePurpose purpose) {
+        return readable(workspaceId, resultId, viewerAccountId, purpose);
+    }
+
+    private Optional<ResultHistoryEntry> readable(
+            long workspaceId, UUID resultId, long viewerAccountId, SourceUsePurpose purpose) {
         if (!memberships.isActiveVisibleMember(workspaceId, viewerAccountId)) return Optional.empty();
         return results.findByIdAndWorkspaceId(resultId, workspaceId)
                 .filter(r -> Objects.equals(r.getDeveloperId(), viewerAccountId)
@@ -69,6 +74,14 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
                                 && memberships.isAdministrator(workspaceId, viewerAccountId)))
                 .flatMap(r -> entry(r, purpose))
                 .filter(ResultHistoryEntry::copyAuthorityComplete);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ResultHistoryEntry> findOfProblem(
+            long workspaceId, UUID problemId, long viewerAccountId, SourceUsePurpose purpose) {
+        return problems.findByIdAndWorkspaceId(problemId, workspaceId)
+                .flatMap(problem -> readable(workspaceId, problem.getResultId(), viewerAccountId, purpose));
     }
 
     @Override

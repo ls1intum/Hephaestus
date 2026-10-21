@@ -122,9 +122,9 @@ Never write cleanup that another test depends on having run.
   returns pull requests too. Any query that means "issues only" must say `WHERE TYPE(i) = Issue`
   explicitly — see `MentorContextQueryRepository` and `ReviewableArtifactOwnershipRepository`. A test
   with a mocked repository cannot catch a missing `TYPE(…)`.
-- **Integration tests do not prove migrations.** Their schema uses `ddl-auto: create`. Run
-  `vp run db:check-drift` to replay and compare the changelog
-  (`docs/contributor/database-migration.mdx`).
+- **Integration tests use the dev migration context and `ddl-auto: validate`.** They do not replace
+  production-context or released-state upgrade checks. Run `vp run db:check-drift` to replay and
+  compare the changelog (`docs/contributor/database-migration.mdx`).
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the start of a string literal.
   The whole `ApplicationContext` fails to build, naming something else.
   `NativeQueryCommentArchTest` turns that into a named failure.

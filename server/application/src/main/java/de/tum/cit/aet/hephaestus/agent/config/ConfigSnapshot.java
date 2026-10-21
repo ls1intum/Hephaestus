@@ -11,7 +11,12 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Frozen non-secret runtime configuration. Credentials and their target URL resolve together live. */
+/**
+ * Frozen non-secret runtime configuration. Credentials and their target URL resolve together live.
+ *
+ * @param allowInternet always {@code false}: no sandbox reaches the Internet. The field stays in the stored format, so
+ *     snapshots written before the setting was removed keep schema version 8 and stay reusable.
+ */
 public record ConfigSnapshot(
         int schemaVersion,
         FrozenModel model,
@@ -38,7 +43,7 @@ public record ConfigSnapshot(
                 resolved.contextWindow(),
                 resolved.maxOutputTokens(),
                 source.getTimeoutSeconds(),
-                source.isAllowInternet(),
+                false,
                 null);
     }
 
