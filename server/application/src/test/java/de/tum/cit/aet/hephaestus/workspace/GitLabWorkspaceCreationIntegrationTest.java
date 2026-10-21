@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
@@ -33,9 +34,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 @DisplayName("GitLab workspace creation integration")
 class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -129,7 +132,16 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 .headers(auth)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new CreateWorkspaceRequestDTO(
-                        slug, slug, "my-group", AccountType.ORG, null, IntegrationKind.GITLAB, "glpat-test", serverUrl))
+                        slug,
+                        slug,
+                        "my-group",
+                        AccountType.ORG,
+                        null,
+                        IntegrationKind.GITLAB,
+                        "glpat-test",
+                        serverUrl,
+                        null,
+                        null))
                 .exchange();
     }
 
@@ -251,7 +263,9 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 persistedId(owner.getId()),
                 IntegrationKind.GITLAB,
                 "glpat-test-token-12345",
-                "HTTPS://GitLab.LRZ.de:443");
+                "HTTPS://GitLab.LRZ.de:443",
+                null,
+                null);
 
         WorkspaceDTO created = webTestClient
                 .post()
@@ -276,6 +290,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         Workspace persisted = workspaceRepository.findById(workspace.id()).orElseThrow();
         assertThat(persisted.getAccountLogin()).isEqualTo("my-group/my-project");
+        // A request that names no selection follows every project of the group.
+        assertThat(persisted.getRepositorySelection()).isEqualTo(RepositorySelection.ALL);
         User instanceActor = userRepository
                 .findByLoginAndProviderId("mentor", persistedId(instance.getId()))
                 .orElseThrow();
@@ -298,6 +314,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 persistedId(owner.getId()),
                 IntegrationKind.GITLAB,
                 "glpat-test-token-67890",
+                null,
+                null,
                 null);
 
         WorkspaceDTO created = webTestClient
@@ -331,6 +349,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 persistedId(owner.getId()),
                 IntegrationKind.GITLAB,
                 null, // missing token
+                null,
+                null,
                 null);
 
         ProblemDetail problem = webTestClient
@@ -369,8 +389,9 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 persistedId(owner.getId()),
                 IntegrationKind.GITLAB,
                 "glpat-test-token",
-                "http://insecure.example.com" // not HTTPS
-                );
+                "http://insecure.example.com", // not HTTPS
+                null,
+                null);
 
         ProblemDetail problem = webTestClient
                 .post()
@@ -408,6 +429,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 persistedId(namesake.getId()),
                 IntegrationKind.GITLAB,
                 "glpat-owner-token",
+                null,
+                null,
                 null);
 
         WorkspaceDTO created = webTestClient
@@ -447,6 +470,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 persistedId(owner.getId()),
                 IntegrationKind.GITLAB,
                 secretToken,
+                null,
+                null,
                 null);
 
         String responseBody = webTestClient
@@ -480,6 +505,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 caller.scmUser().getId(),
                 IntegrationKind.GITLAB,
                 "glpat-list-token",
+                null,
+                null,
                 null);
 
         webTestClient
@@ -523,6 +550,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 persistedId(owner.getId()),
                 IntegrationKind.GITLAB,
                 "glpat-lifecycle-token",
+                null,
+                null,
                 null));
         ensureOwnerMembership(workspace);
 
@@ -546,6 +575,102 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         Workspace purged =
                 workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
         assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
+    }
+
+    private CreateWorkspaceRequestDTO selecting(
+            String slug,
+            IntegrationKind kind,
+            @Nullable RepositorySelection selection,
+            @Nullable List<Long> projectIds) {
+        return new CreateWorkspaceRequestDTO(
+                slug, slug, "my-group", AccountType.ORG, null, kind, "glpat-test", null, selection, projectIds);
+    }
+
+    @Test
+    void shouldRefuseAContradictoryProjectSelectionBeforeAskingGitLab() {
+        Consumer<HttpHeaders> caller = gitLabCaller("mentor");
+        List<CreateWorkspaceRequestDTO> contradictory = List.of(
+                selecting("selection-all-ids", IntegrationKind.GITLAB, RepositorySelection.ALL, List.of(5L)),
+                selecting("selection-ids-only", IntegrationKind.GITLAB, null, List.of(5L)),
+                selecting("selection-missing", IntegrationKind.GITLAB, RepositorySelection.SELECTED, null),
+                selecting("selection-empty", IntegrationKind.GITLAB, RepositorySelection.SELECTED, List.of()),
+                selecting("selection-zero", IntegrationKind.GITLAB, RepositorySelection.SELECTED, List.of(0L)),
+                selecting("selection-negative", IntegrationKind.GITLAB, RepositorySelection.SELECTED, List.of(-3L)),
+                selecting("selection-github", IntegrationKind.GITHUB, RepositorySelection.SELECTED, List.of(5L)));
+
+        for (CreateWorkspaceRequestDTO request : contradictory) {
+            webTestClient
+                    .post()
+                    .uri("/workspaces")
+                    .headers(caller)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchange()
+                    .expectStatus()
+                    .isBadRequest()
+                    .expectBody(Void.class);
+
+            assertThat(workspaceRepository.findByWorkspaceSlug(Objects.requireNonNull(request.workspaceSlug())))
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    void shouldApplyTheSelectionRuleToInProcessCallersToo() {
+        User owner = persistUser("in-process-owner");
+        var request = new CreateWorkspaceRequestDTO(
+                "selection-in-process",
+                "In process",
+                "my-group",
+                AccountType.ORG,
+                persistedId(owner.getId()),
+                IntegrationKind.GITLAB,
+                "glpat-test",
+                null,
+                RepositorySelection.ALL,
+                List.of(5L));
+
+        assertThatThrownBy(() -> workspaceService.createWorkspace(request))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+        assertThat(workspaceRepository.findByWorkspaceSlug("selection-in-process"))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldRefuseToListProjectsWithoutAGroupOrOnAPageBeforeTheFirst() {
+        Consumer<HttpHeaders> caller = gitLabCaller("mentor");
+
+        webTestClient
+                .post()
+                .uri("/workspaces/gitlab/projects")
+                .headers(caller)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new GitLabPreflightRequestDTO("glpat-test", null, null))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(Void.class);
+        webTestClient
+                .post()
+                .uri("/workspaces/gitlab/projects?page=0")
+                .headers(caller)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new GitLabPreflightRequestDTO("glpat-test", null, "my-group"))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(Void.class);
+        webTestClient
+                .post()
+                .uri("/workspaces/gitlab/projects")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new GitLabPreflightRequestDTO("glpat-test", null, "my-group"))
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectBody(Void.class);
     }
 
     private static long persistedId(@Nullable Long id) {

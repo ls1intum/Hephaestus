@@ -160,6 +160,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 owner.getId(),
                 IntegrationKind.GITLAB,
                 "glpat-purge-test-token",
+                null,
+                null,
                 null));
 
         // Add a monitored repository (saved directly — purge reloads workspace with EAGER fetch)
@@ -303,6 +305,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     owner.getId(),
                     IntegrationKind.GITLAB,
                     "glpat-cleanup-token",
+                    null,
+                    null,
                     null));
             Long workspaceId = workspace.getId();
 
@@ -364,6 +368,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     owner.getId(),
                     IntegrationKind.GITLAB,
                     "glpat-idempotent-token",
+                    null,
+                    null,
                     null));
 
             Workspace first = workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
@@ -487,6 +493,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     owner.getId(),
                     IntegrationKind.GITLAB,
                     "glpat-chat-cleanup-token",
+                    null,
+                    null,
                     null));
 
             MentorConversation main = mentorConversations.findOrCreateMain(workspace.getId(), accountId(owner));
@@ -532,6 +540,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 owner.getId(),
                 IntegrationKind.GITLAB,
                 "glpat-non-owner-token",
+                null,
+                null,
                 null));
 
         User mentorUser = persistUser("mentor");
@@ -563,6 +573,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     owner.getId(),
                     IntegrationKind.GITLAB,
                     "glpat-slack-test-token",
+                    null,
+                    null,
                     null));
         }
 

@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.events.RepositoryAboutToBeDeletedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -238,16 +239,25 @@ public class WorkspaceRepositoryMonitorService {
         if (!(connection.getConfig() instanceof ConnectionConfig.GitLabConfig initialConfig)) {
             throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
         }
-        Long storedNativeId = sourceProvider(IntegrationKind.GITLAB, initialConfig)
-                .flatMap(provider -> repositoryRepository.findByNameWithOwnerAndProviderId(
-                        nameWithOwner, Objects.requireNonNull(provider.getId())))
-                .map(Repository::getNativeId)
-                .orElse(null);
+        // A workspace that selected its projects admits a project only by the id its monitor carries, so the id comes
+        // from GitLab, never from a shared mirror whose path another workspace may have recorded.
+        boolean selected = workspaceRepository
+                .findMonitorPolicy(workspaceId)
+                .filter(policy -> policy.getRepositorySelection() == RepositorySelection.SELECTED)
+                .isPresent();
+        Long storedNativeId = selected
+                ? null
+                : sourceProvider(IntegrationKind.GITLAB, initialConfig)
+                        .flatMap(provider -> repositoryRepository.findByNameWithOwnerAndProviderId(
+                                nameWithOwner, Objects.requireNonNull(provider.getId())))
+                        .map(Repository::getNativeId)
+                        .orElse(null);
         // Stop can remove the last mirror. Resolve an explicit Add against GitLab before taking the write lock;
         // a path alone cannot tell which excluded native project it is, or whether that path has been reused.
         Long includedNativeId = storedNativeId;
         if (includedNativeId == null
-                && (!initialConfig.projectExclusions().nativeIds().isEmpty()
+                && (selected
+                        || !initialConfig.projectExclusions().nativeIds().isEmpty()
                         || initialConfig.projectExclusions().excludes(null, nameWithOwner))) {
             RepositoryIdentityLookup lookup = repositoryIdentityLookups.get(IntegrationKind.GITLAB);
             if (lookup == null) throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());

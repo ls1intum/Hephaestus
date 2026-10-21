@@ -115,7 +115,16 @@ class WorkspaceRegistryControllerTest {
 
     private static CreateWorkspaceRequestDTO request(IntegrationKind kind) {
         return new CreateWorkspaceRequestDTO(
-                "test-workspace", "Test Workspace", "test-org", AccountType.ORG, 1L, kind, "test-token", null);
+                "test-workspace",
+                "Test Workspace",
+                "test-org",
+                AccountType.ORG,
+                1L,
+                kind,
+                "test-token",
+                null,
+                null,
+                null);
     }
 
     private static void authenticate(List<String> roles) {

@@ -23,6 +23,11 @@ A deployment syncs one GitLab instance. **Create workspace** lets an eligible us
 that configured instance, using their connected GitLab account and an access token. A login provider
 for a different instance permits sign-in, but does not permit a workspace there.
 
+The user also chooses which projects the workspace monitors.
+**All projects** monitors every project of the group and its subgroups, including projects added later.
+**Selected projects** monitors only the chosen projects. Hephaestus checks each chosen project with the user's token.
+The choice limits project content only. Workspace members and teams still come from the whole group.
+
 Hephaestus automatically registers group hooks with a signed routing token bound to the connection.
 Do not replace that token with `WEBHOOK_SECRET`.
 

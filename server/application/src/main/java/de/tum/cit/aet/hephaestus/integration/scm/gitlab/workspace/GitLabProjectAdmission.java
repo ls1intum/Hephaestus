@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -162,21 +163,38 @@ public class GitLabProjectAdmission {
                 .orElse(false);
     }
 
-    /** Discovery may create a fresh monitor, but must check its original connection and the current exclusion first. */
+    /**
+     * Discovery may create a fresh monitor, but must check its original connection and the current exclusion first. A
+     * workspace that selected its projects admits only a project one of its original monitors still names by id, so
+     * no project row is written for a project outside the selection, and a later Add lends nothing to this read.
+     */
     public <T> Optional<T> discover(
             ConnectionRead read, long nativeId, String path, String serverUrl, Supplier<@Nullable T> write) {
         return Optional.ofNullable(transactions.execute(status -> {
             connections.acquireLifecycleLock(read.connectionId(), read.workspaceId());
             Set<Long> original = originalMonitors(read, nativeId, path);
             if (!original.isEmpty() && original.stream().noneMatch(monitors::existsById)) return null;
+            if (selected(read.workspaceId())
+                    && original.stream()
+                            .map(monitors::findById)
+                            .flatMap(Optional::stream)
+                            .noneMatch(monitor -> Objects.equals(monitor.getNativeId(), nativeId))) return null;
             return allowed(read, nativeId, path, serverUrl, true, true) ? write.get() : null;
         }));
     }
 
+    /**
+     * Whether held work may relate to, and so change or show, {@code repository}. A workspace that selected its
+     * projects relates only to a repository it monitors now.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean allowsReference(ProjectRead read, Repository repository) {
+        long workspaceId = read.connection().workspaceId();
         return Objects.equals(
                         repository.getProvider().getId(), read.connection().providerId())
+                && (!selected(workspaceId)
+                        || !monitors.findByWorkspaceIdAndSourceRepositoryId(workspaceId, repository.getId())
+                                .isEmpty())
                 && connections
                         .findConfigInState(
                                 read.connection().connectionId(),
@@ -218,6 +236,14 @@ public class GitLabProjectAdmission {
                     .orElse(current);
         }
         return !current.projectExclusions().excludes(nativeId, path);
+    }
+
+    /** Whether the workspace monitors only the projects it selected, as stored now. */
+    private boolean selected(long workspaceId) {
+        return workspaces
+                .findMonitorPolicy(workspaceId)
+                .filter(policy -> policy.getRepositorySelection() == RepositorySelection.SELECTED)
+                .isPresent();
     }
 
     private static Set<Long> originalMonitors(ConnectionRead read, long nativeId, String path) {

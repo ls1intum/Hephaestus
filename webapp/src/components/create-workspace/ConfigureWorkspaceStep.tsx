@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -6,14 +6,27 @@ import { hasText } from "@/lib/text";
 
 import { type WorkspaceDetailsData, workspaceDetailsSchema } from "./schemas";
 import { generateSlug } from "./slug-utils";
-import { useWizard } from "./wizard-context";
+import { useWizard, type WizardState } from "./wizard-context";
 
 const DETAIL_FIELDS = [
 	"displayName",
 	"workspaceSlug",
 ] as const satisfies readonly (keyof WorkspaceDetailsData)[];
 
-export function ConfigureWorkspaceStep() {
+/** How the summary states the project choice. */
+function projectSummary(scope: WizardState["projectScope"], selected: number): string {
+	if (scope === "ALL") {
+		return "All projects";
+	}
+	return selected === 1 ? "1 selected project" : `${selected} selected projects`;
+}
+
+export interface ConfigureWorkspaceStepProps {
+	/** The choice of the group's projects to monitor, which reads the group's projects itself. */
+	projects: ReactNode;
+}
+
+export function ConfigureWorkspaceStep({ projects }: ConfigureWorkspaceStepProps) {
 	const { state, dispatch } = useWizard();
 	const [fieldErrors, setFieldErrors] = useState<
 		Partial<Record<keyof WorkspaceDetailsData, string>>
@@ -123,6 +136,8 @@ export function ConfigureWorkspaceStep() {
 				)}
 			</Field>
 
+			{projects}
+
 			{/* Summary */}
 			<div className="rounded-lg border bg-muted/30 p-3 text-sm">
 				<h2
@@ -135,6 +150,10 @@ export function ConfigureWorkspaceStep() {
 					<SummaryRow label="Provider" value="GitLab" />
 					<SummaryRow label="Instance" value={state.serverUrl} />
 					<SummaryRow label="Group" value={state.selectedGroup?.fullPath ?? "—"} />
+					<SummaryRow
+						label="Projects"
+						value={projectSummary(state.projectScope, state.selectedProjectIds.length)}
+					/>
 					<SummaryRow label="Token owner" value={state.preflightResult?.username ?? "—"} />
 				</dl>
 			</div>

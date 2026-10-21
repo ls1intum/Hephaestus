@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -13,12 +14,17 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
@@ -35,6 +41,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryIdentityLookup.RepositoryIdentity;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
@@ -93,13 +100,17 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.NatsTestContainer;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
+import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActivationService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
+import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepository;
@@ -114,6 +125,7 @@ import io.nats.client.api.StorageType;
 import io.nats.client.api.StreamConfiguration;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -136,10 +148,13 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -148,7 +163,9 @@ import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -288,6 +305,25 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitLabRepositoryMonitors repositoryMonitors;
+
+    @Autowired
+    private GitLabWorkspaceInitializationService initializationService;
+
+    @Autowired
+    private GitLabProjectAdmission admission;
+
+    /** Workspace creation reads selected projects through it; GitLab itself is not reachable here. */
+    @MockitoSpyBean
+    private GitLabPreflightService preflightService;
+
+    @Autowired
+    private WebTestClient webTestClient;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private IdentityRepository identityRepository;
 
     @Autowired
     private ReviewScopeRepositoryRepository practiceReviewRepositoryTargetRepository;
@@ -864,6 +900,275 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .isFalse();
         assertThat(repositoryRepository.findById(project.getId()).orElseThrow().getNameWithOwner())
                 .isEqualTo(renamed);
+    }
+
+    @Test
+    void shouldNotMonitorAnUnselectedSiblingWhenASelectedWorkspaceIsInitialized() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        long selected = repositoryToMonitorRepository
+                .findByWorkspaceIdAndNameWithOwner(workspaceId, REPOSITORY)
+                .orElseThrow()
+                .getId();
+        Workspace selecting = workspaceRepository.findById(workspaceId).orElseThrow();
+        selecting.setRepositorySelection(RepositorySelection.SELECTED);
+        workspaceRepository.save(selecting);
+        long siblingId = 2_216_001L;
+        Repository sibling = foreignRepository(GROUP + "/unselected-sibling", siblingId);
+        when(groupSync.syncGroupProjects(anyLong(), eq(GROUP), eq(SERVER_URL)))
+                .thenAnswer(
+                        invocation -> GitLabSyncResult.completed(List.of(discoveredRepository(), sibling), 1, 0, 0));
+
+        initializationService.initialize(
+                workspaceRepository.findById(workspaceId).orElseThrow());
+
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, siblingId))
+                .isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, REPOSITORY_NATIVE_ID))
+                .singleElement()
+                .satisfies(monitor -> assertThat(monitor.getId()).isEqualTo(selected));
+    }
+
+    @Test
+    void shouldStoreNothingFromANewSubgroupProjectOutsideTheSelectionWhileTheSelectedProjectSyncs() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        Workspace selecting = workspaceRepository.findById(workspaceId).orElseThrow();
+        selecting.setRepositorySelection(RepositorySelection.SELECTED);
+        workspaceRepository.save(selecting);
+        long unselectedId = 2_216_002L;
+        String unselected = GROUP + "/test-subgroup/unselected-project";
+        // GitLab reports the project inside the connected group; only the selection keeps it out.
+        doReturn(Optional.of(reported(unselectedId, unselected)))
+                .when(projectSyncService)
+                .fetchProjectById(workspaceId, unselectedId);
+        doReturn(Optional.of(reported(unselectedId, unselected)))
+                .when(projectSyncService)
+                .fetchProject(workspaceId, unselected);
+
+        deliver(connected, projectCreate(unselected, unselectedId), "unselected-created");
+        long excludedIssueId = 2_216_003L;
+        JsonNode excludedIssue = onProject(fixture("gitlab/issue.open.json"), unselected, unselectedId);
+        ((ObjectNode) excludedIssue.get("object_attributes")).put("id", excludedIssueId);
+        deliver(connected, excludedIssue, "unselected-issue");
+        awaitAcknowledged();
+
+        assertThat(repositoryRepository.findByNativeIdAndProviderId(unselectedId, gitLabProviderId()))
+                .isEmpty();
+        assertThat(repositoryRepository.findByNameWithOwner(unselected)).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, unselectedId))
+                .isEmpty();
+        assertThat(issueRepository.findAll()).noneMatch(issue -> Objects.equals(excludedIssueId, issue.getNativeId()));
+
+        deliver(connected, fixture("gitlab/issue.open.json"), "selected-issue");
+        long selectedRepositoryId = discoveredRepository().getId();
+        await().atMost(Duration.ofSeconds(20))
+                .untilAsserted(() -> assertThat(issueRepository.findByRepositoryIdAndNumber(selectedRepositoryId, 5))
+                        .hasValueSatisfying(
+                                issue -> assertThat(issue.getNativeId()).isEqualTo(NATIVE_ISSUE_ID)));
+    }
+
+    @Test
+    void shouldCommitTheSelectionWithTheActiveConnectionBeforeInitializationDiscoversProjects() throws Exception {
+        createStream();
+        Consumer<HttpHeaders> caller = gitLabCaller("selecting-owner");
+        doReturn(List.of(
+                        new RepositoryIdentity(NESTED_PROJECT_ID, NESTED_PROJECT),
+                        new RepositoryIdentity(REPOSITORY_NATIVE_ID, REPOSITORY)))
+                .when(preflightService)
+                .verify(anyString(), any(), anyString(), anyCollection());
+        Repository sibling = foreignRepository(GROUP + "/unselected-at-creation", 2_216_006L);
+        AtomicReference<@Nullable List<RepositoryToMonitor>> seededAtDiscovery = new AtomicReference<>();
+        AtomicReference<@Nullable RepositorySelection> modeAtDiscovery = new AtomicReference<>();
+        AtomicReference<@Nullable Boolean> activeAtDiscovery = new AtomicReference<>();
+        when(groupSync.syncGroupProjects(anyLong(), eq(GROUP), eq(SERVER_URL))).thenAnswer(invocation -> {
+            long scopeId = invocation.getArgument(0);
+            seededAtDiscovery.set(repositoryToMonitorRepository.findByWorkspaceId(scopeId));
+            modeAtDiscovery.set(workspaceRepository
+                    .findMonitorPolicy(scopeId)
+                    .map(policy -> policy.getRepositorySelection())
+                    .orElse(null));
+            activeAtDiscovery.set(connectionRepository
+                    .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                            scopeId, IntegrationKind.GITLAB, IntegrationState.ACTIVE)
+                    .isPresent());
+            return GitLabSyncResult.completed(List.of(discoveredRepository(), sibling), 1, 0, 0);
+        });
+
+        WorkspaceDTO created = Objects.requireNonNull(webTestClient
+                .post()
+                .uri("/workspaces")
+                .headers(caller)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreateWorkspaceRequestDTO(
+                        "selected-at-creation",
+                        "Selected at creation",
+                        GROUP,
+                        AccountType.ORG,
+                        null,
+                        IntegrationKind.GITLAB,
+                        "glpat-test",
+                        SERVER_URL,
+                        RepositorySelection.SELECTED,
+                        List.of(NESTED_PROJECT_ID, REPOSITORY_NATIVE_ID, NESTED_PROJECT_ID)))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody());
+        workspace = workspaceRepository.findById(created.id()).orElseThrow();
+        awaitMonitoringIdle();
+
+        ArgumentCaptor<Collection<Long>> checked = ArgumentCaptor.captor();
+        verify(preflightService).verify(eq("glpat-test"), eq(SERVER_URL), eq(GROUP), checked.capture());
+        assertThat(checked.getValue()).containsExactly(NESTED_PROJECT_ID, REPOSITORY_NATIVE_ID);
+        // Initialization saw the committed selection, on an active connection, before it discovered anything.
+        assertThat(modeAtDiscovery.get()).isEqualTo(RepositorySelection.SELECTED);
+        assertThat(activeAtDiscovery.get()).isTrue();
+        assertThat(seededAtDiscovery.get())
+                .extracting(RepositoryToMonitor::getNativeId, RepositoryToMonitor::getNameWithOwner)
+                .containsExactlyInAnyOrder(
+                        tuple(NESTED_PROJECT_ID, NESTED_PROJECT), tuple(REPOSITORY_NATIVE_ID, REPOSITORY));
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(created.id()))
+                .extracting(RepositoryToMonitor::getNativeId)
+                .containsExactlyInAnyOrder(NESTED_PROJECT_ID, REPOSITORY_NATIVE_ID);
+    }
+
+    @Test
+    void shouldCreateNothingWhenGitLabDoesNotConfirmASelectedProject() throws Exception {
+        createStream();
+        Consumer<HttpHeaders> caller = gitLabCaller("refused-owner");
+        for (HttpStatus refusal : List.of(HttpStatus.UNPROCESSABLE_CONTENT, HttpStatus.BAD_GATEWAY)) {
+            String slug = "refused-" + refusal.value();
+            doThrow(new ResponseStatusException(refusal, "GitLab did not confirm the selected projects."))
+                    .when(preflightService)
+                    .verify(anyString(), any(), anyString(), anyCollection());
+
+            webTestClient
+                    .post()
+                    .uri("/workspaces")
+                    .headers(caller)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new CreateWorkspaceRequestDTO(
+                            slug,
+                            slug,
+                            GROUP,
+                            AccountType.ORG,
+                            null,
+                            IntegrationKind.GITLAB,
+                            "glpat-test",
+                            SERVER_URL,
+                            RepositorySelection.SELECTED,
+                            List.of(2_216_007L)))
+                    .exchange()
+                    .expectStatus()
+                    .isEqualTo(refusal.value())
+                    .expectBody(Void.class);
+
+            assertThat(workspaceRepository.findByWorkspaceSlug(slug)).isEmpty();
+        }
+        awaitMonitoringIdle();
+        assertThat(repositoryToMonitorRepository.findAll())
+                .noneMatch(monitor -> monitor.getNativeId() != null && monitor.getNativeId() == 2_216_007L);
+        verify(groupSync, never()).syncGroupProjects(anyLong(), anyString(), any());
+    }
+
+    @Test
+    void shouldNotLetAReadFromBeforeAnAddAdmitTheAddedProjectWhenTheWorkspaceSelectedItsProjects() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        Workspace selecting = workspaceRepository.findById(workspaceId).orElseThrow();
+        selecting.setRepositorySelection(RepositorySelection.SELECTED);
+        workspaceRepository.save(selecting);
+        GitLabProjectAdmission.ConnectionRead before =
+                admission.captureConnection(workspaceId, gitLabProviderId()).orElseThrow();
+        doReturn(Optional.of(reported(NESTED_PROJECT_ID, NESTED_PROJECT)))
+                .when(projectSyncService)
+                .fetchProject(workspaceId, NESTED_PROJECT);
+
+        workspaceRepositoryMonitorService.addRepositoryToMonitor(connected.getWorkspaceSlug(), NESTED_PROJECT);
+
+        // A selected workspace's Add keeps GitLab's id even with no stop or mirror to look it up.
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(workspaceId, NESTED_PROJECT))
+                .hasValueSatisfying(monitor -> assertThat(monitor.getNativeId()).isEqualTo(NESTED_PROJECT_ID));
+        assertThat(admission.discover(before, NESTED_PROJECT_ID, NESTED_PROJECT, SERVER_URL, () -> "written"))
+                .isEmpty();
+        GitLabProjectAdmission.ConnectionRead after =
+                admission.captureConnection(workspaceId, gitLabProviderId()).orElseThrow();
+        assertThat(admission.discover(after, NESTED_PROJECT_ID, NESTED_PROJECT, SERVER_URL, () -> "written"))
+                .contains("written");
+    }
+
+    @Test
+    void shouldAdmitAProjectCreatedAfterTheReadWhenTheWorkspaceFollowsTheWholeGroup() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        GitLabProjectAdmission.ConnectionRead read = admission
+                .captureConnection(connected.getId(), gitLabProviderId())
+                .orElseThrow();
+
+        assertThat(admission.discover(read, 2_216_004L, GROUP + "/created-later", SERVER_URL, () -> "written"))
+                .contains("written");
+    }
+
+    @Test
+    void shouldNotLetAnotherWorkspacesSharedSourceAdmitAProjectOutsideTheSelection() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        Workspace selecting = workspaceRepository.findById(workspaceId).orElseThrow();
+        selecting.setRepositorySelection(RepositorySelection.SELECTED);
+        workspaceRepository.save(selecting);
+        Workspace holder = WorkspaceTestFixtures.persistGitLabWorkspace(
+                workspaceRepository,
+                connectionRepository,
+                WorkspaceTestFixtures.gitLabPatWorkspace(GROUP).withSlug("shared-source-holder"),
+                SERVER_URL);
+        long sharedId = 2_216_005L;
+        String sharedPath = GROUP + "/shared-sibling";
+        Repository shared = foreignRepository(sharedPath, sharedId);
+        RepositoryToMonitor held = WorkspaceTestFixtures.repositoryMonitor(holder, sharedPath);
+        held.setNativeId(sharedId);
+        repositoryToMonitorRepository.save(held);
+        GitLabProjectAdmission.ConnectionRead read =
+                admission.captureConnection(workspaceId, gitLabProviderId()).orElseThrow();
+
+        assertThat(admission.discover(read, sharedId, sharedPath, SERVER_URL, () -> "written"))
+                .isEmpty();
+
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, sharedId))
+                .isEmpty();
+        assertThat(repositoryToMonitorRepository.findById(held.getId())).isPresent();
+        assertThat(repositoryRepository.findById(shared.getId()))
+                .hasValueSatisfying(
+                        repository -> assertThat(repository.getNameWithOwner()).isEqualTo(sharedPath));
+    }
+
+    /** A caller whose one GitLab identity is on the connected instance, as workspace creation requires. */
+    private Consumer<HttpHeaders> gitLabCaller(String login) {
+        Account account = accountRepository.save(new Account(login));
+        IdentityProvider gitlab = identityProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, SERVER_URL)
+                .orElseGet(() ->
+                        identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, SERVER_URL)));
+        long nativeId = 2_216_100L + Objects.requireNonNull(account.getId());
+        TestUserFactory.ensureUser(userRepository, login, nativeId, gitlab);
+        Identity link = new Identity();
+        link.setAccount(account);
+        link.setProviderId(Objects.requireNonNull(gitlab.getId()));
+        link.setProviderUserKey(String.valueOf(nativeId));
+        identityRepository.save(link);
+        String token = "mock-jwt-sub-" + account.getId();
+        return headers -> headers.setBearerAuth(token);
     }
 
     @Test

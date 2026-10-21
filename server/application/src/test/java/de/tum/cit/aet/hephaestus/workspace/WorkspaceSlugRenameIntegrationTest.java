@@ -214,6 +214,8 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
                 ownerB.getId(),
                 IntegrationKind.GITHUB,
                 "ghp_dummy_token_for_test",
+                null,
+                null,
                 null);
 
         webTestClient

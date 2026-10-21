@@ -1015,6 +1015,8 @@ export const zCreateWorkspaceRequest = z.object({
     kind: z.enum(['GITHUB', 'GITLAB']),
     ownerUserId: z.int().optional(),
     personalAccessToken: z.string().min(0).max(512).optional(),
+    repositorySelection: z.enum(['ALL', 'SELECTED']).optional(),
+    selectedProjectIds: z.array(z.int()).optional(),
     serverUrl: z.string().optional(),
     workspaceSlug: z.string().min(3).max(51).regex(/^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$/)
 });
@@ -1520,6 +1522,24 @@ export const zGitLabPreflightResponse = z.object({
     userId: z.int().optional(),
     username: z.string().optional(),
     valid: z.boolean()
+});
+
+/**
+ * GitLab project of a group that the provided PAT can read
+ */
+export const zGitLabProject = z.object({
+    fullPath: z.string(),
+    id: z.int(),
+    name: z.string(),
+    webUrl: z.string().optional()
+});
+
+/**
+ * One page of the projects of a GitLab group that the provided PAT can read
+ */
+export const zGitLabProjectPage = z.object({
+    nextPage: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional(),
+    projects: z.array(zGitLabProject)
 });
 
 /**

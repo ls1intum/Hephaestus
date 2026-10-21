@@ -225,9 +225,11 @@ public class GitLabIssueDependencySyncService {
             Issue issue,
             Repository repository,
             GitLabProjectAdmission.ProjectRead read) {
-        if (links == null || links.isEmpty()) {
-            // No links — clear any stale blockedBy entries for this issue
-            clearAllBlockers(issue);
+        // A response without a body says nothing about this issue's links, so no stored edge is removed.
+        if (links == null) return 0;
+        if (links.isEmpty()) {
+            // No links — clear the stale blockedBy entries this read may change
+            clearBlockersInScope(issue, read);
             return 0;
         }
 
@@ -250,7 +252,8 @@ public class GitLabIssueDependencySyncService {
             if ("is_blocked_by".equals(linkType)) {
                 // The linked issue blocks this issue
                 Issue blocker = findIssueByLink(link, linkedIid, repository);
-                if (blocker != null) {
+                Repository referenced = blocker != null ? blocker.getRepository() : null;
+                if (blocker != null && referenced != null && admission.allowsReference(read, referenced)) {
                     currentBlockerIds.add(blocker.getId());
                     if (!issueWithDeps.getBlockedBy().contains(blocker)) {
                         issueWithDeps.getBlockedBy().add(blocker);
@@ -276,7 +279,9 @@ public class GitLabIssueDependencySyncService {
         }
 
         // Remove stale blockers: issues that no longer block this issue
-        issueWithDeps.getBlockedBy().removeIf(blocker -> !currentBlockerIds.contains(blocker.getId()));
+        issueWithDeps
+                .getBlockedBy()
+                .removeIf(blocker -> !currentBlockerIds.contains(blocker.getId()) && mayChange(read, blocker));
 
         // Bidirectional stale cleanup: remove this issue as blocker from issues
         // it no longer blocks (the "blocks" direction)
@@ -287,15 +292,23 @@ public class GitLabIssueDependencySyncService {
     }
 
     /**
-     * Clears all blockers for an issue that has no links in GitLab.
+     * Clears the blockers this read may change for an issue that has no links in GitLab.
      */
-    private void clearAllBlockers(Issue issue) {
+    private void clearBlockersInScope(Issue issue, GitLabProjectAdmission.ProjectRead read) {
         Issue issueWithDeps =
                 issueRepository.findByIdWithBlockedBy(issue.getId()).orElse(null);
-        if (issueWithDeps != null && !issueWithDeps.getBlockedBy().isEmpty()) {
-            issueWithDeps.getBlockedBy().clear();
+        if (issueWithDeps != null && issueWithDeps.getBlockedBy().removeIf(blocker -> mayChange(read, blocker))) {
             issueRepository.save(issueWithDeps);
         }
+    }
+
+    /**
+     * Whether this read may change an edge to {@code blocker}. An edge to a project the workspace may not refer to
+     * may be used by another workspace. A refusal to read that project does not establish deletion of the edge.
+     */
+    private boolean mayChange(GitLabProjectAdmission.ProjectRead read, Issue blocker) {
+        Repository referenced = blocker.getRepository();
+        return referenced != null && admission.allowsReference(read, referenced);
     }
 
     /**
@@ -324,35 +337,30 @@ public class GitLabIssueDependencySyncService {
     }
 
     /**
-     * Finds an issue from a link response. First tries same-repo, then cross-repo
-     * using the project_id from the REST response.
+     * Finds an issue from a link response by its project first: an IID is unique only within one project, so
+     * another project's issue #5 must never resolve to this project's #5. A link without a project id names this
+     * project; an unreadable project id names none.
      */
     @Nullable
     private Issue findIssueByLink(Map<String, Object> link, int linkedIid, Repository repository) {
-        // Same-repo lookup first (fast path)
-        Issue issue = issueRepository
-                .findByRepositoryIdAndNumber(repository.getId(), linkedIid)
-                .orElse(null);
-        if (issue != null) return issue;
-
-        // Cross-repo: extract project_id from the link response
-        Object projectIdObj = link.get("project_id");
-        if (projectIdObj instanceof Number projectIdNum) {
-            long linkedProjectId = projectIdNum.longValue();
-            if (linkedProjectId != repository.getNativeId()) {
-                Repository crossRepo = repositoryRepository
-                        .findByNativeIdAndProviderId(
-                                linkedProjectId,
-                                Objects.requireNonNull(repository.getProvider().getId()))
-                        .orElse(null);
-                if (crossRepo != null) {
-                    return issueRepository
-                            .findByRepositoryIdAndNumber(crossRepo.getId(), linkedIid)
-                            .orElse(null);
-                }
-            }
+        Object projectId = link.get("project_id");
+        Repository linkedRepository;
+        if (projectId == null
+                || (projectId instanceof Number number && number.longValue() == repository.getNativeId())) {
+            linkedRepository = repository;
+        } else if (projectId instanceof Number other && other.longValue() > 0) {
+            linkedRepository = repositoryRepository
+                    .findByNativeIdAndProviderId(
+                            other.longValue(),
+                            Objects.requireNonNull(repository.getProvider().getId()))
+                    .orElse(null);
+        } else {
+            linkedRepository = null;
         }
-        return null;
+        if (linkedRepository == null) return null;
+        return issueRepository
+                .findByRepositoryIdAndNumber(linkedRepository.getId(), linkedIid)
+                .orElse(null);
     }
 
     @Nullable

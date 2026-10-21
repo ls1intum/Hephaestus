@@ -70,6 +70,8 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
                 namesake.getId(),
                 IntegrationKind.GITHUB,
                 "test-token",
+                null,
+                null,
                 null);
 
         client.post()
@@ -105,6 +107,8 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
                 null,
                 IntegrationKind.GITHUB,
                 "t",
+                null,
+                null,
                 null);
 
         client.post()
