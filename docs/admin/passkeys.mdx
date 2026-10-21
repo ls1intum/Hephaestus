@@ -48,6 +48,13 @@ An account without a credential cannot use admin capabilities that require passk
 The first enrollment depends on the security of the existing OAuth account.
 An upstream session can satisfy OAuth without a new authenticator challenge.
 
+An account owner can remove their last passkey.
+They must first verify a passkey recently and turn off personal admin protection.
+Removal is not possible during recovery.
+It deletes the account's recovery codes and ends its other sessions.
+Admin capabilities that require passkeys stay locked until the owner enrolls and verifies a new passkey.
+That new enrollment depends on the OAuth account again.
+
 High-risk admin operations require passkey verification within five minutes by default.
 `HEPHAESTUS_AUTH_STEP_UP_MAX_AGE` controls this interval.
 Token refresh does not advance verification time or the absolute session deadline.

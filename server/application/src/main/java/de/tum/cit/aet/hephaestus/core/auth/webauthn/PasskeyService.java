@@ -178,13 +178,24 @@ public class PasskeyService implements AccountErasureContributor {
         if (!Objects.equals(row.getAccount().getId(), accountId)) {
             throw new PasskeyRequiredException();
         }
-        if (credentials.findByAccountId(accountId).size() <= 1) {
+        boolean last = credentials.findByAccountId(accountId).size() <= 1;
+        // The last passkey returns the account to first enrollment, which rests on a recent OAuth sign-in again.
+        // Only the owner who turned personal protection off may choose that; recovery must finish with a passkey.
+        if (last && account.isPasskeyProtectionEnabled()) {
             throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Add another passkey before you remove the last one.");
+                    HttpStatus.CONFLICT, "Turn off personal admin protection before you remove your last passkey.");
+        }
+        if (last && account.isPasskeyRecoveryRequired()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Finish recovery with a verified passkey before you remove it.");
         }
         credentials.delete(row);
+        if (last) {
+            recoveryCodes.deleteByAccountId(accountId);
+            challenges.deleteByAccountId(accountId);
+        }
         sessionLifecycle.rotate(accountId, null, request, response, true);
-        securityEvents.changed(account, "removed");
+        securityEvents.changed(account, last ? "last_removed" : "removed");
     }
 
     @Transactional

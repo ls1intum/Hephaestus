@@ -91,6 +91,43 @@ function servePasskeys(verified: boolean) {
 	return account;
 }
 
+/**
+ * One passkey, confirmed recently, with personal protection off. The removal either succeeds, after
+ * which every read shows no passkey, or is refused because protection was turned on elsewhere.
+ */
+function serveLastPasskey(answer: "removed" | "refused") {
+	const account = { removed: false, protectionEnabled: false, removals: 0 };
+	server.use(
+		http.get("*/user/passkeys", () =>
+			HttpResponse.json({
+				protectionEnabled: account.protectionEnabled,
+				recoveryRequired: false,
+				instanceAdminRequired: true,
+				workspaceAdminRequired: false,
+				verified: !account.removed,
+				credentials: account.removed ? [] : [{ id: "one", label: "Phone" }],
+			}),
+		),
+		http.delete("*/user/passkeys/:credentialId", () => {
+			account.removals += 1;
+			if (answer === "refused") {
+				account.protectionEnabled = true;
+				return HttpResponse.json(
+					{
+						status: 409,
+						title: "Conflict",
+						detail: "Turn off personal admin protection before you remove your last passkey.",
+					},
+					{ status: 409 },
+				);
+			}
+			account.removed = true;
+			return new HttpResponse(null, { status: 200 });
+		}),
+	);
+	return account;
+}
+
 async function passkeys() {
 	const region = await screen.findByRole("region", { name: "Passkeys" }, ROUTE_RENDER_WAIT);
 	await within(region).findByText("Phone");
@@ -169,5 +206,40 @@ describe("passkeys on the settings page", () => {
 			).toBe("true"),
 		);
 		region.getByText("Phone");
+	});
+
+	it("removes the last passkey once, then reads that none is left", async () => {
+		const account = serveLastPasskey("removed");
+		renderRouteAt("/settings");
+		const region = await passkeys();
+
+		await userEvent.click(region.getByRole("button", { name: "Remove Phone" }));
+		await userEvent.click(await screen.findByRole("button", { name: "Remove last passkey" }));
+
+		await region.findByText(
+			"No passkeys yet. Register a passkey to protect admin access.",
+			{},
+			ROUTE_RENDER_WAIT,
+		);
+		expect(account.removals).toBe(1);
+		expect(region.queryByText("Phone")).toBeNull();
+	});
+
+	it("keeps the last passkey listed when the server refuses its removal, and does not send it again", async () => {
+		const account = serveLastPasskey("refused");
+		renderRouteAt("/settings");
+		const region = await passkeys();
+
+		await userEvent.click(region.getByRole("button", { name: "Remove Phone" }));
+		await userEvent.click(await screen.findByRole("button", { name: "Remove last passkey" }));
+
+		await region.findByText(
+			"Turn off personal admin protection before you remove your last passkey.",
+			{ selector: "[role='alert']" },
+			ROUTE_RENDER_WAIT,
+		);
+		region.getByText("Phone");
+		expect(region.queryByText(/No passkeys yet/u)).toBeNull();
+		expect(account.removals).toBe(1);
 	});
 });

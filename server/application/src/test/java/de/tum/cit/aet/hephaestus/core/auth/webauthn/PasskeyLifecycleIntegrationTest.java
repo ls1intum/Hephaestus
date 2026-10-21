@@ -640,6 +640,231 @@ class PasskeyLifecycleIntegrationTest extends RealAuthIntegrationTest {
                 .expectBody(Void.class);
     }
 
+    @Test
+    void shouldRemoveTheLastPasskeyOnlyOnceProtectionIsOffAndReturnToFirstEnrollment() throws GeneralSecurityException {
+        var account = account();
+        long accountId = Objects.requireNonNull(account.getId());
+        String oauth = token(account, null);
+        var signIn = decoder.decode(oauth);
+        String csrf = csrf();
+        var original = new PasskeyTestAuthenticator();
+        enroll(oauth, csrf, original, "Laptop");
+        String verified = verify(oauth, csrf, account, original, 1);
+        post("/user/passkeys/recovery-codes", verified, csrf)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.codes.length()")
+                .isEqualTo(10);
+        String credentialId = credentials.findByAccountId(accountId).getFirst().getId();
+
+        // Enrollment turned personal protection on: the last passkey stays while it is on.
+        delete("/user/passkeys/" + credentialId, verified, csrf)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody(Void.class);
+        assertThat(credentials.findByAccountId(accountId)).hasSize(1);
+        assertThat(recoveryCodeCount(account)).isEqualTo(10);
+
+        var protectionOff = patch("/user/passkeys/protection", verified, csrf)
+                .bodyValue(new PasskeyController.PasskeyProtectionRequestDTO(false))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(Void.class);
+        String off = Objects.requireNonNull(protectionOff.getResponseCookies().getFirst(cookie))
+                .getValue();
+        String otherSession = token(account, null);
+        var pending = verificationOptions(off, csrf);
+
+        var removal = delete("/user/passkeys/" + credentialId, off, csrf)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(Void.class);
+        String removed = Objects.requireNonNull(removal.getResponseCookies().getFirst(cookie))
+                .getValue();
+
+        assertThat(credentials.findByAccountId(accountId)).isEmpty();
+        assertThat(recoveryCodeCount(account)).isZero();
+        assertThat(challenges.findById(pending.challengeId())).isEmpty();
+        var stored = accounts.findById(accountId).orElseThrow();
+        assertThat(stored.isPasskeyProtectionEnabled()).isFalse();
+        assertThat(stored.isPasskeyRecoveryRequired()).isFalse();
+        for (String revoked : new String[] {off, otherSession}) {
+            client.get()
+                    .uri("/user")
+                    .header(HttpHeaders.COOKIE, cookie + "=" + revoked)
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized()
+                    .expectBody(Void.class);
+        }
+        // The replacement session keeps the original sign-in and deadline, and no longer holds a passkey factor.
+        var replacement = decoder.decode(removed);
+        assertThat(replacement.hasClaim("passkey_time")).isFalse();
+        assertThat(replacement.<Long>getClaim("auth_time")).isEqualTo(signIn.<Long>getClaim("auth_time"));
+        assertThat(replacement.<Long>getClaim("session_exp")).isEqualTo(signIn.<Long>getClaim("session_exp"));
+        client.get()
+                .uri("/user/passkeys")
+                .header(HttpHeaders.COOKIE, cookie + "=" + removed)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.credentials.length()")
+                .isEqualTo(0)
+                .jsonPath("$.protectionEnabled")
+                .isEqualTo(false)
+                .jsonPath("$.verified")
+                .isEqualTo(false);
+        client.get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookie + "=" + removed)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+        // The instance still requires a passkey for administration, so admin access waits for a new one.
+        client.get()
+                .uri("/admin/users")
+                .header(HttpHeaders.COOKIE, cookie + "=" + removed)
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectBody()
+                .jsonPath("$.code")
+                .isEqualTo("passkey_required");
+
+        var next = new PasskeyTestAuthenticator();
+        enroll(removed, csrf, next, "Phone");
+        String restored = verify(removed, csrf, account, next, 1);
+        client.get()
+                .uri("/admin/users")
+                .header(HttpHeaders.COOKIE, cookie + "=" + restored)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+        assertThat(accounts.findById(accountId).orElseThrow().isPasskeyProtectionEnabled())
+                .isTrue();
+    }
+
+    @Test
+    void shouldKeepTheLastPasskeyWithoutFreshOwnProofOrDuringRecovery() throws GeneralSecurityException {
+        var account = account();
+        long accountId = Objects.requireNonNull(account.getId());
+        String csrf = csrf();
+        enroll(token(account, null), csrf, new PasskeyTestAuthenticator(), "Laptop");
+        var stored = accounts.findById(accountId).orElseThrow();
+        stored.setPasskeyProtectionEnabled(false);
+        accounts.saveAndFlush(stored);
+        String credentialId = credentials.findByAccountId(accountId).getFirst().getId();
+
+        delete("/user/passkeys/" + credentialId, token(account, Instant.now().minusSeconds(600)), csrf)
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectBody()
+                .jsonPath("$.code")
+                .isEqualTo("passkey_required");
+
+        var other = account();
+        enroll(token(other, null), csrf, new PasskeyTestAuthenticator(), "Other laptop");
+        String foreignId = credentials
+                .findByAccountId(Objects.requireNonNull(other.getId()))
+                .getFirst()
+                .getId();
+        delete("/user/passkeys/" + foreignId, token(account, Instant.now()), csrf)
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectBody(Void.class);
+        assertThat(credentials.findByAccountId(other.getId())).hasSize(1);
+
+        var recovering = accounts.findById(accountId).orElseThrow();
+        recovering.setPasskeyRecoveryRequired(true);
+        accounts.saveAndFlush(recovering);
+        delete("/user/passkeys/" + credentialId, token(account, Instant.now()), csrf)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody(Void.class);
+
+        assertThat(credentials.findByAccountId(accountId)).hasSize(1);
+    }
+
+    @Test
+    void shouldKeepRecoveryCodesWhenAnotherPasskeyRemains() throws GeneralSecurityException {
+        var account = account();
+        long accountId = Objects.requireNonNull(account.getId());
+        String oauth = token(account, null);
+        String csrf = csrf();
+        var laptop = new PasskeyTestAuthenticator();
+        enroll(oauth, csrf, laptop, "Laptop");
+        String verified = verify(oauth, csrf, account, laptop, 1);
+        String laptopId = credentials.findByAccountId(accountId).getFirst().getId();
+        enroll(verified, csrf, new PasskeyTestAuthenticator(), "Phone");
+        post("/user/passkeys/recovery-codes", verified, csrf)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+        String phoneId = credentials.findByAccountId(accountId).stream()
+                .map(PasskeyCredential::getId)
+                .filter(id -> !id.equals(laptopId))
+                .findFirst()
+                .orElseThrow();
+
+        delete("/user/passkeys/" + phoneId, verified, csrf)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+
+        assertThat(credentials.findByAccountId(accountId))
+                .extracting(PasskeyCredential::getId)
+                .containsExactly(laptopId);
+        assertThat(recoveryCodeCount(account)).isEqualTo(10);
+        assertThat(accounts.findById(accountId).orElseThrow().isPasskeyProtectionEnabled())
+                .isTrue();
+    }
+
+    private WebTestClient.RequestHeadersSpec<?> delete(String path, String token, String csrf) {
+        return client.delete()
+                .uri(path)
+                .header(HttpHeaders.COOKIE, cookie + "=" + token + "; __Host-XSRF-TOKEN=" + csrf)
+                .header("X-XSRF-TOKEN", csrf);
+    }
+
+    /** Verifies with {@code authenticator} and returns the session it rotates to. */
+    private String verify(
+            String token, String csrf, Account account, PasskeyTestAuthenticator authenticator, int counter)
+            throws GeneralSecurityException {
+        String userHandle = Objects.requireNonNull(accounts.findById(Objects.requireNonNull(account.getId()))
+                .orElseThrow()
+                .getPasskeyUserHandle());
+        var options = verificationOptions(token, csrf);
+        var result = post("/user/passkeys/verification", token, csrf)
+                .bodyValue(new PasskeyController.VerifyPasskeyRequestDTO(
+                        options.challengeId(),
+                        authenticator.assertCredential(
+                                options.optionsJson(), userHandle, true, "http://localhost:4200", counter)))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(Void.class);
+        return Objects.requireNonNull(result.getResponseCookies().getFirst(cookie))
+                .getValue();
+    }
+
+    private long recoveryCodeCount(Account account) {
+        return Objects.requireNonNull(jdbc.queryForObject(
+                "SELECT count(*) FROM passkey_recovery_code WHERE account_id = ?", Long.class, account.getId()));
+    }
+
     private PasskeyService.PasskeyOptionsDTO verificationOptions(String token, String csrf) {
         return Objects.requireNonNull(post("/user/passkeys/verification-options", token, csrf)
                 .exchange()

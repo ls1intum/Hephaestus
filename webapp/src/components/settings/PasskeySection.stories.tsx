@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { PasskeySection } from "./PasskeySection";
 
 const status = {
@@ -40,12 +40,17 @@ export const Error: Story = {
 };
 export const Recovery: Story = { args: { status: { ...status, recoveryRequired: true } } };
 /**
- * One passkey, not confirmed recently. Confirming comes first; every change waits for it, adding a
- * second passkey too, and stays focusable so its reason can be read.
+ * One passkey, not confirmed recently, with the personal protection enrolling turned on. Confirming
+ * comes first; every change waits for it, adding a second passkey too, and stays focusable so its
+ * reason can be read.
  */
 export const Enrolled: Story = {
 	args: {
-		status: { ...status, credentials: [{ id: "test-credential", label: "Personal device" }] },
+		status: {
+			...status,
+			protectionEnabled: true,
+			credentials: [{ id: "test-credential", label: "Personal device" }],
+		},
 	},
 	play: async ({ args, canvas, userEvent }) => {
 		const verify = canvas.getByRole("button", { name: "Verify passkey" });
@@ -83,6 +88,52 @@ export const Verified: Story = {
 		await expect(canvas.getByRole("button", { name: "Create new recovery codes" })).toBeEnabled();
 	},
 };
+const lastPasskey = [{ id: "test-credential", label: "Personal device" }];
+
+/** The last passkey, confirmed recently, while personal protection is on: it stays, and says why. */
+export const LastPasskeyProtected: Story = {
+	args: {
+		status: { ...status, verified: true, protectionEnabled: true, credentials: lastPasskey },
+	},
+	play: async ({ canvas, userEvent }) => {
+		const remove = canvas.getByRole("button", { name: "Remove Personal device" });
+		await expect(remove).toHaveAttribute("aria-disabled", "true");
+		await expect(remove).toHaveAccessibleDescription(
+			"Turn off personal admin protection before you remove your last passkey.",
+		);
+		await userEvent.click(remove);
+		await expect(screen.queryByRole("alertdialog")).toBeNull();
+	},
+};
+
+/**
+ * The last passkey, confirmed recently, with personal protection off. It can go, after a confirmation
+ * that says what stops working.
+ */
+export const LastPasskeyRemovable: Story = {
+	args: { status: { ...status, verified: true, credentials: lastPasskey } },
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Remove Personal device" }));
+		const dialog = await screen.findByRole("alertdialog");
+		await expect(dialog).toHaveTextContent(/This is your last passkey\./u);
+		await expect(dialog).toHaveTextContent(/until you add and verify a new one/u);
+		await userEvent.click(within(dialog).getByRole("button", { name: "Remove last passkey" }));
+		await waitFor(async () => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+	},
+};
+
+/** The last passkey during recovery: recovery ends with a verified passkey, so this one stays. */
+export const LastPasskeyDuringRecovery: Story = {
+	args: {
+		status: { ...status, verified: true, recoveryRequired: true, credentials: lastPasskey },
+	},
+	play: async ({ canvas }) => {
+		const remove = canvas.getByRole("button", { name: "Remove Personal device" });
+		await expect(remove).toHaveAttribute("aria-disabled", "true");
+		await expect(remove).toHaveAccessibleDescription(/Recovery is active\./u);
+	},
+};
+
 /** New recovery codes, shown once, with a way to copy them all. */
 export const RecoveryCodesShown: Story = {
 	args: {

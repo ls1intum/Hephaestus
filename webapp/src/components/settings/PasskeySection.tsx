@@ -41,6 +41,40 @@ interface Confirmation {
 	action: () => void;
 }
 
+const PASSKEY_REMOVAL = {
+	description:
+		"This passkey will stop working. Other sessions will end. Verify a remaining passkey to restore protected access.",
+	confirmLabel: "Remove passkey",
+};
+
+// The server keeps the recovery codes only while a passkey remains, and admin access that requires a
+// passkey stays locked until a new one is added and verified.
+const LAST_PASSKEY_REMOVAL = {
+	description:
+		"This is your last passkey. Removing it also deletes your recovery codes and signs you out of your other sessions. Admin access that requires a passkey stays locked until you add and verify a new one.",
+	confirmLabel: "Remove last passkey",
+};
+
+/**
+ * How removing a listed passkey is confirmed, and the id of the reason it stays, if it does. The last
+ * passkey stays while recovery or personal protection still depends on it.
+ */
+function passkeyRemoval(
+	{ credentials, recoveryRequired, protectionEnabled }: PasskeyStatus,
+	id: string,
+): { copy: typeof PASSKEY_REMOVAL; heldBy?: string } {
+	if (credentials.length !== 1) {
+		return { copy: PASSKEY_REMOVAL };
+	}
+	if (recoveryRequired) {
+		return { copy: LAST_PASSKEY_REMOVAL, heldBy: `${id}-recovery-active` };
+	}
+	if (protectionEnabled) {
+		return { copy: LAST_PASSKEY_REMOVAL, heldBy: `${id}-last` };
+	}
+	return { copy: LAST_PASSKEY_REMOVAL };
+}
+
 /** The instance policy, scoped as it applies: instance administration and workspace administration differ. */
 function passkeyRequirement({
 	instanceAdminRequired,
@@ -113,6 +147,10 @@ export function PasskeySection({
 		const lockedReasonId = locked ? `${id}-locked` : undefined;
 		// Every change to the passkeys waits for the one in flight and for a recent confirmation.
 		const unavailable = pending || locked;
+		const removal = passkeyRemoval(status, id);
+		const removalReasons = [lockedReasonId, removal.heldBy].filter(
+			(reason) => reason !== undefined,
+		);
 		let verificationStatus = "";
 		if (pending && pendingAction === "protection") {
 			verificationStatus = "Saving personal protection…";
@@ -128,7 +166,7 @@ export function PasskeySection({
 					{requirement !== undefined && ` ${requirement}`}
 				</p>
 				{status.recoveryRequired && (
-					<p role="alert">
+					<p id={`${id}-recovery-active`} role="alert">
 						Recovery is active. Register and verify a new passkey before you use admin access.
 					</p>
 				)}
@@ -160,16 +198,16 @@ export function PasskeySection({
 								<Button
 									variant="outline"
 									aria-label={`Remove ${credential.label}`}
-									disabled={unavailable || credentials.length < 2}
+									disabled={unavailable || removal.heldBy !== undefined}
 									focusableWhenDisabled
 									className="aria-disabled:opacity-50"
-									aria-describedby={credentials.length < 2 ? `${id}-last` : lockedReasonId}
+									aria-describedby={
+										removalReasons.length > 0 ? removalReasons.join(" ") : undefined
+									}
 									onClick={() =>
 										ask({
 											title: `Remove ${credential.label}?`,
-											description:
-												"This passkey will stop working. Other sessions will end. Verify a remaining passkey to restore protected access.",
-											confirmLabel: "Remove passkey",
+											...removal.copy,
 											action: () => onRemove(credential.id),
 										})
 									}
@@ -182,9 +220,9 @@ export function PasskeySection({
 						))}
 					</ul>
 				)}
-				{credentials.length === 1 && (
-					<p id={`${id}-last`} className="text-sm text-muted-foreground">
-						You cannot remove your last passkey. Add a second passkey on another device first.
+				{removal.heldBy === `${id}-last` && (
+					<p id={removal.heldBy} className="text-sm text-muted-foreground">
+						Turn off personal admin protection before you remove your last passkey.
 					</p>
 				)}
 				{!supported && (
