@@ -146,6 +146,7 @@ function MentorPage({
 						parentEntryId={thread}
 						readOnly={readOnly}
 						canAsk={canAsk}
+						livePaused={livePaused}
 						focusComposer={threadFocus === "composer"}
 						jumpTo={entry}
 					/>

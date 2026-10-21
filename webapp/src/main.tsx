@@ -17,7 +17,7 @@ import "./styles.css";
 
 import { applyStateChangingHeaders } from "@/runtime/auth/auth-client";
 import { AuthProvider, useAuth } from "@/runtime/auth/AuthContext";
-import { handlePasskeyChallenge } from "@/runtime/auth/passkey-challenge";
+import { installPasskeyChallenge } from "@/runtime/auth/passkey-challenge";
 import { handlePossibleSessionExpiry } from "@/runtime/auth/session-expiry";
 import { SessionKeepAlive } from "@/runtime/auth/use-session-keep-alive";
 import { TanstackDevtools } from "@/runtime/devtools/TanstackDevtools";
@@ -66,10 +66,9 @@ const router = createRouter({
 	defaultErrorComponent: RouteError,
 });
 
-client.interceptors.response.use(async (response) => {
-	await handlePasskeyChallenge(response, async () =>
-		router.navigate({ to: "/settings", hash: "passkeys" }),
-	);
+installPasskeyChallenge(router);
+
+client.interceptors.response.use((response) => {
 	handlePossibleSessionExpiry(response, TanstackQuery.getContext().queryClient);
 	return response;
 });

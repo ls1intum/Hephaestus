@@ -1100,6 +1100,27 @@ it("says live updates are paused while the browser's own reconnects keep failing
 	await waitFor(() => expect(screen.queryByText("Live updates paused. Reconnecting…")).toBeNull());
 });
 
+it("says in a thread drawer over the conversation that live updates are paused, and clears it once one opens", async () => {
+	const fake = new MentorFake();
+	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
+	fake.add({ kind: "HEPH", text: "Share blockers earlier.", parentEntryId: parent.id });
+	serve(fake);
+
+	// No room is measured, so the thread is a drawer that covers the conversation and its notice.
+	renderRouteAtWithRouter(`/w/acme/mentor?thread=${parent.id}`);
+	const drawer = await screen.findByRole("dialog", { name: "Thread" }, ROUTE_RENDER_WAIT);
+	await within(drawer).findByText("Share blockers earlier.");
+	const stream = await liveStream();
+	act(() => stream.open());
+	act(() => stream.error());
+	act(() => stream.error());
+	await within(drawer).findByText("Live updates paused. Reconnecting…");
+	act(() => stream.open());
+	await waitFor(() =>
+		expect(within(drawer).queryByText("Live updates paused. Reconnecting…")).toBeNull(),
+	);
+});
+
 it("offers Retry in a linked thread when the conversation's state cannot be read, and shows the thread after it", async () => {
 	giveRoom(ROOMY);
 	const fake = new MentorFake();
