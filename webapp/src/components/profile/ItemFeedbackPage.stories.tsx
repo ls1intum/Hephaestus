@@ -91,5 +91,8 @@ export const ReadOnly: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("list", { name: "Reviews" })).toBeVisible();
 		await expect(canvas.queryByRole("group")).toBeNull();
+		// No responses here, so the page does not tell the reader how to give one.
+		await expect(canvas.queryByText(/Mark feedback addressed/u)).toBeNull();
+		await expect(canvas.queryByText(/Workspace admins read your reason/u)).toBeNull();
 	},
 };

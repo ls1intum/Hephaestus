@@ -42,6 +42,12 @@ export const NoAllowlistOwnProviderDisabled: Story = {
 
 export const Loading: Story = {
 	args: { settings: undefined, isLoading: true },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText("Instance-wide rules that apply to every workspace."),
+		).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Save settings" })).not.toBeInTheDocument();
+	},
 };
 
 export const EditedButUnsaved: Story = {

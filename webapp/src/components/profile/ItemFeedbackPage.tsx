@@ -15,6 +15,9 @@ export interface ItemFeedbackPageProps {
 	responses?: FeedbackResponseControls;
 }
 
+const RESPONSE_GUIDE =
+	"Mark feedback addressed or not applicable, or disagree and say why. Workspace admins read your reason. While your disagreement stands, a later review of this work does not raise the same point again.";
+
 /**
  * "Your feedback on pull request #16", so a reader who arrives from a comment on the work can tell
  * it is the right one. A document or conversation has no number, so it is "this document".
@@ -38,7 +41,8 @@ export function ItemFeedbackPage({ feed, responses }: ItemFeedbackPageProps) {
 				<PageHeader
 					icon={<MessageSquareTextIcon />}
 					title={feedbackTitle(item)}
-					description="Mark feedback addressed or not applicable, or disagree and say why. Workspace admins read your reason. While your disagreement stands, a later review of this work does not raise the same point again."
+					// Read-only, the page offers no responses, so it does not describe them.
+					description={responses === undefined ? undefined : RESPONSE_GUIDE}
 				/>
 				{item !== undefined && hasText(name) && (
 					<p className="ps-9 text-sm font-medium break-words">

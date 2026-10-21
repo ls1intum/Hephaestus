@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { LlmModel } from "@/api/types.gen";
+import { expectNoPageOverflow } from "@/stories/reflow";
 
 import { AdminLlmModelsSection } from "./AdminLlmModelsSection";
 
@@ -132,6 +133,25 @@ export const Empty: Story = {
 		).toBeVisible();
 		await expect(canvas.getAllByRole("button", { name: /add model/iu })).toHaveLength(1);
 	},
+};
+
+/** The first read of the models: the table keeps its header, so only the rows change when they arrive. */
+export const Loading: Story = {
+	args: { models: [], isLoading: true },
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table", { name: "Models on OpenAI production" });
+		await expect(table).toHaveAttribute("aria-busy", "true");
+		for (const header of ["Model", "Data handling", "Price", "Workspace access", "Status"]) {
+			await expect(within(table).getByRole("columnheader", { name: header })).toBeVisible();
+		}
+		await expect(within(table).queryByText(/^No models yet/u)).not.toBeInTheDocument();
+	},
+};
+
+/** At 320px the table scrolls inside itself, and the page around it does not. */
+export const Reflow: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" } },
+	play: expectNoPageOverflow,
 };
 
 export const PracticeScriptConnection: Story = {

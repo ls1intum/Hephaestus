@@ -9,6 +9,7 @@ import {
 import { ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
 // oxlint-disable-next-line no-restricted-imports -- TanStack Table keys its caches on identity, which the compiler memoises as an optimisation rather than promises; each `useMemo` below says what breaks without it.
 import { type ComponentProps, type ReactElement, useMemo, useState } from "react";
+import { useSpinDelay } from "spin-delay";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -66,6 +67,11 @@ interface WorkspaceMembersTableProps {
 	rowCount: number;
 	teams: TeamInfo[];
 	isLoading?: boolean;
+	/**
+	 * Previous rows stay readable while the next answer loads. Hide their count until it arrives,
+	 * and announce a wait only if it lasts longer than a second.
+	 */
+	updating?: boolean;
 	onToggleHidden?: (accountId: string, hidden: boolean) => void;
 	/** Present for an admin, who can give a member another workspace role. */
 	onRoleChange?: (accountId: string, role: WorkspaceRole) => void;
@@ -106,6 +112,7 @@ export function WorkspaceMembersTable({
 	rowCount,
 	teams,
 	isLoading = false,
+	updating = false,
 	onToggleHidden,
 	onRoleChange,
 	pendingRoleAccountId,
@@ -113,6 +120,7 @@ export function WorkspaceMembersTable({
 	onViewChange,
 	renderPageLink,
 }: WorkspaceMembersTableProps) {
+	const showUpdating = useSpinDelay(updating, { delay: 1000, minDuration: 0 });
 	const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
 	// Identity matters as much as the value: `useTable` republishes controlled state on every render,
 	// so a fresh array here writes the sorting atom every time the parent re-renders.
@@ -415,7 +423,7 @@ export function WorkspaceMembersTable({
 				</div>
 			</div>
 
-			<Table bordered aria-label="Workspace members" aria-busy={isLoading || undefined}>
+			<Table bordered aria-label="Workspace members" aria-busy={isLoading || updating || undefined}>
 				<DataTableHeader table={table} />
 				{isLoading ? (
 					// A page of placeholder rows under the real header, one cell per visible column.
@@ -431,13 +439,19 @@ export function WorkspaceMembersTable({
 			</Table>
 
 			<div className="flex flex-col items-center justify-between space-y-4 py-4 sm:flex-row sm:space-y-0 sm:space-x-2">
-				<div className="order-2 flex-1 text-sm text-muted-foreground sm:order-1">
+				<div role="status" className="order-2 flex-1 text-sm text-muted-foreground sm:order-1">
 					{/* No count until the members are in: "0 of 0" while loading would read as a result. */}
 					{!isLoading && (
 						<div className="flex flex-col gap-1 sm:flex-row sm:gap-4">
 							<span>
-								Showing {table.getRowModel().rows.length} of {table.getRowCount()}{" "}
-								{table.getRowCount() === 1 ? "member" : "members"}
+								{updating ? (
+									showUpdating && "Updating members…"
+								) : (
+									<>
+										Showing {table.getRowModel().rows.length} of {table.getRowCount()}{" "}
+										{table.getRowCount() === 1 ? "member" : "members"}
+									</>
+								)}
 							</span>
 						</div>
 					)}

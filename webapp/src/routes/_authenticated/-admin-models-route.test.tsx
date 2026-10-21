@@ -81,6 +81,44 @@ async function confirmTurnOff(name: string) {
 }
 
 describe("instance AI models route", () => {
+	it("draws the models table under its real headers while the first read of models is in flight", async () => {
+		const modelsRead = deferred();
+		let modelsRequested = false;
+		mockPage([connection(1, "Shared OpenAI")]);
+		server.use(
+			http.get("*/admin/llm/models", async () => {
+				modelsRequested = true;
+				await modelsRead.promise;
+				return HttpResponse.json([model(7, 1, "GPT Test")]);
+			}),
+		);
+
+		// A failed assertion must still answer the held read, or cleanup waits on it.
+		try {
+			await renderModelsRoute();
+			// The connection is on screen, so it is selected, and its models are still being read.
+			await screen.findByRole("switch", { name: "Shared OpenAI" }, ROUTE_RENDER_WAIT);
+			await waitFor(() => expect(modelsRequested).toBe(true));
+
+			// The region keeps the shape it resolves to, rather than a fixed-height spinner standing in.
+			const table = screen.getByRole("table", { name: "Models on Shared OpenAI" });
+			expect(table.getAttribute("aria-busy")).toBe("true");
+			for (const header of ["Model", "Data handling", "Price", "Workspace access", "Status"]) {
+				within(table).getByRole("columnheader", { name: header });
+			}
+			expect(screen.queryByRole("status", { name: "Loading models" })).toBeNull();
+			expect(within(table).queryByText("No models yet", { exact: false })).toBeNull();
+
+			modelsRead.resolve();
+			await screen.findByText("GPT Test", undefined, ROUTE_RENDER_WAIT);
+			expect(
+				screen.getByRole("table", { name: "Models on Shared OpenAI" }).getAttribute("aria-busy"),
+			).toBeNull();
+		} finally {
+			modelsRead.resolve();
+		}
+	});
+
 	it("keeps each connection's toggle pending independently when two run at once", async () => {
 		const slowToggle = deferred();
 		let slowToggleCalls = 0;

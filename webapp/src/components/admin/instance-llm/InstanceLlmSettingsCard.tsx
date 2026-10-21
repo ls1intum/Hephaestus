@@ -4,8 +4,11 @@ import type { InstanceLlmSettings, UpdateInstanceLlmSettingsRequest } from "@/ap
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+
+const DESCRIPTION = "Instance-wide rules that apply to every workspace.";
 
 export interface InstanceLlmSettingsCardProps {
 	settings?: InstanceLlmSettings;
@@ -25,11 +28,30 @@ export function InstanceLlmSettingsCard({
 	onSave,
 }: InstanceLlmSettingsCardProps) {
 	if (isLoading || !settings) {
+		// The form's own shape, so the card does not grow when the settings arrive.
 		return (
-			<Card>
+			<Card aria-busy="true">
 				<CardHeader>
 					<CardTitle>Settings</CardTitle>
+					<CardDescription>{DESCRIPTION}</CardDescription>
 				</CardHeader>
+				<CardContent className="space-y-4">
+					<div className="space-y-2">
+						<Skeleton className="h-4 w-40" />
+						<Skeleton className="h-24 w-full" />
+						<Skeleton className="h-4 w-3/4" />
+					</div>
+					<div className="flex items-start justify-between gap-4">
+						<div className="w-full space-y-2">
+							<Skeleton className="h-4 w-56" />
+							<Skeleton className="h-4 w-full" />
+						</div>
+						<Skeleton className="h-5 w-9 shrink-0 rounded-full" />
+					</div>
+					<div className="flex justify-end">
+						<Skeleton className="h-7 w-24" />
+					</div>
+				</CardContent>
 			</Card>
 		);
 	}
@@ -61,7 +83,7 @@ function InstanceLlmSettingsForm({ settings, isSubmitting, onSave }: InstanceLlm
 		<Card>
 			<CardHeader>
 				<CardTitle>Settings</CardTitle>
-				<CardDescription>Instance-wide rules that apply to every workspace.</CardDescription>
+				<CardDescription>{DESCRIPTION}</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<Field>
