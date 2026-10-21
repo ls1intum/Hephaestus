@@ -109,8 +109,12 @@ export const OPERATED_BY_DEFS: StatusDefs<OperatedBy> = {
 	},
 };
 
-/** The rows every answer is compared on, in the order the cards show them. */
-export const MEMBER_AI_CHOICE_DIMENSIONS = ["AI help", "Models", "Speed", "Sent to"] as const;
+/**
+ * The rows every answer is compared on, in the order the cards show them. An answer sets which
+ * models may handle a member's work, not which one runs or how well: both answers that permit AI can
+ * reach the same in-house model. So no row ranks model size, quality or speed.
+ */
+export const MEMBER_AI_CHOICE_DIMENSIONS = ["AI help", "Models", "Sent to"] as const;
 export type MemberAiChoiceDimension = (typeof MEMBER_AI_CHOICE_DIMENSIONS)[number];
 
 export interface MemberAiChoiceFact {
@@ -137,8 +141,7 @@ export const MEMBER_AI_CHOICE_DEFS: Record<MemberAiChoice, MemberAiChoiceDef> = 
 				text: "Feedback and Heph",
 				withoutHeph: "Practice feedback where set up",
 			},
-			Models: { tone: "caveat", text: "Usually smaller models" },
-			Speed: { tone: "caveat", text: "Limited capacity, can be slower" },
+			Models: { tone: "pro", text: "Only in-house models" },
 			"Sent to": { tone: "pro", text: "Only your organization" },
 		},
 		ceiling: "IN_HOUSE",
@@ -154,9 +157,8 @@ export const MEMBER_AI_CHOICE_DEFS: Record<MemberAiChoice, MemberAiChoiceDef> = 
 				text: "Feedback and Heph",
 				withoutHeph: "Practice feedback where set up",
 			},
-			Models: { tone: "pro", text: "Strongest models on offer" },
-			Speed: { tone: "pro", text: "More capacity, usually faster" },
-			"Sent to": { tone: "caveat", text: "Also a cloud provider" },
+			Models: { tone: "pro", text: "In-house and cloud models" },
+			"Sent to": { tone: "caveat", text: "Your organization or a cloud provider" },
 		},
 		ceiling: "CLOUD",
 	},
@@ -166,9 +168,9 @@ export const MEMBER_AI_CHOICE_DEFS: Record<MemberAiChoice, MemberAiChoiceDef> = 
 		badgeVariant: "secondary",
 		description: "Hephaestus without AI",
 		facts: {
-			"AI help": { tone: "con", text: "No feedback or Heph", withoutHeph: "No new AI requests" },
+			// Not "no feedback": what AI produced earlier stays readable.
+			"AI help": { tone: "con", text: "No new AI requests" },
 			Models: { tone: "none", text: "None" },
-			Speed: { tone: "none", text: "Not applicable" },
 			"Sent to": { tone: "pro", text: "Nowhere" },
 		},
 		ceiling: null,

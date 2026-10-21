@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 
+import { StandardPageSurface } from "@/components/layout/StandardPageSurface";
+import { expectNoPageOverflow } from "@/stories/reflow";
+
 import { SlackPreferencesSection } from "./SlackPreferencesSection";
 
 const meta = {
@@ -88,12 +91,82 @@ export const ConnectedWithoutWorkspace: Story = {
 	},
 };
 
+/**
+ * The preferences in the shape they load into, under the section's own heading. Nothing is claimed
+ * about the connection or any workspace until they arrive.
+ */
 export const Loading: Story = {
 	args: {
 		workspaces: [],
 		isSlackLinked: true,
 		canConnectSlack: true,
 		isLoading: true,
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { level: 2, name: "Slack" })).toBeVisible();
+		await expect(
+			canvas.getByText(/choose whether Hephaestus can use your new messages/iu),
+		).toBeVisible();
+		await expect(canvas.getByRole("group", { name: "Loading Slack preferences" })).toHaveAttribute(
+			"aria-busy",
+			"true",
+		);
+		await expect(canvas.queryByRole("switch")).toBeNull();
+		await expect(canvas.queryByRole("button")).toBeNull();
+		await expect(canvas.queryByRole("heading", { level: 3 })).toBeNull();
+		await expect(canvas.queryByText(/connected|not available|message use/iu)).toBeNull();
+	},
+};
+
+/**
+ * On a 320px phone, inside the settings page's own padding, the placeholder stays inside its box.
+ * The width is set on the page here rather than by the viewport, so the story measures the same
+ * layout whatever the canvas size.
+ */
+export const PhoneLoading: Story = {
+	args: {
+		workspaces: [],
+		isSlackLinked: true,
+		canConnectSlack: true,
+		isLoading: true,
+	},
+	decorators: [
+		(Story) => (
+			<StandardPageSurface
+				role="region"
+				aria-label="Settings on a phone"
+				className="w-80 max-w-full"
+			>
+				<Story />
+			</StandardPageSurface>
+		),
+	],
+	play: async ({ canvas }) => {
+		// The page is 320px wide, or the whole canvas where that is narrower.
+		const page = canvas.getByRole("region", { name: "Settings on a phone" });
+		await expect(page.getBoundingClientRect().width).toBe(
+			Math.min(320, document.documentElement.clientWidth),
+		);
+		await expectNoPageOverflow();
+		await expect(page.scrollWidth).toBeLessThanOrEqual(page.clientWidth);
+
+		// A page-wide check cannot see a row that spills out of the placeholder itself.
+		const loading = canvas.getByRole("group", { name: "Loading Slack preferences" });
+		await expect(loading).toHaveAttribute("aria-busy", "true");
+		await expect(loading.scrollWidth).toBeLessThanOrEqual(loading.clientWidth);
+
+		const box = loading.getBoundingClientRect();
+		const style = getComputedStyle(loading);
+		const contentLeft = box.left + loading.clientLeft + Number.parseFloat(style.paddingLeft);
+		const contentRight =
+			box.left + loading.clientLeft + loading.clientWidth - Number.parseFloat(style.paddingRight);
+		const skeletons = [...loading.querySelectorAll<HTMLElement>('[data-slot="skeleton"]')];
+		await expect(skeletons.length).toBeGreaterThan(0);
+		for (const skeleton of skeletons) {
+			const { left, right } = skeleton.getBoundingClientRect();
+			await expect(left).toBeGreaterThanOrEqual(contentLeft);
+			await expect(right).toBeLessThanOrEqual(contentRight);
+		}
 	},
 };
 

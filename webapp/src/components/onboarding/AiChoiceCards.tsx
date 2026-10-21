@@ -72,7 +72,7 @@ export function AiChoiceCards({ choice, saved, onChoice, workspace }: AiChoiceCa
 						className={cn(
 							"*:data-[slot=questionnaire-choice-indicator]:absolute *:data-[slot=questionnaire-choice-indicator]:top-4 *:data-[slot=questionnaire-choice-indicator]:right-4",
 							"md:grid md:grid-rows-subgrid md:*:data-[slot=questionnaire-choice-label]:contents",
-							workspace ? "md:row-span-6" : "md:row-span-5",
+							workspace ? "md:row-span-5" : "md:row-span-4",
 						)}
 					>
 						<span

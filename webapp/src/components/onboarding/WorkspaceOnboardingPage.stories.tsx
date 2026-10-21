@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, waitFor, within } from "storybook/test";
 
-import type { WorkspaceOnboarding, WorkspaceOnboardingLink } from "@/api/types.gen";
+import type {
+	WorkspaceAiModel,
+	WorkspaceOnboarding,
+	WorkspaceOnboardingLink,
+} from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
@@ -171,11 +175,16 @@ export const Default: Story = {
 		}
 		await expect(first.top).toBe(second.top);
 		await expect(second.top).toBe(third.top);
-		for (const dimension of ["AI help", "Models", "Speed", "Sent to"]) {
+		for (const dimension of ["AI help", "Models", "Sent to"]) {
 			const rows = canvas.getAllByText(dimension);
 			await expect(rows).toHaveLength(3);
 			await expect(rows[0]?.getBoundingClientRect().top).toBe(rows[1]?.getBoundingClientRect().top);
 			await expect(rows[1]?.getBoundingClientRect().top).toBe(rows[2]?.getBoundingClientRect().top);
+		}
+		// An answer permits models; it does not make one stronger or faster.
+		await expect(canvas.queryByText("Speed")).toBeNull();
+		for (const radio of radios) {
+			await expect(radio).not.toHaveAccessibleName(/smaller|strongest|faster|slower|capacity/iu);
 		}
 	},
 };
@@ -217,7 +226,7 @@ export const NoAi: Story = {
 	args: { state: { ...ready, data: { ...welcome, links: [] } } },
 	play: async ({ canvas, userEvent, args }) => {
 		await expect(canvas.getByRole("radio", { name: NO_AI })).toHaveAccessibleName(
-			/No AI.*Hephaestus without AI.*No feedback or Heph.*Sent to Nowhere/u,
+			/No AI.*Hephaestus without AI.*No new AI requests.*Sent to Nowhere/u,
 		);
 		await expect(canvas.queryByRole("region", { name: /models in Engineering/u })).toBeNull();
 		await userEvent.click(canvas.getByRole("radio", { name: NO_AI }));
@@ -286,6 +295,61 @@ export const WorkspaceModels: Story = {
 		await expect(model?.querySelectorAll("img")).toHaveLength(2);
 		const inHouse = canvas.getByRole("radio", { name: IN_HOUSE });
 		await expect(inHouse).toHaveAccessibleName(/Qwen3 through Logos/u);
+	},
+};
+
+const SHARED_IN_HOUSE_MODEL = {
+	name: "Qwen3.5",
+	brand: "QWEN",
+	connectionPlatform: "LOGOS",
+	dataHandlingTier: "IN_HOUSE",
+} satisfies WorkspaceAiModel;
+
+/**
+ * Both answers that permit AI can reach the same in-house model: an answer sets which models may
+ * handle your work, not which one runs. The two cards differ only in what each answer permits.
+ */
+export const SameModelUnderBothAnswers: Story = {
+	args: {
+		state: {
+			...ready,
+			data: {
+				...welcome,
+				links: [],
+				aiOptions: [
+					{
+						choice: "IN_HOUSE_ONLY",
+						practiceReviewsReady: true,
+						mentorReady: true,
+						models: [SHARED_IN_HOUSE_MODEL],
+					},
+					{
+						choice: "CLOUD",
+						practiceReviewsReady: true,
+						mentorReady: true,
+						models: [SHARED_IN_HOUSE_MODEL],
+					},
+				],
+			},
+		},
+	},
+	play: async ({ canvas, userEvent }) => {
+		const inHouse = canvas.getByRole("radio", { name: IN_HOUSE });
+		const cloud = canvas.getByRole("radio", { name: CLOUD });
+		for (const radio of [inHouse, cloud]) {
+			await expect(radio).toHaveAccessibleName(/Qwen3\.5 through Logos/u);
+		}
+		await expect(inHouse).toHaveAccessibleName(
+			/Models Only in-house models Sent to Only your organization/u,
+		);
+		await expect(cloud).toHaveAccessibleName(
+			/Models In-house and cloud models Sent to Your organization or a cloud provider/u,
+		);
+		await userEvent.click(cloud);
+		const models = canvas.getByRole("region", { name: "Cloud models in Engineering" });
+		await expect(models).toHaveTextContent("Qwen3.5");
+		// The admin's declaration still says where this model runs, whichever answer reaches it.
+		await expect(within(models).getByText("In-house")).toBeVisible();
 	},
 };
 
