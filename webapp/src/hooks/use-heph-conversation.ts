@@ -63,11 +63,13 @@ function earlierOf<TData, TError>(
 	const load = () => {
 		void query.fetchNextPage();
 	};
-	if (query.isFetchNextPageError) {
-		return { status: "error", onRetry: load };
-	}
+	// Loading first: a query that holds pages stays in error while Retry fetches the older page
+	// again, so the error flag alone would still offer Retry while the page loads.
 	if (query.isFetchingNextPage) {
 		return { status: "loading" };
+	}
+	if (query.isFetchNextPageError) {
+		return { status: "error", onRetry: load };
 	}
 	return query.hasNextPage ? { status: "available", onLoad: load } : { status: "none" };
 }

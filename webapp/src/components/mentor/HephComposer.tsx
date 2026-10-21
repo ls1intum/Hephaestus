@@ -29,7 +29,12 @@ export interface HephComposerProps {
 	draftKey?: string;
 }
 
-/** Where the developer writes to Heph. Enter sends and Shift+Enter starts a new line. */
+/**
+ * Where the developer writes to Heph. Enter sends and Shift+Enter starts a new line. An empty field
+ * is one line tall and grows with what is written. The row below it holds the context and the
+ * controls; where they do not fit side by side, as a long page name with Stop in a phone's panel,
+ * the controls wrap below the context, and the context's name shortens before it leaves the row.
+ */
 export function HephComposer({
 	label,
 	placeholder,
@@ -69,7 +74,7 @@ export function HephComposer({
 				<InputGroupTextarea
 					ref={textareaRef}
 					aria-label={label}
-					className="max-h-48"
+					className="max-h-48 min-h-0"
 					placeholder={placeholder}
 					value={input}
 					onChange={(event) => setInput(event.target.value)}
@@ -82,8 +87,8 @@ export function HephComposer({
 					// oxlint-disable-next-line jsx-a11y/no-autofocus -- Only where the composer is the one field of a surface the developer just opened: the Heph panel, or a thread they chose to reply in.
 					autoFocus={focusOnMount}
 				/>
-				<InputGroupAddon align="block-end">
-					{rendersContent(context) && <div className="min-w-0">{context}</div>}
+				<InputGroupAddon align="block-end" className="flex-wrap">
+					{rendersContent(context) && <div className="flex min-w-0 *:min-w-0">{context}</div>}
 					<div className="ml-auto flex items-center gap-1">
 						{stop && (
 							<InputGroupButton

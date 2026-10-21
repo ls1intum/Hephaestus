@@ -4,6 +4,7 @@ import { http, HttpResponse, type PathParams } from "msw";
 import { afterEach, assert, expect, it, vi } from "vitest";
 
 import type { MentorTurnRequest } from "@/api/types.gen";
+import { hephEntriesOptions } from "@/hooks/heph-cache";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
@@ -167,6 +168,139 @@ it("opens at the newest messages and reads older ones above them", async () => {
 	await userEvent.click(screen.getByRole("button", { name: "Show earlier messages" }));
 	await screen.findByText("The oldest question");
 	expect(reads).toStrictEqual([null, "2"]);
+});
+
+it("says older messages are loading once Retry reads them again after they failed", async () => {
+	const fake = new MentorFake("acme", { pageSize: 2 });
+	fake.add({ kind: "USER", text: "The oldest question" });
+	fake.add({ kind: "HEPH", text: "A middle answer" });
+	fake.add({ kind: "USER", text: "The newest question" });
+	serve(fake);
+	const held = deferred();
+
+	renderRouteAtWithRouter("/w/acme/mentor");
+	try {
+		await screen.findByText("The newest question", {}, ROUTE_RENDER_WAIT);
+		server.use(
+			http.get(
+				"*/workspaces/acme/mentor/entries",
+				() => HttpResponse.json({ status: 503 }, { status: 503 }),
+				{ once: true },
+			),
+		);
+		await userEvent.click(screen.getByRole("button", { name: "Show earlier messages" }));
+		const retry = await screen.findByRole("button", { name: "Retry" });
+		screen.getByText("We could not load earlier messages.");
+
+		// The read Retry starts is held open, so the line shows what is on screen while it runs.
+		server.use(
+			http.get(
+				"*/workspaces/acme/mentor/entries",
+				async () => {
+					await held.promise;
+					return HttpResponse.json({ entries: fake.entries.slice(0, 1) });
+				},
+				{ once: true },
+			),
+		);
+		await userEvent.click(retry);
+		await screen.findByText("Loading earlier messages…");
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+		held.resolve();
+		await screen.findByText("The oldest question");
+		expect(screen.queryByText("Loading earlier messages…")).toBeNull();
+	} finally {
+		held.resolve();
+	}
+});
+
+it("offers the composer only once the conversation is read, so a message sent from it shows", async () => {
+	const fake = new MentorFake();
+	fake.add({ kind: "USER", text: "How did my week go?" });
+	serve(fake);
+	const held = deferred();
+	server.use(
+		http.get(
+			"*/workspaces/acme/mentor/entries",
+			async () => {
+				await held.promise;
+				return HttpResponse.json({ status: 503 }, { status: 503 });
+			},
+			{ once: true },
+		),
+	);
+
+	renderRouteAtWithRouter("/w/acme/mentor");
+	try {
+		// The first read is on the way. A message sent now has no page to land in, so nothing takes one.
+		await screen.findByText("Loading the conversation…", {}, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("textbox", { name: "Message Heph" })).toBeNull();
+
+		held.resolve();
+		const retry = await screen.findByRole("button", { name: "Retry" });
+		screen.getByText("We could not load these messages");
+		expect(screen.queryByRole("textbox", { name: "Message Heph" })).toBeNull();
+		expect(fake.submissions).toStrictEqual([]);
+
+		await userEvent.click(retry);
+		await screen.findByText("How did my week go?");
+		await userEvent.type(
+			screen.getByRole("textbox", { name: "Message Heph" }),
+			"Is my description clear?{Enter}",
+		);
+		await waitFor(() =>
+			expect(fake.submissions.map(({ text }) => text)).toStrictEqual(["Is my description clear?"]),
+		);
+		await screen.findByText("Is my description clear?");
+	} finally {
+		held.resolve();
+	}
+});
+
+it("gives a draft back once Retry reads a conversation that could not be read on the way back to it", async () => {
+	const acme = new MentorFake("acme");
+	acme.add({ kind: "USER", text: "How did my week go?" });
+	const beta = new MentorFake("beta");
+	serve(acme, beta);
+
+	const { router, queryClient } = renderRouteAtWithRouter("/w/acme/mentor");
+	await screen.findByText("How did my week go?", {}, ROUTE_RENDER_WAIT);
+	await userEvent.type(screen.getByRole("textbox", { name: "Message Heph" }), "Half a question");
+	await act(async () => {
+		await router.navigate({ to: "/w/$workspaceSlug/mentor", params: { workspaceSlug: "beta" } });
+	});
+	await waitFor(() => expect(router.state.location.pathname).toBe("/w/beta/mentor"));
+	await screen.findByRole("textbox", { name: "Message Heph" });
+
+	// Nothing shows acme's messages now. Only their pages leave the cache, as unused data does after
+	// a while, so the way back reads them first. The draft is not part of the cache.
+	const acmePages = hephEntriesOptions("acme").queryKey;
+	queryClient.removeQueries({ queryKey: acmePages, exact: true, type: "inactive" });
+	expect(queryClient.getQueryState(acmePages)).toBeUndefined();
+	server.use(
+		http.get(
+			"*/workspaces/acme/mentor/entries",
+			() => HttpResponse.json({ status: 503 }, { status: 503 }),
+			{ once: true },
+		),
+	);
+
+	await act(async () => {
+		await router.navigate({ to: "/w/$workspaceSlug/mentor", params: { workspaceSlug: "acme" } });
+	});
+	const retry = await screen.findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
+	screen.getByText("We could not load these messages");
+	expect(screen.queryByRole("textbox", { name: "Message Heph" })).toBeNull();
+
+	await userEvent.click(retry);
+	await screen.findByText("How did my week go?");
+	expect(screen.getByRole("textbox", { name: "Message Heph" })).toHaveProperty(
+		"value",
+		"Half a question",
+	);
+	expect(acme.submissions).toStrictEqual([]);
+	expect(beta.submissions).toStrictEqual([]);
 });
 
 it("brings a linked message into view on a cold load, reading older pages until it arrives", async () => {
@@ -583,6 +717,46 @@ it("says a thread is not found only when the server knows no such message", asyn
 	expect(within(panel).queryByRole("textbox")).toBeNull();
 });
 
+it("says the thread is loading in its panel while the conversation beside it shows", async () => {
+	giveRoom(ROOMY);
+	const fake = new MentorFake();
+	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
+	const reply = fake.add({
+		kind: "HEPH",
+		text: "Share blockers earlier.",
+		parentEntryId: parent.id,
+	});
+	serve(fake);
+	const held = deferred();
+	server.use(
+		http.get(
+			"*/workspaces/acme/mentor/entries/:entryId/thread",
+			async () => {
+				await held.promise;
+				return HttpResponse.json({
+					parent,
+					conversationId: reply.conversationId,
+					entries: [reply],
+				});
+			},
+			{ once: true },
+		),
+	);
+
+	renderRouteAtWithRouter(`/w/acme/mentor?thread=${parent.id}`);
+	try {
+		const panel = await screen.findByRole("complementary", { name: "Thread" }, ROUTE_RENDER_WAIT);
+		await within(panel).findByText("Loading the thread…");
+		expect(within(panel).queryByText("Loading the conversation…")).toBeNull();
+
+		held.resolve();
+		await within(panel).findByText("Share blockers earlier.");
+		expect(within(panel).queryByText("Loading the thread…")).toBeNull();
+	} finally {
+		held.resolve();
+	}
+});
+
 it("shows a thread as a drawer until the page has measured room for it beside the conversation", async () => {
 	const fake = new MentorFake();
 	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
@@ -646,6 +820,30 @@ it("chooses the thread's column or drawer by the room the page measures, and kee
 		within(again).findByRole("textbox", { name: "Reply in thread" }),
 	).resolves.toHaveProperty("value", "Half a reply");
 	expect(fake.submissions).toStrictEqual([]);
+});
+
+it("closes a thread drawer before the address drops the thread, and gives focus back to the summary that opened it", async () => {
+	// A 1000px window with the sidebar open: no room for the column, so the thread is a drawer.
+	giveRoom(744);
+	const fake = new MentorFake();
+	const parent = fake.add({ kind: "USER", text: "How did my week go?" });
+	fake.add({ kind: "HEPH", text: "Share blockers earlier.", parentEntryId: parent.id });
+	serve(fake);
+
+	const { router } = renderRouteAtWithRouter("/w/acme/mentor");
+	const summary = await screen.findByRole("button", { name: /^1 reply/u }, ROUTE_RENDER_WAIT);
+	await userEvent.click(summary);
+	const drawer = await screen.findByRole("dialog", { name: "Thread" });
+	await within(drawer).findByText("Share blockers earlier.");
+	expect(router.state.location.href).toContain(`thread=${parent.id}`);
+
+	await userEvent.click(within(drawer).getByRole("button", { name: "Close thread" }));
+	await waitFor(() => {
+		expect(screen.queryByRole("dialog", { name: "Thread" })).toBeNull();
+		expect(router.state.location.href).not.toContain("thread=");
+	});
+	await waitFor(() => expect(document.activeElement).toBe(summary));
+	expect(summary.getAttribute("aria-expanded")).toBe("false");
 });
 
 it("counts every reply above the open thread and on its message, from Slack and from the panel", async () => {
