@@ -272,15 +272,16 @@ void test("hands each script to its checker as the shell receives it, expression
 	}
 });
 
+const backgroundRunWorkflow = (run: string) =>
+	job(`      - run: ${run}\n        background: true\n      - wait-all: true\n`);
+
 void test(
 	"checks a native workflow's scripts with ShellCheck",
 	{ skip: spawnSync("shellcheck", ["--version"]).error !== undefined && "ShellCheck is absent" },
 	async () => {
-		const workflow = (run: string) =>
-			job(`      - run: ${run}\n        background: true\n      - wait-all: true\n`);
-		const broken = await check(workflow(`'echo "unterminated'`));
+		const broken = await check(backgroundRunWorkflow(`'echo "unterminated'`));
 		assert.ok(broken.problems.some((problem) => /SC\d+/u.test(problem)));
-		const masked = await check(workflow(`echo "\${{ format('}}{0}', github.sha) }}"`));
+		const masked = await check(backgroundRunWorkflow(`echo "\${{ format('}}{0}', github.sha) }}"`));
 		assert.deepEqual(masked.problems, []);
 	},
 );

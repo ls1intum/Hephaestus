@@ -1043,6 +1043,21 @@ describe("the way to a review an accepted ask created", () => {
 	});
 });
 
+const responseControls = async () => {
+	const router = await renderProfile();
+	await screen.findByText(feedback.headline, undefined, ROUTE_RENDER_WAIT);
+	const ratings = screen.queryAllByRole("button", { name: "Helpful" }).length;
+	const answers = screen.queryAllByRole("button", { name: "I fixed this" }).length;
+	await openPractice(router);
+	await showResults();
+	await screen.findAllByText(ownSummary, undefined, ROUTE_RENDER_WAIT);
+	return {
+		ratings,
+		answers,
+		responses: screen.queryAllByRole("group", { name: /^Your response to the feedback/u }).length,
+	};
+};
+
 // User view is read-only; every response control must stay absent.
 describe("practice profile in a user view", () => {
 	beforeEach(() => {
@@ -1053,21 +1068,6 @@ describe("practice profile in a user view", () => {
 		);
 	});
 	afterEach(clearUserView);
-
-	const responseControls = async () => {
-		const router = await renderProfile();
-		await screen.findByText(feedback.headline, undefined, ROUTE_RENDER_WAIT);
-		const ratings = screen.queryAllByRole("button", { name: "Helpful" }).length;
-		const answers = screen.queryAllByRole("button", { name: "I fixed this" }).length;
-		await openPractice(router);
-		await showResults();
-		await screen.findAllByText(ownSummary, undefined, ROUTE_RENDER_WAIT);
-		return {
-			ratings,
-			answers,
-			responses: screen.queryAllByRole("group", { name: /^Your response to the feedback/u }).length,
-		};
-	};
 
 	it("offers the developer a rating, an answer and a response", async () => {
 		await expect(responseControls()).resolves.toStrictEqual({

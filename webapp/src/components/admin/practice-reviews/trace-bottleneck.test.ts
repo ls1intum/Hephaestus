@@ -398,6 +398,22 @@ describe("traceBottleneck where nothing was lost", () => {
 	});
 });
 
+const continued = (attempt: number) =>
+	detailOf("complete", {
+		createdAt: at("13:28:20"),
+		completedAt: at("13:46:57"),
+		runtime: {
+			jobs: [
+				job({
+					attempt,
+					availableAt: at("13:43:10"),
+					startedAt: at("13:43:14"),
+					completedAt: at("13:46:57"),
+				}),
+			],
+		},
+	});
+
 describe("traceSpans", () => {
 	it("measures each stage from the record, in order, and marks a long wait", () => {
 		const lineage = withFeedback(lineageStateCase("complete").lineage, STATE_FEEDBACK_ID, {
@@ -423,21 +439,6 @@ describe("traceSpans", () => {
 	 */
 	it("measures no queue or run once the job continued past its first attempt", () => {
 		const { lineage } = lineageStateCase("complete");
-		const continued = (attempt: number) =>
-			detailOf("complete", {
-				createdAt: at("13:28:20"),
-				completedAt: at("13:46:57"),
-				runtime: {
-					jobs: [
-						job({
-							attempt,
-							availableAt: at("13:43:10"),
-							startedAt: at("13:43:14"),
-							completedAt: at("13:46:57"),
-						}),
-					],
-				},
-			});
 		const kinds = (detail: ReviewDetail) =>
 			traceSpans(lineage, REVIEW, detail).map((entry) => [entry.kind, entry.text]);
 		expect(kinds(continued(0))).toContainEqual(["queue", "15 min"]);

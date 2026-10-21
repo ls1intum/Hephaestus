@@ -70,25 +70,25 @@ describe("instance-admin route gate", () => {
 	});
 });
 
+async function titleOf(url: string) {
+	mockAppRole("APP_ADMIN");
+	server.use(
+		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("hephaestus")])),
+		http.get("*/workspaces/:workspaceSlug/members/me", () =>
+			HttpResponse.json(ownMembership("ADMIN")),
+		),
+	);
+	const router = newRouter(url);
+	await router.load();
+	const titlesOutsideIn = router.state.matches
+		.flatMap((match) => match.meta ?? [])
+		.map((tag) => tag?.title)
+		.filter((title): title is string => typeof title === "string");
+	return titlesOutsideIn.at(-1);
+}
+
 /** Both consoles reuse page names, so the title is all that separates two open admin tabs. */
 describe("admin tab titles", () => {
-	async function titleOf(url: string) {
-		mockAppRole("APP_ADMIN");
-		server.use(
-			http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("hephaestus")])),
-			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json(ownMembership("ADMIN")),
-			),
-		);
-		const router = newRouter(url);
-		await router.load();
-		const titlesOutsideIn = router.state.matches
-			.flatMap((match) => match.meta ?? [])
-			.map((tag) => tag?.title)
-			.filter((title): title is string => typeof title === "string");
-		return titlesOutsideIn.at(-1);
-	}
-
 	it.each([
 		["/admin/usage", "AI usage · Instance admin · Hephaestus"],
 		["/w/hephaestus/admin/usage", "AI usage · Admin · Hephaestus"],

@@ -34,12 +34,9 @@ export function applyTheme(theme: FrameTheme): void {
  */
 export function followSystemTheme(initial: FrameTheme = "system"): () => void {
 	const query = window.matchMedia(DARK_QUERY);
-	const listener = () => {
-		render();
-	};
 	applyTheme(initial);
-	query.addEventListener("change", listener);
+	query.addEventListener("change", render);
 	return () => {
-		query.removeEventListener("change", listener);
+		query.removeEventListener("change", render);
 	};
 }

@@ -94,16 +94,17 @@ void test("each enforced check independently rejects any drop or missing evidenc
 	}
 });
 
-void test("a push answers for the configuration its commit left and no other event forgives", () => {
-	const dropped = (name: keyof typeof enforced) => {
-		const value = assessment();
-		for (const check of value.checks) {
-			if (check.name === name) {
-				check.score = Number(enforced[name]?.score) - 1;
-			}
+const dropped = (name: keyof typeof enforced) => {
+	const value = assessment();
+	for (const check of value.checks) {
+		if (check.name === name) {
+			check.score = Number(enforced[name]?.score) - 1;
 		}
-		return value;
-	};
+	}
+	return value;
+};
+
+void test("a push answers for the configuration its commit left and no other event forgives", () => {
 	assert.deepEqual(checkScorecard(baseline, dropped("SAST"), now, "push"), {
 		failures: [],
 		reported: ["SAST: 9 (minimum 10)"],

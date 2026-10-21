@@ -505,6 +505,9 @@ describe("a late answer to the developer's own write", () => {
 	});
 });
 
+const readThreadWithReply = () =>
+	HttpResponse.json({ parent: entry(1, { id: PARENT }), entries: [reply(1)] });
+
 describe("a read in flight", () => {
 	const turnId = turn("RUNNING").id;
 
@@ -536,14 +539,17 @@ describe("a read in flight", () => {
 
 	it("keeps a reply that arrives live while a refetch on focus of the thread is in flight", async () => {
 		const response = deferred();
-		const read = () => HttpResponse.json({ parent: entry(1, { id: PARENT }), entries: [reply(1)] });
 		server.use(
 			http.get("*/workspaces/acme/mentor/entries/:entryId/thread", async () => {
 				await response.promise;
-				return read();
+				return readThreadWithReply();
 			}),
 		);
-		server.use(http.get("*/workspaces/acme/mentor/entries/:entryId/thread", read, { once: true }));
+		server.use(
+			http.get("*/workspaces/acme/mentor/entries/:entryId/thread", readThreadWithReply, {
+				once: true,
+			}),
+		);
 		const refetch = await refetchOnFocus(
 			(client) =>
 				new InfiniteQueryObserver(client, { ...hephThreadOptions(SLUG, PARENT), staleTime: 0 }),

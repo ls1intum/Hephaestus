@@ -10,11 +10,19 @@ import { required } from "~/testing/required";
 import { createQueryClient } from "~/ui/worker-state";
 import { ActionView } from "~/views/ActionView";
 
-const platform = vi.hoisted(() => ({
-	sendMessage: vi.fn<(request: RpcRequest) => Promise<unknown>>(),
-	addListener:
-		vi.fn<(listener: (event: RpcEvent, sender: { id: string; url: string }) => void) => void>(),
-}));
+const platform = vi.hoisted(() => {
+	type WorkerListener = (event: RpcEvent, sender: { id: string; url: string }) => void;
+	// The client registers its one listener for the module's lifetime, and Vitest clears call history
+	// before each test, so the fixture keeps the callback it was given.
+	const registered: { listener?: WorkerListener } = {};
+	return {
+		registered,
+		sendMessage: vi.fn<(request: RpcRequest) => Promise<unknown>>(),
+		addListener: vi.fn<(listener: WorkerListener) => void>((listener) => {
+			registered.listener = listener;
+		}),
+	};
+});
 vi.mock("@wxt-dev/browser", () => ({
 	browser: {
 		runtime: {
@@ -54,7 +62,7 @@ async function until(assertion: () => void): Promise<void> {
 async function changed(): Promise<void> {
 	generation += 1;
 	await act(async () => {
-		const listener = platform.addListener.mock.calls[0]?.[0];
+		const { listener } = platform.registered;
 		if (listener === undefined) {
 			throw new Error("No worker listener");
 		}

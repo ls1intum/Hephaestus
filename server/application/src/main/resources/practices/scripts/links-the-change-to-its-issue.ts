@@ -24,6 +24,7 @@ type ReferenceKind = keyof typeof LABELS;
 // Qualified references cannot become local #N candidates.
 const QUALIFIED_REF =
 	/(?<![\w./-])(?<target>[\w.-]+(?:\/[\w.-]+)*)#(?<number>\d+)(?![\w]|\.[0-9])/gu;
+const unqualified = (source: string) => source.replaceAll(QUALIFIED_REF, " ");
 
 export default definePracticeScript({
 	meta: {},
@@ -63,7 +64,6 @@ export default definePracticeScript({
 				}
 			}
 		};
-		const unqualified = (source: string) => source.replaceAll(QUALIFIED_REF, " ");
 		for (const item of linked ?? []) {
 			row(
 				"linked_work_items.json",

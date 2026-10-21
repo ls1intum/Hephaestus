@@ -63,6 +63,16 @@ function pageOf<T>(rows: T[]) {
 
 const emptyPage = pageOf([]);
 
+const listed =
+	(urls: URL[]) =>
+	({ request }: { request: Request }) => {
+		const url = new URL(request.url);
+		if (isListPage(url)) {
+			urls.push(url);
+		}
+		return HttpResponse.json(emptyPage);
+	};
+
 function recordRequests() {
 	server.use(...reviewHandlers());
 	const reviewUrls: URL[] = [];
@@ -70,15 +80,6 @@ function recordRequests() {
 	const problemUrls: URL[] = [];
 	const feedbackUrls: URL[] = [];
 	const locationCountUrls: URL[] = [];
-	const listed =
-		(urls: URL[]) =>
-		({ request }: { request: Request }) => {
-			const url = new URL(request.url);
-			if (isListPage(url)) {
-				urls.push(url);
-			}
-			return HttpResponse.json(emptyPage);
-		};
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
 			HttpResponse.json(ownMembership("ADMIN")),

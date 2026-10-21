@@ -394,7 +394,7 @@ async function main() {
 		"--rm",
 		...dockerNetwork(process.env.LOAD_TEST_NETWORK),
 		...dockerUser,
-		...inputs.filter((key) => process.env[key] !== undefined).flatMap((key) => ["-e", key]),
+		...inputs.flatMap((key) => (process.env[key] === undefined ? [] : ["-e", key])),
 		"-v",
 		`${directory}/scripts:/tests:ro`,
 		"-v",

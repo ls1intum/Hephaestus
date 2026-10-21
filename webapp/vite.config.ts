@@ -4,27 +4,13 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import Terminal from "vite-plugin-terminal";
 import { configDefaults, defineConfig } from "vite-plus";
 
-import { readJsonc } from "./tools/jsonc.ts";
 import { loadLintConfig } from "./tools/oxlint/load-config.ts";
 import { appSourcePlugins } from "./vite.shared.ts";
-
-const formatConfig = readJsonc(new URL("../.oxfmtrc.json", import.meta.url));
-const fmt = {
-	...formatConfig,
-	ignorePatterns: [
-		"**/*.md",
-		"**/*.html",
-		"src/api/**",
-		"src/routeTree.gen.ts",
-		"public/mockServiceWorker.js",
-	],
-};
 
 const lint = loadLintConfig(new URL(".oxlintrc.json", import.meta.url));
 
 const viteConfig = defineConfig({
 	root: import.meta.dirname,
-	fmt,
 	lint,
 	plugins: [
 		tanstackRouter({ autoCodeSplitting: true }),

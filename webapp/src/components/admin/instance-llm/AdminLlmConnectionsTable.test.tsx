@@ -23,6 +23,27 @@ const connection: LlmConnection = {
 	createdAt: new Date("2026-07-01T00:00:00Z"),
 };
 
+function renderTable(
+	modelCounts: Record<number, number>,
+	onToggleEnabled = vi.fn<AdminLlmConnectionsTableProps["onToggleEnabled"]>(),
+) {
+	render(
+		<AdminLlmConnectionsTable
+			connections={[connection]}
+			modelCounts={modelCounts}
+			isLoading={false}
+			isError={false}
+			mutatingIds={new Set<number>()}
+			selectedId={null}
+			onSelect={vi.fn()}
+			onEdit={vi.fn()}
+			onToggleEnabled={onToggleEnabled}
+			onDelete={vi.fn()}
+		/>,
+	);
+	return { onToggleEnabled };
+}
+
 describe("AdminLlmConnectionsTable", () => {
 	it("opens a connection's models from a keyboard-focusable button", async () => {
 		const onSelect = vi.fn<AdminLlmConnectionsTableProps["onSelect"]>();
@@ -48,27 +69,6 @@ describe("AdminLlmConnectionsTable", () => {
 		await userEvent.keyboard("{Enter}");
 		expect(onSelect).toHaveBeenCalledWith(connection);
 	});
-
-	function renderTable(
-		modelCounts: Record<number, number>,
-		onToggleEnabled = vi.fn<AdminLlmConnectionsTableProps["onToggleEnabled"]>(),
-	) {
-		render(
-			<AdminLlmConnectionsTable
-				connections={[connection]}
-				modelCounts={modelCounts}
-				isLoading={false}
-				isError={false}
-				mutatingIds={new Set<number>()}
-				selectedId={null}
-				onSelect={vi.fn()}
-				onEdit={vi.fn()}
-				onToggleEnabled={onToggleEnabled}
-				onDelete={vi.fn()}
-			/>,
-		);
-		return { onToggleEnabled };
-	}
 
 	it("confirms before turning off every model on a connection", async () => {
 		const { onToggleEnabled } = renderTable({ 1: 2 });

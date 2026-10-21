@@ -674,25 +674,25 @@ ${subject} Each captured record keeps the attribution it was captured with: its 
 `;
 }
 
-export async function runReviewJob(): Promise<void> {
-	function submittedList(value: unknown): { items: unknown[] } | { error: string } {
-		if (typeof value !== "string") {
-			return { items: listOrItem(value) };
-		}
-		try {
-			return { items: listOrItem(JSON.parse(value)) };
-		} catch (error) {
-			const at = /position (?<position>\d+)/u.exec(errorText(error))?.groups?.position;
-			const near =
-				at === undefined
-					? ""
-					: `; it breaks here: ${JSON.stringify(value.slice(Math.max(0, Number(at) - 60), Number(at)))} ⟵ ${JSON.stringify(value.slice(Number(at), Number(at) + 20))}`;
-			return {
-				error: `the list arrived as a string that is not valid JSON (${errorText(error)})${near}. Fix that spot — usually a quote inside a text left unescaped — or send the array itself`,
-			};
-		}
+function submittedList(value: unknown): { items: unknown[] } | { error: string } {
+	if (typeof value !== "string") {
+		return { items: listOrItem(value) };
 	}
+	try {
+		return { items: listOrItem(JSON.parse(value)) };
+	} catch (error) {
+		const at = /position (?<position>\d+)/u.exec(errorText(error))?.groups?.position;
+		const near =
+			at === undefined
+				? ""
+				: `; it breaks here: ${JSON.stringify(value.slice(Math.max(0, Number(at) - 60), Number(at)))} ⟵ ${JSON.stringify(value.slice(Number(at), Number(at) + 20))}`;
+		return {
+			error: `the list arrived as a string that is not valid JSON (${errorText(error)})${near}. Fix that spot — usually a quote inside a text left unescaped — or send the array itself`,
+		};
+	}
+}
 
+export async function runReviewJob(): Promise<void> {
 	const WORKSPACE_ROOT = "/workspace";
 	const EVIDENCE_TOOLS = ["read", "grep", "find", "ls"] as const;
 	// Codemode runs a script that calls the other tools, so a chain of reads and searches, or a large

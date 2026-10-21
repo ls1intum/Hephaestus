@@ -40,6 +40,23 @@ function SettingsHarness() {
 	);
 }
 
+function SavingHarness() {
+	const [saving, setSaving] = useState(false);
+	return (
+		<>
+			<button type="button" onClick={() => setSaving(true)}>
+				Save other settings
+			</button>
+			<GeneratedPathsSettings
+				settings={reviewSettings()}
+				repositories={repositories}
+				isSaving={saving}
+				onSave={async () => undefined}
+			/>
+		</>
+	);
+}
+
 describe("GeneratedPathsSettings", () => {
 	it("reads each repository's saved patterns by its item identity", async () => {
 		await renderWithRouter(<SettingsHarness />, "/w/acme/admin/practices");
@@ -103,22 +120,6 @@ describe("GeneratedPathsSettings", () => {
 	});
 
 	it("guards an unsaved repository draft while another repository is saving", async () => {
-		function SavingHarness() {
-			const [saving, setSaving] = useState(false);
-			return (
-				<>
-					<button type="button" onClick={() => setSaving(true)}>
-						Save other settings
-					</button>
-					<GeneratedPathsSettings
-						settings={reviewSettings()}
-						repositories={repositories}
-						isSaving={saving}
-						onSave={async () => undefined}
-					/>
-				</>
-			);
-		}
 		const { router } = await renderWithRouter(<SavingHarness />, "/w/acme/admin/practices");
 		// Nothing is saved for it, so its row starts closed.
 		fireEvent.click(screen.getByRole("button", { name: "Generated paths for owner/repo" }));

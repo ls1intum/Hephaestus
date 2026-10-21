@@ -1233,19 +1233,19 @@ void describe("preview workflow admits only the events that can deploy", () => {
 	});
 });
 
-void describe("preview workflow reporting follows the finalized deployment", () => {
-	function runs(name: string, outputs: Record<string, Record<string, string>>) {
-		const steps = previewWorkflow.getIn(["jobs", "deploy", "steps"]);
-		assert.ok(isSeq(steps));
-		const step = steps.items.find((item) => isMap(item) && item.get("name") === name);
-		assert.ok(isMap(step));
-		return holds(step.get("if"), {
-			steps: Object.fromEntries(
-				Object.entries(outputs).map(([id, values]) => [id, { outputs: values }]),
-			),
-		});
-	}
+function runs(name: string, outputs: Record<string, Record<string, string>>) {
+	const steps = previewWorkflow.getIn(["jobs", "deploy", "steps"]);
+	assert.ok(isSeq(steps));
+	const step = steps.items.find((item) => isMap(item) && item.get("name") === name);
+	assert.ok(isMap(step));
+	return holds(step.get("if"), {
+		steps: Object.fromEntries(
+			Object.entries(outputs).map(([id, values]) => [id, { outputs: values }]),
+		),
+	});
+}
 
+void describe("preview workflow reporting follows the finalized deployment", () => {
 	for (const scenario of [
 		{ name: "ready preview", state: "success", pull, comment: false, fail: false, link: true },
 		{ name: "failed deployment", state: "failure", pull, comment: true, fail: true, link: false },

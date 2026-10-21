@@ -58,6 +58,20 @@ async function setUp(options?: DetailStackOptions) {
 	return { router, controls, stack, index };
 }
 
+/** The switch's own step, as `usePracticeFocusSwitch` writes it over the page it left. */
+async function switchedTo(options: DetailStackOptions) {
+	const setup = await setUp(options);
+	const before = setup.index();
+	await act(async () =>
+		setup.router.navigate({
+			to: ".",
+			search: { detail: ["group:a"] },
+			...focusSwitchHistory({}),
+		}),
+	);
+	return { ...setup, before, step: setup.index() };
+}
+
 describe("useDetailStack", () => {
 	it("closes pushed levels by going back, so Back afterwards opens none of them again", async () => {
 		const { controls, stack, index } = await setUp();
@@ -96,20 +110,6 @@ describe("useDetailStack", () => {
 	});
 
 	describe("after a switch from the other page opened a group", () => {
-		/** The switch's own step, as `usePracticeFocusSwitch` writes it over the page it left. */
-		async function switchedTo(options: DetailStackOptions) {
-			const setup = await setUp(options);
-			const before = setup.index();
-			await act(async () =>
-				setup.router.navigate({
-					to: ".",
-					search: { detail: ["group:a"] },
-					...focusSwitchHistory({}),
-				}),
-			);
-			return { ...setup, before, step: setup.index() };
-		}
-
 		it("closes a level over it and the group by going back, then rewriting the step", async () => {
 			const { router, controls, stack, index, before, step } = await switchedTo({
 				replaceOnClose: isFocusSwitchStep,

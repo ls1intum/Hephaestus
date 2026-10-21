@@ -428,13 +428,14 @@ await test("frontmatter is read through a BOM, CRLF and a trailing YAML comment"
 	}
 });
 
+const skillWithInvocationValue = (value: string): string =>
+	skillWithFrontmatter(`disable-model-invocation: ${value}`);
+
 await test("a YAML boolean is read the way YAML spells it, and a non-boolean is reported", () => {
-	const skill = (value: string): string =>
-		skillWithFrontmatter(`disable-model-invocation: ${value}`);
 	for (const truthy of ["true", "yes", "on", "True", "YES"]) {
 		const failures = analyse(
 			snapshot({
-				".claude/skills/land-pr/SKILL.md": skill(truthy),
+				".claude/skills/land-pr/SKILL.md": skillWithInvocationValue(truthy),
 				".opencode/commands/land-pr.md": null,
 			}),
 		);
@@ -444,7 +445,7 @@ await test("a YAML boolean is read the way YAML spells it, and a non-boolean is 
 		assert.deepEqual(
 			analyse(
 				snapshot({
-					".claude/skills/land-pr/SKILL.md": skill(falsy),
+					".claude/skills/land-pr/SKILL.md": skillWithInvocationValue(falsy),
 					".opencode/commands/land-pr.md": null,
 				}),
 			),
@@ -453,7 +454,9 @@ await test("a YAML boolean is read the way YAML spells it, and a non-boolean is 
 		);
 	}
 	assert.match(
-		only(analyse(snapshot({ ".claude/skills/land-pr/SKILL.md": skill("maybe") }))),
+		only(
+			analyse(snapshot({ ".claude/skills/land-pr/SKILL.md": skillWithInvocationValue("maybe") })),
+		),
 		/is not a YAML boolean/u,
 	);
 });

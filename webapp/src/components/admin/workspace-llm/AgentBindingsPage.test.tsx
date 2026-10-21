@@ -286,26 +286,27 @@ describe("AgentBindingsPage rows", () => {
 		screen.getByText("Needs attention", { ignore: ".sr-only" });
 	});
 
+	function NeedsArriveLater() {
+		const [practiceScriptNeeds, setPracticeScriptNeeds] = useState<
+			AgentBindingsPageProps["practiceScriptNeeds"]
+		>({ status: "loading" });
+		return (
+			<>
+				<button
+					type="button"
+					onClick={() => setPracticeScriptNeeds({ status: "ready", summaries: [...needs] })}
+				>
+					Needs arrive
+				</button>
+				<Page
+					availableModels={[inHouseModel, cloudModel, decisionModel]}
+					practiceScriptNeeds={practiceScriptNeeds}
+				/>
+			</>
+		);
+	}
+
 	it("opens a row for practice scripts once, when needs that arrive after the page ask for it", async () => {
-		function NeedsArriveLater() {
-			const [practiceScriptNeeds, setPracticeScriptNeeds] = useState<
-				AgentBindingsPageProps["practiceScriptNeeds"]
-			>({ status: "loading" });
-			return (
-				<>
-					<button
-						type="button"
-						onClick={() => setPracticeScriptNeeds({ status: "ready", summaries: [...needs] })}
-					>
-						Needs arrive
-					</button>
-					<Page
-						availableModels={[inHouseModel, cloudModel, decisionModel]}
-						practiceScriptNeeds={practiceScriptNeeds}
-					/>
-				</>
-			);
-		}
 		await renderWithRouter(<NeedsArriveLater />, "/");
 		expect(expanded("Decision model")).toBe("false");
 		fireEvent.click(screen.getByRole("button", { name: "Needs arrive" }));

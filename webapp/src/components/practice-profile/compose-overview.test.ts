@@ -165,10 +165,10 @@ describe("a fall back", () => {
 	});
 });
 
-describe("dedupe", () => {
-	const sentencesOf = (changes: ProfileChange[]) =>
-		composeGroupOverview(overview({ changes }), "review-ready-work").practiceSentences;
+const sentencesOf = (changes: ProfileChange[]) =>
+	composeGroupOverview(overview({ changes }), "review-ready-work").practiceSentences;
 
+describe("dedupe", () => {
 	it("says no sentence for new feedback: the card says it, so a move up in the same review shows", () => {
 		const sentences = sentencesOf([
 			change("STANDING_MOVED", "scope", "Scope", { from: "MIXED", to: "STRENGTH" }),
@@ -214,6 +214,16 @@ const groupSentences = (group: ChangesInGroup) =>
 	);
 const practiceSentences = (group: ChangesInGroup) =>
 	composeGroupOverview(overview({ changes: inGroup(group) }), group.groupSlug).practiceSentences;
+const resolvedGroup = (resolvedBy: ProfileChange["resolvedBy"]): ChangesInGroup => ({
+	groupSlug: "review-ready-work",
+	groupName: "Packaging work for review",
+	changes: [
+		change("FEEDBACK_RESOLVED", "describe", "Describe what changed and why", {
+			resolvedBy,
+			evidence: [pullRequest(428), pullRequest(427), pullRequest(425)],
+		}),
+	],
+});
 
 describe("group sentences", () => {
 	it("say what changed in the group, one sentence per event, what needs the reader first", () => {
@@ -230,26 +240,16 @@ describe("group sentences", () => {
 	});
 
 	it("word a resolution by what resolved it", () => {
-		const group = (resolvedBy: ProfileChange["resolvedBy"]): ChangesInGroup => ({
-			groupSlug: "review-ready-work",
-			groupName: "Packaging work for review",
-			changes: [
-				change("FEEDBACK_RESOLVED", "describe", "Describe what changed and why", {
-					resolvedBy,
-					evidence: [pullRequest(428), pullRequest(427), pullRequest(425)],
-				}),
-			],
-		});
-		expect(groupSentences(group("WORK"))).toStrictEqual([
+		expect(groupSentences(resolvedGroup("WORK"))).toStrictEqual([
 			"Describe what changed and why resolved by the work after !428, !427 and !425 came back clean.",
 		]);
-		expect(groupSentences(group("DEVELOPER"))).toStrictEqual([
+		expect(groupSentences(resolvedGroup("DEVELOPER"))).toStrictEqual([
 			"Describe what changed and why marked as addressed on 9 September.",
 		]);
-		expect(plainBullets(practiceSentences(group("WORK")).describe)).toBe(
+		expect(plainBullets(practiceSentences(resolvedGroup("WORK")).describe)).toBe(
 			"Feedback resolved by the work after !428, !427 and !425 came back clean.",
 		);
-		expect(plainBullets(practiceSentences(group("DEVELOPER")).describe)).toBe(
+		expect(plainBullets(practiceSentences(resolvedGroup("DEVELOPER")).describe)).toBe(
 			"Feedback marked as addressed on 9 September.",
 		);
 	});

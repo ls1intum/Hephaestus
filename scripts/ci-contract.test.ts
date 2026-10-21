@@ -3499,7 +3499,11 @@ void test("the task graph keeps its cache posture", async () => {
 			`${entry} delegates caching to Gradle`,
 		);
 	}
-	assert.ok(Array.isArray(asRecord(tasks["gate:docs-lint"], "gate:docs-lint").input));
+	const docsLintCache = asRecord(
+		asRecord(tasks["gate:docs-lint"], "gate:docs-lint").cache,
+		"gate:docs-lint cache",
+	);
+	assert.ok(Array.isArray(docsLintCache.input));
 	assert.equal(
 		asRecord(tasks["gate:changesets"], "gate:changesets").cache,
 		false,

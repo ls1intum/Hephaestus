@@ -20,7 +20,6 @@ export const BUNDLED_PINS: Record<string, string> = {
 	"@vitest/browser": "@vitest/browser",
 	"@vitest/browser-playwright": "vitest",
 	"@vitest/coverage-v8": "vitest",
-	"@vitest/runner": "@vitest/runner",
 };
 
 /** The versions the installed vite-plus bundles, by package name. */

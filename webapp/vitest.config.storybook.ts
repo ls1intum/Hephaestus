@@ -1,8 +1,8 @@
 import path from "node:path";
 
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
-import { playwright } from "@vitest/browser-playwright";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
+import { playwright } from "vite-plus/test/browser-playwright";
 
 import pkg from "./package.json" with { type: "json" };
 import { appSourcePlugins } from "./vite.shared.ts";

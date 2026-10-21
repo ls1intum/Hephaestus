@@ -9,14 +9,22 @@ import { required } from "~/testing/required";
 import { createQueryClient } from "~/ui/worker-state";
 import { OptionsView } from "~/views/OptionsView";
 
-const platform = vi.hoisted(() => ({
-	sendMessage: vi.fn<(request: RpcRequest) => Promise<unknown>>(),
-	addListener:
-		vi.fn<(listener: (event: RpcEvent, sender: { id: string; url: string }) => void) => void>(),
-	contains: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(),
-	request: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(),
-	remove: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(),
-}));
+const platform = vi.hoisted(() => {
+	type WorkerListener = (event: RpcEvent, sender: { id: string; url: string }) => void;
+	// The client registers its one listener for the module's lifetime, and Vitest clears call history
+	// before each test, so the fixture keeps the callback it was given.
+	const registered: { listener?: WorkerListener } = {};
+	return {
+		registered,
+		sendMessage: vi.fn<(request: RpcRequest) => Promise<unknown>>(),
+		addListener: vi.fn<(listener: WorkerListener) => void>((listener) => {
+			registered.listener = listener;
+		}),
+		contains: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(),
+		request: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(),
+		remove: vi.fn<(permissions: { origins: string[] }) => Promise<boolean>>(),
+	};
+});
 vi.mock("@wxt-dev/browser", () => ({
 	browser: {
 		runtime: {
@@ -422,7 +430,7 @@ it("renders the published instance when a state event resets the options query d
 	);
 	await render();
 	await until(() => expect(container.textContent).toContain("Connect to Hephaestus"));
-	const listener = platform.addListener.mock.calls[0]?.[0];
+	const { listener } = platform.registered;
 	expect(listener).toBeDefined();
 	await act(async () => {
 		listener?.(

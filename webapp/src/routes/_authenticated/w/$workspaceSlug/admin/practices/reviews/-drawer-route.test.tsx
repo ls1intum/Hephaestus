@@ -468,6 +468,9 @@ describe("the facts a sheet reads beyond its record", () => {
 	});
 });
 
+const listReads = () =>
+	requestsTo("/practices/reviews").filter((url) => url.searchParams.get("size") !== "1");
+
 describe("a new review from a row of the Reviews table", () => {
 	const REQUESTS = "*/workspaces/:workspaceSlug/practices/review-requests";
 
@@ -500,8 +503,6 @@ describe("a new review from a row of the Reviews table", () => {
 		renderRouteAtWithRouter(REVIEWS);
 		const itemLabel = itemName(reviewItem);
 		const name = `${itemLabel.charAt(0).toLowerCase()}${itemLabel.slice(1)}`;
-		const listReads = () =>
-			requestsTo("/practices/reviews").filter((url) => url.searchParams.get("size") !== "1");
 		// The table first stands as its skeleton, so the rows are found once they are drawn.
 		const [button] = await screen.findAllByRole(
 			"button",
@@ -1027,6 +1028,10 @@ async function askFrom(level: HTMLElement, label: string) {
 	await userEvent.click(within(confirm).getByRole("button", { name: "Request review" }));
 }
 
+/** Every read of one review, in any workspace. */
+const readsOf = (reviewId: string) =>
+	requested.filter((url) => url.pathname.endsWith(`/practices/reviews/${reviewId}`));
+
 /**
  * An accepted ask names the review it created. The reader reaches that review from a note that
  * outlives the toast, and only when they follow it: the record they asked from stays as it was, and
@@ -1069,10 +1074,6 @@ describe("the way to a review an accepted ask created", () => {
 		);
 		return bodies;
 	}
-
-	/** Every read of one review, in any workspace. */
-	const readsOf = (reviewId: string) =>
-		requested.filter((url) => url.pathname.endsWith(`/practices/reviews/${reviewId}`));
 
 	/** The one sheet of the work in front once it reads `text`, past any level still leaving. */
 	const sheetReading = async (text: string) =>

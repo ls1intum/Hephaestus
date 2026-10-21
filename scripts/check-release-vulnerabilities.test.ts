@@ -508,6 +508,9 @@ await test("withholds component reuse unless every Go binary is the reviewed one
 	);
 });
 
+// Each opposite is hashed as reviewed, so only its identity can refuse it.
+const reviewed = (raw: Uint8Array) => ({ advisory: raw, reviewedSha256: sha256(raw) });
+
 await test("withholds component reuse unless the published Go advisory is the reviewed one and names the finding", () => {
 	const blocked = ["server|CVE-9|stdlib|1.25.0"];
 	const document = {
@@ -515,8 +518,6 @@ await test("withholds component reuse unless the published Go advisory is the re
 		aliases: ["CVE-9"],
 		affected: [{ package: { name: "stdlib", ecosystem: "Go" } }],
 	};
-	// Each opposite is hashed as reviewed, so only its identity can refuse it.
-	const reviewed = (raw: Uint8Array) => ({ advisory: raw, reviewedSha256: sha256(raw) });
 	const cases: [string, Parameters<typeof componentRejected>[0]][] = [
 		["no advisory bytes", { advisory: undefined }],
 		["bytes other than the reviewed ones", { advisory: Buffer.from(` ${advisoryRaw.toString()}`) }],

@@ -434,11 +434,12 @@ function dataFingerprint(layout: PeopleLayout, preserved?: PreservedPeopleIds): 
 	return query(preservationSql(layout, preserved));
 }
 
+const rows = (table: string) => {
+	const value = query(`SELECT id FROM ${table} ORDER BY id`);
+	return value === "" ? [] : value.split("\n");
+};
+
 function preservedPeople(layout: PeopleLayout): PreservedPeopleIds {
-	const rows = (table: string) => {
-		const value = query(`SELECT id FROM ${table} ORDER BY id`);
-		return value === "" ? [] : value.split("\n");
-	};
 	return {
 		accounts: rows("account"),
 		identities: rows(layout === "legacy" ? "identity_link" : "identity"),
