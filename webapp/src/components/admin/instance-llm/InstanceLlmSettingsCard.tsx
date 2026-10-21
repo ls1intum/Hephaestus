@@ -48,6 +48,9 @@ export function InstanceLlmSettingsCard({
 						</div>
 						<Skeleton className="h-5 w-9 shrink-0 rounded-full" />
 					</div>
+					<div className="flex justify-end">
+						<Skeleton className="h-7 w-24" />
+					</div>
 				</CardContent>
 			</Card>
 		);
