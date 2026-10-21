@@ -90,6 +90,8 @@ const docsLintInputs = [
 ];
 
 const gradlew = "node scripts/run-gradlew.ts";
+// Each native test file can start subprocesses. Bound file workers independently of task concurrency.
+const nodeTestConcurrency = 2;
 // The gates, by the tree they judge. `quality` runs all of them; each CI job runs one tree's set.
 const policyGates = [
 	"gate:toolchain",
@@ -328,10 +330,10 @@ export default defineConfig({
 			]),
 			"gate:agent-tests": group(["test:agents"]),
 			"test:agents": run(
-				"node --test server/application/src/test/resources/agent/*.spec.ts docker/agents/practice-scripts/*.test.ts docker/agents/practice-scripts/lib/core/**/*.test.ts docker/agents/practice-scripts/kits/**/*.test.ts docker/agents/pi/*.test.ts",
+				`node --test --test-concurrency=${nodeTestConcurrency} server/application/src/test/resources/agent/*.spec.ts docker/agents/practice-scripts/*.test.ts docker/agents/practice-scripts/lib/core/**/*.test.ts docker/agents/practice-scripts/kits/**/*.test.ts docker/agents/pi/*.test.ts`,
 			),
 			"test:tooling": run(
-				"node --test scripts/*.test.ts scripts/api-generator/*.test.ts server/application/src/test/resources/integration/scm/sarif/*.test.ts",
+				`node --test --test-concurrency=${nodeTestConcurrency} scripts/*.test.ts scripts/api-generator/*.test.ts server/application/src/test/resources/integration/scm/sarif/*.test.ts`,
 			),
 
 			// Load tests
