@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import java.time.Instant;
@@ -138,6 +139,10 @@ public class ResultHistoryContentSource implements ContentSource {
                 .put("outcome", entry.outcome().name())
                 .put("recordedAt", entry.recordedAt().toString())
                 .put("resource", resourceOf(entry.resultId()));
+        Instant endedAt = entry.endedAt();
+        if (endedAt != null) row.put("endedAt", endedAt.toString());
+        ResultEndReason endReason = entry.endReason();
+        if (endReason != null) row.put("endReason", endReason.name());
         if (work != null) {
             var named = row.putObject("work").put("title", work.title());
             if (work.number() != null) named.put("number", work.number());

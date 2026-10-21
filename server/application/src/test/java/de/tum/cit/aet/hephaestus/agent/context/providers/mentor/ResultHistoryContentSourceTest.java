@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -115,6 +116,119 @@ class ResultHistoryContentSourceTest extends BaseUnitTest {
                         .path("number")
                         .asInt())
                 .isEqualTo(421);
+    }
+
+    @Test
+    void shouldCarryTheRecordedEndToOverviewAndDetailWhenAResultEnded() {
+        var results = mock(ResultHistoryQuery.class);
+        var copies = mock(HistoryCopies.class);
+        var pullRequest = new ItemRef(1, 41, new ItemKind("scm.pull_request"), 421L, null, null);
+        UUID endedId = UUID.randomUUID();
+        UUID openId = UUID.randomUUID();
+        Instant endedAt = Instant.parse("2026-10-15T11:30:00Z");
+        var ended = notMet(
+                endedId,
+                pullRequest,
+                Instant.parse("2026-10-14T09:00:00Z"),
+                "scm.pull_request:v1:" + "a".repeat(40) + ":" + "b".repeat(40) + ":" + "c".repeat(64));
+        when(ended.endedAt()).thenReturn(endedAt);
+        when(ended.endReason()).thenReturn(ResultEndReason.WORK_CHANGED);
+        var open = notMet(
+                openId,
+                pullRequest,
+                Instant.parse("2026-10-16T08:00:00Z"),
+                "scm.pull_request:v1:" + "a".repeat(40) + ":" + "d".repeat(40) + ":" + "e".repeat(64));
+        when(results.forDeveloper(eq(1L), eq(2L), any(), eq(91))).thenReturn(List.of(open, ended));
+        when(results.find(1, endedId, 2, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(Optional.of(ended));
+        when(results.find(1, openId, 2, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(Optional.of(open));
+        var authorized = new HistoryCopy(true, List.of(), List.of(), List.of());
+        when(copies.of(ended)).thenReturn(authorized);
+        when(copies.of(open)).thenReturn(authorized);
+        when(copies.record(authorized)).thenReturn(true);
+        var source = new ResultHistoryContentSource(
+                results,
+                new JsonMapper(),
+                copies,
+                mock(ConversationConsentGate.class),
+                mock(RegisteredItemLabels.class));
+
+        var rows = source.buildPayload(1L, 2L).path("results");
+        var openRow = rows.get(0);
+        var endedRow = rows.get(1);
+        var openDetail = source.inspect(1, 2, openId).path("result");
+        var endedDetail = source.inspect(1, 2, endedId).path("result");
+
+        for (var row : List.of(endedRow, endedDetail)) {
+            assertThat(row.path("resultId").asString()).isEqualTo(endedId.toString());
+            assertThat(row.path("outcome").asString()).isEqualTo("NOT_MET");
+            assertThat(row.path("summary").asString()).isEqualTo("The description omits why.");
+            assertThat(row.path("endedAt").asString()).isEqualTo(endedAt.toString());
+            assertThat(row.path("endReason").asString()).isEqualTo("WORK_CHANGED");
+        }
+        for (var row : List.of(openRow, openDetail)) {
+            assertThat(row.path("resultId").asString()).isEqualTo(openId.toString());
+            assertThat(row.path("outcome").asString()).isEqualTo("NOT_MET");
+            assertThat(row.has("endedAt")).isFalse();
+            assertThat(row.has("endReason")).isFalse();
+            assertThat(row.toString()).doesNotContain("CURRENT").doesNotContain("REPAIRED");
+        }
+    }
+
+    @Test
+    void shouldKeepTheEndButNotTheWordsWhenAReplacedResultHasNoCopyAuthority() {
+        var results = mock(ResultHistoryQuery.class);
+        var copies = mock(HistoryCopies.class);
+        UUID id = UUID.randomUUID();
+        Instant endedAt = Instant.parse("2026-10-15T11:30:00Z");
+        var replaced = notMet(
+                id,
+                new ItemRef(1, 41, new ItemKind("scm.pull_request"), 421L, null, null),
+                Instant.parse("2026-10-14T09:00:00Z"),
+                "opaque-version");
+        when(replaced.endedAt()).thenReturn(endedAt);
+        when(replaced.endReason()).thenReturn(ResultEndReason.REPLACED);
+        when(results.forDeveloper(eq(1L), eq(2L), any(), eq(91))).thenReturn(List.of(replaced));
+        when(results.find(1, id, 2, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(Optional.of(replaced));
+        var unavailable = new HistoryCopy(false, List.of(), List.of(), List.of());
+        when(copies.of(replaced)).thenReturn(unavailable);
+        var source = new ResultHistoryContentSource(
+                results,
+                new JsonMapper(),
+                copies,
+                mock(ConversationConsentGate.class),
+                mock(RegisteredItemLabels.class));
+
+        var row = source.buildPayload(1L, 2L).path("results").get(0);
+        var detail = source.inspect(1, 2, id).path("result");
+
+        for (var shown : List.of(row, detail)) {
+            assertThat(shown.path("outcome").asString()).isEqualTo("NOT_MET");
+            assertThat(shown.path("endedAt").asString()).isEqualTo(endedAt.toString());
+            assertThat(shown.path("endReason").asString()).isEqualTo("REPLACED");
+            assertThat(shown.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
+            assertThat(shown.has("summary")).isFalse();
+            assertThat(shown.has("explanation")).isFalse();
+        }
+    }
+
+    private static ResultHistoryEntry notMet(UUID id, ItemRef item, Instant recordedAt, String itemVersion) {
+        var entry = mock(ResultHistoryEntry.class);
+        when(entry.resultId()).thenReturn(id);
+        when(entry.reviewId()).thenReturn(UUID.randomUUID());
+        when(entry.practiceSlug()).thenReturn("explains-why");
+        when(entry.itemId()).thenReturn(item.itemId());
+        when(entry.itemKind()).thenReturn(item.kind().value());
+        when(entry.itemVersion()).thenReturn(itemVersion);
+        when(entry.outcome()).thenReturn(ResultOutcome.NOT_MET);
+        when(entry.recordedAt()).thenReturn(recordedAt);
+        when(entry.item()).thenReturn(item);
+        when(entry.developerAccountId()).thenReturn(2L);
+        // Read only where copy authority allows the result's words.
+        lenient().when(entry.summary()).thenReturn("The description omits why.");
+        lenient().when(entry.explanation()).thenReturn("The captured description names the change but not its reason.");
+        return entry;
     }
 
     private static ResultHistoryEntry entry(UUID id, ItemRef item) {
