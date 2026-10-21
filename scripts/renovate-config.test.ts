@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
+import { parse } from "yaml";
+
 import { isSet } from "./lib/env.ts";
 import { isRecord, parseJson } from "./lib/json.ts";
 import { BUNDLED_PINS } from "./lib/toolchain-pins.ts";
@@ -87,14 +89,24 @@ void test("dependency pull requests explain the human-review requirement", () =>
 	);
 });
 
-void test("compatibility overrides receive same-major fixes without restricting direct dependencies", () => {
+void test("compatibility overrides receive same-major fixes without restricting direct dependencies", async () => {
+	const workspace: unknown = parse(await readFile("pnpm-workspace.yaml", "utf8"));
+	assert.ok(isRecord(workspace) && isRecord(workspace.overrides));
+	const { overrides } = workspace;
 	assert.ok(Array.isArray(config.packageRules));
 	const rules = config.packageRules.filter(isRecord);
-	for (const [selector, versions] of [
-		["js-yaml@>=4.0.0", "4.x"],
-		["markdown-it@<14.3.1", "14.x"],
-		["uuid@<11.1.1", "11.x"],
-	]) {
+	for (const name of ["js-yaml", "markdown-it", "uuid"]) {
+		const selectors = Object.keys(overrides).filter(
+			(selector) => selector === name || selector.startsWith(`${name}@`),
+		);
+		assert.equal(selectors.length, 1, `${name} must have one compatibility override`);
+		const [selector] = selectors;
+		assert.ok(selector !== undefined);
+		const version = overrides[selector];
+		assert.ok(typeof version === "string");
+		const [major] = version.split(".");
+		assert.ok(major !== undefined);
+		const versions = `${major}.x`;
 		const rule = rules.find(
 			(candidate) =>
 				Array.isArray(candidate.matchDepNames) && candidate.matchDepNames.includes(selector),

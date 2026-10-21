@@ -64,11 +64,11 @@ overrides:
   "js-yaml@>=4.0.0": 4.3.2
   lodash: 4.18.1
   lodash-es: 4.18.1
-  "markdown-it@<14.3.1": 14.3.1
+  "markdown-it@<14.3.3": 14.3.3
   "qs@>=2.2.5 <6.16.0": 6.16.0
-  serialize-javascript: 7.1.1
+  serialize-javascript: 7.1.2
   "shell-quote@<1.11.0": 1.11.0
-  "smol-toml@<1.7.1": 1.7.1
+  "smol-toml@<1.9.0": 1.9.0
   "undici@>=8.0.0 <8.11.2": 8.11.2
   "uuid@<11.1.1": 11.1.1
 patchedDependencies:
