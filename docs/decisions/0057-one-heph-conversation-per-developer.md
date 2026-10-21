@@ -126,9 +126,11 @@ The answer appears where the developer asked. The app shows everything.
   In both cases, the app marks it "Not fully delivered to Slack" and shows the full answer. Hephaestus never posts it a second time.
   This is the practice model's rule for an uncertain write.
   It applies to the whole answer, because an answer can show feedback.
-- A developer stops a turn in the app only.
-  Heph does not use Slack's agent-session status or its stop event.
-  Both belong to the Slack thread, not to one turn.
+- A developer can stop any active turn in the app.
+  A `stopped_by_user` response to a running turn's stream append also stops that exact turn.
+  The response identifies one stream and its owning turn. It does not stop queued follow-ups.
+  Heph learns of a Slack stop only at the next append. An app stop takes effect during a tool wait.
+  Heph does not use Slack's agent-session status or its stop event. These name a thread rather than one turn.
 
 The app offers Helpful and Not helpful on each Heph answer.
 Ratings come from these buttons only. Heph's own 👀 reaction is its working signal, and Hephaestus does not read Slack reactions.
