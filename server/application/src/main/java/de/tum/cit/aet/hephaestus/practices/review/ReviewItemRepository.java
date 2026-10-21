@@ -105,6 +105,10 @@ public interface ReviewItemRepository extends JpaRepository<ReviewItem, ReviewIt
     List<ReviewItem> findByWorkspaceIdAndReviewIdAndPracticeIdAndJobIdOrderByItemIdAsc(
             long workspaceId, UUID reviewId, long practiceId, UUID jobId);
 
+    /** The assignments of a review bound to one job, for a retained job that recorded none of its own. */
+    List<ReviewItem> findByWorkspaceIdAndReviewIdAndJobIdOrderByPracticeIdAscItemIdAsc(
+            long workspaceId, UUID reviewId, UUID jobId);
+
     List<ReviewItem> findByWorkspaceIdAndResultIdOrderByReviewIdAscPracticeIdAscItemIdAsc(
             long workspaceId, UUID resultId);
 

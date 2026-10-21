@@ -67,6 +67,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.adapter.PracticesWorkspacePurgeAdapterTest", "review-fixture"),
             assignment("practices.feedback.AbstractFeedbackDeliveryIntegrationTest", "review-feedbackdelivery"),
             assignment("agent.adapter.EvidenceDeliveryAuthorizationIntegrationTest", "review-delivery-authorization"),
+            assignment("agent.context.providers.mentor.ReviewAttemptsContentSourceIntegrationTest", "review-fixture"),
+            assignment(
+                    "agent.context.providers.mentor.RetainedReviewContextRegressionIntegrationTest", "review-fixture"),
             assignment("practices.feedback.FeedbackGateIntegrationTest", "review-feedbackgate"),
             assignment("agent.handler.PublicReviewEligibilityIntegrationTest", "review-feedbackgate"),
             assignment("practices.feedback.FeedbackPreparationReceiptIntegrationTest", "review-preparation-receipt"),
