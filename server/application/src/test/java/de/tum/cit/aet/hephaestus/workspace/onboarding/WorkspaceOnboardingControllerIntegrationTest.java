@@ -27,6 +27,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -341,16 +343,75 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     /** An enabled Heph binding of a fresh model in {@code tier}; an in-house model declares its own operator. */
-    private void bindHeph(Workspace workspace, DataHandlingTier tier) {
+    private WorkspaceAgentBinding bindHeph(Workspace workspace, DataHandlingTier tier) {
         String slug = workspace.getWorkspaceSlug() + "-" + tier.name().toLowerCase(Locale.ROOT);
         var connection = connections.save(LlmCatalogTestFixtures.connection(slug));
         LlmModel model = LlmCatalogTestFixtures.model(connection, slug, "heph-model");
         if (tier == DataHandlingTier.IN_HOUSE) {
             model.setDataHandling(DataHandlingFacts.of(LlmDataOperator.OWN_ORGANISATION, null));
+        } else if (tier == DataHandlingTier.CLOUD) {
+            model.setDataHandling(DataHandlingFacts.of(LlmDataOperator.PROVIDER, null));
         }
         WorkspaceAgentBinding binding = LlmCatalogTestFixtures.mentorBinding(workspace, models.save(model));
         binding.setDataHandlingTier(tier);
-        bindings.save(binding);
+        return bindings.saveAndFlush(binding);
+    }
+
+    @ParameterizedTest
+    @EnumSource(DataHandlingTier.class)
+    void shouldFollowBindingAndModelAvailabilityInEverySupportedTier(DataHandlingTier tier) {
+        var workspace = workspace(
+                "onboarding-heph-states-" + tier.name().toLowerCase(Locale.ROOT).replace('_', '-'),
+                persistUser("testuser"));
+        var binding = bindHeph(workspace, tier);
+        var initial =
+                switch (tier) {
+                    case IN_HOUSE -> choose(workspace.getWorkspaceSlug(), "IN_HOUSE_ONLY");
+                    case CLOUD -> choose(workspace.getWorkspaceSlug(), "CLOUD");
+                    case UNDECLARED -> state(workspace.getWorkspaceSlug());
+                };
+        assertThat(initial.mentorRefusal()).isNull();
+        if (tier == DataHandlingTier.UNDECLARED) {
+            assertThat(initial.aiChoice()).isNull();
+            assertThat(initial.aiOptions()).noneMatch(WorkspaceOnboardingDTO.WorkspaceAiOptionDTO::mentorReady);
+        }
+
+        binding.setEnabled(false);
+        bindings.saveAndFlush(binding);
+        assertThat(state(workspace.getWorkspaceSlug()).mentorRefusal()).isEqualTo(MentorRefusalReason.UNAVAILABLE);
+
+        binding.setEnabled(true);
+        bindings.saveAndFlush(binding);
+        assertThat(state(workspace.getWorkspaceSlug()).mentorRefusal()).isNull();
+
+        var model = Objects.requireNonNull(binding.getInstanceModel());
+        model.setEnabled(false);
+        models.saveAndFlush(model);
+        assertThat(state(workspace.getWorkspaceSlug()).mentorRefusal()).isEqualTo(MentorRefusalReason.UNAVAILABLE);
+
+        model.setEnabled(true);
+        models.saveAndFlush(model);
+        assertThat(state(workspace.getWorkspaceSlug()).mentorRefusal()).isNull();
+
+        bindings.delete(binding);
+        bindings.flush();
+        assertThat(state(workspace.getWorkspaceSlug()).mentorRefusal()).isEqualTo(MentorRefusalReason.UNAVAILABLE);
+    }
+
+    @Test
+    void shouldKeepRequiredChoiceAndNoAiRefusalsWithAnAvailableUndeclaredBinding() {
+        var workspace = workspace("onboarding-heph-required", persistUser("testuser"));
+        bindHeph(workspace, DataHandlingTier.UNDECLARED);
+        var policy = new WorkspaceOnboardingSettings();
+        policy.setWorkspace(workspace);
+        policy.setAiChoiceRequired(true);
+        settings.saveAndFlush(policy);
+
+        assertThat(state(workspace.getWorkspaceSlug()).mentorRefusal()).isEqualTo(MentorRefusalReason.CHOICE_REQUIRED);
+        assertThat(choose(workspace.getWorkspaceSlug(), "NO_AI").mentorRefusal())
+                .isEqualTo(MentorRefusalReason.NO_AI);
+        assertThat(choose(workspace.getWorkspaceSlug(), "CLOUD").mentorRefusal())
+                .isEqualTo(MentorRefusalReason.UNAVAILABLE);
     }
 
     @Test

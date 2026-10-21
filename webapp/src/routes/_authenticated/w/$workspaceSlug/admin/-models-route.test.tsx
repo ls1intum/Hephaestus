@@ -25,6 +25,7 @@ import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
 import { ownMembership } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { levelsOpenedBy } from "@/test/detail-stack";
+import { MentorFake } from "@/test/mentor-server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
@@ -657,55 +658,139 @@ it("saves and clears only the selected tier and lists only that tier's models", 
 	expect(pickerOf(row("Practice reviews", "Cloud")).textContent).toContain("Select a model");
 });
 
-/** A member who chose Cloud, answered as the server would for the workspace's `bindings`. */
-function cloudMemberOnboarding(bindings: AgentBinding[]): WorkspaceOnboarding {
-	const mentorReady = bindings.some((entry) => entry.purpose === "MENTOR");
-	return {
-		...workspaceOnboarding(),
-		aiChoice: "CLOUD",
-		...(mentorReady ? {} : { mentorRefusal: "UNAVAILABLE" }),
-		aiOptions: [{ choice: "CLOUD", mentorReady, practiceReviewsReady: true, models: [] }],
-	};
-}
+it.each([
+	{
+		tier: "IN_HOUSE",
+		memberChoice: { aiChoice: "IN_HOUSE_ONLY" },
+		title: "In-house",
+		id: 20,
+		modelName: "GPT Test",
+		inHouseReady: true,
+		cloudReady: true,
+		unavailableHeading: "Heph is not set up for your AI choice yet",
+	},
+	{
+		tier: "CLOUD",
+		memberChoice: { aiChoice: "CLOUD" },
+		title: "Cloud",
+		id: 21,
+		modelName: "GPT Other",
+		inHouseReady: false,
+		cloudReady: true,
+		unavailableHeading: "Heph is not set up for your AI choice yet",
+	},
+	{
+		tier: "UNDECLARED",
+		memberChoice: {},
+		title: UNCHOSEN,
+		id: 22,
+		modelName: "Undeclared test",
+		inHouseReady: false,
+		cloudReady: false,
+		unavailableHeading: "Heph is not set up in this workspace yet",
+	},
+] as const)(
+	"updates navigation and the conversation after adding and clearing a $tier Heph assignment in the same workspace",
+	async ({
+		tier,
+		memberChoice,
+		title,
+		id,
+		modelName,
+		inHouseReady,
+		cloudReady,
+		unavailableHeading,
+	}) => {
+		const user = userEvent.setup();
+		let assignments: AgentBinding[] = [];
+		const unavailable: WorkspaceOnboarding = {
+			...workspaceOnboarding(),
+			...memberChoice,
+			mentorRefusal: "UNAVAILABLE",
+			aiOptions: [
+				{ choice: "IN_HOUSE_ONLY", mentorReady: false, practiceReviewsReady: false, models: [] },
+				{ choice: "CLOUD", mentorReady: false, practiceReviewsReady: false, models: [] },
+			],
+		};
+		const ready: WorkspaceOnboarding = {
+			...workspaceOnboarding(),
+			...memberChoice,
+			aiOptions: [
+				{
+					choice: "IN_HOUSE_ONLY",
+					mentorReady: inHouseReady,
+					practiceReviewsReady: false,
+					models: [],
+				},
+				{ choice: "CLOUD", mentorReady: cloudReady, practiceReviewsReady: false, models: [] },
+			],
+		};
+		let onboarding = unavailable;
+		mockModelsRoute(() => assignments);
+		server.use(
+			http.get("*/workspaces/acme/onboarding/me", () => HttpResponse.json(onboarding)),
+			http.get("*/workspaces/acme/llm/available-models", () =>
+				HttpResponse.json([
+					...MODELS,
+					{
+						id: 22,
+						scope: "SHARED",
+						displayName: "Undeclared test",
+						connectionDisplayName: "Test provider",
+						pricingMode: "NO_CHARGE",
+						dataHandlingTier: "UNDECLARED",
+						purposes: ["MENTOR"],
+					} satisfies AvailableLlmModel,
+				]),
+			),
+			http.put("*/workspaces/acme/agents/MENTOR", () => {
+				const saved = binding("MENTOR", id, tier);
+				assignments = [saved];
+				onboarding = ready;
+				return HttpResponse.json(saved);
+			}),
+			http.delete("*/workspaces/acme/agents/MENTOR", () => {
+				assignments = [];
+				onboarding = unavailable;
+				return new HttpResponse(null, { status: 204 });
+			}),
+			...new MentorFake().handlers(),
+		);
+		const { router, queryClient } = renderRouteAtWithRouter("/w/acme/admin/models");
+		await screen.findByRole("button", { name: "Heph" }, ROUTE_RENDER_WAIT);
+		await waitFor(() =>
+			expect(
+				queryClient.getQueryState(getMemberOnboardingQueryKey({ path: { workspaceSlug: "acme" } }))
+					?.status,
+			).toBe("success"),
+		);
+		expect(screen.queryByRole("link", { name: /AI mentor/u })).toBeNull();
 
-it("lists Heph in the navigation once a Heph model is assigned, and drops it when the assignment is cleared", async () => {
-	const user = userEvent.setup();
-	let bindings: AgentBinding[] = [binding("PRACTICE_REVIEW", 20)];
-	mockModelsRoute(() => bindings);
-	server.use(
-		http.get("*/workspaces/acme/onboarding/me", () =>
-			HttpResponse.json(cloudMemberOnboarding(bindings)),
-		),
-		http.put("*/workspaces/acme/agents/MENTOR", () => {
-			bindings = [...bindings, binding("MENTOR", 20)];
-			return HttpResponse.json(binding("MENTOR", 20));
-		}),
-		http.delete("*/workspaces/acme/agents/MENTOR", () => {
-			bindings = bindings.filter((entry) => entry.purpose !== "MENTOR");
-			return new HttpResponse(null, { status: 204 });
-		}),
-	);
-	const queryClient = renderRouteAt("/w/acme/admin/models");
-	await screen.findByRole("button", { name: "Heph" }, ROUTE_RENDER_WAIT);
-	await waitFor(() =>
-		expect(
-			queryClient.getQueryState(getMemberOnboardingQueryKey({ path: { workspaceSlug: "acme" } }))
-				?.status,
-		).toBe("success"),
-	);
-	expect(screen.queryByRole("link", { name: /AI mentor/u })).toBeNull();
+		await user.click(pickerOf(row("Heph", title)));
+		await user.click(await screen.findByRole("option", { name: new RegExp(modelName, "u") }));
+		await user.click(saveButton("Heph", title));
+		await user.click(await screen.findByRole("link", { name: /AI mentor/u }, ROUTE_RENDER_WAIT));
+		await screen.findByRole("textbox", { name: "Message Heph" }, ROUTE_RENDER_WAIT);
 
-	await user.click(pickerOf(row("Heph")));
-	await user.click(await screen.findByRole("option", { name: /GPT Test/u }));
-	await user.click(saveButton("Heph"));
-	await screen.findByRole("link", { name: /AI mentor/u }, ROUTE_RENDER_WAIT);
-
-	await user.click(clearButton(row("Heph")));
-	await waitFor(
-		() => expect(screen.queryByRole("link", { name: /AI mentor/u })).toBeNull(),
-		ROUTE_RENDER_WAIT,
-	);
-});
+		await act(async () => {
+			await router.navigate({
+				to: "/w/$workspaceSlug/admin/models",
+				params: { workspaceSlug: "acme" },
+			});
+		});
+		await screen.findByRole("button", { name: "Heph" }, ROUTE_RENDER_WAIT);
+		await user.click(clearButton(row("Heph", title)));
+		await waitFor(
+			() => expect(screen.queryByRole("link", { name: /AI mentor/u })).toBeNull(),
+			ROUTE_RENDER_WAIT,
+		);
+		await act(async () => {
+			await router.navigate({ to: "/w/$workspaceSlug/mentor", params: { workspaceSlug: "acme" } });
+		});
+		await screen.findByRole("heading", { name: unavailableHeading }, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("textbox", { name: "Message Heph" })).toBeNull();
+	},
+);
 
 it("resets model drafts on workspace navigation while a previous workspace save completes", async () => {
 	mockModelsRoute(() => [binding("PRACTICE_REVIEW", 20)]);
