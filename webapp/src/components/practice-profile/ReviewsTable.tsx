@@ -46,7 +46,12 @@ export interface ReviewsTableProps {
 	requesting?: string;
 	/** Each review's position among the reviews of its item, when every review is loaded. */
 	positions?: Map<string, number>;
+	/** Whether the next page of reviews is on its way: placeholder rows then continue the table. */
+	isLoadingMore?: boolean;
 }
+
+/** Placeholder rows for the next page: enough to read as the list going on, not a whole page. */
+const LOADING_MORE_ROWS = 3;
 
 const COLUMNS: readonly ReviewColumn[] = [
 	{ label: "What it saw" },
@@ -87,6 +92,7 @@ export function ReviewsTable({
 	onReviewNow,
 	requesting,
 	positions,
+	isLoadingMore = false,
 }: ReviewsTableProps) {
 	// The newest row of a narrowed list is only the newest of what the filter kept.
 	const latestId = filtered ? undefined : reviews[0]?.review.id;
@@ -98,6 +104,7 @@ export function ReviewsTable({
 			reviews={reviews}
 			dateOf={reviewedAt}
 			reviewKey={(entry) => entry.review.id}
+			loadingMore={isLoadingMore ? LOADING_MORE_ROWS : undefined}
 			renderRow={(entry) => (
 				<ReviewRow
 					entry={entry}

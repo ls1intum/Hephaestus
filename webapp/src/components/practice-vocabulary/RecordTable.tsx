@@ -53,6 +53,7 @@ const STACKED = [
 	"@max-2xl:[&_thead]:sr-only @max-2xl:[&_tbody]:block @max-2xl:[&_tfoot]:block",
 	"@max-2xl:[&_tr]:grid @max-2xl:[&_tr]:grid-cols-[minmax(6rem,auto)_minmax(0,1fr)] @max-2xl:[&_tr]:gap-x-3 @max-2xl:[&_tr]:px-2 @max-2xl:[&_tr]:py-2.5",
 	"@max-2xl:[&_tr:has(th)]:p-0 @max-2xl:[&_th[scope=rowgroup]]:col-span-2",
+	"@max-2xl:[&_tr[data-separator]]:p-0 @max-2xl:[&_tr[data-separator]_td]:pb-0",
 	"@max-2xl:[&_td]:col-start-2 @max-2xl:[&_td]:block @max-2xl:[&_td]:p-0 @max-2xl:[&_td]:pb-1.5 @max-2xl:[&_td]:text-left @max-2xl:[&_td]:whitespace-normal",
 	"@max-2xl:[&_td:first-child]:col-start-1 @max-2xl:[&_td:first-child]:row-span-12",
 	"@max-2xl:[&_td[colspan]]:col-span-2! @max-2xl:[&_td[colspan]]:col-start-1!",
@@ -154,6 +155,11 @@ export function RecordDayTable<TRow>({ dateOf, rows, ...props }: RecordDayTableP
 export interface RecordGroupedTableProps<TRow> extends Omit<RecordRowsProps<TRow>, "rows"> {
 	/** The bodies in order, each under its heading; a table with none says `empty`. */
 	groups: readonly { label: string; rows: readonly TRow[] }[];
+	/**
+	 * Placeholder rows after the last body while the next page loads. The table stays busy and
+	 * keeps its columns.
+	 */
+	loadingMore?: number;
 }
 
 /**
@@ -167,9 +173,10 @@ export function RecordGroupedTable<TRow>({
 	rowKey,
 	renderRow,
 	empty,
+	loadingMore = 0,
 }: RecordGroupedTableProps<TRow>) {
 	return (
-		<RecordTableFrame aria-label={label} columns={columns}>
+		<RecordTableFrame aria-label={label} columns={columns} busy={loadingMore > 0}>
 			{groups.length === 0 && <EmptyBody span={columns.length}>{empty}</EmptyBody>}
 			{groups.map((group) => (
 				<TableBody key={group.label}>
@@ -189,6 +196,16 @@ export function RecordGroupedTable<TRow>({
 					))}
 				</TableBody>
 			))}
+			{loadingMore > 0 && (
+				<TableBody>
+					{/* A body's last row drops its border, so this line keeps the last record apart from the
+					    placeholders, as a group heading's line does. */}
+					<tr aria-hidden data-separator>
+						<td colSpan={columns.length} className="border-t p-0" />
+					</tr>
+					<SkeletonRows columns={columns} rows={loadingMore} tall />
+				</TableBody>
+			)}
 		</RecordTableFrame>
 	);
 }
@@ -243,6 +260,8 @@ export function RecordTable<TRow>({
 }
 
 const SKELETON_WIDTHS = ["w-16", "w-48", "w-32", "w-24"];
+/** The same widths as caps, for a placeholder among real rows. */
+const TALL_SKELETON_WIDTHS = ["max-w-16", "max-w-48", "max-w-32", "max-w-24"];
 
 export interface RecordTableSkeletonProps {
 	"aria-label": string;
@@ -273,27 +292,50 @@ export function RecordTableSkeleton({
 			footer={footer}
 		>
 			<TableBody>
-				{Array.from({ length: rows }, (_, index) => (
-					<TableRow key={index} variant="static" aria-hidden>
-						{columns.map((column, columnIndex) => (
-							<TableCell key={column.label} className="align-top">
-								{column.srOnly !== true && (
-									<Skeleton
-										className={cn(
-											"h-4",
-											column.numeric === true
-												? "ml-auto w-10"
-												: SKELETON_WIDTHS[Math.min(columnIndex, SKELETON_WIDTHS.length - 1)],
-										)}
-									/>
-								)}
-							</TableCell>
-						))}
-					</TableRow>
-				))}
+				<SkeletonRows columns={columns} rows={rows} />
 			</TableBody>
 		</RecordTableFrame>
 	);
+}
+
+/**
+ * Placeholder rows in the table's own columns: the first page's, and the next page's while it
+ * loads. A `tall` row stands among rows already drawn: two lines, as a record's title and its facts,
+ * and widths that only cap a bar, so a placeholder never widens a column that real rows have set.
+ */
+function SkeletonRows({
+	columns,
+	rows,
+	tall = false,
+}: {
+	columns: readonly RecordTableColumn[];
+	rows: number;
+	tall?: boolean;
+}) {
+	return Array.from({ length: rows }, (_, index) => (
+		<TableRow key={index} variant="static" aria-hidden data-loading-row>
+			{columns.map((column, columnIndex) => {
+				if (column.srOnly === true) {
+					return <TableCell key={column.label} className="align-top" />;
+				}
+				const slot = Math.min(columnIndex, SKELETON_WIDTHS.length - 1);
+				const width = column.numeric === true ? "ml-auto w-10" : SKELETON_WIDTHS[slot];
+				const cap = column.numeric === true ? "ml-auto max-w-10" : TALL_SKELETON_WIDTHS[slot];
+				return (
+					<TableCell key={column.label} className="align-top">
+						{tall ? (
+							<div className="flex flex-col gap-2 py-1">
+								<Skeleton className={cn("h-4 w-full", cap)} />
+								<Skeleton className="h-3 w-full max-w-24" />
+							</div>
+						) : (
+							<Skeleton className={cn("h-4", width)} />
+						)}
+					</TableCell>
+				);
+			})}
+		</TableRow>
+	));
 }
 
 export interface RecordTimeCellProps {

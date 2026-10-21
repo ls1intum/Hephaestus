@@ -51,6 +51,20 @@ describe("InfiniteListEnd", () => {
 		expect(onLoadMore).toHaveBeenCalledOnce();
 	});
 
+	it("adds no placeholder while loading when the list draws its own", () => {
+		vi.stubGlobal("IntersectionObserver", InViewObserver);
+		const { container } = render(end({ isLoadingMore: true, loadingRow: null }));
+		// Only the press stays: an empty placeholder would open a gap above it while the page loads.
+		expect(container.querySelector("[aria-hidden]")).toBeNull();
+		screen.getByRole("button", { name: "Loading…" });
+	});
+
+	it("shows the list's placeholder while the next page loads", () => {
+		vi.stubGlobal("IntersectionObserver", InViewObserver);
+		render(end({ isLoadingMore: true, loadingRow: <p>placeholder</p> }));
+		screen.getByText("placeholder");
+	});
+
 	it("keeps focus at the end of the list when the last page removes the press", () => {
 		vi.stubGlobal("IntersectionObserver", InViewObserver);
 		const { container, rerender } = render(end({ isLoadingMore: true }));

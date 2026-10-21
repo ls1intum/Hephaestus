@@ -51,7 +51,7 @@ export function InfiniteListEnd({
 		<div tabIndex={-1} data-list-end className="outline-none">
 			{(hasMore || failed) && (
 				<div ref={end} className="flex flex-col gap-2.5">
-					{isLoadingMore && (
+					{isLoadingMore && loadingRow != null && (
 						<div aria-hidden className="flex flex-col gap-2.5">
 							{loadingRow}
 						</div>
