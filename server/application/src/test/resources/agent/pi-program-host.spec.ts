@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	realpathSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { after, test } from "node:test";
@@ -50,7 +57,7 @@ async function run(
 	env: Record<string, string> = {},
 	stage: (cwd: string) => void = () => undefined,
 ): Promise<Run> {
-	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-program-host-"));
+	const cwd = realpathSync(mkdtempSync(nodePath.join(tmpdir(), "pi-program-host-")));
 	roots.push(cwd);
 	stagePractices(cwd, practices);
 	stage(cwd);
