@@ -38,6 +38,16 @@ No integration hand-rolls a vendor DTO.
 
 ## The rules the matrix depends on
 
+### Partial metadata updates preserve known values
+
+An update can omit counts and discussion-lock state. On an existing issue, pull request or merge
+request, an absent value preserves the stored value. An explicit zero count or unlocked state
+replaces it. Insert defaults apply only to new rows.
+
+GitLab merge request sync treats an absent or failed count or lock field as unknown. Each field is
+checked at its own GraphQL error path, so an error in one field does not discard valid sibling
+values. An unknown note count cannot skip discussion sync.
+
 ### Fail-closed: an incomplete listing deletes nothing
 
 A sweep may tombstone only what a **provably complete** upstream listing omits.

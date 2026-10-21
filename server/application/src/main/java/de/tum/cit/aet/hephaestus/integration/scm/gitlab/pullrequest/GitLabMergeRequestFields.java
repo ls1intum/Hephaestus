@@ -24,6 +24,15 @@ final class GitLabMergeRequestFields {
         return !response.field(path).getErrors().isEmpty();
     }
 
+    /** A provider count, or unknown where its own field or an ancestor failed to load. */
+    static @Nullable Integer count(
+            ClientGraphQlResponse response, String parentPath, Map<String, Object> fields, String name) {
+        if (failed(response, parentPath + "." + name)) {
+            return null;
+        }
+        return fields.get(name) instanceof Number count ? count.intValue() : null;
+    }
+
     /**
      * The head pipeline of the merge request at {@code mergeRequestPath}: no pipeline only where GitLab returned the
      * field, as {@code null}, with no error; a pipeline only with its status and SHA and no error at or below it.
