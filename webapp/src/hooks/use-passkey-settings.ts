@@ -185,6 +185,7 @@ export function usePasskeySettings({
 						await withSessionLock(async () =>
 							removePasskey({ path: { credentialId }, throwOnError: true }),
 						);
+						setRecoveryCodes(undefined);
 					},
 				}),
 			onCreateRecoveryCodes: () =>

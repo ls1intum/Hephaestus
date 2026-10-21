@@ -235,6 +235,89 @@ describe("usePasskeySettings", () => {
 		expect(verifications).toBe(0);
 		expect(result.current.section.status?.verified).toBe(false);
 	});
+	it("does not show invalid recovery codes after removing the last key and enrolling again", async () => {
+		const codes = ["synthetic-recovery-code"];
+		let status = {
+			protectionEnabled: false,
+			recoveryRequired: false,
+			instanceAdminRequired: true,
+			workspaceAdminRequired: false,
+			verified: true,
+			credentials: [{ id: "one", label: "Laptop" }],
+		};
+		let removals = 0;
+		server.use(
+			http.get("*/user/passkeys", () => HttpResponse.json(status)),
+			http.post("*/user/passkeys/recovery-codes", () => HttpResponse.json({ codes })),
+			http.delete("*/user/passkeys/one", () => {
+				removals += 1;
+				status = { ...status, credentials: [], verified: false };
+				return new HttpResponse(null, { status: 204 });
+			}),
+			http.post("*/user/passkeys/registration-options", () =>
+				HttpResponse.json({ challengeId, optionsJson: JSON.stringify(creation) }),
+			),
+			http.post("*/user/passkeys", () => {
+				status = {
+					...status,
+					protectionEnabled: true,
+					credentials: [{ id: "new", label: "Phone" }],
+				};
+				return new HttpResponse(null, { status: 204 });
+			}),
+		);
+		const { result } = setup();
+		await waitFor(() => expect(result.current.section.status?.credentials).toHaveLength(1));
+		act(() => result.current.section.onCreateRecoveryCodes());
+		await waitFor(() => expect(result.current.section.recoveryCodes).toStrictEqual(codes));
+		await waitFor(() => expect(result.current.section.pending).toBe(false));
+		act(() => result.current.section.onRemove("one"));
+		await waitFor(() => expect(result.current.section.status?.credentials).toHaveLength(0));
+		await waitFor(() => expect(result.current.section.pending).toBe(false));
+		act(() => result.current.section.onRegister("Phone"));
+		await waitFor(() => expect(result.current.completed).toBe("register"));
+		expect(result.current.section.status?.credentials).toStrictEqual([
+			{ id: "new", label: "Phone" },
+		]);
+		expect(result.current.section.recoveryCodes).toBeUndefined();
+		expect(removals).toBe(1);
+	});
+	it("keeps the displayed recovery codes when the last-key removal is refused", async () => {
+		const codes = ["synthetic-recovery-code"];
+		const status = {
+			protectionEnabled: false,
+			recoveryRequired: false,
+			instanceAdminRequired: true,
+			workspaceAdminRequired: false,
+			verified: true,
+			credentials: [{ id: "one", label: "Laptop" }],
+		};
+		let removals = 0;
+		server.use(
+			http.get("*/user/passkeys", () => HttpResponse.json(status)),
+			http.post("*/user/passkeys/recovery-codes", () => HttpResponse.json({ codes })),
+			http.delete("*/user/passkeys/one", () => {
+				removals += 1;
+				return HttpResponse.json(
+					{ status: 409, detail: "Personal protection is still on." },
+					{ status: 409 },
+				);
+			}),
+		);
+		const { result } = setup();
+		await waitFor(() => expect(result.current.section.status?.credentials).toHaveLength(1));
+		act(() => result.current.section.onCreateRecoveryCodes());
+		await waitFor(() => expect(result.current.section.recoveryCodes).toStrictEqual(codes));
+		await waitFor(() => expect(result.current.section.pending).toBe(false));
+		act(() => result.current.section.onRemove("one"));
+		await waitFor(() =>
+			expect(result.current.section.error).toBe("Personal protection is still on."),
+		);
+		await waitFor(() => expect(result.current.section.pending).toBe(false));
+		expect(result.current.section.status?.credentials).toStrictEqual(status.credentials);
+		expect(result.current.section.recoveryCodes).toStrictEqual(codes);
+		expect(removals).toBe(1);
+	});
 	it("ends a canceled browser ceremony without sending a verification", async () => {
 		let verifications = 0;
 		get.mockRejectedValueOnce(new DOMException("Canceled", "NotAllowedError"));

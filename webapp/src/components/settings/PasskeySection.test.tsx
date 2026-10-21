@@ -44,7 +44,9 @@ describe("PasskeySection", () => {
 	it("keeps the last credential and requires verification for protection changes", () => {
 		render(<PasskeySection {...props} status={status} />);
 		expect(unavailable("Remove Personal device")).toBe(true);
-		expect(reasonOf("Remove Personal device")).toContain("You cannot remove your last passkey.");
+		expect(reasonOf("Remove Personal device")).toContain(
+			"Confirm it’s you with one of your passkeys",
+		);
 		expect(
 			screen
 				.getByRole("switch", { name: "Personal admin protection" })
@@ -87,6 +89,51 @@ describe("PasskeySection", () => {
 		await user.click(screen.getByRole("button", { name: "Create new recovery codes" }));
 		await user.click(await screen.findByRole("button", { name: "Create codes" }));
 		expect(props.onCreateRecoveryCodes).toHaveBeenCalledOnce();
+	});
+	it("keeps the last passkey while personal admin protection is on, and says how to remove it", async () => {
+		const onRemove = vi.fn();
+		render(
+			<PasskeySection
+				{...props}
+				onRemove={onRemove}
+				status={{ ...status, protectionEnabled: true, verified: true }}
+			/>,
+		);
+		expect(unavailable("Remove Personal device")).toBe(true);
+		expect(reasonOf("Remove Personal device")).toContain(
+			"Turn off personal admin protection before you remove your last passkey.",
+		);
+		await userEvent.setup().click(screen.getByRole("button", { name: "Remove Personal device" }));
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(onRemove).not.toHaveBeenCalled();
+	});
+	it("keeps the last passkey while recovery is active", () => {
+		render(
+			<PasskeySection {...props} status={{ ...status, recoveryRequired: true, verified: true }} />,
+		);
+		expect(unavailable("Remove Personal device")).toBe(true);
+		expect(reasonOf("Remove Personal device")).toContain("Recovery is active.");
+		expect(screen.getByLabelText("Recovery code")).toBeInstanceOf(HTMLInputElement);
+	});
+	it("removes the last passkey only after a confirmation that says what stops working", async () => {
+		const user = userEvent.setup();
+		const onRemove = vi.fn();
+		render(
+			<PasskeySection {...props} onRemove={onRemove} status={{ ...status, verified: true }} />,
+		);
+		expect(unavailable("Remove Personal device")).toBe(false);
+
+		await user.click(screen.getByRole("button", { name: "Remove Personal device" }));
+		const dialog = await screen.findByRole("alertdialog");
+		expect(dialog.textContent).toContain("This is your last passkey.");
+		expect(dialog.textContent).toContain("recovery codes");
+		expect(dialog.textContent).toContain("until you add and verify a new one");
+		await user.click(screen.getByRole("button", { name: "Cancel" }));
+		expect(onRemove).not.toHaveBeenCalled();
+
+		await user.click(screen.getByRole("button", { name: "Remove Personal device" }));
+		await user.click(await screen.findByRole("button", { name: "Remove last passkey" }));
+		expect(onRemove).toHaveBeenCalledExactlyOnceWith("one");
 	});
 	it("states that recovery does not restore admin access", () => {
 		render(
