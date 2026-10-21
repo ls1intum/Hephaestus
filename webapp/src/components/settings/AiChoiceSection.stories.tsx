@@ -44,6 +44,17 @@ export const Unanswered: Story = {
 			.map((radio) => radio.closest("label")?.querySelector('[data-slot="ai-choice-header"]'))) {
 			await expect(header?.querySelector("img")).toBeNull();
 		}
+		// Each answer says which models it permits and where requests may go, and ranks none of them.
+		await expect(canvas.getByRole("radio", { name: IN_HOUSE })).toHaveAccessibleName(
+			/Models Only in-house models Sent to Only your organization/u,
+		);
+		await expect(canvas.getByRole("radio", { name: CLOUD })).toHaveAccessibleName(
+			/Models In-house and cloud models Sent to Your organization or a cloud provider/u,
+		);
+		await expect(canvas.getByRole("radio", { name: NO_AI })).toHaveAccessibleName(
+			/AI help No new AI requests Models None Sent to Nowhere/u,
+		);
+		await expect(canvas.queryByText("Speed")).toBeNull();
 		const save = canvas.getByRole("button", { name: "Save AI choice" });
 		await expectGenuinelyDisabled(save);
 		await expect(save).toHaveAccessibleDescription(

@@ -25,7 +25,7 @@ import {
 	ItemMedia,
 	ItemTitle,
 } from "@/components/ui/item";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 
 export interface SlackPreferencesSectionProps {
@@ -56,11 +56,7 @@ export function SlackPreferencesSection({
 }: SlackPreferencesSectionProps) {
 	let body: ReactNode;
 	if (isLoading) {
-		body = (
-			<div className="flex justify-center py-6">
-				<Spinner aria-label="Loading Slack preferences…" />
-			</div>
-		);
+		body = <WorkspacePreferenceSkeleton />;
 	} else if (isError) {
 		body = (
 			<QueryErrorAlert
@@ -146,6 +142,37 @@ export function SlackPreferencesSection({
 
 			{body}
 		</section>
+	);
+}
+
+/**
+ * One workspace's preference group in the shape it loads into. How many workspaces there are is not
+ * known yet, so one stands for them; it claims no connection, status or workspace.
+ */
+function WorkspacePreferenceSkeleton() {
+	return (
+		<div
+			role="group"
+			aria-label="Loading Slack preferences"
+			aria-busy="true"
+			className="space-y-4 rounded-lg border p-4"
+		>
+			<div className="space-y-1">
+				<div className="flex flex-wrap items-center gap-2">
+					<Skeleton className="h-5 w-32" />
+					<Skeleton className="h-5 w-24" />
+				</div>
+				<Skeleton className="h-4 w-48" />
+				<Skeleton className="h-4 w-40" />
+			</div>
+			<div className="flex items-start justify-between gap-4">
+				<div className="min-w-0 flex-1 space-y-2">
+					<Skeleton className="h-4 w-56 max-w-full" />
+					<Skeleton className="h-12 w-full" />
+				</div>
+				<Skeleton className="h-5 w-9 shrink-0" />
+			</div>
+		</div>
 	);
 }
 
