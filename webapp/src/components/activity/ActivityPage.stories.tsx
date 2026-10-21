@@ -37,6 +37,14 @@ const readyTimeline = (items = WORK_LOG) => ({
 	onCopy,
 });
 
+/** The standard workspace page width (`PageLayout`), shared with Workspace activity. */
+const STANDARD_PAGE_WIDTH = "1152px";
+
+function pageMaxWidth(heading: HTMLElement): string | undefined {
+	const page = heading.closest<HTMLElement>(".mx-auto");
+	return page === null ? undefined : getComputedStyle(page).maxWidth;
+}
+
 const meta = {
 	component: ActivityPage,
 	parameters: { layout: "fullscreen", chromatic: { viewports: [320, 1440] } },
@@ -59,6 +67,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ args, canvas, userEvent }) => {
+		// The standard workspace width, as on Workspace activity; loading and error states use it too.
+		await expect(pageMaxWidth(canvas.getByRole("heading", { level: 1, name: "Activity" }))).toBe(
+			STANDARD_PAGE_WIDTH,
+		);
 		// Action before history: what needs you, what is assigned, then the period, then the timeline.
 		const headings = canvas
 			.getAllByRole("heading", { level: 2 })
@@ -163,6 +175,9 @@ export const Loading: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { level: 1, name: "Activity" })).toBeVisible();
 		await expect(canvas.queryAllByRole("link")).toHaveLength(0);
+		await expect(pageMaxWidth(canvas.getByRole("heading", { level: 1, name: "Activity" }))).toBe(
+			STANDARD_PAGE_WIDTH,
+		);
 	},
 };
 
@@ -172,6 +187,10 @@ export const MembershipFailed: Story = {
 		await expect(canvas.queryByRole("heading", { name: "Needs you" })).not.toBeInTheDocument();
 		await userEvent.click(canvas.getByRole("button", { name: /Retry/u }));
 		await expect(onRetry).toHaveBeenCalledOnce();
+		// The same width as the loaded page, so a retry does not make the page jump.
+		await expect(pageMaxWidth(canvas.getByRole("heading", { level: 1, name: "Activity" }))).toBe(
+			STANDARD_PAGE_WIDTH,
+		);
 	},
 };
 
