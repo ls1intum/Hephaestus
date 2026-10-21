@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -162,6 +165,49 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                 .files()
                 .get(FILE_KEY));
         assertThat(authorReview.has("reviewRecipient")).isFalse();
+    }
+
+    @Test
+    void shouldNameTheReviewerAndTheirDecisionForEachBundledReviewerPractice() {
+        var target =
+                review(PullRequestReview.State.CHANGES_REQUESTED, "reviewer", Instant.parse("2025-06-01T12:00:00Z"));
+        target.setBody("Please cover the empty list before merging.");
+        ReflectionTestUtils.setField(target, "id", 31L);
+        var author = Objects.requireNonNull(target.getAuthor());
+        ReflectionTestUtils.setField(author, "id", 32L);
+        author.setNativeId(33L);
+        when(reviewRepository.findRecentByPullRequestIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(target));
+        var metadata = metadataWithPr();
+        metadata.put("subject_role", "REVIEWER");
+        metadata.put("review_id", 31L);
+        metadata.put("about_user_id", 32L);
+        var reviewItem = request(metadata);
+
+        var reviewerPractices = ScmCaptureFixtures.bundledPractices().values().stream()
+                .filter(practice -> practice.definition().about() == AboutRole.REVIEWER)
+                .toList();
+
+        assertThat(reviewerPractices).hasSize(3).allSatisfy(practice -> {
+            assertThat(practice.kind()).isEqualTo(reviewItem.pinned().item().kind());
+            var reads = practice.definition().reads().sources();
+            assertThat(reads).anySatisfy(read -> {
+                assertThat(read.source()).isEqualTo(ReviewThreadContentSource.KIND);
+                assertThat(read.need()).isEqualTo(ReadNeed.COMPLETE);
+            });
+            var selected = reads.stream().map(read -> read.source()).collect(Collectors.toSet());
+            JsonNode threads = objectMapper.readTree(
+                    provider.capture(reviewItem, selected).files().get(FILE_KEY));
+            assertThat(threads.path("reviewRecipient").path("author").asString())
+                    .isEqualTo("reviewer");
+            assertThat(threads.path("reviewRecipient").path("authorId").asLong())
+                    .isEqualTo(33L);
+            assertThat(threads.path("reviewDecisions")).singleElement().satisfies(decision -> {
+                assertThat(decision.path("author").asString()).isEqualTo("reviewer");
+                assertThat(decision.path("state").asString()).isEqualTo("CHANGES_REQUESTED");
+                assertThat(decision.path("body").asString()).isEqualTo(target.getBody());
+            });
+        });
     }
 
     @Test

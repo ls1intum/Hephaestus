@@ -1,20 +1,37 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
+import static org.mockito.Mockito.mock;
+
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogPracticeDocument;
+import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalogLoader;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 public final class ScmCaptureFixtures {
     private ScmCaptureFixtures() {}
+
+    /**
+     * Every bundled practice by slug, as the catalogue ships it. {@code BundledPracticeReadRequirementsTest}
+     * runs the definition validator, so this load does not repeat it.
+     */
+    public static Map<String, CatalogPracticeDocument> bundledPractices() {
+        return new BundledPracticeCatalogLoader(JsonMapper.builder().build(), mock(PracticeDefinitionValidator.class))
+                .catalog().practices().stream()
+                        .collect(Collectors.toMap(practice -> practice.slug(), practice -> practice.definition()));
+    }
 
     public static ScmCaptureContext context(JsonNode fixture, long workspaceId, boolean issue) {
         long source = fixture.path(issue ? "issue_id" : "pull_request_id").asLong(1);
