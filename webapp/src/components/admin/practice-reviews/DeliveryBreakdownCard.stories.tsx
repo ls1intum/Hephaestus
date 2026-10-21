@@ -180,7 +180,10 @@ export const NothingYet: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByText("Nothing delivered in the last 30 days");
 		canvas.getByText("Nothing withheld in the last 30 days");
-		await expect(canvas.queryByRole("link")).toBeNull();
+		// No count opens an empty list; only the title opens the Feedback tab, as on every card.
+		await expect(canvas.getAllByRole("link").map((link) => link.textContent)).toStrictEqual([
+			"Delivered and withheld",
+		]);
 	},
 };
 
