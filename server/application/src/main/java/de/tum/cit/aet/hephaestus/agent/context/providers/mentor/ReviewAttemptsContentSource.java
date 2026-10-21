@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
-import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
@@ -13,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -43,7 +43,7 @@ public class ReviewAttemptsContentSource implements ContentSource {
     static final int LOOKBACK_DAYS = 90;
     static final int MAX_ATTEMPTS = 20;
     private final ReviewJobRepository jobs;
-    private final ReviewJobAssignments assignments;
+    private final ReviewAssignmentQuery assignments;
     private final List<ItemSourceAccess> sources;
     private final RegisteredItemLabels labels;
     private final ObjectMapper objectMapper;
@@ -116,8 +116,19 @@ public class ReviewAttemptsContentSource implements ContentSource {
         coverage.put("listingComplete", candidates.size() <= 200);
         var rows = root.putArray("attempts");
         List<Listed> listed = new ArrayList<>();
+        // A run is attributed by the developer its review wrote on each assignment, not by what it can still execute: a
+        // retired practice keeps its history. A run whose assignments cannot all be read is left out, and only this
+        // flag
+        // says so, so another developer's runs are not counted here.
+        boolean attributionComplete = true;
         for (ReviewJob job : candidates.stream().limit(200).toList()) {
-            var pinned = assignments.load(job).stream()
+            var asked = job.getInput().assignments();
+            var retained = assignments.retained(workspaceId, job.getReviewId(), job.getId(), asked);
+            if (retained.isEmpty() || (!asked.isEmpty() && retained.size() != asked.size())) {
+                attributionComplete = false;
+                continue;
+            }
+            var pinned = retained.stream()
                     .filter(entry -> Long.valueOf(developerId).equals(entry.developerId()))
                     .filter(entry -> selection.isEmpty()
                             || (entry.item().kind().equals(selection.get().kind())
@@ -155,11 +166,19 @@ public class ReviewAttemptsContentSource implements ContentSource {
                 row.put("completedAt", job.getCompletedAt().toString());
             listed.add(new Listed(row, item));
         }
+        coverage.put("attributionComplete", attributionComplete);
+        if (!attributionComplete)
+            coverage.put(
+                    "attributionNote",
+                    "Some retained runs in this workspace no longer show whose work they reviewed, so they are left out;"
+                            + " this list may be missing runs about the developer.");
         Map<Long, ItemLabel> named = listed.isEmpty()
                 ? Map.of()
                 : labels.labels(workspaceId, listed.stream().map(Listed::item).toList());
         listed.forEach(entry -> name(entry.row(), named.get(entry.item().itemId())));
-        if (selection.isPresent() && rows.isEmpty()) root.put("status", "NOT_FOUND");
+        // Absence is claimed only from a complete read: an unattributed run or a cut listing could be this item's.
+        if (selection.isPresent() && rows.isEmpty())
+            root.put("status", attributionComplete && candidates.size() <= 200 ? "NOT_FOUND" : "UNAVAILABLE");
         return root;
     }
 

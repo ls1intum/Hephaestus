@@ -1,18 +1,27 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
+import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -84,5 +93,55 @@ public class ReviewAssignmentQueryService implements ReviewAssignmentQuery {
                         definition,
                         version.orElseThrow().getReviewDigest(),
                         pinned.getMethod())));
+    }
+
+    /**
+     * Reads only the review, its rows and the workspace's items: the attribution is the developer the review wrote on
+     * its row when it listed the item, never the job's own input. Recorded keys are read in one scoped query and each
+     * item once. The selection is all or nothing: a key of another review, a recorded key without its row, or any
+     * selected row without a readable item or attribution leaves the whole run unattributed.
+     */
+    @Override
+    public List<Retained> retained(long workspaceId, UUID reviewId, UUID jobId, Collection<ReviewAssignmentId> ids) {
+        if (ids.stream().anyMatch(id -> !id.reviewId().equals(reviewId))) return List.of();
+        var review = reviews.findByIdAndWorkspaceId(reviewId, workspaceId);
+        if (review.isEmpty()) return List.of();
+        List<ReviewItem> rows;
+        if (ids.isEmpty()) {
+            rows = items.findByWorkspaceIdAndReviewIdAndJobIdOrderByPracticeIdAscItemIdAsc(
+                    workspaceId, reviewId, jobId);
+        } else {
+            var wanted = Set.copyOf(ids);
+            var itemIds = ids.stream().map(ReviewAssignmentId::itemId).collect(Collectors.toSet());
+            rows = items.findByWorkspaceIdAndReviewIdAndItemIdIn(workspaceId, reviewId, itemIds).stream()
+                    .filter(row ->
+                            wanted.contains(new ReviewAssignmentId(reviewId, row.getPracticeId(), row.getItemId())))
+                    .sorted(Comparator.comparingLong(ReviewItem::getPracticeId)
+                            .thenComparingLong(ReviewItem::getItemId))
+                    .toList();
+            if (rows.size() != wanted.size()) return List.of();
+        }
+        boolean scan = review.orElseThrow().getKind() == ReviewKind.SCAN;
+        Map<Long, Optional<ItemRef>> refs = new HashMap<>();
+        var retained = new ArrayList<Retained>();
+        for (var row : rows) {
+            var ref = refs.computeIfAbsent(row.getItemId(), itemId -> itemQuery.find(workspaceId, itemId));
+            if (ref.isEmpty()) return List.of();
+            Long developer = null;
+            if (!scan) {
+                var detail = row.getDetail();
+                if (detail == null || !detail.has("developerId")) return List.of();
+                var named = detail.path("developerId");
+                if (!named.isNull()) {
+                    if (!named.isIntegralNumber() || !named.canConvertToLong()) return List.of();
+                    developer = named.longValue();
+                }
+            }
+            retained.add(new Retained(
+                    new ReviewAssignmentId(reviewId, row.getPracticeId(), row.getItemId()),
+                    ref.orElseThrow(),
+                    developer));
+        }
+        return List.copyOf(retained);
     }
 }
