@@ -24,6 +24,8 @@ public record ResultHistoryEntry(
         Instant recordedAt,
         @Nullable Instant endedAt,
         @Nullable ResultEndReason endReason,
+        @Nullable Instant capturedAt,
+        StoredWorkVersion storedWorkVersion,
         List<ResultMarkKind> activeMarks,
         List<ProblemHistoryEntry> problems,
         List<String> openQuestions,
@@ -50,6 +52,16 @@ public record ResultHistoryEntry(
         example = example == null ? null : example.deepCopy();
         coverage = coverage == null ? null : coverage.deepCopy();
         criteria = criteria == null ? null : criteria.deepCopy();
+    }
+
+    /**
+     * How the result's recorded item version compares with the version of the work that Hephaestus stores now. Only an
+     * issue or a pull request has a comparable version, and only a result whose words may be read is compared.
+     */
+    public enum StoredWorkVersion {
+        SAME,
+        DIFFERENT,
+        UNKNOWN
     }
 
     @Override

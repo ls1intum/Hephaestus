@@ -333,7 +333,27 @@ Two server paths end a result with `WORK_CHANGED`:
 A result of a later-ordered review for the same practice, item and developer ends the earlier one with `REPLACED`.
 The mentor's result history shows `endedAt` and `endReason` of an ended result, beside its recorded outcome.
 It does not name a replacing result, and its bounded sample can omit one.
-It does not compare a result with the work again when Heph reads it.
+
+The history states two more facts of a result whose words it may copy:
+
+- `capturedAt` is the capture time in the retained manifest of the job that produced the result.
+  Only the assignment of the result's own review, practice and item that records this result names that job.
+  The custody's `sourceJobIds` also list copied dependencies, so they do not name it.
+  When that job is missing, belongs to another review, or has no valid manifest, the capture time is unknown.
+  `recordedAt`, the job's submission time and the provider's edit times are not capture times.
+- `storedWorkVersion` compares the exact recorded `item_version` with the version of the work that Hephaestus stores now.
+  `ProductItemQuery.currentWorkVersion` reads that version, for an issue or a pull request only.
+  `ResultCurrentness` reads the same version.
+  `SAME` means that the two stored versions are equal.
+  It is not a live provider read.
+  The version does not cover every field of the work.
+  A matching version does not show that a review is current or that a problem was repaired.
+  `DIFFERENT` includes an edit of only the title or the description.
+  `UNKNOWN` applies to other kinds and to a source that is unavailable or withheld.
+  It also applies to a result whose words the history may not copy.
+
+A history read ends no result.
+The results of a removed item stay out of the history.
 
 A result without an end time is not proof that it concerns the current work.
 The version comparison ends no result when its source is unavailable.

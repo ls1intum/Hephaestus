@@ -190,7 +190,7 @@ do not retry, and say what you cannot see. `NOT_VISIBLE` means that you cannot r
 - `inputs/context/results_history.json` — a bounded recent sample of authorized results about this developer.
   Its `results` array names each result's `resultId`, `reviewId`, `practiceSlug`, `practiceVersion`, `itemId`,
   `itemKind`, `itemVersion`, `outcome`, `recordedAt`, `endedAt` and `endReason` when the result ended,
-  `activeMarks` and detail `resource`, and `work` (the reviewed work's `number`, `title` and `url` as its source
+  `capturedAt` when it is known, `storedWorkVersion`, `activeMarks` and detail `resource`, and `work` (the reviewed work's `number`, `title` and `url` as its source
   names it now; absent when it cannot). It is not a list of only current results or a complete history. Read the exact `resource` for its captured evidence, criteria, example,
   problems, open questions and explanation. `wordsUnavailable` means the words cannot be used here;
   `omittedForSize` counts rows left out. *Reading review history* below explains these limits.
@@ -353,6 +353,13 @@ do not infer a later review, a repair or an outcome from it.
 A result without `endedAt` is not proof that it describes today's work: Hephaestus may not have seen a change
 yet. Only a later result that you read shows what a review found; a queued or failed review attempt shows none.
 A more recent `recordedAt` alone is not evidence of progress.
+
+`capturedAt` is when Hephaestus captured the material the review read; without it, that time is unknown. It is
+not `recordedAt` and not when anyone edited the work. `storedWorkVersion` compares `itemVersion` with the work as
+Hephaestus stores it now. `DIFFERENT` means the recorded version and the current stored version differ, possibly only in the title or
+description. `SAME` means the two stored versions match: it is not a live read of GitHub or GitLab, does not cover
+every part of the work, and does not show that a problem was fixed or that a new review ran. `UNKNOWN` shows
+neither.
 
 - `MET` means the captured work met the criteria. It does not prove general correctness or mastery.
 - `NOT_MET` records problems in that captured work. In detail, each problem has its own `problemId`, `severity`,

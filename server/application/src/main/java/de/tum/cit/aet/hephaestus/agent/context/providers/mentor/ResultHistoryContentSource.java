@@ -149,7 +149,12 @@ public class ResultHistoryContentSource implements ContentSource {
             if (work.url() != null) named.put("url", work.url());
         }
         row.set("activeMarks", objectMapper.valueToTree(entry.activeMarks()));
-        if (!copies.record(copies.of(entry))) return row.put("wordsUnavailable", "COPY_AUTHORITY_UNAVAILABLE");
+        if (!copies.record(copies.of(entry)))
+            return row.put("storedWorkVersion", ResultHistoryEntry.StoredWorkVersion.UNKNOWN.name())
+                    .put("wordsUnavailable", "COPY_AUTHORITY_UNAVAILABLE");
+        Instant capturedAt = entry.capturedAt();
+        if (capturedAt != null) row.put("capturedAt", capturedAt.toString());
+        row.put("storedWorkVersion", entry.storedWorkVersion().name());
         row.put("summary", entry.summary());
         if (detail) {
             row.put("explanation", entry.explanation());

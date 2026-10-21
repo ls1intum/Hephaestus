@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
@@ -14,11 +15,14 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +41,7 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
     private final ResultHistoryRepository historyRows;
     private final ReviewAssignmentQuery assignments;
     private final AccountMembershipQuery memberships;
+    private final HistoryCustodyQuery custody;
 
     @Override
     @Transactional(readOnly = true)
@@ -44,6 +49,7 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
         limit(limit);
         if (!memberships.isActiveVisibleMember(workspaceId, developerAccountId)) return List.of();
         return history(
+                workspaceId,
                 historyRows.forDeveloper(workspaceId, developerAccountId, since, PageRequest.of(0, limit)),
                 SourceUsePurpose.CONVERSATIONAL_MENTORING);
     }
@@ -54,6 +60,7 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
         limit(limit);
         if (items.find(workspaceId, itemId).isEmpty()) return List.of();
         return history(
+                workspaceId,
                 historyRows.forItem(workspaceId, itemId, practiceId, PageRequest.of(0, limit)),
                 SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
     }
@@ -72,7 +79,7 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
                 .filter(r -> Objects.equals(r.getDeveloperId(), viewerAccountId)
                         || (purpose == SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
                                 && memberships.isAdministrator(workspaceId, viewerAccountId)))
-                .flatMap(r -> entry(r, purpose))
+                .flatMap(r -> entry(r, purpose, new Read(workspaceId, List.of(r))))
                 .filter(ResultHistoryEntry::copyAuthorityComplete);
     }
 
@@ -91,6 +98,7 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
         var assignment = assignments.find(workspaceId, id);
         if (assignment.isEmpty()) return List.of();
         return history(
+                workspaceId,
                 historyRows.forAssignment(
                         workspaceId,
                         id.itemId(),
@@ -100,14 +108,15 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
                 SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
     }
 
-    private List<ResultHistoryEntry> history(List<Result> rows, SourceUsePurpose purpose) {
+    private List<ResultHistoryEntry> history(long workspaceId, List<Result> rows, SourceUsePurpose purpose) {
+        var read = new Read(workspaceId, rows);
         return rows.stream()
-                .map(r -> entry(r, purpose))
+                .map(r -> entry(r, purpose, read))
                 .flatMap(Optional::stream)
                 .toList();
     }
 
-    private Optional<ResultHistoryEntry> entry(Result result, SourceUsePurpose purpose) {
+    private Optional<ResultHistoryEntry> entry(Result result, SourceUsePurpose purpose, Read read) {
         if (result.getPracticeVersionId() == null || result.getItemVersion() == null) return Optional.empty();
         var version = versions.findByIdAndWorkspaceId(result.getPracticeVersionId(), result.getWorkspaceId());
         var item = items.find(result.getWorkspaceId(), result.getItemId());
@@ -161,6 +170,8 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
                 result.getRecordedAt(),
                 result.getEndedAt(),
                 result.getEndReason(),
+                permitted ? read.capturedAt(result) : null,
+                permitted ? read.storedWorkVersion(result) : ResultHistoryEntry.StoredWorkVersion.UNKNOWN,
                 marks
                         .findByWorkspaceIdAndResultIdOrderByCreatedAtDescIdDesc(result.getWorkspaceId(), result.getId())
                         .stream()
@@ -183,6 +194,56 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
                 facts.repositoryIds(),
                 permitted));
     }
+
+    /**
+     * The lookups of one history read: each work item's current version and each producing job's capture time are
+     * read once, and only for a result whose words may be read. Nothing outlives the read, and nothing it reads ends a
+     * result.
+     */
+    private final class Read {
+        private final long workspaceId;
+        private final List<Result> rows;
+        private final Map<Long, ProductItemQuery.CurrentWorkVersion> works = new HashMap<>();
+        private final Map<Receipt, Optional<Instant>> receipts = new HashMap<>();
+        private @Nullable Map<UUID, UUID> producers;
+
+        Read(long workspaceId, List<Result> rows) {
+            this.workspaceId = workspaceId;
+            this.rows = rows;
+        }
+
+        ResultHistoryEntry.StoredWorkVersion storedWorkVersion(Result result) {
+            // A row removed after the history read found it active is not compared.
+            return switch (works.computeIfAbsent(
+                    result.getItemId(), itemId -> items.currentWorkVersion(workspaceId, itemId))) {
+                case ProductItemQuery.CurrentWorkVersion.Known known ->
+                    known.value().equals(result.getItemVersion())
+                            ? ResultHistoryEntry.StoredWorkVersion.SAME
+                            : ResultHistoryEntry.StoredWorkVersion.DIFFERENT;
+                case ProductItemQuery.CurrentWorkVersion.Unknown ignored ->
+                    ResultHistoryEntry.StoredWorkVersion.UNKNOWN;
+                case ProductItemQuery.CurrentWorkVersion.Removed ignored ->
+                    ResultHistoryEntry.StoredWorkVersion.UNKNOWN;
+            };
+        }
+
+        @Nullable
+        Instant capturedAt(Result result) {
+            var known = producers;
+            if (known == null) {
+                known = authorization.producingJobs(workspaceId, rows);
+                producers = known;
+            }
+            var job = known.get(result.getId());
+            if (job == null) return null;
+            return receipts.computeIfAbsent(
+                            new Receipt(result.getReviewId(), job),
+                            receipt -> custody.capturedAt(workspaceId, receipt.reviewId(), receipt.jobId()))
+                    .orElse(null);
+        }
+    }
+
+    private record Receipt(UUID reviewId, UUID jobId) {}
 
     private static void limit(int limit) {
         if (limit < 1 || limit > 1000) throw new IllegalArgumentException("Use a history limit from 1 to 1000.");
