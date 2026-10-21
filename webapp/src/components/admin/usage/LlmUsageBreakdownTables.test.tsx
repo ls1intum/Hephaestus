@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 import type { LlmUsageByDay, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import type { Purse } from "@/components/practice-vocabulary/purse-defs";
@@ -195,6 +195,33 @@ describe("usage breakdown columns", () => {
 
 		const row = screen.getByRole("row", { name: /^Pull request review/u });
 		expect(cellTexts(row).slice(1, 5)).toStrictEqual(["$4.50", "$0.45", "$0.00", "$0.00"]);
+	});
+
+	it("names a practice review by the run type the server records for it now", () => {
+		const review = report.byJobType[0];
+		assert(review);
+		const current = {
+			...report,
+			byJobType: [{ ...review, jobType: "PRACTICE_REVIEW" }, ...report.byJobType.slice(1)],
+		};
+		render(<LlmUsageByJobTypeTable report={current} purses={BOTH} />);
+
+		const table = screen.getByRole("table", { name: "AI spend by run type" });
+		const row = within(table).getByRole("row", { name: /^Practice review/u });
+		expect(cellTexts(row)).toStrictEqual([
+			"Practice review",
+			"$4.50",
+			"$0.45",
+			"$1.50",
+			"$0.15",
+			"10",
+			"1",
+			"1,000",
+			"600",
+			"50",
+			"200",
+			"12",
+		]);
 	});
 
 	it("leaves the average out where runs with no price stand beside no priced spend", () => {

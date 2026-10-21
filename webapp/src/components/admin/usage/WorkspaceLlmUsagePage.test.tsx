@@ -128,6 +128,26 @@ describe("WorkspaceLlmUsagePage", () => {
 		).toStrictEqual(["$3.84", "$0.06", "$1.92", "$0.03"]);
 	});
 
+	it("names the practice reviews this month ran, beside the figures they used", async () => {
+		const review = pricedReport.byJobType[0];
+		assert(review);
+		await renderPage({
+			...pricedReport,
+			byJobType: [{ ...review, jobType: "PRACTICE_REVIEW" }, ...pricedReport.byJobType.slice(1)],
+		});
+
+		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
+		const cells = within(within(byJobType).getByRole("row", { name: /^Practice review/u }))
+			.getAllByRole("cell")
+			.map((cell) => cell.textContent);
+		expect([cells[0], cells[1], cells[5], cells.at(-1)]).toStrictEqual([
+			"Practice review",
+			"$8.20",
+			"41",
+			"312",
+		]);
+	});
+
 	describe("pause banners", () => {
 		it.each<[string, Partial<WorkspaceLlmUsageReport>, string, string, string | null]>([
 			[
