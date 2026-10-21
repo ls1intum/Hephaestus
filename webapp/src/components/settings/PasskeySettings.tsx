@@ -12,9 +12,9 @@ export function PasskeySettings({
 	confirmation: ConfirmAccessDialogProps;
 }) {
 	return (
-		<div id="passkeys">
+		<>
 			<PasskeySection {...section} />
 			<ConfirmAccessDialog {...confirmation} />
-		</div>
+		</>
 	);
 }

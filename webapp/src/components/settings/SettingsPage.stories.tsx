@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 
 import { TIME_ZONES } from "@/lib/dates";
 import { AuthProvider } from "@/runtime/auth/AuthContext";
@@ -141,6 +141,21 @@ export const Default: Story = {
 		onAccountDeleted: fn(),
 		isLoading: false,
 	},
+	play: async ({ canvas }) => {
+		// Each link leads to a group that is on the page; no passkeys are passed here, so none is listed.
+		const nav = within(canvas.getByRole("navigation", { name: "Settings sections" }));
+		const links = nav.getAllByRole("link");
+		await expect(links.map((link) => link.textContent)).toStrictEqual([
+			"Account security",
+			"Preferences",
+			"Research participation",
+			"Your data and account",
+		]);
+		for (const link of links) {
+			const target = link.getAttribute("href")?.slice(1) ?? "";
+			await expect(document.getElementById(target)).not.toBeNull();
+		}
+	},
 };
 
 export const EmailNotConfigured: Story = {
@@ -202,6 +217,45 @@ export const Loading: Story = {
 		onAccountDeleted: fn(),
 		isLoading: true,
 	},
+	play: async ({ canvas }) => {
+		// Only the setting the preferences read holds waits on it: every other section has its read.
+		await expect(canvas.getByRole("switch", { name: "Comments on your work" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(
+			canvas.getByRole("switch", { name: "Allow research use of my data" }),
+		).not.toHaveAttribute("aria-disabled", "true");
+		await expect(canvas.getByText("The Octocat")).toBeVisible();
+		await expect(canvas.queryByRole("list", { name: "Loading connected accounts…" })).toBeNull();
+		const aiChoice = within(canvas.getByRole("region", { name: "Your AI choice" }));
+		await expect(aiChoice.queryByText("Loading…")).toBeNull();
+	},
+};
+
+/**
+ * The preferences read failed. Only the setting it holds gives way to Retry: the research choice is
+ * read on its own, so it can still be withdrawn.
+ */
+export const PreferencesUnavailable: Story = {
+	args: {
+		...Default.args,
+		settingsError: true,
+		onRetrySettings: fn(),
+	},
+	play: async ({ args, canvas, userEvent }) => {
+		await expect(
+			canvas.getByText(
+				"We could not load your preferences, so your practice feedback setting is not shown.",
+			),
+		).toBeVisible();
+		await expect(canvas.queryByRole("switch", { name: "Comments on your work" })).toBeNull();
+		await userEvent.click(canvas.getByRole("switch", { name: "Allow research use of my data" }));
+		await expect(args.researchProps.onToggleResearch).toHaveBeenCalledWith(
+			false,
+			expect.anything(),
+		);
+	},
 };
 
 export const ResearchHidden: Story = {
@@ -223,6 +277,12 @@ export const ResearchHidden: Story = {
 		slackPreferencesProps: defaultSlackPreferencesProps,
 		onAccountDeleted: fn(),
 		isLoading: false,
+	},
+	play: async ({ canvas }) => {
+		// No research on this instance: neither the section nor a link to it.
+		const nav = within(canvas.getByRole("navigation", { name: "Settings sections" }));
+		await expect(nav.queryByRole("link", { name: "Research participation" })).toBeNull();
+		await expect(canvas.queryByRole("region", { name: "Research participation" })).toBeNull();
 	},
 };
 

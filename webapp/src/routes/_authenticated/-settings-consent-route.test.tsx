@@ -70,6 +70,34 @@ describe("research choice in account settings", () => {
 		);
 	});
 
+	it("withdraws while the other preferences cannot be read, since the research choice is read on its own", async () => {
+		let saved: ResearchConsent | undefined;
+		showConsent(consent, (body) => {
+			saved = body;
+		});
+		server.use(
+			http.get("*/user/settings", () =>
+				HttpResponse.json({ status: 503, title: "Service Unavailable" }, { status: 503 }),
+			),
+		);
+		renderRouteAtWithRouter("/settings");
+
+		await screen.findByText(
+			"We could not load your preferences, so your practice feedback setting is not shown.",
+			{},
+			ROUTE_RENDER_WAIT,
+		);
+		await userEvent.click(screen.getByRole("switch", { name: "Allow research use of my data" }));
+
+		await waitFor(() =>
+			expect(saved).toStrictEqual({
+				granted: false,
+				noticeVersion: WORDING_VERSION,
+				researchOrganization: "AET",
+			}),
+		);
+	});
+
 	it("sends the wording the page showed and tells the reader to reload when the server has moved on", async () => {
 		// A tab left open across a release shows the old words. The server refuses a decision filed
 		// under any other version, and a retry cannot succeed until the page reloads.

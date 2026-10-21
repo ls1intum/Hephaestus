@@ -167,6 +167,74 @@ describe("usePasskeySettings", () => {
 		expect(create).not.toHaveBeenCalled();
 		expect(result.current.section.error).toBeUndefined();
 	});
+	it("reads an expired confirmation again and reports a later verification failure", async () => {
+		let fresh = true;
+		const credentials = [
+			{ id: "one", label: "Laptop" },
+			{ id: "two", label: "Phone" },
+		];
+		server.use(
+			http.get("*/user/passkeys", () =>
+				HttpResponse.json({
+					protectionEnabled: true,
+					recoveryRequired: false,
+					instanceAdminRequired: true,
+					workspaceAdminRequired: false,
+					verified: fresh,
+					credentials,
+				}),
+			),
+			http.delete("*/user/passkeys/:credentialId", () => {
+				// The confirmation aged out between the page's read and the press.
+				fresh = false;
+				return HttpResponse.json(
+					{
+						type: "about:blank",
+						status: 403,
+						title: "Confirm access with a passkey",
+						detail:
+							"This action requires passkey verification. Open your passkey settings to confirm access.",
+						code: "passkey_required",
+					},
+					{ status: 403 },
+				);
+			}),
+		);
+		const { result } = setup();
+		await waitFor(() => expect(result.current.section.status?.verified).toBe(true));
+		act(() => result.current.section.onRemove("two"));
+		await waitFor(() =>
+			expect(result.current.section.error).toBe(
+				"Your passkey confirmation has expired. Verify your passkey again, then retry.",
+			),
+		);
+		await waitFor(() => expect(result.current.section.status?.verified).toBe(false));
+		expect(result.current.section.status?.credentials).toHaveLength(2);
+		expect(result.current.confirmation.open).toBe(false);
+
+		// The failed mutation stays recorded while verification options are requested. A newer
+		// refusal must be shown in its place, without starting the browser or sending a proof.
+		let verifications = 0;
+		server.use(
+			http.post("*/user/passkeys/verification-options", () =>
+				HttpResponse.json(
+					{ status: 503, detail: "Passkey verification is temporarily unavailable." },
+					{ status: 503 },
+				),
+			),
+			http.post("*/user/passkeys/verification", () => {
+				verifications += 1;
+				return new HttpResponse(null, { status: 204 });
+			}),
+		);
+		act(() => result.current.section.onVerify());
+		await waitFor(() =>
+			expect(result.current.section.error).toBe("Passkey verification is temporarily unavailable."),
+		);
+		expect(get).not.toHaveBeenCalled();
+		expect(verifications).toBe(0);
+		expect(result.current.section.status?.verified).toBe(false);
+	});
 	it("ends a canceled browser ceremony without sending a verification", async () => {
 		let verifications = 0;
 		get.mockRejectedValueOnce(new DOMException("Canceled", "NotAllowedError"));

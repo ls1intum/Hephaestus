@@ -31,6 +31,13 @@ const outline: IdentityView = {
 	displayName: "Octo Docs",
 };
 
+const slack: IdentityView = {
+	id: 4,
+	providerType: "SLACK",
+	subject: "U-1",
+	displayName: "Octo in Slack",
+};
+
 const githubProvider: IdentityProviderView = {
 	registrationId: "github",
 	displayName: "GitHub",
@@ -131,6 +138,9 @@ export const MultipleIdentities: Story = {
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("Outline");
+		// Two sign-in accounts: each of the three, the link-only one too, can be disconnected.
+		await expect(canvas.getAllByRole("button", { name: /^Disconnect /u })).toHaveLength(3);
+		await expect(canvas.queryByText(/only sign-in method/iu)).toBeNull();
 		await expect(canvas.queryByText("OUTLINE")).not.toBeInTheDocument();
 		await expect(canvas.queryByText("GITHUB")).not.toBeInTheDocument();
 		// Outline is already linked → no Outline connect CTA is offered.
@@ -138,23 +148,67 @@ export const MultipleIdentities: Story = {
 	},
 };
 
-/** Only one identity — disconnect is unavailable so the account can never lock itself out. */
+/** Only one sign-in identity — disconnect is unavailable so the account can never lock itself out. */
 export const SingleIdentity: Story = {
 	args: { identities: [github], providers: [githubProvider], linkedProviders: [githubLinked] },
 	play: async ({ args, canvas }) => {
 		// The lockout reason is always-visible text (not a disabled button), so SR/keyboard users
-		// can read why disconnect is unavailable.
-		canvas.getByText(/only sign-in method/iu);
+		// can read why disconnect is unavailable. No other sign-in account is offered to connect.
+		canvas.getByText(
+			"This is your only sign-in method. To remove it, delete your account in Danger zone.",
+		);
 		await expect(canvas.queryByRole("button", { name: /^disconnect /iu })).toBeNull();
 		await expect(args.onUnlink).not.toHaveBeenCalled();
 	},
 };
 
-/** One identity plus another provider available to connect. */
+/**
+ * GitHub is the only way in, beside a link-only Slack and Outline. The link-only accounts are no
+ * sign-in method, so they do not let GitHub go; each of them can still be disconnected.
+ */
+export const OnlySignInBesideLinkOnly: Story = {
+	args: {
+		identities: [github, slack, outline],
+		providers: [githubProvider],
+		linkedProviders: [githubLinked, outlineLinked],
+	},
+	play: async ({ args, canvas }) => {
+		await expect(canvas.getByText(/only sign-in method/iu)).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Disconnect The Octocat" })).toBeNull();
+		await expect(canvas.getByRole("button", { name: "Disconnect Octo Docs" })).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Disconnect Octo in Slack" }));
+		await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+		await expect(args.onUnlink).toHaveBeenCalledWith(4);
+	},
+};
+
+/** One sign-in account, and another one to connect: that is the way to let the first one go. */
 export const WithLinkableProvider: Story = {
 	args: { identities: [github], linkedProviders: [githubLinked] },
 	play: async ({ canvas }) => {
 		canvas.getByRole("button", { name: /connect gitlab/iu });
+		await expect(
+			canvas.getByText(
+				"This is your only sign-in method. To remove it, first connect another sign-in account below.",
+			),
+		).toBeVisible();
+	},
+};
+
+/** An offered provider without a registration cannot unlock the last sign-in account. */
+export const UnavailableSignInProvider: Story = {
+	args: {
+		identities: [github],
+		linkedProviders: [githubLinked],
+		providers: [githubProvider, { ...gitlabProvider, registrationId: "" }],
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: /connect gitlab/iu })).toBeDisabled();
+		await expect(
+			canvas.getByText(
+				"This is your only sign-in method. To remove it, delete your account in Danger zone.",
+			),
+		).toBeVisible();
 	},
 };
 

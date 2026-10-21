@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { BrowserContext, Page } from "@playwright/test";
+import type { BrowserContext, Locator, Page } from "@playwright/test";
 import { z } from "zod";
 
 import { expect, loginAsDevAdmin, test } from "./fixtures";
@@ -39,13 +39,19 @@ async function expectAdminAccess(context: BrowserContext, allowed: boolean) {
 	}
 }
 
-async function submitFromSettings(page: Page, path: string, button: string, status = 200) {
+async function submitFromSettings(
+	page: Page,
+	path: string,
+	button: string,
+	status = 200,
+	scope: Page | Locator = page,
+) {
 	const [response] = await Promise.all([
 		page.waitForResponse(
 			(value) =>
 				value.request().method() === "POST" && value.url() === `${serverUrl}/user/passkeys${path}`,
 		),
-		page.getByRole("button", { name: button, exact: true }).click(),
+		scope.getByRole("button", { name: button, exact: true }).click(),
 	]);
 	expect(response.status()).toBe(status);
 	// The mutation must settle before starting another browser ceremony.
@@ -142,7 +148,13 @@ test("real user verification grants admin access and recovery requires re-enroll
 		await page.getByLabel("Recovery code", { exact: true }).fill(recoveryCode);
 		await page.getByRole("button", { name: "Start recovery", exact: true }).click();
 		await expect(page.getByRole("alertdialog", { name: "Start passkey recovery?" })).toBeVisible();
-		await submitFromSettings(page, "/recovery", "Confirm");
+		await submitFromSettings(
+			page,
+			"/recovery",
+			"Start recovery",
+			200,
+			page.getByRole("alertdialog", { name: "Start passkey recovery?" }),
+		);
 		const recovered = await passkeyStatus(context);
 		expect(recovered).toMatchObject({ recoveryRequired: true, verified: false });
 		expect(recovered.credentials).toHaveLength(0);

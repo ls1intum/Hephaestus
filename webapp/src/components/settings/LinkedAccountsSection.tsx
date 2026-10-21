@@ -43,6 +43,16 @@ import { firstNonBlank, hasText } from "@/lib/text";
 const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
 
 /**
+ * The identities the server counts as a way in when it refuses to disconnect the last one. Named
+ * rather than derived from the link-only set: the server counts no other type, so an identity of a
+ * type not listed here never holds the account's last sign-in.
+ */
+const SIGN_IN_PROVIDER_TYPES = new Set(["GITHUB", "GITLAB"]);
+
+const signsIn = (identity: IdentityView) =>
+	SIGN_IN_PROVIDER_TYPES.has(identity.providerType.toUpperCase());
+
+/**
  * Providers an instance can run more than one deployment of, each its own registration. An account
  * linked to one deployment is not linked to another, so these are matched by origin, not by type.
  */
@@ -187,7 +197,13 @@ export function LinkedAccountsSection({
 		(provider) => !LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? ""),
 	);
 
-	const isOnlyIdentity = identities.length <= 1;
+	const signInCount = identities.filter(signsIn).length;
+	// A GitHub or GitLab offered below would let the last one go; Slack and Outline would not.
+	const canConnectSignIn = signInProviders.some(
+		(provider) =>
+			SIGN_IN_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? "") &&
+			hasText(provider.registrationId),
+	);
 
 	return (
 		<LinkedAccountsFrame headingRef={headingRef}>
@@ -234,7 +250,8 @@ export function LinkedAccountsSection({
 										identityId={identity.id}
 										name={name}
 										providerType={identity.providerType}
-										isOnlyIdentity={isOnlyIdentity}
+										isOnlySignIn={signsIn(identity) && signInCount <= 1}
+										canConnectSignIn={canConnectSignIn}
 										isUnlinking={unlinkingId === identity.id}
 										onConfirm={() => onUnlink(identity.id)}
 									/>
@@ -358,31 +375,37 @@ interface UnlinkControlProps {
 	identityId: number;
 	name: string;
 	providerType?: string;
-	isOnlyIdentity: boolean;
+	/** The account's one remaining sign-in identity, which the server refuses to disconnect. */
+	isOnlySignIn: boolean;
+	/** Another sign-in account is offered below, which would let this one go. */
+	canConnectSignIn: boolean;
 	isUnlinking: boolean;
 	onConfirm: () => void;
 }
 
 /**
- * The account's only identity cannot be disconnected, since that would lock the account out, so it
- * gets a sentence saying why in place of the control; a disabled button's reason would be unreachable
- * by keyboard.
+ * The account's only sign-in identity cannot be disconnected, since that would lock the account out,
+ * so it gets a sentence saying why in place of the control; a disabled button's reason would be
+ * unreachable by keyboard. A link-only account beside it stays free to disconnect.
  */
 function UnlinkControl({
 	identityId,
 	name,
 	providerType,
-	isOnlyIdentity,
+	isOnlySignIn,
+	canConnectSignIn,
 	isUnlinking,
 	onConfirm,
 }: UnlinkControlProps) {
-	if (isOnlyIdentity) {
+	if (isOnlySignIn) {
 		return (
 			<p
 				id={`lockout-hint-${identityId}`}
 				className="max-w-3xs shrink-0 text-xs text-muted-foreground"
 			>
-				This is your only sign-in method. To remove it, delete your account in Danger zone.
+				{canConnectSignIn
+					? "This is your only sign-in method. To remove it, first connect another sign-in account below."
+					: "This is your only sign-in method. To remove it, delete your account in Danger zone."}
 			</p>
 		);
 	}
