@@ -100,10 +100,6 @@ public class SlackMentorService {
             return;
         }
         long workspaceId = workspaceOpt.get();
-        if (!mentorReadinessQuery.isReady(workspaceId)) {
-            log.debug("Heph is not ready for workspace={}, ignoring DM", workspaceId);
-            return;
-        }
         String replyTs = threadTs.equals(messageTs) ? null : threadTs;
         SlackMentorInputGuard.Verdict verdict = inputGuard.decide(text);
         if (!verdict.allowsMentorTurn()) {
@@ -111,6 +107,10 @@ public class SlackMentorService {
                 reply(workspaceId, channelId, replyTs, verdict.responseText());
             }
             log.info("Slack DM diverted by input guard: workspace={} action={}", workspaceId, verdict.action());
+            return;
+        }
+        if (!mentorReadinessQuery.isReady(workspaceId)) {
+            reply(workspaceId, channelId, replyTs, MentorRefusal.UNAVAILABLE.userMessage());
             return;
         }
         Optional<Long> account = identityResolver.resolveActiveAccountId(workspaceId, teamId, slackUserId);

@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.mentor.MentorLedgerNotifications;
 import de.tum.cit.aet.hephaestus.mentor.MentorSlackDelivery;
 import de.tum.cit.aet.hephaestus.mentor.MentorSlackDelivery.SlackTurn;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurn;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnService;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import java.time.Clock;
@@ -113,6 +114,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
 
     private final MentorLedgerNotifications notifications;
     private final MentorSlackDelivery delivery;
+    private final MentorTurnService turns;
     private final MentorTurnCompletion completion;
     private final SlackMessageService slack;
     private final SlackMentorPoster poster;
@@ -131,6 +133,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
     public SlackMentorProjector(
             MentorLedgerNotifications notifications,
             MentorSlackDelivery delivery,
+            MentorTurnService turns,
             MentorTurnCompletion completion,
             SlackMessageService slack,
             SlackMentorPoster poster,
@@ -139,6 +142,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
         this(
                 notifications,
                 delivery,
+                turns,
                 completion,
                 slack,
                 poster,
@@ -158,6 +162,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
     SlackMentorProjector(
             MentorLedgerNotifications notifications,
             MentorSlackDelivery delivery,
+            MentorTurnService turns,
             MentorTurnCompletion completion,
             SlackMessageService slack,
             SlackMentorPoster poster,
@@ -167,6 +172,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
             ScheduledExecutorService timer) {
         this.notifications = notifications;
         this.delivery = delivery;
+        this.turns = turns;
         this.completion = completion;
         this.slack = slack;
         this.poster = poster;
@@ -302,12 +308,19 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
      * have shown the words before Slack went away, and unconfirmed feedback is never sent again.
      */
     private void giveUp(long workspaceId, UUID turnId) {
-        delivery.giveUp(workspaceId, turnId, () -> completion.recordUncertain(workspaceId, turnId));
+        delivery.giveUp(
+                workspaceId,
+                turnId,
+                () -> delivery.turn(workspaceId, turnId)
+                        .filter(turn -> turn.getStatus() == MentorTurn.Status.DONE)
+                        .ifPresent(turn -> completion.recordUncertain(workspaceId, turnId)));
     }
 
-    /** Settles the feedback the answer claimed by what the Slack reply shows of it. */
-    private void deliver(long workspaceId, UUID turnId, SlackMentorPosts.Reply.Seen seen) {
-        completion.recordDelivery(workspaceId, turnId, seen.whole(), seen.partly());
+    /** A completed answer settles by Slack visibility; stopped and failed turns settle at their end. */
+    private void deliver(SlackTurn turn, SlackMentorPosts.Reply.Seen seen) {
+        if (turn.turn().getStatus() == MentorTurn.Status.DONE) {
+            completion.recordDelivery(turn.turn().getWorkspaceId(), turn.turn().getId(), seen.whole(), seen.partly());
+        }
     }
 
     /** The turn's reply is settled: no wake-up still pending looks at it again. Runs under the lock. */
@@ -394,6 +407,9 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
             write(projection.workspaceId, stream, text.substring(stream.sent.length()));
             stream.failures = 0;
         } catch (SlackSendException e) {
+            if (STOPPED_BY_DEVELOPER.equals(e.slackError())) {
+                turns.stop(projection.workspaceId, projection.turnId);
+            }
             stream.end = afterRefusal(e, ++stream.failures);
             if (stream.end == StreamEnd.SEND_REST) {
                 later(projection, APPEND_INTERVAL);
@@ -535,7 +551,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
             delivery.settle(turn.turn().getWorkspaceId(), turn.question().getId(), MentorEntry.SlackDelivery.FAILED);
             replied = Replied.NOTHING;
         }
-        if (reconciling && replied == Replied.UNCERTAIN && answerId != null) {
+        if (reconciling && replied == Replied.UNCERTAIN && answerId != null && status == MentorTurn.Status.DONE) {
             // The one history read could not decide: what the reply showed stays unconfirmed.
             completion.recordUncertain(turn.turn().getWorkspaceId(), turn.turn().getId());
         }
@@ -598,15 +614,12 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
                 blocks(turn, text, answerId),
                 SlackMentorPosts.notification(text),
                 answerId);
-        SlackMentorPoster.Receipts receipts = answerId == null
+        SlackMentorPoster.Receipts receipts = answerId == null || turn.turn().getStatus() != MentorTurn.Status.DONE
                 ? SlackMentorPoster.Receipts.NONE
                 : outcome -> {
                     switch (outcome) {
                         case DELIVERED ->
-                            deliver(
-                                    workspaceId,
-                                    turn.turn().getId(),
-                                    reply.shownIn(text.substring(0, SlackMentorPosts.shownLength(text))));
+                            deliver(turn, reply.shownIn(text.substring(0, SlackMentorPosts.shownLength(text))));
                         case SILENCED -> silenced(turn, stream, reply);
                         case FAILED -> failed(turn, stream, reply);
                         case UNKNOWN -> {}
@@ -627,7 +640,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
      * the answer claimed was not shown. Runs in the transaction that stores the failure.
      */
     private void failed(SlackTurn turn, @Nullable ReplyStream stream, SlackMentorPosts.Reply reply) {
-        deliver(turn.turn().getWorkspaceId(), turn.turn().getId(), streamed(stream, reply));
+        deliver(turn, streamed(stream, reply));
     }
 
     /** What a stream of the reply showed; nothing without a stream. */
@@ -711,9 +724,9 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
             return replaceStream(turn, stream, ts, answerId, reply, whole);
         }
         delivery.delivered(workspaceId, questionId, answerId, ts, () -> {
-            if (answerId != null) {
+            if (answerId != null && status == MentorTurn.Status.DONE) {
                 if (stream != null) {
-                    deliver(workspaceId, turn.turn().getId(), reply.shownIn(stream.sent));
+                    deliver(turn, reply.shownIn(stream.sent));
                 } else {
                     // A stream that another server left behind: what it shows is not known here.
                     completion.recordUncertain(workspaceId, turn.turn().getId());
@@ -749,10 +762,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
         }
         delivery.delivered(workspaceId, questionId, answerId, ts, () -> {
             if (answerId != null) {
-                deliver(
-                        workspaceId,
-                        turn.turn().getId(),
-                        reply.shownIn(text.substring(0, SlackMentorPosts.shownLength(text))));
+                deliver(turn, reply.shownIn(text.substring(0, SlackMentorPosts.shownLength(text))));
             }
         });
         return Replied.DELIVERED;
@@ -794,8 +804,10 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
      * feedback.
      */
     private void silenced(SlackTurn turn, @Nullable ReplyStream stream, SlackMentorPosts.Reply reply) {
-        SlackMentorPosts.Reply.Seen seen = streamed(stream, reply);
-        completion.recordSilenced(turn.turn().getWorkspaceId(), turn.turn().getId(), seen.whole(), seen.partly());
+        if (turn.turn().getStatus() == MentorTurn.Status.DONE) {
+            SlackMentorPosts.Reply.Seen seen = streamed(stream, reply);
+            completion.recordSilenced(turn.turn().getWorkspaceId(), turn.turn().getId(), seen.whole(), seen.partly());
+        }
     }
 
     /** Removes 👀 from the question. */

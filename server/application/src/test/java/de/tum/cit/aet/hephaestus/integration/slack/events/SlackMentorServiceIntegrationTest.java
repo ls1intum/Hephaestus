@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorAdmission;
@@ -53,6 +54,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -422,13 +424,55 @@ class SlackMentorServiceIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertNothingStored("100.1");
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldExplainUnavailabilityInTheSameDmOrThreadWhenHephIsNotReady(boolean inThread) {
+        when(readiness.isReady(workspace.getId())).thenReturn(false);
+        String threadTs = inThread ? "100.0" : "100.1";
+
+        service.handleDm(TEAM, CHANNEL, SLACK_USER, "Can you review my work?", "100.1", threadTs);
+
+        verify(slack)
+                .postMessage(
+                        workspace.getId(),
+                        CHANNEL,
+                        inThread ? threadTs : null,
+                        List.of(),
+                        MentorRefusal.UNAVAILABLE.userMessage(),
+                        SlackMentorPosts.noticeMetadata());
+        verifyNoMoreInteractions(slack);
+        verifyNoInteractions(identities, admission);
+        assertNothingStored("100.1");
+        assertThat(turnRepository.findByWorkspaceIdAndRequestId(workspace.getId(), "slack:T1:D9:100.1"))
+                .isEmpty();
+    }
+
     @Test
-    void shouldIgnoreTheDmAndStoreNothingWhenHephIsNotReady() {
+    void shouldPointToHelpAndStoreNothingWhenTheDmSpeaksOfSelfHarmAndHephIsNotReady() {
         when(readiness.isReady(workspace.getId())).thenReturn(false);
 
-        service.handleDm(TEAM, CHANNEL, SLACK_USER, "Can you review my work?", "100.1", "100.1");
+        service.handleDm(TEAM, CHANNEL, SLACK_USER, "I want to kill myself", "100.1", "100.1");
 
-        verifyNoInteractions(slack);
+        verify(slack)
+                .postMessage(
+                        workspace.getId(),
+                        CHANNEL,
+                        null,
+                        List.of(),
+                        KeywordSlackMentorInputGuard.SELF_HARM_RESPONSE,
+                        SlackMentorPosts.noticeMetadata());
+        verifyNoMoreInteractions(slack);
+        verifyNoInteractions(readiness, identities, admission);
+        assertNothingStored("100.1");
+    }
+
+    @Test
+    void shouldStayQuietAndStoreNothingWhenTheDmIsAbusiveAndHephIsNotReady() {
+        when(readiness.isReady(workspace.getId())).thenReturn(false);
+
+        service.handleDm(TEAM, CHANNEL, SLACK_USER, "stupid bot", "100.1", "100.1");
+
+        verifyNoInteractions(slack, readiness, identities, admission);
         assertNothingStored("100.1");
     }
 

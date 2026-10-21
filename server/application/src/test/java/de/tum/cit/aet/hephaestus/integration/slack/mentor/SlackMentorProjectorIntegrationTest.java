@@ -9,6 +9,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -21,6 +23,7 @@ import static org.mockito.Mockito.when;
 import com.slack.api.model.Message;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.MarkdownBlock;
+import de.tum.cit.aet.hephaestus.agent.mentor.turn.ConversationReceiptsDue;
 import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorTurnCompletion;
 import de.tum.cit.aet.hephaestus.integration.core.sync.MutableClock;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -63,9 +66,13 @@ import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -103,7 +110,7 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
     @Autowired
     private MentorLedgerNotifications notifications;
 
-    @Autowired
+    @MockitoSpyBean
     private MentorTurnCompletion completion;
 
     @Autowired
@@ -142,6 +149,7 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
         projector = new SlackMentorProjector(
                 notifications,
                 delivery,
+                turns,
                 completion,
                 slack,
                 new SlackMentorPoster(slack, delivery),
@@ -919,6 +927,117 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
         assertThat(appended.getValue()).contains(FEEDBACK).endsWith("What do you make of the gap?");
         assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.DELIVERED);
         assertThat(feedbackState()).isEqualTo(FeedbackState.DELIVERED);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "STOPPED, false, POST",
+        "STOPPED, true, POST",
+        "FAILED, false, POST",
+        "FAILED, true, POST",
+        "STOPPED, false, STREAM",
+        "STOPPED, true, STREAM",
+        "STOPPED, false, SILENCED",
+        "STOPPED, true, SILENCED",
+        "STOPPED, false, DISCONNECTED",
+        "STOPPED, true, DISCONNECTED",
+        "FAILED, false, STREAM",
+        "FAILED, true, STREAM",
+        "FAILED, false, SILENCED",
+        "FAILED, true, SILENCED",
+        "FAILED, false, DISCONNECTED",
+        "FAILED, true, DISCONNECTED"
+    })
+    void shouldKeepTheEndReceiptInEitherOrderWhenTheSlackReplyOfAnInterruptedTurnSettles(
+            MentorTurn.Status outcome, boolean reverseReceipts, String path) {
+        boolean topLevel = path.equals("POST");
+        MentorTurnService.Submission asked = topLevel ? ask(main, "How are my reviews?", "100.1") : askInThread();
+        MentorTurn running = topLevel ? turns.claimNext(WORKER, LEASE).orElseThrow() : running(asked);
+        if (topLevel) {
+            postsAt("300.1");
+        }
+        MentorTurnCompletion receiptListener = AopTestUtils.getUltimateTargetObject(completion);
+        List<ConversationReceiptsDue> pending = new ArrayList<>();
+        doAnswer(call -> {
+                    ConversationReceiptsDue due = call.getArgument(0);
+                    if (due.workspaceId() == workspace.getId() && due.turnId().equals(running.getId())) {
+                        pending.add(due);
+                    } else {
+                        call.callRealMethod();
+                    }
+                    return null;
+                })
+                .when(receiptListener)
+                .settle(any());
+        when(slack.startStream(workspace.getId(), CHANNEL, "100.1", "Here is what I saw."))
+                .thenReturn("300.1");
+        turns.updatePartial(running.getId(), running.getAttempt(), WORKER, partial("Here is what I saw."));
+        changed(running);
+        List<JsonNode> answer = linkingAnswer(running, "What do you make of the gap?");
+        UUID unshown = ConversationFeedbackRows.claimedBy(
+                jdbc, workspace.getId(), developerAccount, running.getId(), "Feedback Heph did not show.");
+        if (outcome == MentorTurn.Status.STOPPED) {
+            turns.stop(workspace.getId(), running.getId());
+        }
+        end(running, outcome, answer, outcome == MentorTurn.Status.FAILED ? "Heph could not finish." : "");
+        if (path.equals("DISCONNECTED")) {
+            when(slack.isConnected(workspace.getId())).thenReturn(false);
+            assertThat(delivery.retry(workspace.getId(), asked.question().getId()))
+                    .isTrue();
+            projector.reconcile(workspace.getId(), running.getId(), true);
+        } else {
+            if (path.equals("SILENCED")) {
+                stopStreamFails("silent_mode_engaged");
+            }
+            changed(running);
+        }
+        // The listeners may run in either order in production, outside the turn's committing transaction.
+        doCallRealMethod().when(receiptListener).settle(any());
+        (reverseReceipts ? pending.reversed() : pending).forEach(completion::settle);
+
+        assertThat(feedbackState()).isEqualTo(FeedbackState.UNCONFIRMED);
+        assertThat(jdbc.queryForObject(
+                        "SELECT state FROM feedback WHERE workspace_id=? AND id=?",
+                        String.class,
+                        workspace.getId(),
+                        unshown))
+                .isEqualTo(FeedbackState.FAILED.name());
+        assertThat(copySettled()).isTrue();
+        assertThat(pending).hasSize(1);
+    }
+
+    @Test
+    void shouldStopOnlyTheStreamingTurnWhenSlackReportsThatTheDeveloperStoppedIt() {
+        MentorTurnService.Submission asked = askInThread();
+        MentorTurn running = running(asked);
+        MentorTurnService.Submission followUp =
+                ask(conversations.require(workspace.getId(), running.getConversationId()), "And next?", "100.6");
+        when(slack.startStream(workspace.getId(), CHANNEL, "100.1", "Here is what I saw."))
+                .thenReturn("300.1");
+        turns.updatePartial(running.getId(), running.getAttempt(), WORKER, partial("Here is what I saw."));
+        changed(running);
+        appendFails(new SlackSendException(workspace.getId(), CHANNEL, "stopped_by_user"));
+        clock.advance(SlackMentorProjector.APPEND_INTERVAL);
+        List<JsonNode> answer = linkingAnswer(running, "What do you make of the gap?");
+        turns.updatePartial(running.getId(), running.getAttempt(), WORKER, partial("Here is what I saw. More"));
+
+        changed(running);
+
+        assertThat(turns.require(workspace.getId(), running.getId()).getStatus())
+                .isEqualTo(MentorTurn.Status.STOPPED);
+        assertThat(turns.require(workspace.getId(), followUp.turn().getId()).getStatus())
+                .isEqualTo(MentorTurn.Status.QUEUED);
+        assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.PENDING);
+        end(running, MentorTurn.Status.STOPPED, answer, "");
+        changed(running);
+        changed(running);
+
+        verify(slack).appendStream(workspace.getId(), CHANNEL, "300.1", " More");
+        verify(slack, never()).postMessage(anyLong(), anyString(), any(), anyList(), anyString(), any());
+        verify(slack, never()).stopStream(anyLong(), anyString(), anyString(), any());
+        assertThat(answerOf(running).getSlackTs()).isEqualTo("300.1");
+        // The successful show_feedback call preceded the stop; its visibility outside Slack is not disproved.
+        assertThat(feedbackState()).isEqualTo(FeedbackState.UNCONFIRMED);
     }
 
     @Test

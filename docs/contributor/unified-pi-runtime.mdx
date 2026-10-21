@@ -265,8 +265,13 @@ Thus, only a stream that no server ended is a Heph message without metadata.
 A failed turn gets its reason as the reply.
 A stopped turn's reply is what Heph wrote before the stop.
 If Heph wrote nothing, nothing is posted.
-A developer stops a turn in the app, also a turn asked in Slack.
-A stop of the stream in Slack does not stop the turn.
+
+A developer can stop any active turn in the app, also a turn asked in Slack.
+When Slack rejects a running turn's stream append with `stopped_by_user`, the projector calls the same workspace-scoped turn stop.
+The stream belongs to one claimed turn, so the stop changes that turn only. Queued follow-ups stay queued.
+
+Heph learns of a Slack stop only at the next append. An app stop remains available during a tool wait.
+A turn that already ended stays unchanged. Other stream failures do not mean the developer asked to stop the turn.
 
 A retried attempt starts its answer again, in a new message.
 If Slack still streams the lost attempt's stream, it ends with "… Heph had to start again. The answer follows below."
@@ -285,7 +290,7 @@ Slack documents no way to keep a stream open while it gets no text.
 
 | Cause | The stream | When the turn ends |
 | --- | --- | --- |
-| `stopped_by_user`: the developer stopped the stream in Slack. | Takes no more text. | The stream ends where it is. |
+| `stopped_by_user`: the developer stopped the stream in Slack. | Takes no more text. A refused append while the turn runs also stops that turn. | The stream ends where it is. |
 | `message_not_in_streaming_state`: Slack ended the stream, for example after a timeout that it does not document. | Takes no more text. | `chat.update` replaces the message with the whole reply. |
 | A transport failure or a Slack server error. Slack can show the text already, so the append is not sent again. | Takes no more text. | `chat.stopStream`, then `chat.update` with the whole reply. If this error answered `chat.startStream`, the server does not know the stream's `ts`. It reads the thread for a message with the app's `bot_id` (from `auth.test`) and without metadata, from within 2 seconds of the refused start. It replaces that message only if exactly one matches. Otherwise, it posts the whole reply. |
 | A rate limit, or any other error. | Takes the text again a second later. After 8 refused appends in a row, it takes no more text. | As for a transport failure. |
@@ -323,6 +328,7 @@ The shown part is what the stream sent, or the part of a post or a `chat.update`
 | The reply can no longer reach Slack. | It stays `UNCONFIRMED`. |
 
 A turn asked in Slack that ended `STOPPED` or `FAILED` settles its feedback at the end, as an app turn does ([Delivery of shown feedback](#delivery-of-shown-feedback)).
+Only a `DONE` turn's Slack projection publishes feedback receipts. A later stream, post, Silent Mode refusal, or disconnected-reply reconciliation cannot replace the end's cutoff receipt.
 
 ### Reconciler
 
