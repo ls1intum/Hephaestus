@@ -322,10 +322,21 @@ Messages still expire under the stream's retention.
 A deployment offline past the stream's byte or age bound returns to a cursor that points at messages no longer present.
 Those messages are not delivered.
 
+## Broker image security scope
+
+The bundled broker uses standalone JetStream with user/password authentication and plain NATS
+with the host port bound to loopback by default. Its image assessment for CVE-2026-111943 applies to these
+shipped launches. The certificate-verification code is present but its TLS, HTTPS resolver, OCSP
+and remote-cluster paths are not enabled.
+
+A custom broker configuration that enables certificate verification is outside that assessment.
+Use a fixed vendor image or reassess the advisory before enabling those features. This also
+applies to an external broker reached through a `tls://` application connection.
+
 ## Making a change actually reach the broker
 
 **Compose does not recreate NATS when only its config changes.**
-The broker configuration is a Compose `configs:` block that renders to a bind-mounted file.
+The broker configuration is supplied by a Compose `configs:` block.
 A content change does not change the container spec.
 
 :::caution CAUTION: Restart loses active deliveries
