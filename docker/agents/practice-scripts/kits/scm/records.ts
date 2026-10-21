@@ -6,19 +6,24 @@ function notKnownWhenUnnamed<const T extends readonly [string, ...string[]]>(val
 	return z.enum(values).optional();
 }
 
-/** `metadata.json` of a pull request: `PullRequestContentSource.buildPullRequestMetadata`. */
+/** `metadata.json` of a pull request: `PullRequestContentSource.workRecord`. */
 export const pullRequestRecordSchema = z.object({
-	/** Which time each part describes: `admission_fields` come from the job, the rest from the mirror. */
+	/**
+	 * Which time each part describes. A current record reads every field at capture, at `captured_at`, which is not the
+	 * provider event time. Older records may contain `admission_fields` and `admitted_at` declarations.
+	 * Readers preserve these declarations as recorded.
+	 */
 	basis: z.object({
-		admission_fields: z.array(z.string()),
+		admission_fields: z.array(z.string()).optional(),
 		admitted_at: z.string().optional(),
 		other_fields: z.string(),
+		captured_at: z.string().optional(),
 		mirror_synced_at: z.string().optional(),
 	}),
 	pr_number: z.int(),
 	pr_url: z.string(),
 	repository_full_name: z.string(),
-	/** The admitted repository's id: a full name is unique only within one provider. */
+	/** The pinned repository's id: a full name is unique only within one provider. */
 	repository_id: z.int().positive().optional(),
 	/** That repository's provider, as the mirror held it at capture. Absent when it could not be told. */
 	provider_id: z.int().positive().optional(),

@@ -18,12 +18,14 @@
         "other_fields": {
           "type": "string"
         },
+        "captured_at": {
+          "type": "string"
+        },
         "mirror_synced_at": {
           "type": "string"
         }
       },
       "required": [
-        "admission_fields",
         "other_fields"
       ]
     },

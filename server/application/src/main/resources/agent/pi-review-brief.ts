@@ -444,9 +444,10 @@ function datedOf(value: unknown): string | undefined {
 }
 
 /**
- * When each part of the record was read, as its producer states it: the named fields as retained when the review was
- * admitted, the others as the capture read them. Only fields this block shows may be named; a malformed part stays
- * unstated, and no time is inferred.
+ * When each part of the record was read, as its producer states it. A current record reads every field at capture and
+ * dates that read with `captured_at`, which is not the provider event time. Older records may contain
+ * `admission_fields` and `admitted_at` declarations, which readers preserve as recorded. Only fields this block shows
+ * may be named; a malformed part stays unstated, and no time is inferred.
  */
 function basisOf(value: unknown, shown: ReadonlySet<string>): Record<string, unknown> | undefined {
 	if (!isRecord(value)) {
@@ -457,11 +458,13 @@ function basisOf(value: unknown, shown: ReadonlySet<string>): Record<string, unk
 		? named.filter((field) => shown.has(field))
 		: [];
 	const admittedAt = datedOf(value.admitted_at);
+	const capturedAt = datedOf(value.captured_at);
 	const mirrorSyncedAt = datedOf(value.mirror_synced_at);
 	const basis = {
 		...(admissionFields.length > 0 ? { admission_fields: admissionFields } : {}),
 		...(admittedAt === undefined ? {} : { admitted_at: admittedAt }),
 		...(value.other_fields === "CAPTURE" ? { other_fields: "CAPTURE" } : {}),
+		...(capturedAt === undefined ? {} : { captured_at: capturedAt }),
 		...(mirrorSyncedAt === undefined ? {} : { mirror_synced_at: mirrorSyncedAt }),
 	};
 	return Object.keys(basis).length > 0 ? basis : undefined;

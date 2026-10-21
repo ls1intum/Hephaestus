@@ -136,6 +136,18 @@ Description and discussion capture can still succeed from synchronized provider 
 Readiness withholds practices that require the unavailable source and retains the precise reason in each source check.
 Neither a fetch failure nor an unavailable source is evidence of a problem in the work.
 
+A pull or merge request work record contains the mirror as capture reads it.
+Capture first verifies the mirror against the pinned version.
+If the version changed, for example its title, description, head or base, the capture stops.
+It uses none of the changed material.
+
+The record dates its read with `basis.captured_at`.
+This time is not the provider event time, the request time or a sync observation time.
+`basis.mirror_synced_at` dates the status fields separately.
+The record does not recover material of an earlier version.
+Records from earlier releases can name `admission_fields` and `admitted_at`.
+Readers keep those declarations as recorded.
+
 Preparation failures log exception class names and their cause chain once per attempt.
 These diagnostics exclude exception messages, credentials and provider bodies.
 
