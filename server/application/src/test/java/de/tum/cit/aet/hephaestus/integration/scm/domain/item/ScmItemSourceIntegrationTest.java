@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
@@ -62,6 +63,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultCurrentness;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -1325,6 +1327,85 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         issue.setUpdatedAt(Instant.now());
         issue.setParentIssue(parent);
         return issues.saveAndFlush(issue);
+    }
+
+    @Autowired
+    private ProductReferenceQuery productReferences;
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldNameRegisteredWorkByItsProvidersLabelOnlyInsideItsOwnWorkspace(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var elsewhere = fixture(type);
+        var pull = new PullRequest();
+        pull.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+        pull.setProvider(fixture.provider());
+        pull.setRepository(fixture.repository());
+        pull.setNumber(21);
+        pull.setTitle("Explain the change");
+        pull.setBody("Why this change is needed.");
+        pull.setState(Issue.State.OPEN);
+        pull.setAuthor(fixture.author());
+        pull.setHtmlUrl(fixture.repository().getHtmlUrl() + "/pull/21");
+        pull.setCreatedAt(Instant.now());
+        pull.setUpdatedAt(Instant.now());
+        pull.setHeadRefOid("a".repeat(40));
+        pull.setBaseRefOid("b".repeat(40));
+        pull.setHeadRefName("topic");
+        pull.setBaseRefName("main");
+        long pullId = pulls.saveAndFlush(pull).getId();
+        long workspaceId = fixture.workspace().getId();
+        var holder = writer.upsert(new ItemRegistration(
+                workspaceId, ScmItemEvents.REPOSITORY, fixture.repository().getId(), null, null));
+        var item = writer.upsert(
+                new ItemRegistration(workspaceId, ScmItemEvents.PULL_REQUEST, pullId, holder.itemId(), null));
+
+        var references = productReferences.items(workspaceId, List.of(item.itemId(), holder.itemId()));
+        var named = Objects.requireNonNull(references.get(item.itemId()));
+        var repositoryReference = Objects.requireNonNull(references.get(holder.itemId()));
+        assertThat(repositoryReference.kind()).isEqualTo("scm.repository");
+        assertThat(repositoryReference.label()).isEqualTo(fixture.repository().getNameWithOwner());
+        assertThat(repositoryReference.url()).isEqualTo(fixture.repository().getHtmlUrl());
+        // GitHub numbers pull requests with #, GitLab merge requests with !.
+        assertThat(named.label()).isEqualTo(type == IdentityProviderType.GITHUB ? "#21" : "!21");
+        assertThat(named.title()).isEqualTo("Explain the change");
+        assertThat(named.url()).isEqualTo(pull.getHtmlUrl());
+        assertThat(named.container()).isEqualTo(fixture.repository().getNameWithOwner());
+        assertThat(named.provider()).isEqualTo(IntegrationKind.valueOf(type.name()));
+        assertThat(named.removedAt()).isNull();
+
+        // Another workspace learns nothing about this one's work, not even that it exists.
+        assertThat(productReferences.items(elsewhere.workspace().getId(), List.of(item.itemId(), holder.itemId())))
+                .isEmpty();
+
+        // Removed work keeps its own name while its address is withdrawn.
+        jdbc.update(
+                "UPDATE item SET removed_at=? WHERE workspace_id=? AND id=?",
+                Timestamp.from(Instant.now()),
+                workspaceId,
+                item.itemId());
+        var removed = Objects.requireNonNull(
+                productReferences.items(workspaceId, List.of(item.itemId())).get(item.itemId()));
+        assertThat(removed.label()).isEqualTo(named.label());
+        assertThat(removed.url()).isNull();
+        assertThat(removed.removedAt()).isNotNull();
+
+        long unavailableId = Objects.requireNonNull(jdbc.queryForObject(
+                "INSERT INTO item(workspace_id,kind,source_id,parent_id,created_at)"
+                        + " VALUES (?,'scm.pull_request',?,?,?) RETURNING id",
+                Long.class,
+                workspaceId,
+                Long.MAX_VALUE,
+                holder.itemId(),
+                Timestamp.from(Instant.now())));
+        var unavailable = Objects.requireNonNull(
+                productReferences.items(workspaceId, List.of(unavailableId)).get(unavailableId));
+        assertThat(unavailable.label()).isEqualTo("Pull or merge request");
+        assertThat(unavailable.provider()).isNull();
+        assertThat(unavailable.title()).isNull();
+        assertThat(unavailable.url()).isNull();
     }
 
     private Fixture fixture(IdentityProviderType type) {

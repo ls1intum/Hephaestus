@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -15,6 +16,10 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.PracticePageFeedbackRouter;
 import de.tum.cit.aet.hephaestus.practices.feedback.page.PracticePageFeedbackService;
@@ -73,6 +78,11 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
 
     @MockitoBean
     PracticePageFeedbackRouter pageRouter;
+
+    // This fixture's item has no mirrored work behind it, so the real labels are empty, which is also this
+    // mock's default. Only the label mapping test below names one.
+    @MockitoBean
+    RegisteredItemLabels itemLabels;
 
     @Test
     void shouldReturnOnePersistedPreparationTimeAndCanonicalOrderedPackageDigest() {
@@ -592,6 +602,117 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
                 .isEqualTo(PrivateFeedbackProgress.NONE);
         assertThat(store.privateProgress(workspace.getId(), UUID.randomUUID(), developerId, everything))
                 .isEqualTo(PrivateFeedbackProgress.NONE);
+    }
+
+    /**
+     * Label mapping only: visibility, the current developer and pattern support are controlled as in the card
+     * projection test above, so this proves what the page names the work, not who may read it.
+     */
+    @Test
+    void shouldNameTheCardEvidenceByTheProvidersOwnLabelAndFallBackToTheKindsDisplayName() {
+        when(pageRouter.supportsPattern(any(), anyList())).thenReturn(true);
+        var job = new ReviewJob();
+        job.setId(UUID.randomUUID());
+        job.setWorkspaceId(workspace.getId());
+        job.setReviewId(reviewId);
+        job.setInput(new ReviewJobInput(itemId, List.of()));
+        var composed = new ComposedFeedback(
+                FeedbackDestination.PRACTICE_PAGE,
+                List.of(supportingResult.getId()),
+                null,
+                List.of(),
+                null,
+                new FeedbackCompositionTrace(
+                        List.of(new FeedbackCompositionTrace.CopySupport(
+                                FeedbackCopyKind.SUMMARY, 0, support(supportingResult))),
+                        List.of(),
+                        null,
+                        null),
+                new ComposedFeedback.Page(
+                        "Cover the failure case",
+                        "The failure case has no test.",
+                        "Add a test that reaches the failure case."));
+        var draft = FeedbackDraftBuilder.build(
+                        job,
+                        new PrepareFeedbackRequestDTO(
+                                reviewId,
+                                job.getId(),
+                                0,
+                                List.of(supportingResult.getId()),
+                                List.of(composed),
+                                false,
+                                null),
+                        List.of(snapshot(supportingResult)),
+                        List.of(),
+                        Map.of())
+                .getFirst();
+        store.prepareAll(workspace.getId(), reviewId, List.of(draft));
+        when(currentDeveloper.currentDeveloperId()).thenReturn(Optional.of(developerId));
+        when(resultVisibility.permitsShown(
+                        eq(workspace.getId()), anyList(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
+                .thenReturn(Set.of(supportingResult.getId()));
+
+        // The provider's own name for the work, never the kind's noun shared by every pull request.
+        String url = "https://github.com/ls1intum/hephaestus/pull/21";
+        when(itemLabels.labels(eq(workspace.getId()), anyCollection()))
+                .thenReturn(Map.of(
+                        itemId,
+                        new ItemLabel(
+                                itemId,
+                                "#21",
+                                "Explain the change",
+                                "pull request",
+                                21,
+                                "ls1intum/hephaestus",
+                                url,
+                                IntegrationKind.GITHUB)));
+        var named = evidenceItem(draft.id());
+        assertThat(named.label()).isEqualTo("#21");
+        assertThat(named.title()).isEqualTo("Explain the change");
+        assertThat(named.url()).isEqualTo(url);
+        assertThat(named.provider()).isEqualTo(IntegrationKind.GITHUB);
+        assertThat(named.removedAt()).isNull();
+
+        // Removed work may keep its name while its address is gone; the removal stays on the reference.
+        jdbc.update(
+                "UPDATE item SET removed_at=? WHERE workspace_id=? AND id=?",
+                Timestamp.from(AT.plusSeconds(60)),
+                workspace.getId(),
+                itemId);
+        when(itemLabels.labels(eq(workspace.getId()), anyCollection()))
+                .thenReturn(Map.of(
+                        itemId,
+                        new ItemLabel(
+                                itemId,
+                                "#21",
+                                "Explain the change",
+                                "pull request",
+                                21,
+                                "ls1intum/hephaestus",
+                                null,
+                                IntegrationKind.GITHUB)));
+        var removed = evidenceItem(draft.id());
+        assertThat(removed.label()).isEqualTo("#21");
+        assertThat(removed.url()).isNull();
+        assertThat(removed.removedAt()).isEqualTo(AT.plusSeconds(60));
+
+        // With no label at all, the kind's human name stands in, and nothing about the provider is invented.
+        when(itemLabels.labels(eq(workspace.getId()), anyCollection())).thenReturn(Map.of());
+        var unnamed = evidenceItem(draft.id());
+        assertThat(unnamed.label()).isEqualTo("Pull or merge request");
+        assertThat(unnamed.kind()).isEqualTo("scm.pull_request");
+        assertThat(unnamed.provider()).isNull();
+        assertThat(unnamed.title()).isNull();
+        assertThat(unnamed.url()).isNull();
+    }
+
+    private ItemRefDTO evidenceItem(UUID feedbackId) {
+        var card = page.getOwnPracticePageFeedback(workspace.getId()).stream()
+                .filter(row -> row.id().equals(feedbackId))
+                .findFirst()
+                .orElseThrow();
+        assertThat(card.evidence()).hasSize(1);
+        return card.evidence().getFirst().item();
     }
 
     private AdmittedResultSnapshot snapshot(Result result) {

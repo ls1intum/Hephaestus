@@ -60,6 +60,55 @@ export const RegularUser: Story = {
 	},
 };
 
+/**
+ * Collapsed to icons on a desktop, the workspace button shows only the avatar but still says which
+ * workspace it is: the name and login stay readable to a screen reader, whether the avatar loads or not.
+ */
+export const Collapsed: Story = {
+	decorators: [
+		(Story) => (
+			<SidebarProvider defaultOpen={false} className="w-full max-w-[16rem]">
+				<Story />
+			</SidebarProvider>
+		),
+	],
+	play: async ({ canvas }) => {
+		const workspace = canvas.getByRole("button", { name: "AET aet-org" });
+		// Icon width proves the real sidebar collapsed, not a story that only names it so.
+		await expect(workspace.getBoundingClientRect().width).toBeLessThanOrEqual(48);
+	},
+};
+
+/** Collapsed with no workspace, a member's button still says there is none, and stays unavailable. */
+export const CollapsedNoWorkspace: Story = {
+	decorators: Collapsed.decorators,
+	args: {
+		isAppAdmin: false,
+		workspaces: [],
+		activeWorkspace: undefined,
+	},
+	play: async ({ canvas }) => {
+		const empty = canvas.getByRole("button", { name: "No workspace" });
+		await expect(empty).toBeDisabled();
+		await expect(empty.getBoundingClientRect().width).toBeLessThanOrEqual(48);
+	},
+};
+
+/** Collapsed with no workspace, an instance admin's button still says that it creates one. */
+export const CollapsedNoWorkspaceAppAdmin: Story = {
+	decorators: Collapsed.decorators,
+	args: {
+		isAppAdmin: true,
+		workspaces: [],
+		activeWorkspace: undefined,
+	},
+	play: async ({ canvas }) => {
+		const create = canvas.getByRole("button", { name: "Create workspace" });
+		await expect(create).toBeEnabled();
+		await expect(create.getBoundingClientRect().width).toBeLessThanOrEqual(48);
+	},
+};
+
 export const WorkspaceAdminUser: Story = {
 	args: {
 		isAdmin: true,

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import { expectSettledVisible } from "@/stories/overlay";
+import { expectNoPageOverflow, expectWithinViewport } from "@/stories/reflow";
 
 import { withSidebarFrame } from "./sidebar-story-frame";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -57,6 +58,65 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const SingleWorkspace: Story = {};
+
+/** The menu shortcut's words, which differ by platform: "⌘1" on macOS, "Ctrl1" elsewhere. */
+const SHORTCUT = "(⌘|Ctrl)";
+
+/**
+ * A workspace named the same as its account says the name once, on the button and in the menu. The
+ * avatar repeats what the words already say, so it adds nothing to either name.
+ */
+export const SameNameAndLogin: Story = {
+	args: {
+		activeWorkspace: {
+			...meta.args.activeWorkspace,
+			displayName: "HephaestusTest",
+			accountLogin: "HephaestusTest",
+		},
+		workspaces: [
+			{
+				...meta.args.activeWorkspace,
+				displayName: "HephaestusTest",
+				accountLogin: "HephaestusTest",
+			},
+		],
+	},
+	play: async ({ canvas }) => {
+		const trigger = canvas.getByRole("button", { name: "HephaestusTest" });
+		await expect(within(trigger).getAllByText("HephaestusTest")).toHaveLength(1);
+
+		await userEvent.click(trigger);
+		const menu = within(await screen.findByRole("menu"));
+		const item = within(menu.getByRole("group", { name: "Workspaces" })).getByRole("menuitem", {
+			name: new RegExp(`^HephaestusTest ${SHORTCUT}1$`, "u"),
+		});
+		await expectSettledVisible(item);
+		await expect(within(item).getAllByText("HephaestusTest")).toHaveLength(1);
+	},
+};
+
+/** An account whose login differs only in case is still a different word, so both lines stay. */
+export const LoginDiffersOnlyInCase: Story = {
+	args: {
+		activeWorkspace: {
+			...meta.args.activeWorkspace,
+			displayName: "HephaestusTest",
+			accountLogin: "hephaestustest",
+		},
+		workspaces: [
+			{
+				...meta.args.activeWorkspace,
+				displayName: "HephaestusTest",
+				accountLogin: "hephaestustest",
+			},
+		],
+	},
+	play: async ({ canvas }) => {
+		const trigger = canvas.getByRole("button", { name: "HephaestusTest hephaestustest" });
+		await expect(within(trigger).getByText("HephaestusTest")).toBeVisible();
+		await expect(within(trigger).getByText("hephaestustest")).toBeVisible();
+	},
+};
 
 const longName = "Software Engineering Education Research Group, Practice Review Pilot";
 
@@ -150,6 +210,52 @@ export const MultipleWorkspaces: Story = {
 			...featureFlags,
 		},
 	},
+	play: async ({ canvas }) => {
+		// A login that differs from the name tells two workspaces apart, so it stays on every line.
+		await userEvent.click(canvas.getByRole("button", { name: "AET aet-org" }));
+		const menu = within(await screen.findByRole("menu"));
+		await expectSettledVisible(
+			menu.getByRole("menuitem", { name: new RegExp(`^AET aet-org ${SHORTCUT}1$`, "u") }),
+		);
+		await expect(
+			menu.getByRole("menuitem", { name: new RegExp(`^Personal personal ${SHORTCUT}2$`, "u") }),
+		).toBeVisible();
+		await expect(
+			menu.getByRole("menuitem", { name: new RegExp(`^Team B team-b ${SHORTCUT}3$`, "u") }),
+		).toBeVisible();
+	},
+};
+
+/** On a phone, a long name and login wrap on the button, and the menu opens inside the screen. */
+export const PhoneLongNames: Story = {
+	args: {
+		activeWorkspace: {
+			...meta.args.activeWorkspace,
+			displayName: longName,
+			accountLogin: "an-organisation-with-a-very-long-account-login-and-no-spaces",
+		},
+		workspaces: [
+			{
+				...meta.args.activeWorkspace,
+				displayName: longName,
+				accountLogin: "an-organisation-with-a-very-long-account-login-and-no-spaces",
+			},
+		],
+	},
+	parameters: { viewport: { defaultViewport: "reflow" } },
+	play: async ({ canvas }) => {
+		await expect(window.innerWidth).toBe(320);
+		const trigger = canvas.getByRole("button", {
+			name: `${longName} an-organisation-with-a-very-long-account-login-and-no-spaces`,
+		});
+		await expectNoPageOverflow();
+		await userEvent.click(trigger);
+		const item = within(await screen.findByRole("menu")).getByRole("menuitem", {
+			name: new RegExp(`^${longName}`, "u"),
+		});
+		await expectSettledVisible(item);
+		await expectWithinViewport(item);
+	},
 };
 
 export const NoWorkspacesRegular: Story = {
@@ -157,6 +263,9 @@ export const NoWorkspacesRegular: Story = {
 		workspaces: [],
 		activeWorkspace: undefined,
 		isAppAdmin: false,
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "No workspace" })).toBeDisabled();
 	},
 };
 
@@ -166,6 +275,9 @@ export const NoWorkspacesAppAdmin: Story = {
 		activeWorkspace: undefined,
 		isAppAdmin: true,
 	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Create workspace" })).toBeEnabled();
+	},
 };
 
 export const Loading: Story = {
@@ -173,5 +285,8 @@ export const Loading: Story = {
 		workspaces: [],
 		activeWorkspace: undefined,
 		isLoading: true,
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Loading workspaces" })).toBeDisabled();
 	},
 };
