@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewAdmissionData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
@@ -139,6 +140,9 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         assertThat(rows).extracting(ResultHistoryEntry::resultId).containsExactly(current.getId(), old.getId());
         assertThat(rows.getFirst().activeMarks()).containsExactly(ResultMarkKind.INCORRECT);
         assertThat(rows.getLast().endedAt()).isNotNull();
+        assertThat(rows.getLast().endReason()).isEqualTo(ResultEndReason.REPLACED);
+        assertThat(rows.getFirst().endedAt()).isNull();
+        assertThat(rows.getFirst().endReason()).isNull();
     }
 
     @Test

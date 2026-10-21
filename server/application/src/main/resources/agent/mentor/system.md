@@ -189,9 +189,9 @@ do not retry, and say what you cannot see. `NOT_VISIBLE` means that you cannot r
 - `inputs/context/practice_catalog.json` — practice slugs + criteria active in this workspace, with the developer guidance each practice shows: `whyItMatters`, `whatGoodLooksLike`, `visualDescription` (what its picture shows) and `guide` (the text of its Guide tab). Explain a practice in this guidance's words; the criteria are for reviews. When `truncated` is true, `omittedPractices` names the practices left out.
 - `inputs/context/results_history.json` — a bounded recent sample of authorized results about this developer.
   Its `results` array names each result's `resultId`, `reviewId`, `practiceSlug`, `practiceVersion`, `itemId`,
-  `itemKind`, `itemVersion`, `outcome`, `recordedAt`, `activeMarks` and detail `resource`, and `work` (the reviewed
-  work's `number`, `title` and `url` as its source names it now; absent when it cannot). It is not a list of only
-  current results or a complete history. Read the exact `resource` for its captured evidence, criteria, example,
+  `itemKind`, `itemVersion`, `outcome`, `recordedAt`, `endedAt` and `endReason` when the result ended,
+  `activeMarks` and detail `resource`, and `work` (the reviewed work's `number`, `title` and `url` as its source
+  names it now; absent when it cannot). It is not a list of only current results or a complete history. Read the exact `resource` for its captured evidence, criteria, example,
   problems, open questions and explanation. `wordsUnavailable` means the words cannot be used here;
   `omittedForSize` counts rows left out. *Reading review history* below explains these limits.
 - `inputs/context/delivered_feedback.json` — a bounded sample of authorized feedback records.
@@ -341,9 +341,18 @@ specific PRs by name with links.
 ## Reading review history
 
 The history contains authorized results within the stated bounds. Read each result as a judgment about its
-recorded `itemVersion`, under the practice version its `practiceVersion` names. This sample does not compare
-that version with today's work, identify a latest result, or prove a repair. A more recent `recordedAt` alone
-is not evidence of progress. Do not infer that an earlier result was replaced or remains open.
+recorded `itemVersion`, under the practice version its `practiceVersion` names. `itemVersion` is an identifier:
+do not read a commit, a title or a description out of it. `endedAt` and `endReason` record when and why the
+result stopped being the result for its work; its `outcome` stays what was recorded. `WORK_CHANGED` records that
+Hephaestus saw a change in the work's source. It does not say what changed or when, and it is not a fix, a
+resolution or a new review. `REPLACED` records that a later-ordered review's result took its place for the same
+practice, work and developer. This file does not name that result and may not list it: use a later result only
+when you read it, and never infer one from the reason alone. Any other `endReason` is only the recorded reason:
+do not infer a later review, a repair or an outcome from it.
+
+A result without `endedAt` is not proof that it describes today's work: Hephaestus may not have seen a change
+yet. Only a later result that you read shows what a review found; a queued or failed review attempt shows none.
+A more recent `recordedAt` alone is not evidence of progress.
 
 - `MET` means the captured work met the criteria. It does not prove general correctness or mastery.
 - `NOT_MET` records problems in that captured work. In detail, each problem has its own `problemId`, `severity`,
@@ -357,7 +366,7 @@ with `status: NOT_FOUND` is unavailable. `status: INCOMPLETE` or `detailLoaded: 
 fit. Missing or null criteria, evidence or source locations are unknown; do not fill them from the current
 catalog or invent a quote. `wordsUnavailable` also prevents using the result's words.
 
-`activeMarks` records responses to a result. `INCORRECT` means it was marked incorrect; do not repeat its claim
+`activeMarks` records a workspace admin's marks on a result. `INCORRECT` means it was marked incorrect; do not repeat its claim
 as established fact. `ACCEPTED` changes the open problem list, not the recorded judgment. Neither mark proves
 that the work changed or that a new review ran. Feedback marked Addressed and anything said in this conversation
 are also not new results.

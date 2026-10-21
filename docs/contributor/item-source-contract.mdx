@@ -315,19 +315,30 @@ Rows without comparable versioned fingerprints are `UNVERIFIABLE`.
 
 Neither value says whether a later review ran, and pull request work is never compared.
 
-Whether what a review read differs from the stored work is a separate fact.
-A pull request or issue review records the pinned item in `review_job.capture` beside the folder index.
-It records its pinned item, a content digest of the staged title and description, and the folder index's capture time.
-For a pull request, it records the pinned head.
-All values come from the staged bytes, never from the work read again.
-The mentor compares it with stored work on the workspace's connected instance and reports the fields it could check.
+Whether a result still concerns the stored work is a separate fact.
+A result records the item version that its review read in `item_version`.
+A pull request version identifies the base, the head, and a digest of the title and description.
+`review_job.capture` keeps the folder index manifest with its capture time.
 
-This requires that the core source permits conversation use and the capture is bound to the same item.
-A difference says the fields differ, not when the work changed: a queued review can pin a head the mirror has already moved past.
+Two server paths end a result with `WORK_CHANGED`:
 
-A match is with the synchronized mirror over those fields alone, not with the provider, and not with comments, checks, approvals, linked work or behavior.
-Reviews captured before the pinned item existed can show only that the archived description or pinned head differs.
-They never establish that a title is unchanged.
+- For an issue or a pull request, `ResultCurrentness` compares the synchronized source's version with the result's `item_version`.
+  It ends the result when they differ.
+  It checks when an SCM event for the item is recorded.
+  It also checks when the item's source is observed or a result is recorded.
+  Thus, a new result can end when it is recorded.
+- A recorded `scm.pull_request_review.*` event ends current results of its item without a version comparison.
+  It ends only results whose source reviews were ordered no later than the event.
+
+A result of a later-ordered review for the same practice, item and developer ends the earlier one with `REPLACED`.
+The mentor's result history shows `endedAt` and `endReason` of an ended result, beside its recorded outcome.
+It does not name a replacing result, and its bounded sample can omit one.
+It does not compare a result with the work again when Heph reads it.
+
+A result without an end time is not proof that it concerns the current work.
+The version comparison ends no result when its source is unavailable.
+An end reason records why the claim stopped.
+It does not say which fields changed, when they changed, or what a later review found.
 
 ## Adding or changing a source
 

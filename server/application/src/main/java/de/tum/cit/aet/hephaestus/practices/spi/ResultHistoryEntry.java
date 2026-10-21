@@ -23,6 +23,7 @@ public record ResultHistoryEntry(
         @Nullable String summary,
         Instant recordedAt,
         @Nullable Instant endedAt,
+        @Nullable ResultEndReason endReason,
         List<ResultMarkKind> activeMarks,
         List<ProblemHistoryEntry> problems,
         List<String> openQuestions,

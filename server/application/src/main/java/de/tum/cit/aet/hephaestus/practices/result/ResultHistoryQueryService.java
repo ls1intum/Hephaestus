@@ -160,6 +160,7 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
                 permitted ? result.getSummary() : null,
                 result.getRecordedAt(),
                 result.getEndedAt(),
+                result.getEndReason(),
                 marks
                         .findByWorkspaceIdAndResultIdOrderByCreatedAtDescIdDesc(result.getWorkspaceId(), result.getId())
                         .stream()
