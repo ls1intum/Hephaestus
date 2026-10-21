@@ -64,7 +64,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Every endpoint that a Heph host calls, over real HTTP through the worker's real gateway connector and its real
@@ -101,9 +100,6 @@ class HephTurnGatewayIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private WorkerJwtVerifier verifier;
 
-    @Autowired
-    private JsonMapper mapper;
-
     private final MentorTurnRepository gatewayTurnReads = mock(MentorTurnRepository.class);
     private final HttpClient http = HttpClient.newHttpClient();
     private ConfigurableApplicationContext gateway;
@@ -136,7 +132,6 @@ class HephTurnGatewayIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 Class.forName("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxySecurityConfig"));
         application.addInitializers(context -> {
             var factory = context.getBeanFactory();
-            factory.registerSingleton("jsonMapper", mapper);
             factory.registerSingleton("hephTurnController", controller);
             factory.registerSingleton("hephTurnSandboxController", sandboxController);
             factory.registerSingleton("reviewJobRepository", jobRepository);

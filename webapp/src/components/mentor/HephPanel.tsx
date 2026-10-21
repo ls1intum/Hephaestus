@@ -26,6 +26,9 @@ export interface HephPanelProps {
 	onOpenInMentor: () => void;
 	/** A message arrived that the developer has not seen, such as an answer that landed while the panel was closed. */
 	unread?: boolean;
+	/** Whether the panel is open, for a caller that closes it itself; left out, the panel keeps its own. */
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 	/** Set while a thread is pushed over the conversation. */
 	thread?: {
 		onBack: () => void;
@@ -46,6 +49,8 @@ export function HephPanel({
 	onOpenInMentor,
 	thread,
 	unread = false,
+	open,
+	onOpenChange,
 }: HephPanelProps) {
 	const titleRef = useRef<HTMLHeadingElement>(null);
 	const focusTitle = thread?.focusTitle === true;
@@ -55,7 +60,7 @@ export function HephPanel({
 		}
 	}, [focusTitle]);
 	return (
-		<Drawer swipeDirection="right">
+		<Drawer swipeDirection="right" open={open} onOpenChange={onOpenChange}>
 			<div className={cn("fixed right-6 bottom-6 z-50", className)}>
 				<DrawerTrigger
 					render={

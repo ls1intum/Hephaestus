@@ -793,13 +793,14 @@ export const NotSent: Story = {
 		}),
 	},
 	play: async ({ args, canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("button", { name: /^Retry \(/u }));
+		const pending = within(rowOf(await canvas.findByText("Can you check my newest one?")));
+		await userEvent.click(pending.getByRole("button", { name: /^Retry \(/u }));
 		await expect(args.actions?.ask?.onRetrySend).toHaveBeenCalledWith("r-unsent");
 		// The composer was cleared on send, so the words stay reachable here: Copy them, or delete the
 		// message from this device instead of retrying.
-		await userEvent.click(canvas.getByRole("button", { name: /^Copy message \(/u }));
+		await userEvent.click(pending.getByRole("button", { name: /^Copy message \(/u }));
 		await expect(args.onCopy).toHaveBeenCalledWith("Can you check my newest one?");
-		await userEvent.click(canvas.getByRole("button", { name: /^Delete message \(/u }));
+		await userEvent.click(pending.getByRole("button", { name: /^Delete message \(/u }));
 		await expect(args.actions?.onDiscardSend).toHaveBeenCalledWith("r-unsent");
 	},
 };

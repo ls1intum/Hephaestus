@@ -72,8 +72,20 @@ function WorkspaceHephPanel({ workspaceSlug }: { workspaceSlug: string }) {
 	const [thread, setThread] = useState<{ parentEntryId: string; focus: ThreadFocus }>();
 	// The control that opened the thread, which Back gives focus back to.
 	const opener = useRef<HTMLElement>(null);
+	// A new page closes the panel, so a link followed from an answer opens its page in front of the
+	// panel rather than under it. Adjusted during render, not in an effect, so the page never paints
+	// under the panel first; the stream and the open thread stay for the next open.
+	const { pathname } = useLocation();
+	const [open, setOpen] = useState(false);
+	const [openedOn, setOpenedOn] = useState(pathname);
+	if (pathname !== openedOn) {
+		setOpenedOn(pathname);
+		setOpen(false);
+	}
 	return (
 		<HephPanel
+			open={open}
+			onOpenChange={setOpen}
 			unread={unread}
 			onOpenInMentor={() => {
 				void navigate({
@@ -149,7 +161,9 @@ function HephPanelConversation({
 					readOnly={false}
 					canAsk
 					livePaused={livePaused}
-					focusComposer
+					// Not on a touch screen, where focusing the field raises the keyboard over the answer the
+					// developer opened the panel to read. Reply in thread still focuses its composer there.
+					focusComposer={window.matchMedia("(pointer: fine)").matches}
 					threads={{ panelId, onOpen: onOpenThread }}
 					pageContext={pageContext}
 				/>

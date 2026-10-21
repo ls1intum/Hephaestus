@@ -1,7 +1,5 @@
-import type { ReactNode } from "react";
-
 import { UserRoundCog } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";

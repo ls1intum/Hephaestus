@@ -155,10 +155,12 @@ The worker logs each attempt that fails on it at `WARN`, with the reason and the
 The `detail` is a kind of failure from a closed set, for example `model_error`, `context_overflow` or `worker_refused` (`FAILURE_DETAILS` in `heph-host-protocol.ts` and in `HephTurnController`).
 It is never the text of the model provider, a tool, or the worker.
 The worker logs a `detail` outside the set as `unrecognized`.
+
 The host writes the same kind to its own output (`failureSummary`), with the worker's HTTP status when the worker answered.
 It never writes a failure's message, name, or stack, because any of them can carry the words of the worker's answer.
 The worker does not read the host's output ([The Heph host](#the-heph-host)).
-It logs an admission refusal at `INFO`.
+
+The worker logs an admission refusal at `INFO`.
 The reaper on the server role logs a lost second attempt at `INFO`.
 [Observability](/admin/observability#heph-turn-metrics) names the log lines.
 
@@ -394,7 +396,8 @@ The next turn starts a new host.
 The worker never reads the host's output, and it does not copy it into its own log (`DockerHostSandbox.remove`).
 Pi, Node, and the host itself can all write to that output, so it can hold the conversation, a provider's answer, or a credential.
 The worker logs the removal with the host's id, and the class of a removal step that fails.
-For a host that cannot start, the worker logs the cause that it knows itself, for example the hostname rule or the exit code of the workspace setup.
+When a host cannot start, the worker logs the cause that it knows itself.
+For example, it logs the hostname rule or the exit code of the workspace setup.
 
 On drain, the worker stops claiming turns.
 It waits up to `HephTurnDispatcher.DRAIN_TIMEOUT` for running turns, then removes the host.

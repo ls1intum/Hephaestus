@@ -8,6 +8,7 @@ import type { WorkspaceOnboarding } from "@/api/types.gen";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
+import { detailReview } from "@/stories/practice-detail-story-mock-data";
 import { FakeEventSource } from "@/test/fake-event-source";
 import { MentorFake } from "@/test/mentor-server";
 import { renderRouteAtWithRouter, ROUTE_RENDER_WAIT } from "@/test/router-harness";
@@ -460,4 +461,83 @@ it("clears the dot live when the developer reads the answer on another device", 
 		stream.emit("read", { lastReadAt: answer.createdAt });
 	});
 	await screen.findByRole("button", { name: "Open Heph, AI mentor" });
+});
+
+it.each([
+	{ pointer: "fine", composerFocused: true },
+	{ pointer: "coarse", composerFocused: false },
+])(
+	"focuses the composer on opening the panel only with a $pointer pointer, and on Reply in thread with any",
+	async ({ pointer, composerFocused }) => {
+		const media = window.matchMedia.bind(window);
+		using _pointerMedia = vi
+			.spyOn(window, "matchMedia")
+			.mockImplementation((text) =>
+				Object.assign(media(text), { matches: text === `(pointer: ${pointer})` }),
+			);
+		const user = userEvent.setup();
+		const { acme } = mockHephPanel(hephReady());
+		const answer = acme.add({ kind: "HEPH", text: "Three pull requests left the reason out." });
+		acme.lastReadAt = answer.createdAt;
+		renderRouteAtWithRouter("/w/acme/teams");
+		await user.click(
+			await screen.findByRole("button", { name: "Open Heph, AI mentor" }, ROUTE_RENDER_WAIT),
+		);
+		const composer = await screen.findByRole("textbox", { name: "Message Heph" });
+		const panel = screen.getByRole("dialog");
+		await waitFor(() => expect(panel.contains(document.activeElement)).toBe(true));
+		// On a touch screen the keyboard stays down over the answer the developer opened the panel to read.
+		expect(document.activeElement === composer).toBe(composerFocused);
+
+		// Reply in thread is the developer asking to write, so its composer takes focus on any pointer.
+		await user.click(screen.getByRole("button", { name: /^Reply in thread \(/u }));
+		const reply = await screen.findByRole("textbox", { name: "Reply in thread" });
+		await waitFor(() => expect(document.activeElement).toBe(reply));
+	},
+);
+
+it("closes the panel when a link in an answer opens another page, which is then in front and usable", async () => {
+	const user = userEvent.setup();
+	const { acme } = mockHephPanel(hephReady());
+	server.use(
+		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/reviews", () =>
+			HttpResponse.json({
+				content: [detailReview],
+				number: 0,
+				size: 10,
+				totalElements: 1,
+				totalPages: 1,
+				last: true,
+			}),
+		),
+	);
+	acme.add({ kind: "USER", text: "What should I fix in my pull request?" });
+	const answer = acme.add({
+		kind: "HEPH",
+		text: "One thing stands out.",
+		links: [
+			{
+				id: "f8000000-0000-4000-8000-000000000002",
+				kind: "FEEDBACK",
+				text: "Add one line on the trade-off before you merge.",
+				itemId: 433,
+			},
+		],
+	});
+	acme.lastReadAt = answer.createdAt;
+	const { router } = renderRouteAtWithRouter("/w/acme/teams");
+	const stream = await openStream(acme);
+	await user.click(screen.getByRole("button", { name: "Open Heph, AI mentor" }));
+	await user.click(await screen.findByRole("link", { name: "Your feedback on this work" }));
+
+	await waitFor(() => expect(router.state.location.pathname).toBe("/w/acme/feedback/433"));
+	await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+	// The page the link named, with no panel left over it.
+	await screen.findByRole("list", { name: "Reviews" }, ROUTE_RENDER_WAIT);
+	screen.getByRole("heading", { name: "Your feedback on pull request #902" });
+
+	// The panel closed but stayed this workspace's: the conversation is there again on the same stream.
+	await user.click(screen.getByRole("button", { name: "Open Heph, AI mentor" }));
+	await screen.findByText("One thing stands out.");
+	expect(FakeEventSource.latest()).toBe(stream);
 });
