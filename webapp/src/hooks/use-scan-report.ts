@@ -28,6 +28,7 @@ import type { ProblemBaselineState } from "@/components/practice-vocabulary/scan
 import type { ScanEntryStatus } from "@/components/practice-vocabulary/scan-entry-defs";
 
 import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
+import { saveBlobFile } from "@/lib/download";
 import { infiniteListState } from "@/runtime/tanstack-query/infinite-list";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
@@ -176,12 +177,7 @@ export function useScanReport(
 			const filename =
 				sarifFilename(response.headers.get("Content-Disposition")) ??
 				`hephaestus-scan-${scanId}.sarif`;
-			const url = URL.createObjectURL(data);
-			const link = document.createElement("a");
-			link.href = url;
-			link.download = filename;
-			link.click();
-			URL.revokeObjectURL(url);
+			saveBlobFile(data, filename);
 		},
 	});
 

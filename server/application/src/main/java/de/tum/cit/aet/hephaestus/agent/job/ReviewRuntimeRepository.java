@@ -9,8 +9,10 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewUsageAttempt;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -43,32 +45,42 @@ public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
     Set<UUID> unsettledJobIds(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
 
     default List<ReviewUsageAttempt> usage(long workspaceId, UUID reviewId) {
-        return usageRows(workspaceId, reviewId).stream()
-                .map(row -> new ReviewUsageAttempt(
-                        row.sourceId(),
-                        row.sourceAttempt(),
-                        row.calls(),
-                        row.inputTokens(),
-                        row.outputTokens(),
-                        row.reasoningTokens(),
-                        row.cacheReadTokens(),
-                        row.cacheWriteTokens(),
-                        row.costUsd(),
-                        UsagePricingState.valueOf(row.pricingState())))
-                .toList();
+        return usageByReview(workspaceId, Set.of(reviewId)).getOrDefault(reviewId, List.of());
+    }
+
+    default Map<UUID, List<ReviewUsageAttempt>> usageByReview(long workspaceId, Set<UUID> reviewIds) {
+        if (reviewIds.isEmpty()) return Map.of();
+        return Map.copyOf(usageRows(workspaceId, reviewIds.toArray(UUID[]::new)).stream()
+                .collect(Collectors.groupingBy(
+                        UsageRow::reviewId,
+                        Collectors.mapping(ReviewRuntimeRepository::usageAttempt, Collectors.toUnmodifiableList()))));
+    }
+
+    private static ReviewUsageAttempt usageAttempt(UsageRow row) {
+        return new ReviewUsageAttempt(
+                row.sourceId(),
+                row.sourceAttempt(),
+                row.calls(),
+                row.inputTokens(),
+                row.outputTokens(),
+                row.reasoningTokens(),
+                row.cacheReadTokens(),
+                row.cacheWriteTokens(),
+                row.costUsd(),
+                UsagePricingState.valueOf(row.pricingState()));
     }
 
     @Query(value = """
-        SELECT source_id, source_attempt, CAST(SUM(total_calls) AS bigint), CAST(SUM(input_tokens) AS bigint),
+        SELECT review_id, source_id, source_attempt, CAST(SUM(total_calls) AS bigint), CAST(SUM(input_tokens) AS bigint),
           CAST(SUM(output_tokens) AS bigint), CAST(SUM(reasoning_tokens) AS bigint),
           CAST(SUM(cache_read_tokens) AS bigint), CAST(SUM(cache_write_tokens) AS bigint),
           CASE WHEN bool_and(cost_usd IS NOT NULL AND pricing_state<>'UNPRICED') THEN SUM(cost_usd) END,
           CASE WHEN bool_or(cost_usd IS NULL OR pricing_state='UNPRICED') THEN 'UNPRICED'
                WHEN bool_and(pricing_state='NO_CHARGE') THEN 'NO_CHARGE' ELSE 'PRICED' END
-        FROM llm_usage_event WHERE workspace_id=:workspaceId AND review_id=:reviewId
-        GROUP BY source_id,source_attempt ORDER BY source_id,source_attempt
+        FROM llm_usage_event WHERE workspace_id=:workspaceId AND review_id = ANY(:reviewIds)
+        GROUP BY review_id,source_id,source_attempt ORDER BY review_id,source_id,source_attempt
         """, nativeQuery = true)
-    List<UsageRow> usageRows(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
+    List<UsageRow> usageRows(@Param("workspaceId") long workspaceId, @Param("reviewIds") UUID[] reviewIds);
 
     default QueueCounts queueCounts(long workspaceId, Instant asOf) {
         return queueCountsAt(workspaceId, asOf, asOf.minusSeconds(3600), asOf.minusSeconds(86400));
@@ -115,6 +127,7 @@ public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
     record JobStateCount(ReviewJobStatus status, long count) {}
 
     record UsageRow(
+            UUID reviewId,
             UUID sourceId,
             int sourceAttempt,
             long calls,

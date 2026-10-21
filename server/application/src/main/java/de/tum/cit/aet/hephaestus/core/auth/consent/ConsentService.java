@@ -6,12 +6,22 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationQuery;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -150,6 +160,120 @@ public class ConsentService implements ResearchParticipationQuery {
     @Transactional(readOnly = true)
     public boolean participates(long accountId) {
         return researchAuthorised(accountId);
+    }
+
+    @Override
+    public Optional<ResearchQuestion> currentQuestion() {
+        String organisation = properties.researchProgramme();
+        return organisation == null
+                ? Optional.empty()
+                : Optional.of(new ResearchQuestion(WORDING_VERSION, organisation));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, Long> currentGrants(Collection<Long> accountIds) {
+        List<Long> ids = sorted(accountIds);
+        if (ids.isEmpty() || properties.researchProgramme() == null) {
+            return Map.of();
+        }
+        return grants(ids, accountRepository.findStatuses(ids));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Map<Long, Long> lockCurrentGrants(Collection<Long> accountIds) {
+        List<Long> ids = sorted(accountIds);
+        if (ids.isEmpty() || properties.researchProgramme() == null) {
+            return Map.of();
+        }
+        // The account rows first, as every consent write and purge takes them: the ledger read below
+        // then sees each of their decisions either committed or not yet begun.
+        return grants(ids, accountRepository.lockStatusesForShare(ids));
+    }
+
+    /** The latest decision per account is the same row {@link #latest} picks, and the same rule authorises it. */
+    private Map<Long, Long> grants(List<Long> ids, List<AccountRepository.AccountStatusRow> statuses) {
+        Set<Long> active = statuses.stream()
+                .filter(row -> Account.Status.ACTIVE.name().equals(row.getStatus()))
+                .map(AccountRepository.AccountStatusRow::getId)
+                .collect(Collectors.toSet());
+        Map<Long, Long> grants = new HashMap<>();
+        history(ids).forEach((accountId, decisions) -> {
+            ConsentDecision latest = decisions.getFirst();
+            if (active.contains(accountId) && latest.isGranted() && isForCurrentQuestion(latest)) {
+                grants.put(accountId, Objects.requireNonNull(latest.getId()));
+            }
+        });
+        return Map.copyOf(grants);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, GrantStanding> grantStandings(Map<Long, Long> grantDecisionIds) {
+        List<Long> ids = sorted(grantDecisionIds.keySet());
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> statuses = accountRepository.findStatuses(ids).stream()
+                .collect(Collectors.toMap(
+                        AccountRepository.AccountStatusRow::getId, AccountRepository.AccountStatusRow::getStatus));
+        Map<Long, List<ConsentDecision>> history = history(ids);
+        Map<Long, GrantStanding> standings = new HashMap<>();
+        for (Long accountId : ids) {
+            standings.put(
+                    accountId,
+                    standing(
+                            statuses.get(accountId),
+                            history.getOrDefault(accountId, List.of()),
+                            Objects.requireNonNull(grantDecisionIds.get(accountId))));
+        }
+        return Map.copyOf(standings);
+    }
+
+    private GrantStanding standing(@Nullable String status, List<ConsentDecision> newestFirst, Long grantId) {
+        if (status == null
+                || Account.Status.DELETING.name().equals(status)
+                || Account.Status.DELETED.name().equals(status)) {
+            return GrantStanding.ACCOUNT_ERASED;
+        }
+        int position = -1;
+        for (int i = 0; i < newestFirst.size(); i++) {
+            if (grantId.equals(newestFirst.get(i).getId())) {
+                position = i;
+                break;
+            }
+        }
+        if (position < 0) {
+            // Erasure unlinks the account's ledger rows; a grant no longer on the account is one of them.
+            return GrantStanding.ACCOUNT_ERASED;
+        }
+        List<ConsentDecision> later = newestFirst.subList(0, position);
+        if (later.stream().anyMatch(decision -> !decision.isGranted())) {
+            return GrantStanding.WITHDRAWN;
+        }
+        if (!later.isEmpty()) {
+            return GrantStanding.SUPERSEDED;
+        }
+        if (!isForCurrentQuestion(newestFirst.get(position))) {
+            return GrantStanding.QUESTION_CHANGED;
+        }
+        return Account.Status.ACTIVE.name().equals(status) ? GrantStanding.CURRENT : GrantStanding.ACCOUNT_INACTIVE;
+    }
+
+    /** Research decisions per account, newest first, in one read. */
+    private Map<Long, List<ConsentDecision>> history(List<Long> ids) {
+        Map<Long, List<ConsentDecision>> history = new LinkedHashMap<>();
+        for (ConsentDecision decision :
+                decisionRepository.findHistoryNewestFirst(ids, ConsentDecision.Purpose.RESEARCH_PARTICIPATION)) {
+            Long accountId = Objects.requireNonNull(decision.getAccount()).getId();
+            history.computeIfAbsent(accountId, ignored -> new ArrayList<>()).add(decision);
+        }
+        return history;
+    }
+
+    private static List<Long> sorted(Collection<Long> ids) {
+        return List.copyOf(new TreeSet<>(ids));
     }
 
     private boolean researchAuthorised(Long accountId) {

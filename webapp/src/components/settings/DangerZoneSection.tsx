@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { saveBlobFile } from "@/lib/download";
 import { hasText } from "@/lib/text";
 import { ACCOUNT_DELETED_NOTICE_KEY } from "@/runtime/auth/account-deleted-notice";
 import { useAuth } from "@/runtime/auth/AuthContext";
@@ -131,14 +132,7 @@ function DataExportRow() {
 			} else {
 				blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
 			}
-			const url = URL.createObjectURL(blob);
-			const anchor = document.createElement("a");
-			anchor.href = url;
-			anchor.download = "hephaestus-export.json";
-			document.body.append(anchor);
-			anchor.click();
-			anchor.remove();
-			URL.revokeObjectURL(url);
+			saveBlobFile(blob, "hephaestus-export.json");
 		} catch {
 			toast.error("We could not download your export. Try again.");
 		}

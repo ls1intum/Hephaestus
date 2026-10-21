@@ -115,8 +115,20 @@ Identity restrictions retain provider and team keys after account removal.
 
 ## Research use of existing stores
 
-Research use processes stores that this map already lists. It adds no store to the instance database.
+Research use processes stores that this map already lists.
 The latest `RESEARCH_PARTICIPATION` decision in `consent_decision` gates it.
+
+A research dataset release adds one store, the disclosure record: `research_disclosure` and `research_disclosure_subject`.
+It holds no dataset payload. It records which participant key each released file used for each account, and the exact grant that allowed the release.
+An instance administrator with a fresh passkey can read which keys must be removed, and why.
+
+Person erasure drops the account link, but keeps the key and records that removal is owed.
+Recording that the researchers removed a participant drops the link and the grant reference.
+Recording that the whole copy was deleted or anonymized deletes the subject rows.
+
+The disclosure header keeps the releasing administrator's account until that account is erased.
+An open disclosure blocks workspace purge.
+Before any further analysis, the research team checks the removal list. Hephaestus cannot revoke a downloaded copy.
 
 A decision authorizes research only for the current notice version and the current research organization (`consent_decision.research_organization`).
 An earlier yes to narrower wording authorizes nothing. Every account answers once more when the wording changes.
@@ -145,7 +157,15 @@ The operator must close that gap:
 1. Apply the latest `RESEARCH_PARTICIPATION` decision of each account before any export or analysis.
 2. After withdrawal or a verified erasure request, remove the account's data from datasets that are not yet anonymized.
    After a Slack message-use opt-out, remove the affected messages the same way.
+   For a released research dataset, the removal list names the dataset and the participant keys to remove.
+   It also names a key whose grant was withdrawn and later given again.
+   Remove the participant's own rows.
+   Also remove every review whose subject list contains the key.
+   Include each such review's shared facts, such as usage and assignment counts.
+   A participant can be named on a review with no row of their own in the file.
+   If the copy cannot be cleaned selectively, delete it and record the closure. A new release can replace it.
 3. Finish the removal without undue delay. This is a manual step of the research team.
+   Record the removal, or record that the whole copy was deleted or anonymized. Hephaestus cannot check the research team's storage. The record is the operator's statement.
 
 An anonymized dataset holds no link to a person. Withdrawal and erasure cannot reach it, so its data cannot be removed.
 
@@ -213,6 +233,7 @@ not enough. Shared provider metadata has an explicit empty person selection, not
 | `mentor_entry_tool_result_copy`, `mentor_entry_feedback_copy`, `mentor_entry`, `mentor_turn`, `mentor_conversation` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`), `server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorEntryPersonDataStore.java` (the words that the app shows for each message) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/mentor/adapter/MentorPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
 | `mentor_turn_attempt_usage` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/adapter/MentorAttemptUsagePersonDataCatalog.java`. `select` freezes the person's own Heph turns with their workspaces, also before a measurement exists. `export` gives the counts of each attempt of those turns. | `server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/adapter/MentorAttemptUsagePersonDataCatalog.java`. `prepareErasure` keeps the observed spend, deletes the measurements and detaches the turns' ledger rows. `erase` deletes what is left. The person-data write fence refuses registration after the account's suppression. |
 | `notification_subscription` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/notification/preferences/adapter/NotificationPreferencesPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/notification/preferences/adapter/NotificationPreferencesPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
+| `research_disclosure_subject`, `research_disclosure` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/research/adapter/ResearchDisclosurePersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/research/adapter/ResearchDisclosurePersonDataCatalog.java` (`erase` policy: drop the account link and record the owed removal, `JdbcPersonDataStore.erase`) |
 | `feedback_send`, `feedback_response`, `feedback_copy`, `feedback_basis`, `feedback_decision`, `feedback`, `result_mark`, `review_item`, `problem`, `result`, `result_mark_created_actor`, `result_mark_removed_actor`, `feedback_decision_actor`, `review`, `review_batch`, `review_schedule` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/adapter/PracticesPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/adapter/PracticesPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
 | `product_feedback`, `product_survey_participation`, `product_survey_email_invitation`, `product_survey`, `product_feedback_resolver`, `product_survey_invitation_requester` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/productfeedback/adapter/ProductfeedbackPersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/productfeedback/adapter/ProductfeedbackPersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |
 | `membership`, `workspace_onboarding_settings` | `server/application/src/main/java/de/tum/cit/aet/hephaestus/workspace/adapter/WorkspacePersonDataCatalog.java` (`select`, explicit export fields, `JdbcPersonDataStore.export`) | `server/application/src/main/java/de/tum/cit/aet/hephaestus/workspace/adapter/WorkspacePersonDataCatalog.java` (`erase` policy, `JdbcPersonDataStore.erase`) |

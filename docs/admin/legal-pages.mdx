@@ -137,6 +137,54 @@ Anonymized data in a published result or dataset cannot be traced back and canno
 Withdrawal does not erase other stored data by itself.
 Account erasure is a separate request.
 
+### Release a structured research dataset
+
+A research disclosure is a JSON file for the configured research organization.
+It contains structured practice history for people whose current research grant permits it.
+It is **pseudonymous personal data**, not anonymous data.
+Keep it within the authorized research team.
+
+The file excludes participant and model text, source code, credentials, and provider identities.
+It retains historical records with their recorded limits.
+A legacy record does not prove a capture contract.
+
+Every operation below requires the instance-admin role and the administrator's own fresh passkey verification.
+This requirement applies even when the instance does not require passkeys for ordinary admin access.
+A user view or installed-client session cannot perform these operations.
+Browser requests also need normal CSRF protection.
+
+1. Verify your passkey through **User settings → Passkeys**.
+2. Submit `POST /admin/research-disclosures` with the workspace ID as a string, `firstDay`, `lastDay`, and `useUntil`.
+   The window uses UTC days and includes the last day.
+   Choose a window of 1 to 400 days that ends no later than today.
+   Set `useUntil` to the future date and time that the study protocol permits.
+   The request cannot change the research purpose, organization, or notice version.
+3. Save the returned attachment and its dataset ID from the filename.
+   Hephaestus records the disclosure and its protected participant mapping, but stores no copy of the file.
+   There is no redownload operation.
+   A new request creates a new disclosure, including after an interrupted download.
+
+Before further analysis, check whether a participant's removal is owed:
+
+1. Verify your passkey again when required, then submit `POST /admin/research-disclosures/removal-checks`.
+   This operation records newly detected obligations.
+   It returns open disclosures with a removal owed or an expired use-until date.
+   An empty list does not mean no datasets were released.
+2. Remove each listed participant key's rows from every retained copy that is not yet anonymized.
+   Remove dependent rows and every whole-review fact that names the key too.
+   If this is not possible, delete the copy.
+3. After removal, submit `POST /admin/research-disclosures/{datasetId}/removal-receipts` with `participantKeys`.
+   This records your statement that the removals were completed.
+   A later research grant does not cancel a removal owed under the earlier grant.
+
+Stop using the file at its use-until date.
+After every retained copy is destroyed or anonymized, submit `POST /admin/research-disclosures/{datasetId}/closure`.
+Set `closure` to `DESTROYED` or `ANONYMIZED`, according to what was done.
+Closure removes the protected participant mapping and keeps the disclosure receipt.
+
+Hephaestus cannot reach or revoke a downloaded copy.
+A removal receipt or closure is an operator's statement, not a check of the research team's storage.
+
 ### No separate consent for datasets
 
 The consent has no second choice for sharing or publishing datasets.

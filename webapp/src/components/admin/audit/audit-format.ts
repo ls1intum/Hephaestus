@@ -13,6 +13,9 @@ const HIGH_RISK_EVENTS = new Set([
 	"ACCOUNT_DELETED",
 	"JWT_REVOKED",
 	"IDENTITY_UNLINKED",
+	// Pseudonymous personal data left the instance, or an admin attested its removal downstream.
+	"RESEARCH_DATASET_RELEASED",
+	"RESEARCH_REMOVAL_RECORDED",
 ]);
 
 export function eventSeverity(eventType: string, result: string): AuditSeverity {
@@ -46,6 +49,8 @@ export const EVENT_TYPE_LABELS: Record<AuthEventType, string> = {
 	EXPORT_REQUESTED: "Data export requested",
 	APP_ROLE_CHANGED: "Instance role changed",
 	RESEARCH_CONSENT_REVOKED: "Research consent revoked",
+	RESEARCH_DATASET_RELEASED: "Research dataset released",
+	RESEARCH_REMOVAL_RECORDED: "Research removal recorded",
 	WORKSPACE_ELEVATION: "Workspace reached as instance admin",
 	LLM_CONNECTION_CREATED: "Connection added",
 	LLM_CONNECTION_UPDATED: "Connection updated",

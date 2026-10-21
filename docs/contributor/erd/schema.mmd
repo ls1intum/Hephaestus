@@ -1347,6 +1347,42 @@ erDiagram
         TIMESTAMPTZ repository_visibility_confirmed_at
     }
 
+    ResearchDisclosure {
+        UUID id PK,UK
+        TIMESTAMPTZ closed_at
+        VARCHAR(16) closure
+        VARCHAR(64) content_sha256 "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        BIGINT created_by_account_id
+        TIMESTAMPTZ cutoff_at "NOT NULL"
+        INTEGER feedback_count "NOT NULL"
+        INTEGER feedback_excluded_count "NOT NULL"
+        VARCHAR(32) notice_version "NOT NULL"
+        INTEGER participant_count "NOT NULL"
+        INTEGER problem_count "NOT NULL"
+        VARCHAR(40) purpose "NOT NULL"
+        VARCHAR(255) research_organization "NOT NULL"
+        INTEGER result_count "NOT NULL"
+        VARCHAR(64) schema_name "NOT NULL"
+        INTEGER schema_version "NOT NULL"
+        TIMESTAMPTZ use_until "NOT NULL"
+        TIMESTAMPTZ window_from "NOT NULL"
+        TIMESTAMPTZ window_to "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
+    }
+
+    ResearchDisclosureSubject {
+        UUID id PK
+        BIGINT account_id UK
+        UUID disclosure_id FK,UK "NOT NULL"
+        BIGINT grant_decision_id
+        VARCHAR(32) participant_key UK "NOT NULL"
+        VARCHAR(24) removal_reason
+        TIMESTAMPTZ removal_required_at
+        TIMESTAMPTZ removed_at
+        BIGINT workspace_id FK "NOT NULL"
+    }
+
     Result {
         UUID id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
@@ -2052,6 +2088,8 @@ erDiagram
     Organization ||--o{ Repository : has
     IdentityProvider ||--o{ Repository : references
     Workspace ||--o{ RepositoryToMonitor : monitors
+    Workspace ||--o{ ResearchDisclosure : has
+    ResearchDisclosure ||--o{ ResearchDisclosureSubject : has
     Membership ||--o{ Result : references
     Item ||--o{ Result : has
     Practice ||--o{ Result : has

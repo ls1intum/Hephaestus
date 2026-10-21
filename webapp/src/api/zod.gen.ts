@@ -483,6 +483,10 @@ export const zClientTokenRequest = z.object({
     redirectUri: z.string().min(0).max(200)
 });
 
+export const zCloseResearchDisclosure = z.object({
+    closure: z.enum(['DESTROYED', 'ANONYMIZED'])
+});
+
 export const zClosedPracticePageSupport = z.object({
     readAt: z.iso.datetime({ offset: true }).pipe(z.coerce.date()),
     refusal: z.string().nullable(),
@@ -3198,6 +3202,10 @@ export const zReasonCount = z.object({
     reason: z.string()
 });
 
+export const zRecordResearchRemovals = z.object({
+    participantKeys: z.array(z.string().min(1)).min(1)
+});
+
 export const zRecoverPasskeyRequest = z.object({
     code: z.string().min(0).max(256)
 });
@@ -3221,6 +3229,13 @@ export const zRegisterPasskeyRequest = z.object({
 export const zRegisterSlackChannelRequest = z.object({
     channelName: z.string().min(0).max(256).optional(),
     slackChannelId: z.string().min(0).max(32).regex(/^[CG][A-Z0-9]{8,}$/)
+});
+
+export const zReleaseResearchDataset = z.object({
+    firstDay: z.iso.date().pipe(z.coerce.date()),
+    lastDay: z.iso.date().pipe(z.coerce.date()),
+    useUntil: z.iso.datetime({ offset: true }).pipe(z.coerce.date()),
+    workspaceId: z.string().min(1).regex(/[1-9][0-9]{0,18}/)
 });
 
 /**
@@ -3269,6 +3284,30 @@ export const zResearchConsent = z.object({
     granted: z.boolean(),
     noticeVersion: z.string(),
     researchOrganization: z.string().optional()
+});
+
+export const zResearchRemovalObligation = z.object({
+    participantKey: z.string(),
+    reason: z.enum([
+        'CONSENT_WITHDRAWN',
+        'CONSENT_SUPERSEDED',
+        'QUESTION_CHANGED',
+        'ACCOUNT_ERASED'
+    ]),
+    requiredAt: z.iso.datetime({ offset: true }).pipe(z.coerce.date())
+});
+
+export const zResearchRemovalDisclosure = z.object({
+    createdAt: z.iso.datetime({ offset: true }).pipe(z.coerce.date()),
+    datasetId: z.string(),
+    removals: z.array(zResearchRemovalObligation),
+    useExpired: z.boolean(),
+    useUntil: z.iso.datetime({ offset: true }).pipe(z.coerce.date()),
+    workspaceId: z.string()
+});
+
+export const zResearchRemovalReceipt = z.object({
+    recorded: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 /**

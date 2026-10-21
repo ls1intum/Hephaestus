@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/** Builds audit events; {@link AuthEventWriter} owns their independent transaction. */
+/** Builds audit events; {@link AuthEventWriter} owns their transactional persistence. */
 @ConditionalOnServerRole
 @Component
 public class AuthEventLogger {
@@ -93,8 +93,20 @@ public class AuthEventLogger {
          *     their operation
          */
         public boolean record() {
+            return record(false);
+        }
+
+        /**
+         * Stages the event in the caller's transaction, so it rolls back with the operation.
+         * A successful return does not mean that the owning transaction has committed.
+         */
+        public boolean recordInCurrentTransaction() {
+            return record(true);
+        }
+
+        private boolean record(boolean currentTransaction) {
             try {
-                return writer.write(new AuthEventData(
+                var data = new AuthEventData(
                         type,
                         result,
                         accountId,
@@ -109,9 +121,10 @@ public class AuthEventLogger {
                         // Read here, from the request's security context, so no producer
                         // can forget the
                         // flag or assert one it did not earn.
-                        WorkspaceElevationContext.isElevated(workspaceId)));
+                        WorkspaceElevationContext.isElevated(workspaceId));
+                return currentTransaction ? writer.writeInCurrentTransaction(data) : writer.write(data);
             } catch (RuntimeException e) {
-                // Commit failures arise outside the writer method, at its transaction proxy.
+                // The writer proxy can fail when joining or committing its transaction.
                 log.warn("auth.audit: {} event could not be committed", type, e);
                 return false;
             }

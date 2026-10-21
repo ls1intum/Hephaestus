@@ -77,6 +77,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.groupdetail.PracticeGroupReviewsControllerIntegrationTest", "review-fixture"),
             assignment("practices.profile.PracticeProfileOverviewIntegrationTest", "review-fixture"),
             assignment("practices.profile.PracticeProfileReviewIntegrationTest", "review-evidence"),
+            assignment("practices.research.ResearchDisclosureControllerIntegrationTest", "research-disclosure-http"),
+            assignment("practices.research.ResearchDisclosureIntegrationTest", "review-fixture"),
             assignment("practices.result.PracticeGroupStandingIntegrationTest", "review-fixture"),
             assignment("practices.review.AbstractResultAdmissionIntegrationTest", "review-resultadmission"),
             assignment("practices.result.ResultControllerIntegrationTest", "review-fixture"),
@@ -144,6 +146,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "practice-script-live",
                     "worker role with the real LLM proxy on a free sandbox gateway port," + " calling live models"),
             Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
+            Map.entry(
+                    "research-disclosure-http",
+                    "real signed browser and installed-client tokens with configured research consent, unconditional fresh-passkey authorization, and persisted disclosure fixtures"),
             Map.entry(
                     "required-passkeys",
                     "mandatory instance-admin policy with real signed cookies, WebAuthn signatures, and database-backed recovery"),
@@ -258,6 +263,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "notification.AccountDeletionEmailIntegrationTest",
             "notification.AccountSecurityEmailIntegrationTest",
             "notification.email.EmailAdminControllerIntegrationTest",
+            "practices.research.ResearchDisclosureControllerIntegrationTest",
             "practices.review.DisabledIntegrationHistoryIntegrationTest",
             "productfeedback.ProductFeedbackEmailIntegrationTest",
             "productfeedback.SurveyEmailInvitationIntegrationTest",

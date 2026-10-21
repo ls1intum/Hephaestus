@@ -518,7 +518,8 @@ class HephTurnDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         // What the lease reaper does once the lease expired.
         turns.renewLease(asked.getId(), 1, WORKER, Duration.ofSeconds(-1));
-        completion.billLostAttempt(turns.expireLease(asked.getId()).orElseThrow());
+        transactions.executeWithoutResult(status ->
+                completion.billLostAttempt(turns.expireLease(asked.getId()).orElseThrow()));
 
         assertThat(target(host.next("stop"))).isEqualTo(asked.getId() + "#1 lease");
         JsonNode retry = host.next("start");
