@@ -349,10 +349,14 @@ export default definePracticeScript({
 `,
 		);
 		const { outcome, logs, reviews } = await run(ws, "probe");
-		// macOS initializes this CoreFoundation marker even when fork receives an empty environment.
-		const expectedEnvironment = process.platform === "darwin" ? ["__CF_USER_TEXT_ENCODING"] : [];
+		// macOS can initialize this CoreFoundation marker even when fork receives an empty environment.
+		const allowedEnvironments =
+			process.platform === "darwin" ? [[], ["__CF_USER_TEXT_ENCODING"]] : [[]];
+		assert.ok(
+			allowedEnvironments.some((keys) => logs.includes(`environment ${JSON.stringify(keys)}`)),
+			`expected only platform environment keys in:\n${logs.join("\n")}`,
+		);
 		for (const line of [
-			`environment ${JSON.stringify(expectedEnvironment)}`,
 			"repository ERR_ACCESS_DENIED",
 			"system ERR_ACCESS_DENIED",
 			"write ERR_ACCESS_DENIED",
