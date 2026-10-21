@@ -1,6 +1,7 @@
 import { Link, type LinkProps } from "@tanstack/react-router";
 
 import { cn } from "cn";
+import { DotSeparator } from "@/components/common/DotSeparator";
 
 /** The `auth` surface renders no site footer, so sign-in and onboarding carry these themselves. */
 export function LegalLinks({ className }: { className?: string }) {
@@ -13,7 +14,7 @@ export function LegalLinks({ className }: { className?: string }) {
 			)}
 		>
 			<LegalLink to="/privacy">Privacy notice</LegalLink>
-			<span aria-hidden="true">·</span>
+			<DotSeparator />
 			<LegalLink to="/imprint">Imprint</LegalLink>
 		</nav>
 	);

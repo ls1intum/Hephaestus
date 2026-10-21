@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { cn } from "cn";
 import type { ItemRef, ProfileReview, ResultList } from "@/api/types.gen";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { InlineLink } from "@/components/common/InlineLink";
 import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
 import { Button } from "@/components/ui/button";
@@ -148,7 +149,7 @@ function ReviewedItem({ item, tone }: { item: ItemRef; tone: "head" | "line" }) 
 			{name}
 			{hasText(item.container) && (
 				<>
-					<span aria-hidden>·</span>
+					<DotSeparator />
 					<span className="truncate">{item.container}</span>
 				</>
 			)}
