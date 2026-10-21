@@ -97,6 +97,15 @@ export function usePracticeProfileReviews({
 		request.forgetRefusal();
 	}
 
+	// This hook outlives the open review, so an acceptance is said on a review only about its own
+	// work, and never as a link to itself. A failed refresh keeps the work read before it.
+	const { accepted } = request;
+	const acceptedHere =
+		accepted !== undefined &&
+		(reviewId === undefined || (accepted.itemId === openItemId && accepted.reviewId !== reviewId))
+			? accepted
+			: undefined;
+
 	const open: ProfileReviewOpenState = panelState(reviewQuery, (detail) => ({
 		status: "ready" as const,
 		detail,
@@ -113,5 +122,7 @@ export function usePracticeProfileReviews({
 		onReviewNow: request.ask,
 		requesting: request.asking,
 		refusal: request.refusal?.outcome,
+		/** The review the latest ask created, for the list or for the open review of the same work. */
+		accepted: acceptedHere,
 	};
 }

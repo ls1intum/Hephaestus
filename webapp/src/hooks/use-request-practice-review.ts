@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { requestReviewMutation } from "@/api/@tanstack/react-query.gen";
-import type { CreateReviewRequest, ReviewRequestOutcome } from "@/api/types.gen";
+import type { CreateReviewRequest, RequestReviewData, ReviewRequestOutcome } from "@/api/types.gen";
 import { PRACTICE_REVIEW_READS } from "@/components/admin/practice-reviews/review-search";
 import { ITEM_EVENT_REASON_SENTENCES } from "@/components/practice-vocabulary/item-event-defs";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -18,8 +18,15 @@ const READS_OF_STARTED_REVIEW: ReadonlySet<string> = new Set([
 ]);
 
 export interface ReviewRefusal {
+	workspaceSlug: string;
 	itemId: string;
 	outcome: ReviewRequestOutcome;
+}
+
+/** The review an accepted ask created, and the work it was asked about. */
+export interface AcceptedReviewRequest {
+	itemId: string;
+	reviewId: string;
 }
 
 interface RequestPracticeReviewOptions {
@@ -37,6 +44,8 @@ export function useRequestPracticeReview(
 ) {
 	const queryClient = useQueryClient();
 	const [refusal, setRefusal] = useState<ReviewRefusal>();
+	// Which ask may answer inline; earlier requests still get their answer in a toast.
+	const latestAsk = useRef<Pick<RequestReviewData, "path" | "body"> | undefined>(undefined);
 	// A level that closed before the answer landed can no longer say it.
 	const mounted = useRef(false);
 	useEffect(() => {
@@ -47,12 +56,21 @@ export function useRequestPracticeReview(
 	}, []);
 	const mutation = useMutation({
 		...requestReviewMutation(),
-		onSuccess: (outcome, { path, body }) => {
+		onSuccess: (outcome, submitted) => {
+			const { path, body } = submitted;
 			if (outcome.status === "REFUSED") {
-				if (mounted.current && showsInline?.(body.itemId) === true) {
-					setRefusal({ itemId: body.itemId, outcome });
+				// Asked in a workspace the reader has since left, so its fix and settings are not this
+				// page's to show; the refusal kept below is read only in the workspace it was asked in.
+				const here = path.workspaceSlug === workspaceSlug;
+				if (
+					mounted.current &&
+					here &&
+					submitted === latestAsk.current &&
+					showsInline?.(body.itemId) === true
+				) {
+					setRefusal({ workspaceSlug: path.workspaceSlug, itemId: body.itemId, outcome });
 				} else {
-					toast.warning("No review was started", {
+					toast.warning("Review request declined", {
 						description:
 							outcome.reason === null ? undefined : ITEM_EVENT_REASON_SENTENCES[outcome.reason],
 					});
@@ -60,22 +78,40 @@ export function useRequestPracticeReview(
 				return;
 			}
 			void invalidateWorkspaceReads(queryClient, path.workspaceSlug, READS_OF_STARTED_REVIEW);
-			toast.success("Review started");
+			// Accepted is not started: the new review's own read says whether it is queued or running.
+			toast.success("Review requested");
 		},
 		onError: (error) =>
 			toast.error("We could not request the review", {
 				description: problemDetailOf(error, "Try again in a moment."),
 			}),
 	});
+	// The answer to the latest ask, read off the mutation rather than kept beside it: a new ask, an
+	// error or a refusal leaves no acceptance to show. An ask from another workspace is not this one's.
+	const { data, variables } = mutation;
+	const asked = variables?.path.workspaceSlug === workspaceSlug ? variables.body.itemId : undefined;
+	const accepted: AcceptedReviewRequest | undefined =
+		asked !== undefined && data?.status === "SUBMITTED" && data.reviewId !== null
+			? { itemId: asked, reviewId: data.reviewId }
+			: undefined;
 	return {
 		ask: (itemId: string) => {
 			// A new ask replaces the answer to the last one, so an alert never outlives its refusal.
 			setRefusal(undefined);
 			const body: CreateReviewRequest = { itemId };
-			mutation.mutate({ path: { workspaceSlug }, body });
+			const submitted = { path: { workspaceSlug }, body };
+			latestAsk.current = submitted;
+			mutation.mutate(submitted);
 		},
-		asking: mutation.isPending ? mutation.variables.body.itemId : undefined,
-		refusal,
+		asking: mutation.isPending ? asked : undefined,
+		// An earlier ask can finish later; only the current mutation's answer belongs inline.
+		refusal:
+			refusal?.workspaceSlug === workspaceSlug && refusal.outcome === data ? refusal : undefined,
+		/**
+		 * The review the latest ask created. A caller that outlives the level it asked from shows it
+		 * only on the work it was asked about.
+		 */
+		accepted,
 		/** Forgets the refusal, for a surface whose level moved on to something else. */
 		forgetRefusal: () => setRefusal(undefined),
 	};

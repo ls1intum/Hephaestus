@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
+import { detailStackKey } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerHeader } from "@/components/layout/detail-drawer/DetailDrawerHeader";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
+import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
 import { DrawerBody, DrawerTitle } from "@/components/ui/drawer";
 import { withPageBehind } from "@/stories/decorators";
 import { expectSettledVisible } from "@/stories/overlay";
@@ -10,14 +13,21 @@ import { groups } from "@/stories/practice-profile-story-mock-data";
 import { openProfileReviewDetail } from "@/stories/profile-reviews-story-mock-data";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { daysBefore } from "@/stories/story-clock";
+import { levelsOpenedBy } from "@/test/detail-stack";
 
-import { reviewLevel, REVIEWS_LEVEL, REVIEWS_OF_YOUR_WORK } from "./practice-profile-search";
+import {
+	REVIEW_SELECTION_CLEARED,
+	reviewLevel,
+	REVIEWS_LEVEL,
+	REVIEWS_OF_YOUR_WORK,
+} from "./practice-profile-search";
 import { type ProfileReviewDetailState, ProfileReviewLevel } from "./ProfileReviewLevel";
 
 const detail = openProfileReviewDetail;
 const { review } = detail;
 
 const loaded = { status: "ready", detail } satisfies ProfileReviewDetailState;
+const REQUESTED_REVIEW_ID = "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01";
 
 const [unfocused, focused] = detail.results;
 if (!unfocused || !focused) {
@@ -74,7 +84,7 @@ const meta = {
 		eventLabel: (name) => EVENT_LABELS[name] ?? name,
 		onReviewNow: fn(),
 	},
-	argTypes: { path: { control: false }, refusal: { control: false } },
+	argTypes: { path: { control: false }, requestOutcome: { control: false } },
 	render: (args) => (
 		<DetailDrawerStack stack={[REVIEWS_LEVEL, reviewLevel(review.id)]} onClose={fn()}>
 			{(entry, level) =>
@@ -163,6 +173,44 @@ export const AskingForAReview: Story = {
 	},
 };
 
+/**
+ * An ask from this review was accepted. The way to the new review stands in this one's place over
+ * the list, and leaves this review's practice filter behind.
+ */
+export const WithRequestedReview: Story = {
+	parameters: {
+		router: {
+			initialUrl: `/?detail=${encodeURIComponent(
+				JSON.stringify([detailStackKey(REVIEWS_LEVEL), detailStackKey(reviewLevel(review.id))]),
+			)}&reviewPractice=thin-controllers`,
+		},
+	},
+	args: {
+		requestOutcome: (
+			<ReviewRequestedNotice
+				review={
+					<DetailStackLink
+						entry={reviewLevel(REQUESTED_REVIEW_ID)}
+						single
+						levelSearch={REVIEW_SELECTION_CLEARED}
+					/>
+				}
+			/>
+		),
+	},
+	play: async () => {
+		const panel = within(await settledReviewPanel());
+		const link = within(panel.getByRole("note")).getByRole("link", {
+			name: "View requested review",
+		});
+		await expect(levelsOpenedBy(link)).toStrictEqual([
+			detailStackKey(REVIEWS_LEVEL),
+			`review:${REQUESTED_REVIEW_ID}`,
+		]);
+		await expect(link.getAttribute("href")).not.toMatch(/admin|reviewPractice/u);
+	},
+};
+
 export const WithoutAsking: Story = {
 	args: { onReviewNow: undefined },
 	play: async () => {
@@ -193,7 +241,9 @@ export const RunningWithNothingRecorded: Story = {
 		}),
 	},
 	play: async () => {
-		await settledReviewPanel();
+		const panel = within(await settledReviewPanel());
+		await expect(panel.getByText("Created")).toBeVisible();
+		await expect(panel.queryByText("Reviewed")).toBeNull();
 		await expect(screen.getByText("Running")).toBeVisible();
 		await expect(
 			screen.getByText("Results appear here as the review reaches each practice."),

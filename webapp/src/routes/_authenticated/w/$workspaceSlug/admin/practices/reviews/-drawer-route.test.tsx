@@ -1,10 +1,20 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
+import { toast } from "sonner";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getReviewLineageQueryKey, listReviewsQueryKey } from "@/api/@tanstack/react-query.gen";
-import type { ReviewDetail, ReviewLineage, ReviewResult } from "@/api/types.gen";
+import {
+	getReviewLineageQueryKey,
+	getReviewQueryKey,
+	listReviewsQueryKey,
+} from "@/api/@tanstack/react-query.gen";
+import type {
+	ReviewDetail,
+	ReviewLineage,
+	ReviewRequestOutcome,
+	ReviewResult,
+} from "@/api/types.gen";
 import {
 	feedbackDetail,
 	practiceCounts,
@@ -27,6 +37,7 @@ import {
 import { RESULT_WORDS_UNAVAILABLE } from "@/components/admin/practice-reviews/result-words";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
+import { itemTrace } from "@/components/practice-trace/fixtures";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { browserTimeZone } from "@/lib/dates";
 import { itemName } from "@/lib/item-kinds";
@@ -509,7 +520,7 @@ describe("a new review from a row of the Reviews table", () => {
 
 		await waitFor(() => expect(bodies).toHaveLength(1), ROUTE_RENDER_WAIT);
 		expect(bodies[0]).toStrictEqual({ itemId: reviewItem.id });
-		await screen.findByText("Review started", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByRole("note", undefined, ROUTE_RENDER_WAIT);
 		expect(screen.queryByRole("alertdialog")).toBeNull();
 		await waitFor(() => expect(listReads().length).toBeGreaterThan(before), ROUTE_RENDER_WAIT);
 	});
@@ -966,5 +977,410 @@ describe("another review of the work from a review's sheet", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+});
+
+function pageOf(content: readonly unknown[]) {
+	return {
+		content,
+		number: 0,
+		size: 25,
+		totalElements: content.length,
+		totalPages: 1,
+		numberOfElements: content.length,
+		first: true,
+		last: true,
+		empty: content.length === 0,
+	};
+}
+
+/** Serves each review by id, and no review of the work queued or running. */
+function serveReviews(byId: Record<string, () => Response>, list?: readonly ReviewDetail[]) {
+	server.use(
+		...Object.entries(byId).flatMap(([id, reply]) => [
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/${id}`, () => reply()),
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/${id}/feedback-checks`, () =>
+				HttpResponse.json([]),
+			),
+		]),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
+			if (!new URL(request.url).searchParams.has("itemId")) {
+				return list === undefined ? undefined : HttpResponse.json(pageOf(list));
+			}
+			return HttpResponse.json(pageOf([]));
+		}),
+	);
+}
+
+interface Located {
+	state: { location: { search: { detail?: unknown } } };
+}
+const front = (router: Located) => stackInSearch(router.state.location.search.detail);
+/** Waits for `level` to stand alone in the address. */
+const opens = async (router: Located, level: string) =>
+	waitFor(() => expect(front(router)).toStrictEqual([level]), ROUTE_RENDER_WAIT);
+
+async function askFrom(level: HTMLElement, label: string) {
+	const button = await within(level).findByRole("button", { name: label }, ROUTE_RENDER_WAIT);
+	await userEvent.click(button);
+	const confirm = await screen.findByRole("alertdialog", { name: /^Request a review of/u });
+	await userEvent.click(within(confirm).getByRole("button", { name: "Request review" }));
+}
+
+/**
+ * An accepted ask names the review it created. The reader reaches that review from a note that
+ * outlives the toast, and only when they follow it: the record they asked from stays as it was, and
+ * the new review's own read says how far it got.
+ */
+describe("the way to a review an accepted ask created", () => {
+	const REQUESTS = "*/workspaces/:workspaceSlug/practices/review-requests";
+	const OLD_ID = "5d1e2f3a-4b5c-4d6e-8f70-819a2b3c4d5e";
+	const NEW_ID = "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01";
+	const OLD_SHEET = `${REVIEWS}?detail=review:${OLD_ID}`;
+	const base = reviewDetail();
+	const sheetName = base.item.title ?? itemName(base.item);
+	const accepted = {
+		status: "SUBMITTED",
+		reviewId: NEW_ID,
+		reason: null,
+	} satisfies ReviewRequestOutcome;
+
+	function reviewAs(id: string, status: ReviewDetail["status"]): ReviewDetail {
+		const active = status === "QUEUED" || status === "RUNNING";
+		return {
+			...base,
+			id,
+			status,
+			completedAt: active ? null : base.createdAt,
+			activeJobCount: active ? 1 : 0,
+		};
+	}
+
+	/** Answers each ask in turn with the next reply; returns the bodies asked with. */
+	function answerAsks(...replies: (() => Response | Promise<Response>)[]): unknown[] {
+		const bodies: unknown[] = [];
+		server.use(
+			http.post(REQUESTS, async ({ request }) => {
+				bodies.push(await request.json());
+				const reply = replies[bodies.length - 1];
+				assert(reply, "an ask nobody expected");
+				return reply();
+			}),
+		);
+		return bodies;
+	}
+
+	/** Every read of one review, in any workspace. */
+	const readsOf = (reviewId: string) =>
+		requested.filter((url) => url.pathname.endsWith(`/practices/reviews/${reviewId}`));
+
+	/** The one sheet of the work in front once it reads `text`, past any level still leaving. */
+	const sheetReading = async (text: string) =>
+		waitFor(() => {
+			const [only, ...leaving] = screen.getAllByRole("dialog", { name: sheetName });
+			expect(leaving).toHaveLength(0);
+			assert(only);
+			within(only).getAllByText(text);
+			return only;
+		}, ROUTE_RENDER_WAIT);
+
+	it("keeps the Partial review open as it was, and opens the new one only from the note", async () => {
+		serveReviews({
+			[OLD_ID]: () => HttpResponse.json(reviewAs(OLD_ID, "PARTIAL")),
+			[NEW_ID]: () => HttpResponse.json(reviewAs(NEW_ID, "RUNNING")),
+		});
+		const bodies = answerAsks(() => HttpResponse.json(accepted));
+		const { router, queryClient } = renderRouteAtWithRouter(OLD_SHEET);
+		const sheet = await screen.findByRole("dialog", { name: sheetName }, ROUTE_RENDER_WAIT);
+		await askFrom(sheet, "Request another review");
+
+		const note = await within(sheet).findByRole("note", undefined, ROUTE_RENDER_WAIT);
+		expect(bodies).toStrictEqual([{ itemId: base.item.id }]);
+		// Nothing opened for the reader: the record they asked from is in front, still Partial.
+		expect(front(router)).toStrictEqual([`review:${OLD_ID}`]);
+		expect(within(sheet).getAllByText("Partial").length).toBeGreaterThan(0);
+		expect(within(sheet).queryByText("Running")).toBeNull();
+		expect(readsOf(NEW_ID)).toHaveLength(0);
+
+		// The toast goes; the way to the new review stays.
+		await waitFor(
+			() => expect(screen.getAllByText("Review requested")).toHaveLength(2),
+			ROUTE_RENDER_WAIT,
+		);
+		act(() => {
+			toast.dismiss();
+		});
+		await waitFor(
+			() => expect(screen.getAllByText("Review requested")).toHaveLength(1),
+			ROUTE_RENDER_WAIT,
+		);
+		await userEvent.click(within(note).getByRole("link", { name: "View requested review" }));
+
+		// In the old review's place, read by its own id; nothing is asked for again.
+		await opens(router, `review:${NEW_ID}`);
+		await sheetReading("Running");
+		expect(readsOf(NEW_ID).length).toBeGreaterThan(0);
+		expect(bodies).toHaveLength(1);
+		expect(
+			queryClient.getQueryData<ReviewDetail>(
+				getReviewQueryKey({ path: { workspaceSlug: "acme", reviewId: OLD_ID } }),
+			)?.status,
+		).toBe("PARTIAL");
+
+		// Back returns to the record asked from, as it was.
+		await act(async () => router.history.back());
+		await opens(router, `review:${OLD_ID}`);
+		const back = await sheetReading("Partial");
+		expect(within(back).queryByText("Running")).toBeNull();
+	});
+
+	it("reaches a new review that the filtered list does not show, and that has already finished", async () => {
+		const old = reviewAs(OLD_ID, "PARTIAL");
+		// Read again after the ask, the filtered list still holds only the old review.
+		serveReviews({ [NEW_ID]: () => HttpResponse.json(reviewAs(NEW_ID, "COMPLETE")) }, [old]);
+		const bodies = answerAsks(() => HttpResponse.json(accepted));
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}?status=["PARTIAL"]`);
+		const itemLabel = itemName(base.item);
+		const work = `${itemLabel.charAt(0).toLowerCase()}${itemLabel.slice(1)}`;
+		const [button] = await screen.findAllByRole(
+			"button",
+			{ name: `Request review of ${work}` },
+			ROUTE_RENDER_WAIT,
+		);
+		assert(button !== undefined);
+		await userEvent.click(button);
+		const confirm = await screen.findByRole("alertdialog", {
+			name: `Request a review of ${work}?`,
+		});
+		await userEvent.click(within(confirm).getByRole("button", { name: "Request review" }));
+
+		const note = await screen.findByRole("note", undefined, ROUTE_RENDER_WAIT);
+		expect(bodies).toStrictEqual([{ itemId: base.item.id }]);
+		expect(router.state.location.search).not.toHaveProperty("detail");
+		await userEvent.click(within(note).getByRole("link", { name: "View requested review" }));
+
+		await opens(router, `review:${NEW_ID}`);
+		await sheetReading("Complete");
+		// The filter stays as the reader set it, and nothing is asked for again.
+		expect(new URLSearchParams(router.state.location.searchStr).getAll("status")).toStrictEqual([
+			"PARTIAL",
+		]);
+		expect(bodies).toHaveLength(1);
+	});
+
+	it("answers the work's sheet, and a failed first read of the new review is read again, not asked again", async () => {
+		serveReviews({ [NEW_ID]: () => HttpResponse.json(reviewAs(NEW_ID, "QUEUED")) });
+		server.use(
+			http.get(
+				`*/workspaces/:workspaceSlug/practices/reviews/${NEW_ID}`,
+				() => unavailable("Review temporarily unavailable"),
+				{ once: true },
+			),
+		);
+		// The work's trace, read again after the ask, does not list the new review yet.
+		server.use(
+			http.get(`*/workspaces/:workspaceSlug/practices/items/${base.item.id}/trace`, () =>
+				HttpResponse.json({ ...itemTrace, item: base.item, reviews: [] }),
+			),
+		);
+		const bodies = answerAsks(() => HttpResponse.json(accepted));
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}?detail=item:${base.item.id}`);
+		const sheet = await screen.findByRole("dialog", { name: sheetName }, ROUTE_RENDER_WAIT);
+		await askFrom(sheet, "Request review");
+
+		const note = await within(sheet).findByRole("note", undefined, ROUTE_RENDER_WAIT);
+		expect(front(router)).toStrictEqual([`item:${base.item.id}`]);
+		await userEvent.click(within(note).getByRole("link", { name: "View requested review" }));
+
+		await opens(router, `review:${NEW_ID}`);
+		await sheetReading("Queued");
+		expect(readsOf(NEW_ID).length).toBeGreaterThan(1);
+		expect(bodies).toHaveLength(1);
+	});
+
+	it("drops the note once a later ask is pending, refused or failed", async () => {
+		const refusing = deferred();
+		serveReviews({ [OLD_ID]: () => HttpResponse.json(reviewAs(OLD_ID, "COMPLETE")) });
+		const bodies = answerAsks(
+			() => HttpResponse.json(accepted),
+			async () => {
+				await refusing.promise;
+				return HttpResponse.json({
+					status: "REFUSED",
+					reviewId: null,
+					reason: "REQUEST_COOLDOWN_ACTIVE",
+				} satisfies ReviewRequestOutcome);
+			},
+			() => unavailable("Requests are temporarily unavailable"),
+		);
+		renderRouteAtWithRouter(OLD_SHEET);
+		const sheet = await screen.findByRole("dialog", { name: sheetName }, ROUTE_RENDER_WAIT);
+		await askFrom(sheet, "Request another review");
+		await within(sheet).findByRole("note", undefined, ROUTE_RENDER_WAIT);
+
+		// While the next ask waits for its answer, the last one's acceptance is not its answer.
+		await askFrom(sheet, "Request another review");
+		await waitFor(() => expect(bodies).toHaveLength(2), ROUTE_RENDER_WAIT);
+		expect(within(sheet).queryByRole("note")).toBeNull();
+		refusing.resolve();
+		const refusal = await within(sheet).findByRole("alert", undefined, ROUTE_RENDER_WAIT);
+		within(refusal).getByText("No review was started");
+		within(refusal).getByText("A review was requested recently, so another request waits.");
+		expect(within(sheet).queryByRole("note")).toBeNull();
+
+		await askFrom(sheet, "Request another review");
+		await waitFor(() => expect(bodies).toHaveLength(3), ROUTE_RENDER_WAIT);
+		await screen.findByText("We could not request the review", undefined, ROUTE_RENDER_WAIT);
+		expect(within(sheet).queryByRole("note")).toBeNull();
+		expect(within(sheet).queryByText("No review was started")).toBeNull();
+	});
+
+	it("keeps the latest accepted request when an earlier row request is refused later", async () => {
+		const answer = deferred();
+		const first = reviewAs(OLD_ID, "COMPLETE");
+		const second = {
+			...first,
+			id: "6f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84",
+			item: { ...first.item, id: "98765", label: "#200", title: "Another piece of work" },
+		};
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/reviews", () =>
+				HttpResponse.json(pageOf([first, second])),
+			),
+		);
+		const bodies = answerAsks(
+			async () => {
+				await answer.promise;
+				return HttpResponse.json({
+					status: "REFUSED",
+					reviewId: null,
+					reason: "REQUEST_COOLDOWN_ACTIVE",
+				} satisfies ReviewRequestOutcome);
+			},
+			() => HttpResponse.json(accepted),
+		);
+		const { queryClient } = renderRouteAtWithRouter(REVIEWS);
+		for (const [index, review] of [first, second].entries()) {
+			const label = itemName(review.item);
+			const work = `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+			await askFrom(document.body, `Request review of ${work}`);
+			await waitFor(() => expect(bodies).toHaveLength(index + 1));
+		}
+		await screen.findByRole("note", undefined, ROUTE_RENDER_WAIT);
+		answer.resolve();
+		await waitFor(() => expect(queryClient.isMutating()).toBe(0), ROUTE_RENDER_WAIT);
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		const note = screen.getByRole("note");
+		within(note).getByRole("link", { name: "View requested review" });
+		expect(screen.queryByRole("alert")).toBeNull();
+		await screen.findByText("Review request declined", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText(
+			"A review was requested recently, so another request waits.",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		expect(bodies).toStrictEqual([{ itemId: first.item.id }, { itemId: second.item.id }]);
+	});
+
+	it("leaves a workspace switched to while the ask was pending, and its sheet, as they are", async () => {
+		const answer = deferred();
+		serveReviews({
+			[OLD_ID]: () => HttpResponse.json(reviewAs(OLD_ID, "COMPLETE")),
+			[NEW_ID]: () => HttpResponse.json(reviewAs(NEW_ID, "RUNNING")),
+		});
+		const bodies = answerAsks(async () => {
+			await answer.promise;
+			return HttpResponse.json(accepted);
+		});
+		const { router, queryClient } = renderRouteAtWithRouter(OLD_SHEET);
+		const sheet = await screen.findByRole("dialog", { name: sheetName }, ROUTE_RENDER_WAIT);
+		await askFrom(sheet, "Request another review");
+		await waitFor(() => expect(bodies).toHaveLength(1), ROUTE_RENDER_WAIT);
+
+		// The same review id open in another workspace is not the record the ask came from.
+		const elsewhere = `/w/other/admin/practices/reviews?detail=review:${OLD_ID}`;
+		await act(async () => router.history.push(elsewhere));
+		// The ask in flight is acme's: this workspace's sheet does not wait on it.
+		await waitFor(() => {
+			expect(router.state.location.pathname).toBe("/w/other/admin/practices/reviews");
+			const other = within(screen.getByRole("dialog", { name: sheetName }));
+			const ask = other.getByRole("button", { name: "Request another review" });
+			expect(ask.getAttribute("aria-disabled")).toBeNull();
+		}, ROUTE_RENDER_WAIT);
+		answer.resolve();
+		await waitFor(() => expect(queryClient.isMutating()).toBe(0), ROUTE_RENDER_WAIT);
+
+		await screen.findByText("Review requested", undefined, ROUTE_RENDER_WAIT);
+		expect(router.state.location.pathname).toBe("/w/other/admin/practices/reviews");
+		expect(front(router)).toStrictEqual([`review:${OLD_ID}`]);
+		expect(screen.queryByRole("note")).toBeNull();
+		expect(readsOf(NEW_ID)).toHaveLength(0);
+	});
+
+	it("says a refusal that lands after a workspace switch as a toast, never on the other workspace's sheet", async () => {
+		const answer = deferred();
+		serveReviews({ [OLD_ID]: () => HttpResponse.json(reviewAs(OLD_ID, "COMPLETE")) });
+		const bodies = answerAsks(async () => {
+			await answer.promise;
+			return HttpResponse.json({
+				status: "REFUSED",
+				reviewId: null,
+				reason: "GATE_WITHHELD",
+			} satisfies ReviewRequestOutcome);
+		});
+		const { router, queryClient } = renderRouteAtWithRouter(OLD_SHEET);
+		const sheet = await screen.findByRole("dialog", { name: sheetName }, ROUTE_RENDER_WAIT);
+		await askFrom(sheet, "Request another review");
+		await waitFor(() => expect(bodies).toHaveLength(1), ROUTE_RENDER_WAIT);
+
+		await act(async () =>
+			router.history.push(`/w/other/admin/practices/reviews?detail=review:${OLD_ID}`),
+		);
+		await waitFor(() => {
+			expect(router.state.location.pathname).toBe("/w/other/admin/practices/reviews");
+			screen.getByRole("dialog", { name: sheetName });
+		}, ROUTE_RENDER_WAIT);
+		answer.resolve();
+		await waitFor(() => expect(queryClient.isMutating()).toBe(0), ROUTE_RENDER_WAIT);
+
+		// Still heard, but acme's settings are not this workspace's to link to.
+		await screen.findByText(
+			"The workspace’s settings did not allow a review to start.",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		const other = screen.getByRole("dialog", { name: sheetName });
+		expect(within(other).queryByRole("alert")).toBeNull();
+		expect(within(other).queryByRole("link", { name: /^Open Review: /u })).toBeNull();
+	});
+
+	it("keeps the way to the new review when the work's sheet then fails to read again", async () => {
+		serveReviews({ [NEW_ID]: () => HttpResponse.json(reviewAs(NEW_ID, "RUNNING")) });
+		server.use(
+			http.get(
+				`*/workspaces/:workspaceSlug/practices/items/${base.item.id}/trace`,
+				() => HttpResponse.json({ ...itemTrace, item: base.item, reviews: [] }),
+				{ once: true },
+			),
+			// The ask invalidates the work's trace; that read fails.
+			http.get(`*/workspaces/:workspaceSlug/practices/items/${base.item.id}/trace`, () =>
+				unavailable("Trace temporarily unavailable"),
+			),
+		);
+		const bodies = answerAsks(() => HttpResponse.json(accepted));
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}?detail=item:${base.item.id}`);
+		const sheet = await screen.findByRole("dialog", { name: sheetName }, ROUTE_RENDER_WAIT);
+		await askFrom(sheet, "Request review");
+
+		await screen.findByText("We could not load this work", undefined, ROUTE_RENDER_WAIT);
+		const note = screen.getByRole("note");
+		await userEvent.click(within(note).getByRole("link", { name: "View requested review" }));
+
+		await opens(router, `review:${NEW_ID}`);
+		await sheetReading("Running");
+		expect(bodies).toHaveLength(1);
 	});
 });

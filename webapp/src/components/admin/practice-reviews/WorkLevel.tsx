@@ -47,7 +47,11 @@ export interface WorkLevelProps {
 	onRequestReview?: () => void;
 	requesting?: boolean;
 	requestBlocked?: string;
-	refusal?: ReactNode;
+	/**
+	 * The answer to the last ask, drawn by the route: why it started nothing, or the way to the review
+	 * it created.
+	 */
+	requestOutcome?: ReactNode;
 }
 
 export function WorkLevel({
@@ -62,7 +66,7 @@ export function WorkLevel({
 	onRequestReview,
 	requesting = false,
 	requestBlocked,
-	refusal,
+	requestOutcome,
 }: WorkLevelProps) {
 	const item = state.status === "ready" ? state.item : undefined;
 	const events = eventsState?.status === "ready" ? eventsState.events : [];
@@ -108,13 +112,17 @@ export function WorkLevel({
 		return (
 			<>
 				{header}
-				<DrawerBody className="pt-2">
+				<DrawerBody className="flex flex-col gap-8 pt-2">
 					{state.status === "error" ? (
-						<QueryErrorAlert
-							error={state.error}
-							title="We could not load this work"
-							onRetry={state.onRetry}
-						/>
+						<>
+							{/* A read that fails after an ask still leaves its answer, and the way to its review. */}
+							{requestOutcome}
+							<QueryErrorAlert
+								error={state.error}
+								title="We could not load this work"
+								onRetry={state.onRetry}
+							/>
+						</>
 					) : (
 						<LevelBodySkeleton />
 					)}
@@ -133,7 +141,7 @@ export function WorkLevel({
 		<>
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
-				{refusal}
+				{requestOutcome}
 				<SheetSection part="what">
 					<ReviewFactGrid>
 						<ReviewFact label="Kind">{itemKindLabel(item.kind, 1, item.provider)}</ReviewFact>

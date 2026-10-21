@@ -77,8 +77,11 @@ export interface ReviewLevelProps {
 	requestingReview?: boolean;
 	/** Why no review can be asked for now, such as another review of the work queued or running. */
 	requestBlocked?: string;
-	/** Why the last ask started nothing, drawn by the route. */
-	requestRefusal?: ReactNode;
+	/**
+	 * The answer to the last ask, drawn by the route: why it started nothing, or the way to the review
+	 * it created. This review stays as it is either way.
+	 */
+	requestOutcome?: ReactNode;
 }
 
 function kindLabel(review: ReviewDetail): string {
@@ -128,7 +131,7 @@ export function ReviewLevel({
 	onRequestReview,
 	requestingReview = false,
 	requestBlocked,
-	requestRefusal,
+	requestOutcome,
 }: ReviewLevelProps) {
 	const review = state.status === "ready" ? state.review : undefined;
 	const header = (
@@ -146,13 +149,17 @@ export function ReviewLevel({
 		return (
 			<>
 				{header}
-				<DrawerBody className="pt-2">
+				<DrawerBody className="flex flex-col gap-8 pt-2">
 					{state.status === "error" ? (
-						<QueryErrorAlert
-							error={state.error}
-							title="We could not load this review"
-							onRetry={state.onRetry}
-						/>
+						<>
+							{/* A read that fails after an ask still leaves its answer, and the way to its review. */}
+							{requestOutcome}
+							<QueryErrorAlert
+								error={state.error}
+								title="We could not load this review"
+								onRetry={state.onRetry}
+							/>
+						</>
 					) : (
 						<LevelBodySkeleton />
 					)}
@@ -166,7 +173,7 @@ export function ReviewLevel({
 		<>
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
-				{requestRefusal}
+				{requestOutcome}
 				<SheetSection part="what">
 					<ReviewWhat workspaceSlug={workspaceSlug} review={review} eventLabel={eventLabel} />
 				</SheetSection>

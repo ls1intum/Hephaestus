@@ -3,7 +3,9 @@ import type { ReviewRef } from "@/api/types.gen";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { eventLabel } from "@/components/practice-trace/fixtures";
+import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
@@ -19,11 +21,12 @@ import {
 	trackerIssue,
 } from "./fixtures";
 import { SHEET_SECTIONS } from "./RecordSheet";
-import { itemLevel } from "./review-levels";
+import { itemLevel, reviewLevel } from "./review-levels";
 
 import { WorkLevel } from "./WorkLevel";
 
 const retryItem = fn();
+const REQUESTED_REVIEW_ID = "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01";
 const reviewItemEvents = itemEventsOf(reviewDetailCompleted);
 
 const requestedReview: ReviewRef = {
@@ -227,6 +230,33 @@ export const RequestedReviewRunning: Story = {
 			"aria-disabled",
 			"true",
 		);
+	},
+};
+
+/**
+ * The ask was accepted before any read of the work lists the new review: the sheet still shows the
+ * reviews it read, and the way to the new one stands above them.
+ */
+export const WithRequestedReview: Story = {
+	args: {
+		reviews: [
+			{ ...requestedReview, status: "COMPLETE", completedAt: reviewDetailCompleted.completedAt },
+		],
+		requestOutcome: (
+			<ReviewRequestedNotice
+				review={<DetailStackLink entry={reviewLevel(REQUESTED_REVIEW_ID)} single />}
+			/>
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		const note = within(panel.getByRole("note"));
+		// In this sheet's place, so Back returns to the work.
+		await expect(
+			levelsOpenedBy(note.getByRole("link", { name: "View requested review" })),
+		).toStrictEqual([`review:${REQUESTED_REVIEW_ID}`]);
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent("Complete");
 	},
 };
 

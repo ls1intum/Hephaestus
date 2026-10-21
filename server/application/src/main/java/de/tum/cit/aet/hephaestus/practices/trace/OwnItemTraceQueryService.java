@@ -9,8 +9,11 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewSummaryQueryService;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.OwnItemEventDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.OwnItemTraceDTO;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -40,13 +43,19 @@ public class OwnItemTraceQueryService {
                 .toList();
         var permitted = authorization.permitsAll(ws, found, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         var visible = found.stream().filter(r -> permitted.contains(r.getId())).toList();
-        if (visible.isEmpty()) throw new EntityNotFoundException("Review", reviewId.toString());
+        boolean requested = review.getKind() == ReviewKind.ITEM
+                && review.getOrigin() == ReviewOrigin.REQUEST
+                && Objects.equals(review.getRequestedById(), account)
+                && review.getItemId() == itemId;
+        if (visible.isEmpty() && !requested) throw new EntityNotFoundException("Review", reviewId.toString());
         return new OwnItemTraceDTO(
                 item,
                 reviewQuery.ref(review),
-                query.events(ws, itemId, PageRequest.ofSize(100)).stream()
-                        .map(e -> new OwnItemEventDTO(e.name(), e.occurredAt()))
-                        .toList(),
+                visible.isEmpty()
+                        ? List.of()
+                        : query.events(ws, itemId, PageRequest.ofSize(100)).stream()
+                                .map(e -> new OwnItemEventDTO(e.name(), e.occurredAt()))
+                                .toList(),
                 presentation.lists(ws, views.views(ws, visible), permitted));
     }
 }

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
 	PracticeGuidanceDto,
@@ -43,6 +43,9 @@ import { storeUserView } from "@/test/user-view";
 vi.setConfig({ testTimeout: ROUTE_RENDER_WAIT.timeout });
 
 const PAGE = "/w/acme/practice-profile";
+
+const stack = (router: { state: { location: { search: { detail?: unknown } } } }) =>
+	stackInSearch(router.state.location.search.detail);
 
 /** Long enough for a response to render once the route is up, short of the test's own timeout. */
 const SETTLE_WAIT = { timeout: 5000 } as const;
@@ -916,6 +919,127 @@ describe("practice introduction", () => {
 		// The page behind counts its own practices by standing; the level makes up none for this one.
 		const level = screen.getByRole("dialog", { name: "Pair on schema changes" });
 		expect(within(level).queryByText("Not reviewed")).toBeNull();
+	});
+});
+
+/**
+ * An accepted ask names the review it created. The reader's own detail of it answers before it
+ * records anything — its own status, nothing listed yet — so the way to it is a link to their own
+ * review, followed only when they choose.
+ */
+describe("the way to a review an accepted ask created", () => {
+	const NEW_ID = "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01";
+
+	/** The server's answer for a review the reader just asked for, before it records anything. */
+	function requestedDetail(item: ProfileReviewDetail["review"]["item"]): ProfileReviewDetail {
+		const review: ProfileReviewDetail["review"] = {
+			...openProfileReview.review,
+			id: NEW_ID,
+			item,
+			origin: "REQUEST",
+			status: "QUEUED",
+			completedAt: null,
+		};
+		return {
+			...openProfileReviewDetail,
+			review,
+			results: [],
+			feedback: [],
+			trace: { item, review, events: [], results: [] },
+			practiceOutcomes: { met: 0, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 },
+		};
+	}
+
+	/** Accepts every ask as the new review and serves that review; counts the asks and its reads. */
+	function acceptAsks(item: ProfileReviewDetail["review"]["item"]) {
+		const asked: unknown[] = [];
+		let reads = 0;
+		server.use(
+			http.post("*/workspaces/:workspaceSlug/practices/review-requests", async ({ request }) => {
+				asked.push(await request.json());
+				return HttpResponse.json({ status: "SUBMITTED", reviewId: NEW_ID, reason: null });
+			}),
+			http.get(`*/workspaces/:workspaceSlug/practice-profile/reviews/${NEW_ID}`, () => {
+				reads += 1;
+				return HttpResponse.json(requestedDetail(item));
+			}),
+		);
+		return { asked, reads: () => reads };
+	}
+
+	const STILL_EMPTY = "Results appear here as the review reaches each practice.";
+
+	it("keeps the review asked from as it was, and opens the new one in its place without its filter", async () => {
+		const { asked, reads } = acceptAsks(openProfileReview.review.item);
+		const { router } = renderRouteAtWithRouter(`${OPEN_REVIEW_PAGE}&reviewPractice=thin`);
+
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Request review" }, ROUTE_RENDER_WAIT),
+		);
+		const note = await screen.findByRole("note", undefined, SETTLE_WAIT);
+		expect(asked).toStrictEqual([{ itemId: openProfileReview.review.item.id }]);
+		// Nothing opened for the reader, and nothing of the new review was read.
+		expect(stack(router)).toStrictEqual(["reviews:all", `review:${openProfileReview.review.id}`]);
+		expect(router.state.location.search.reviewPractice).toBe("thin");
+		expect(reads()).toBe(0);
+
+		fireEvent.click(within(note).getByRole("link", { name: "View requested review" }));
+		await waitFor(() => expect(stack(router)).toStrictEqual(["reviews:all", `review:${NEW_ID}`]));
+		// The filter chosen on the review it replaced is not this one's.
+		expect(router.state.location.search.reviewPractice).toBeUndefined();
+		await screen.findByText(STILL_EMPTY, undefined, ROUTE_RENDER_WAIT);
+		expect(screen.getByText("Created").querySelector("time")).not.toBeNull();
+		expect(reads()).toBeGreaterThan(0);
+		// The open review is the requested one, so it does not link to itself.
+		await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
+		expect(asked).toHaveLength(1);
+
+		// Back returns to the review asked from, still with its filter and the way to the new one.
+		router.history.back();
+		await waitFor(() =>
+			expect(stack(router)).toStrictEqual(["reviews:all", `review:${openProfileReview.review.id}`]),
+		);
+		expect(router.state.location.search.reviewPractice).toBe("thin");
+		await screen.findByRole("note", undefined, SETTLE_WAIT);
+		expect(asked).toHaveLength(1);
+	});
+
+	it("answers a row with the new review opened over the list, and says it on no other work's review", async () => {
+		const row = profileReviews.find((entry) => entry.review.item.label === "#890");
+		assert(row, "The fixtures carry a review of #890");
+		expect(row.review.item.id).not.toBe(openProfileReview.review.item.id);
+		const { asked, reads } = acceptAsks(row.review.item);
+		const router = await renderProfile();
+		fireEvent.click(await openReviewsChip());
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Request review: #890" }, ROUTE_RENDER_WAIT),
+		);
+
+		const note = await screen.findByRole("note", undefined, SETTLE_WAIT);
+		expect(asked).toStrictEqual([{ itemId: row.review.item.id }]);
+		expect(stack(router)).toStrictEqual(["reviews:all"]);
+		fireEvent.click(within(note).getByRole("link", { name: "View requested review" }));
+
+		await waitFor(() => expect(stack(router)).toStrictEqual(["reviews:all", `review:${NEW_ID}`]));
+		await screen.findByText(STILL_EMPTY, undefined, ROUTE_RENDER_WAIT);
+		expect(reads()).toBeGreaterThan(0);
+		await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
+
+		// One step over the list: Back closes it onto the list and its note.
+		router.history.back();
+		await waitFor(() => expect(stack(router)).toStrictEqual(["reviews:all"]));
+		await screen.findByRole("note", undefined, SETTLE_WAIT);
+
+		// A review of other work is not where this ask was made.
+		fireEvent.click(
+			await screen.findByRole("button", { name: openReviewRowName }, ROUTE_RENDER_WAIT),
+		);
+		await waitFor(() =>
+			expect(stack(router)).toStrictEqual(["reviews:all", `review:${openProfileReview.review.id}`]),
+		);
+		await screen.findByRole("tab", { name: /^Every practice/u }, ROUTE_RENDER_WAIT);
+		await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
+		expect(asked).toHaveLength(1);
 	});
 });
 
