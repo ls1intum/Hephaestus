@@ -32,6 +32,8 @@ import java.util.stream.IntStream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -106,6 +108,12 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
         assertThat(GitLabMergeRequestSyncService.readsDiscussions(0, false, "closed"))
                 .isTrue();
         assertThat(GitLabMergeRequestSyncService.readsDiscussions(3, false, "opened"))
+                .isTrue();
+    }
+
+    @Test
+    void shouldReadDiscussionsWhenTheUserNotesCountIsUnknown() {
+        assertThat(GitLabMergeRequestSyncService.readsDiscussions(null, false, "opened"))
                 .isTrue();
     }
 
@@ -303,6 +311,112 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
         assertThat(synced())
                 .extracting(GitLabMergeRequestProcessor.SyncMergeRequestData::baseSha)
                 .containsExactly(base, null);
+    }
+
+    @Test
+    void shouldPreserveMissingMergeRequestCountersAsUnknown() {
+        List<Map<String, Object>> nodes = nullable(List.of(mergeRequest(3)));
+        assertVendorCouldReturn(GITLAB, LISTING, "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(nodes));
+
+        service.syncMergeRequests(SCOPE_ID, repository(), null);
+
+        assertThat(synced()).singleElement().satisfies(data -> {
+            assertThat(data.commitCount()).isNull();
+            assertThat(data.commentsCount()).isNull();
+            assertThat(data.discussionLocked()).isNull();
+            assertThat(data.additions()).isNull();
+            assertThat(data.deletions()).isNull();
+            assertThat(data.fileCount()).isNull();
+        });
+    }
+
+    @Test
+    void shouldPreserveOnlyMissingDiffSummaryFieldsAsUnknown() {
+        Map<String, @Nullable Object> node = mergeRequest(3);
+        node.put("commitCount", 0);
+        node.put("userNotesCount", 0);
+        node.put("discussionLocked", false);
+        node.put("diffStatsSummary", Map.of("additions", 0));
+        List<Map<String, Object>> nodes = nullable(List.of(node));
+        assertVendorCouldReturn(GITLAB, LISTING, "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(nodes));
+
+        service.syncMergeRequests(SCOPE_ID, repository(), null);
+
+        assertThat(synced()).singleElement().satisfies(data -> {
+            assertThat(data.commitCount()).isZero();
+            assertThat(data.commentsCount()).isZero();
+            assertThat(data.discussionLocked()).isFalse();
+            assertThat(data.additions()).isZero();
+            assertThat(data.deletions()).isNull();
+            assertThat(data.fileCount()).isNull();
+        });
+    }
+
+    @ParameterizedTest
+    @CsvSource({"additions,,0,0", "deletions,0,,0", "fileCount,0,0,"})
+    void shouldNotPassFailedCounterFieldsAsKnownValuesOrDiscardValidSiblings(
+            String failedField, @Nullable Integer additions, @Nullable Integer deletions, @Nullable Integer fileCount) {
+        Map<String, @Nullable Object> failed = countedMergeRequest(3);
+        Map<String, @Nullable Object> valid = countedMergeRequest(4);
+        List<Map<String, Object>> nodes = nullable(List.of(failed, valid));
+        assertVendorCouldReturn(GITLAB, LISTING, "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(
+                nodes,
+                List.of(
+                        GraphQlResponses.error("Read failed", "project", "mergeRequests", "nodes", 0, "commitCount"),
+                        GraphQlResponses.error("Read failed", "project", "mergeRequests", "nodes", 0, "userNotesCount"),
+                        GraphQlResponses.error(
+                                "Read failed", "project", "mergeRequests", "nodes", 0, "discussionLocked"),
+                        GraphQlResponses.error(
+                                "Read failed",
+                                "project",
+                                "mergeRequests",
+                                "nodes",
+                                0,
+                                "diffStatsSummary",
+                                failedField))));
+
+        service.syncMergeRequests(SCOPE_ID, repository(), null);
+
+        assertThat(synced())
+                .extracting(
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::commitCount,
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::commentsCount,
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::discussionLocked,
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::additions,
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::deletions,
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::fileCount)
+                .containsExactly(tuple(null, null, null, additions, deletions, fileCount), tuple(0, 0, false, 0, 0, 0));
+    }
+
+    @Test
+    void shouldNotPassFailedDiffSummaryAsKnownCountsOnHistoricalPages() {
+        List<Map<String, Object>> nodes = nullable(List.of(countedMergeRequest(3), countedMergeRequest(4)));
+        assertVendorCouldReturn(GITLAB, "GetProjectMergeRequestsHistorical", "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(
+                nodes,
+                List.of(GraphQlResponses.error(
+                        "Read failed", "project", "mergeRequests", "nodes", 0, "diffStatsSummary"))));
+
+        service.backfillMergeRequests(SCOPE_ID, repository(), null, 10);
+
+        assertThat(synced())
+                .extracting(
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::additions,
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::deletions,
+                        GitLabMergeRequestProcessor.SyncMergeRequestData::fileCount)
+                .containsExactly(tuple(null, null, null), tuple(0, 0, 0));
+    }
+
+    private static Map<String, @Nullable Object> countedMergeRequest(int iid) {
+        Map<String, @Nullable Object> node = mergeRequest(iid);
+        node.put("commitCount", 0);
+        node.put("userNotesCount", 0);
+        node.put("discussionLocked", false);
+        node.put("diffStatsSummary", Map.of("additions", 0, "deletions", 0, "fileCount", 0));
+        return node;
     }
 
     /** Merge request !{@code iid} as the listing names it, with fields a test adds. */

@@ -307,17 +307,20 @@ public class GitLabMergeRequestSyncService {
             @Nullable String updatedAt,
             @Nullable String closedAt,
             @Nullable String mergedAt,
-            int commitCount,
-            int userNotesCount,
-            boolean discussionLocked,
+            @Nullable Integer commitCount,
+            @Nullable Integer userNotesCount,
+            @Nullable Boolean discussionLocked,
             @Nullable String sourceBranch,
             @Nullable String targetBranch,
             @Nullable String diffHeadSha,
             @Nullable String baseSha,
             @Nullable String mergeCommitSha) {}
 
-    private record DiffStats(int additions, int deletions, int fileCount) {
-        static final DiffStats EMPTY = new DiffStats(0, 0, 0);
+    private record DiffStats(
+            @Nullable Integer additions,
+            @Nullable Integer deletions,
+            @Nullable Integer fileCount) {
+        static final DiffStats UNKNOWN = new DiffStats(null, null, null);
     }
 
     private record UserFields(
@@ -495,7 +498,7 @@ public class GitLabMergeRequestSyncService {
         String projectPath = repository.getNameWithOwner();
         ScalarFields fields = extractScalarFields(response, nodePath, node);
         String mrContext = sanitizeForLog(projectPath) + "!" + fields.iid();
-        DiffStats diff = extractDiffStats(node);
+        DiffStats diff = extractDiffStats(response, nodePath, node);
         UserFields author = extractUserFields(node, "author");
         UserFields mergeUser = extractUserFields(node, "mergeUser");
 
@@ -604,10 +607,10 @@ public class GitLabMergeRequestSyncService {
      * Whether a merge request's discussions are fetched at all: the gate spares one request per
      * untouched open MR. The review decisions — an approval's time, a request for changes, an
      * unapproval — live in system notes, which {@code userNotesCount} does not count, so an MR with an
-     * approver or one that has left the open state is read regardless.
+     * approver or one that has left the open state is read regardless. An unknown count cannot skip a read.
      */
-    static boolean readsDiscussions(int userNotesCount, boolean hasApprover, @Nullable String state) {
-        return userNotesCount > 0 || hasApprover || !"opened".equalsIgnoreCase(state);
+    static boolean readsDiscussions(@Nullable Integer userNotesCount, boolean hasApprover, @Nullable String state) {
+        return userNotesCount == null || userNotesCount > 0 || hasApprover || !"opened".equalsIgnoreCase(state);
     }
 
     private static @Nullable Integer parseIid(@Nullable String iid) {
@@ -643,9 +646,11 @@ public class GitLabMergeRequestSyncService {
                 ? null
                 : (String) node.get("detailedMergeStatus");
         Boolean approved = GitLabMergeRequestFields.approved(response, nodePath, node);
-        int commitCount = node.get("commitCount") != null ? ((Number) node.get("commitCount")).intValue() : 0;
-        int userNotesCount = node.get("userNotesCount") != null ? ((Number) node.get("userNotesCount")).intValue() : 0;
-        boolean discussionLocked = Boolean.TRUE.equals(node.get("discussionLocked"));
+        Integer commitCount = GitLabMergeRequestFields.count(response, nodePath, node, "commitCount");
+        Integer userNotesCount = GitLabMergeRequestFields.count(response, nodePath, node, "userNotesCount");
+        Boolean discussionLocked = GitLabMergeRequestFields.failed(response, nodePath + ".discussionLocked")
+                ? null
+                : (Boolean) node.get("discussionLocked");
         String sourceBranch = (String) node.get("sourceBranch");
         String targetBranch = (String) node.get("targetBranch");
         String diffHeadSha = GitLabMergeRequestFields.failed(response, nodePath + ".diffHeadSha")
@@ -683,14 +688,16 @@ public class GitLabMergeRequestSyncService {
     }
 
     @SuppressWarnings("unchecked")
-    private static DiffStats extractDiffStats(Map<String, Object> node) {
+    private static DiffStats extractDiffStats(
+            ClientGraphQlResponse response, String nodePath, Map<String, Object> node) {
         Map<String, Object> diffStats = (Map<String, Object>) node.get("diffStatsSummary");
         if (diffStats == null) {
-            return DiffStats.EMPTY;
+            return DiffStats.UNKNOWN;
         }
-        int additions = diffStats.get("additions") != null ? ((Number) diffStats.get("additions")).intValue() : 0;
-        int deletions = diffStats.get("deletions") != null ? ((Number) diffStats.get("deletions")).intValue() : 0;
-        int fileCount = diffStats.get("fileCount") != null ? ((Number) diffStats.get("fileCount")).intValue() : 0;
+        String path = nodePath + ".diffStatsSummary";
+        Integer additions = GitLabMergeRequestFields.count(response, path, diffStats, "additions");
+        Integer deletions = GitLabMergeRequestFields.count(response, path, diffStats, "deletions");
+        Integer fileCount = GitLabMergeRequestFields.count(response, path, diffStats, "fileCount");
         return new DiffStats(additions, deletions, fileCount);
     }
 
