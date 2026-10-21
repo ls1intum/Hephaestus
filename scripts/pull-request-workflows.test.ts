@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import { data, Evaluator, Lexer, Parser } from "@actions/expressions";
 import { isMap, isSeq, parseDocument, type YAMLMap } from "yaml";
 
 async function stepsIn(file: string, location: string[]): Promise<YAMLMap[]> {
@@ -78,7 +79,8 @@ void test("title preflight loads without dependencies and validates the current 
 				`
 			const context = { repo: { owner: "owner", repo: "repo" }, payload: { pull_request: { number: 7, title: ${JSON.stringify(valid ? "fix!: stale invalid title" : "fix: stale valid title")} } } };
 			const github = { rest: { pulls: { get: async () => ({ data: { title: ${JSON.stringify(title)} } }) } } };
-			const core = { setOutput() {}, setFailed() { process.exitCode = 1; } };
+			const outputs = {};
+			const core = { setOutput(name, value) { outputs[name] = value; }, setFailed() { process.exitCode = 1; } };
 			${String(script)}
 		`,
 			],
@@ -256,8 +258,9 @@ void test("commit identity accepts only the current author or a resolved listed 
 				const nodes = pages[calls++];
 				return { repository: { pullRequest: { author: { __typename: ${JSON.stringify(entry.type)}, login: ${JSON.stringify(entry.author)} }, commits: { nodes, pageInfo: { hasNextPage: calls < pages.length, endCursor: "page-" + calls } } } } };
 			} };
-			const core = { setFailed() { process.exitCode = 1; } };
-			(async () => { ${String(script)} })().then(() => assert.equal(calls, pages.length)).catch(error => { console.error(error); process.exitCode = 2; });
+			const outputs = {};
+			const core = { setOutput(name, value) { outputs[name] = value; }, setFailed() { process.exitCode = 1; } };
+			(async () => { ${String(script)} })().then(() => { assert.equal(calls, pages.length); assert.deepEqual(outputs, ${JSON.stringify(entry.valid ? {} : { violations: "true" })}); }).catch(error => { console.error(error); process.exitCode = 2; });
 		`,
 			],
 			{
@@ -297,15 +300,110 @@ void test("body validation uses the current description rather than a stale reru
 			[
 				"-e",
 				`
+			const assert = require("node:assert/strict");
 			const context = { repo: { owner: "owner", repo: "repo" }, payload: { pull_request: { number: 7, body: ${JSON.stringify(staleBody)} } } };
 			const github = { rest: { pulls: { get: async () => ({ data: { body: ${JSON.stringify(body)} } }) } } };
-			const core = { setFailed() { process.exitCode = 1; } };
-			(async () => { ${String(script)} })().catch(error => { console.error(error); process.exitCode = 2; });
+			const outputs = {};
+			const core = { setOutput(name, value) { outputs[name] = value; }, setFailed() { process.exitCode = 1; } };
+			(async () => { ${String(script)} })().then(() => assert.deepEqual(outputs, ${JSON.stringify(valid ? {} : { violations: "true" })})).catch(error => { console.error(error); process.exitCode = 2; });
 		`,
 			],
 			{ encoding: "utf8", env: { ...process.env, RUNNER_TEMP: directory } },
 		);
 		assert.equal(result.status, valid ? 0 : 1, result.stderr);
 		assert.equal(result.stderr, "");
+	}
+});
+
+void test("policy comments require a recorded violation, even when the API or another policy fails", async () => {
+	const steps = await stepsIn(".github/workflows/pull-request.yml", [
+		"jobs",
+		"validate-pr",
+		"steps",
+	]);
+	for (const [id, header] of [
+		["identity", "pr-commit-identity-error"],
+		["attribution", "pr-attribution-error"],
+	] as const) {
+		const step = steps.find((entry) => entry.getIn(["with", "header"]) === header);
+		assert.ok(step);
+		const condition = String(step.get("if")).replaceAll(/^\$\{\{\s*|\s*\}\}$/gu, "");
+		const expression = new Parser(
+			new Lexer(condition).lex().tokens,
+			["steps"],
+			[{ name: "cancelled", minArgs: 0, maxArgs: 0 }],
+		).parse();
+		for (const [name, outcome, reported, cancelled, expected] of [
+			["API failure without a report", "failure", false, false, false],
+			["actual violation", "failure", true, false, true],
+			["successful check", "success", false, false, false],
+			["cancelled run", "failure", true, true, false],
+		] as const) {
+			const context: unknown = JSON.parse(
+				JSON.stringify({
+					steps: { [id]: { outcome, outputs: reported ? { violations: "true" } : {} } },
+				}),
+				data.reviver,
+			);
+			assert.ok(context instanceof data.Dictionary);
+			const functions = new Map([
+				[
+					"cancelled",
+					{
+						name: "cancelled",
+						minArgs: 0,
+						maxArgs: 0,
+						call: () => new data.BooleanData(cancelled),
+					},
+				],
+			]);
+			assert.equal(
+				new Evaluator(expression, context, functions).evaluate().coerceString() === "true",
+				expected,
+				`${id}: ${name}`,
+			);
+		}
+	}
+});
+
+void test("unavailable PR metadata fails without claiming a policy violation", async (t) => {
+	const steps = await stepsIn(".github/workflows/pull-request.yml", [
+		"jobs",
+		"validate-pr",
+		"steps",
+	]);
+	const directory = await mkdtemp(path.join(tmpdir(), "pr-metadata-unavailable-"));
+	t.after(async () => rm(directory, { recursive: true, force: true }));
+	for (const id of ["identity", "attribution"]) {
+		const script = steps.find((step) => step.get("id") === id)?.getIn(["with", "script"]);
+		assert.equal(typeof script, "string");
+		const result = spawnSync(
+			process.execPath,
+			[
+				"-e",
+				`
+			const assert = require("node:assert/strict");
+			const { existsSync } = require("node:fs");
+			const outputs = {};
+			const failures = [];
+			const core = { setOutput(name, value) { outputs[name] = value; }, setFailed(reason) { failures.push(reason); } };
+			const unavailable = async () => { throw Object.assign(new Error("Service Unavailable"), {status: 503}); };
+			const github = {graphql: unavailable, rest: {pulls: {get: unavailable}}};
+			const context = {repo: {owner: "owner", repo: "repo"}, payload: {pull_request: {number: 7}}};
+			(async () => {
+				await assert.rejects(async () => { ${String(script)} }, {status: 503});
+				assert.deepEqual(outputs, {});
+				assert.deepEqual(failures, []);
+				assert.equal(existsSync(process.env.RUNNER_TEMP + "/${id === "identity" ? "identity" : "attribution"}-comment.md"), false);
+			})().catch(error => {console.error(error); process.exitCode = 1;});
+		`,
+			],
+			{
+				encoding: "utf8",
+				env: { ...process.env, GITHUB_WORKSPACE: process.cwd(), RUNNER_TEMP: directory },
+			},
+		);
+		assert.equal(result.status, 0, `${id}: ${result.stderr}`);
+		assert.equal(result.stderr, "", id);
 	}
 });

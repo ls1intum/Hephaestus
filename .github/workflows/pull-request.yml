@@ -123,6 +123,7 @@ jobs:
         env:
           MAINTAINERS: ${{ vars.REVIEW_POLICY_MAINTAINERS }}
         with:
+          retries: 2
           script: |
             const { writeFile } = require("node:fs/promises");
             const { pathToFileURL } = await import("node:url");
@@ -185,11 +186,12 @@ jobs:
                 "",
               ].join("\n"),
             );
+            core.setOutput("violations", "true");
             core.setFailed(`${offenders.length} commit(s) do not resolve to @${expected} or a listed maintainer.`);
 
       - name: "Comment on PR with the offending commits"
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        if: steps.identity.outcome == 'failure'
+        if: ${{ !cancelled() && steps.identity.outputs.violations == 'true' }}
         with:
           header: pr-commit-identity-error
           path: ${{ runner.temp }}/identity-comment.md
@@ -216,6 +218,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         continue-on-error: true
         with:
+          retries: 2
           script: |
             const { writeFile } = require("node:fs/promises");
 
@@ -255,11 +258,12 @@ jobs:
                 "",
               ].join("\n"),
             );
+            core.setOutput("violations", "true");
             core.setFailed("The pull request body carries model attribution.");
 
       - name: "Comment on PR with the attribution violations"
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        if: steps.attribution.outcome == 'failure'
+        if: ${{ !cancelled() && steps.attribution.outputs.violations == 'true' }}
         with:
           header: pr-attribution-error
           path: ${{ runner.temp }}/attribution-comment.md
