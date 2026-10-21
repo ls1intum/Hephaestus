@@ -16,19 +16,29 @@ import de.tum.cit.aet.hephaestus.practices.ReviewOn;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
+import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +79,9 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     PracticeVersionService versions;
+
+    @Autowired
+    ReviewRepository reviews;
 
     Scenario scenario;
 
@@ -195,6 +208,237 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(1)
                 .jsonPath("$.content[0].review.id")
                 .isEqualTo(r.getReviewId().toString());
+    }
+
+    @ParameterizedTest
+    @EnumSource(ReviewStatus.class)
+    void shouldShowAnOwnRequestReceiptWhenItHasNoResults(ReviewStatus status) {
+        var review = requestedReview(
+                scenario, status, Objects.requireNonNull(scenario.account().getId()));
+
+        get("/practice-profile/reviews/" + review.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.review.id")
+                .isEqualTo(review.getId().toString())
+                .jsonPath("$.review.status")
+                .isEqualTo(status.name())
+                .jsonPath("$.results.length()")
+                .isEqualTo(0)
+                .jsonPath("$.feedback.length()")
+                .isEqualTo(0)
+                .jsonPath("$.trace.item.id")
+                .isEqualTo(scenario.item().getId().toString())
+                .jsonPath("$.trace.review.id")
+                .isEqualTo(review.getId().toString())
+                .jsonPath("$.trace.results.length()")
+                .isEqualTo(0)
+                .jsonPath("$.trace.events.length()")
+                .isEqualTo(0)
+                .jsonPath("$.practiceOutcomes.met")
+                .isEqualTo(0)
+                .jsonPath("$.practiceOutcomes.notMet")
+                .isEqualTo(0)
+                .jsonPath("$.practiceOutcomes.doesNotApply")
+                .isEqualTo(0)
+                .jsonPath("$.practiceOutcomes.couldNotDetermine")
+                .isEqualTo(0)
+                .jsonPath("$.runtime")
+                .doesNotExist()
+                .jsonPath("$.usage")
+                .doesNotExist();
+    }
+
+    @Test
+    void shouldHideAnEmptyReceiptWhenAnotherMemberRequestedIt() {
+        var review = requestedReview(
+                scenario,
+                ReviewStatus.QUEUED,
+                Objects.requireNonNull(data.member(scenario.workspace().getId()).getId()));
+        get("/practice-profile/reviews/" + review.getId())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    void shouldNotGrantAnEmptyReceiptThroughAdminAuthority() {
+        var review = requestedReview(
+                scenario,
+                ReviewStatus.RUNNING,
+                Objects.requireNonNull(data.member(scenario.workspace().getId()).getId()));
+        http.get()
+                .uri(root() + "/practice-profile/reviews/" + review.getId())
+                .headers(h ->
+                        h.setBearerAuth("mock-jwt-admin-" + scenario.account().getId()))
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    void shouldNotGrantAnOwnReceiptInAnotherWorkspace() {
+        var other = data.scenario();
+        var review = requestedReview(
+                other,
+                ReviewStatus.QUEUED,
+                Objects.requireNonNull(scenario.account().getId()));
+        get("/practice-profile/reviews/" + review.getId())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    void shouldHideAnUnknownReviewReceipt() {
+        get("/practice-profile/reviews/" + UUID.randomUUID())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    void shouldLimitAnEmptyReceiptTraceToItsRequestedItem() {
+        var review = requestedReview(
+                scenario,
+                ReviewStatus.QUEUED,
+                Objects.requireNonNull(scenario.account().getId()));
+        var other = historyItem(scenario.account(), "scm.pull_request", scenario.item());
+        get("/practices/items/" + other.item().getId() + "/own-trace?reviewId=" + review.getId())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+        get("/practices/items/" + scenario.item().getId() + "/own-trace?reviewId=" + review.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.review.id")
+                .isEqualTo(review.getId().toString())
+                .jsonPath("$.results.length()")
+                .isEqualTo(0);
+    }
+
+    @Test
+    void shouldNotTurnAnEventReviewIntoAnOwnRequestReceipt() {
+        var review = requestedReview(
+                scenario,
+                ReviewStatus.QUEUED,
+                Objects.requireNonNull(scenario.account().getId()));
+        review.setOrigin(ReviewOrigin.EVENT);
+        review.setRequestedById(null);
+        reviews.saveAndFlush(review);
+        get("/practice-profile/reviews/" + review.getId())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    void shouldNotGrantARepositoryScanThroughAnOwnItemRequestReceipt() {
+        var repository = index.upsert(new ItemRegistration(
+                scenario.workspace().getId(), new ItemKind("scm.repository"), 987_654_321L, null, null));
+        var review = requestedReview(
+                scenario,
+                ReviewStatus.QUEUED,
+                Objects.requireNonNull(scenario.account().getId()));
+        review.setItemId(repository.itemId());
+        review.setKind(ReviewKind.SCAN);
+        review.setBudgetUsd(new BigDecimal("1.0000"));
+        reviews.saveAndFlush(review);
+
+        get("/practice-profile/reviews/" + review.getId())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    void shouldKeepAnotherDevelopersResultsOutOfTheRequestersReceipt() {
+        var other = new Scenario(
+                scenario.workspace(), data.member(scenario.workspace().getId()), scenario.practice(), scenario.item());
+        var result = data.result(other, ResultOutcome.NOT_MET, Instant.now());
+        var review = reviews.findByIdAndWorkspaceId(
+                        result.getReviewId(), scenario.workspace().getId())
+                .orElseThrow();
+        review.setRequestedById(scenario.account().getId());
+        reviews.saveAndFlush(review);
+
+        get("/practice-profile/reviews/" + review.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.results.length()")
+                .isEqualTo(0)
+                .jsonPath("$.feedback.length()")
+                .isEqualTo(0)
+                .jsonPath("$.trace.results.length()")
+                .isEqualTo(0)
+                .jsonPath("$.practiceOutcomes.notMet")
+                .isEqualTo(0);
+    }
+
+    @Test
+    void shouldPreserveOwnResultAccessWhenSomeoneElseRequestedTheReview() {
+        var result = data.result(scenario, ResultOutcome.MET, Instant.now());
+        var review = reviews.findByIdAndWorkspaceId(
+                        result.getReviewId(), scenario.workspace().getId())
+                .orElseThrow();
+        review.setRequestedById(data.member(scenario.workspace().getId()).getId());
+        reviews.saveAndFlush(review);
+
+        get("/practice-profile/reviews/" + review.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.results.length()")
+                .isEqualTo(1)
+                .jsonPath("$.results[0].id")
+                .isEqualTo(result.getId().toString());
+    }
+
+    @Test
+    void shouldKeepEvidenceHiddenWhenTheRequesterReadsItsReceipt() {
+        var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
+        Mockito.when(evidenceAuthorization.permitsAll(
+                        ArgumentMatchers.anyLong(), ArgumentMatchers.anyCollection(), ArgumentMatchers.any()))
+                .thenReturn(Set.of());
+
+        get("/practice-profile/reviews/" + result.getReviewId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.results[0].summary")
+                .isEmpty()
+                .jsonPath("$.results[0].problems.length()")
+                .isEqualTo(0)
+                .jsonPath("$.trace.results.length()")
+                .isEqualTo(0);
+    }
+
+    private Review requestedReview(Scenario target, ReviewStatus status, long requester) {
+        var at = Instant.now();
+        return reviews.saveAndFlush(Review.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(target.workspace().getId())
+                .itemId(target.item().getId())
+                .kind(ReviewKind.ITEM)
+                .origin(ReviewOrigin.REQUEST)
+                .requestedById(requester)
+                .status(status)
+                .orderedAt(at)
+                .createdAt(at)
+                .admittedAt(status == ReviewStatus.QUEUED ? null : at)
+                .completedAt(status.isTerminal() ? at : null)
+                .stopReason(
+                        switch (status) {
+                            case PARTIAL -> ReviewStopReason.RESULT_WITHHELD;
+                            case FAILED -> ReviewStopReason.EXECUTION_FAILED;
+                            case CANCELLED -> ReviewStopReason.CANCELLED_BY_ADMIN;
+                            default -> null;
+                        })
+                .build());
     }
 
     @Test

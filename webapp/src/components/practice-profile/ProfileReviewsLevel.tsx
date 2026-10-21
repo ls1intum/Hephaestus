@@ -48,6 +48,11 @@ export interface ProfileReviewsLevelProps {
 	onSinceChange: (since: ReviewTimeframe | undefined) => void;
 	onReviewNow?: (itemId: string) => void;
 	requesting?: string;
+	/**
+	 * The way to the review a row's ask created, drawn by the route. The list shows a review only
+	 * once it records something, so the new one may not be a row yet.
+	 */
+	requestOutcome?: ReactNode;
 }
 
 /**
@@ -68,6 +73,7 @@ export function ProfileReviewsLevel({
 	onSinceChange,
 	onReviewNow,
 	requesting,
+	requestOutcome,
 }: ProfileReviewsLevelProps) {
 	const reviews = feed.status === "ready" ? feed.reviews : [];
 	const filtered = hasText(kind) || since !== undefined;
@@ -142,6 +148,7 @@ export function ProfileReviewsLevel({
 						onChange={onSinceChange}
 					/>
 				</FilterToolbar>
+				{requestOutcome}
 				{body}
 			</DrawerBody>
 		</>

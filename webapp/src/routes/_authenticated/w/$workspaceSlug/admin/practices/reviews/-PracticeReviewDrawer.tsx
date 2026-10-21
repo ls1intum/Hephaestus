@@ -37,6 +37,7 @@ import {
 	feedbackLevel,
 	PRACTICE_REVIEW_LEVEL_LABELS,
 	type PracticeReviewLevel,
+	reviewLevel,
 } from "@/components/admin/practice-reviews/review-levels";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import type { TraceNode } from "@/components/admin/practice-reviews/review-trace";
@@ -49,8 +50,10 @@ import { panelState } from "@/components/common/panel-state";
 import { detailStackKey, stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { levelPathAt } from "@/components/layout/detail-drawer/level-path";
 import { RefusalFixLink } from "@/components/practice-trace/RefusalFixLink";
+import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
 import { TraceRefusalAlert } from "@/components/practice-trace/TraceRefusalAlert";
 import { isActiveReview } from "@/components/practice-vocabulary/review-status-defs";
 import {
@@ -58,7 +61,10 @@ import {
 	useFeedbackController,
 	useNextInApprovalQueue,
 } from "@/hooks/use-feedback-controller";
-import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
+import {
+	type AcceptedReviewRequest,
+	useRequestPracticeReview,
+} from "@/hooks/use-request-practice-review";
 import { useResultController } from "@/hooks/use-result-controller";
 import { useReviewController } from "@/hooks/use-review-controller";
 import { type ReviewLineageTarget, useReviewLineage } from "@/hooks/use-review-lineage";
@@ -171,23 +177,41 @@ interface LevelReadProps {
 	path: LevelPath;
 }
 
-function RequestRefusal({
+/**
+ * The answer to the last ask: why it started nothing, or the way to the review it created. That
+ * review opens in the asking level's place only when the reader follows the link, so Back returns
+ * to the record they asked from, still as it was.
+ */
+export function RequestOutcome({
 	workspaceSlug,
 	refusal,
+	accepted,
 }: {
 	workspaceSlug: string;
-	refusal: ReviewRequestOutcome;
+	refusal: ReviewRequestOutcome | undefined;
+	/** Each level is keyed by its record and asks with its own hook, so its answer is about its work. */
+	accepted: AcceptedReviewRequest | undefined;
 }) {
-	return (
-		<TraceRefusalAlert
-			refusal={refusal}
-			fix={
-				refusal.reason !== null && (
-					<RefusalFixLink workspaceSlug={workspaceSlug} reason={refusal.reason} />
-				)
-			}
-		/>
-	);
+	if (refusal !== undefined) {
+		return (
+			<TraceRefusalAlert
+				refusal={refusal}
+				fix={
+					refusal.reason !== null && (
+						<RefusalFixLink workspaceSlug={workspaceSlug} reason={refusal.reason} />
+					)
+				}
+			/>
+		);
+	}
+	if (accepted !== undefined) {
+		return (
+			<ReviewRequestedNotice
+				review={<DetailStackLink entry={reviewLevel(accepted.reviewId)} single />}
+			/>
+		);
+	}
+	return null;
 }
 
 function useEventLabel(workspaceSlug: string): (name: string) => string {
@@ -506,10 +530,12 @@ function ReviewLevelRead({
 			onRequestReview={requestable ? () => request.ask(item.id) : undefined}
 			requestingReview={request.asking !== undefined}
 			requestBlocked={otherActive ? REQUEST_BLOCKED.active : undefined}
-			requestRefusal={
-				request.refusal && (
-					<RequestRefusal workspaceSlug={workspaceSlug} refusal={request.refusal.outcome} />
-				)
+			requestOutcome={
+				<RequestOutcome
+					workspaceSlug={workspaceSlug}
+					refusal={request.refusal?.outcome}
+					accepted={request.accepted}
+				/>
 			}
 		/>
 	);
@@ -617,10 +643,12 @@ function ItemLevelRead({ workspaceSlug, itemId, ...props }: LevelReadProps & { i
 			}
 			requesting={request.asking !== undefined}
 			requestBlocked={reviewing(traceQuery.data) ? REQUEST_BLOCKED.active : undefined}
-			refusal={
-				request.refusal && (
-					<RequestRefusal workspaceSlug={workspaceSlug} refusal={request.refusal.outcome} />
-				)
+			requestOutcome={
+				<RequestOutcome
+					workspaceSlug={workspaceSlug}
+					refusal={request.refusal?.outcome}
+					accepted={request.accepted}
+				/>
 			}
 		/>
 	);

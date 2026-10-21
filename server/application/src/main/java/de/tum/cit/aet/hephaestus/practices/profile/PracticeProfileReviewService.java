@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
-import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewDTO;
@@ -12,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewSummaryQueryService;
 import de.tum.cit.aet.hephaestus.practices.review.dto.OutcomeVectorDTO;
+import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.trace.OwnItemTraceQueryService;
@@ -84,7 +84,7 @@ public class PracticeProfileReviewService {
                 ordered.stream()
                         .skip(page.getOffset())
                         .limit(page.getPageSize())
-                        .map(v -> dto(v, permitted))
+                        .map(v -> dto(v.getFirst().review(), ws.id(), v, permitted))
                         .toList(),
                 page,
                 ordered.size());
@@ -92,26 +92,28 @@ public class PracticeProfileReviewService {
 
     public ProfileReviewDetailDTO get(WorkspaceContext ws, UUID id) {
         long account = developer.currentDeveloperIdElseThrow();
+        var review = reviews.require(ws.id(), id);
         var rows = results.findByWorkspaceIdAndReviewIdOrderByRecordedAtAscIdAsc(ws.id(), id).stream()
                 .filter(r -> Objects.equals(r.getDeveloperId(), account))
                 .toList();
         var permitted = authorization.permitsAll(ws.id(), rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        if (rows.isEmpty()) throw new EntityNotFoundException("Review", id.toString());
         var projected = views.views(ws.id(), rows);
-        var dto = dto(projected, permitted);
+        var trace = traces.own(
+                ws.id(), rows.isEmpty() ? review.getItemId() : rows.getFirst().getItemId(), id);
+        var dto = dto(review, ws.id(), projected, permitted);
         var counts = ReviewSummaryQueryService.counts(rows);
         return new ProfileReviewDetailDTO(
                 dto.review(),
                 dto.results(),
                 dto.feedback(),
-                traces.own(ws.id(), projected.getFirst().result().getItemId(), id),
+                trace,
                 new OutcomeVectorDTO(counts.met(), counts.notMet(), counts.doesNotApply(), counts.couldNotDetermine()));
     }
 
-    private ProfileReviewDTO dto(List<ResultView> v, Set<UUID> permitted) {
+    private ProfileReviewDTO dto(Review review, long workspaceId, List<ResultView> v, Set<UUID> permitted) {
         return new ProfileReviewDTO(
-                reviews.ref(v.getFirst().review()),
-                presentation.lists(v.getFirst().result().getWorkspaceId(), v, permitted),
+                reviews.ref(review),
+                presentation.lists(workspaceId, v, permitted),
                 v.stream()
                         .flatMap(r -> presentation.ownFeedback(r.result()).stream())
                         .distinct()

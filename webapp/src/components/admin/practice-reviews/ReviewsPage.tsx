@@ -70,7 +70,11 @@ export interface ReviewsPageProps {
 	onSearchChange: (patch: Partial<ReviewsSearch>) => void;
 	reviews: PagedListState<ReviewSummary>;
 	requestReview?: ReviewRequestActions;
-	refusal?: ReactNode;
+	/**
+	 * The answer to the last ask from a row, drawn by the route: why it started nothing, or the way to
+	 * the review it created, which the filtered list may not show.
+	 */
+	requestOutcome?: ReactNode;
 	record?: ScopeRecordFilter;
 	groups: FacetSource;
 	practices: FacetSource<PracticeFacetOption>;
@@ -88,7 +92,7 @@ export function ReviewsPage({
 	onSearchChange,
 	reviews,
 	requestReview,
-	refusal,
+	requestOutcome,
 	record,
 	groups,
 	practices,
@@ -179,7 +183,7 @@ export function ReviewsPage({
 				people={people}
 				total={reviews.status === "ready" ? reviews.total : undefined}
 			/>
-			{refusal}
+			{requestOutcome}
 			{results}
 		</section>
 	);

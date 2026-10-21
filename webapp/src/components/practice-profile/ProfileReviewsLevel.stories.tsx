@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { ProfileReview } from "@/api/types.gen";
+import { detailStackKey } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { reviewPositionsOnItem } from "@/components/practice-trace/review-groups";
+import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
 import type { ReviewFeedState } from "@/components/profile/reviews";
 import { withPageBehind } from "@/stories/decorators";
 import { settledDrawerPanel } from "@/stories/overlay";
@@ -14,8 +17,9 @@ import {
 } from "@/stories/profile-reviews-story-mock-data";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { daysBefore } from "@/stories/story-clock";
+import { levelsOpenedBy } from "@/test/detail-stack";
 
-import { REVIEWS_LEVEL } from "./practice-profile-search";
+import { REVIEW_SELECTION_CLEARED, reviewLevel, REVIEWS_LEVEL } from "./practice-profile-search";
 import { ProfileReviewsLevel } from "./ProfileReviewsLevel";
 
 const feedOf = (
@@ -39,6 +43,7 @@ function onLoadMoreOf(feed: ReviewFeedState) {
 }
 
 const openItem = openProfileReview.review.item;
+const REQUESTED_REVIEW_ID = "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01";
 
 /** Opened from the header's chip, so every story mounts it as a drawer's first level. */
 const meta = {
@@ -256,6 +261,37 @@ export const PartialReview: Story = {
 		await expect(screen.getByText("Nothing to improve in what it reached")).toBeVisible();
 		await expect(screen.getByRole("button", { name: "Partial" })).toBeVisible();
 		await expect(screen.queryByText("Stopped before it finished")).toBeNull();
+	},
+};
+
+/**
+ * A row's ask was accepted, and the list does not show the new review yet: the way to it opens the
+ * review over this list.
+ */
+export const WithRequestedReview: Story = {
+	parameters: { router: { initialUrl: `/?detail=${detailStackKey(REVIEWS_LEVEL)}` } },
+	args: {
+		requestOutcome: (
+			<ReviewRequestedNotice
+				review={
+					<DetailStackLink
+						entry={reviewLevel(REQUESTED_REVIEW_ID)}
+						levelSearch={REVIEW_SELECTION_CLEARED}
+					/>
+				}
+			/>
+		),
+	},
+	play: async () => {
+		await settledDrawerPanel();
+		const link = within(screen.getByRole("note")).getByRole("link", {
+			name: "View requested review",
+		});
+		await expect(levelsOpenedBy(link)).toStrictEqual([
+			detailStackKey(REVIEWS_LEVEL),
+			`review:${REQUESTED_REVIEW_ID}`,
+		]);
+		await expect(link.getAttribute("href")).not.toMatch(/admin/u);
 	},
 };
 

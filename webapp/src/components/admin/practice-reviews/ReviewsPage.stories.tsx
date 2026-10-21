@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import type { ReviewSummary } from "@/api/types.gen";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
+import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
 import { formatWeekdayDay } from "@/lib/dates";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
@@ -14,12 +16,14 @@ import { levelsOpenedBy } from "@/test/detail-stack";
 
 import { reviews } from "./fixtures";
 import { REVIEWABLE_ON_DEMAND } from "./job-utils";
+import { reviewLevel } from "./review-levels";
 import { REVIEW_PAGE_SIZE, type ReviewsSearch, reviewsQuery } from "./review-search";
 import { type ReviewRequestActions, ReviewsPage } from "./ReviewsPage";
 import { STORY_GROUPS, STORY_PEOPLE, STORY_PRACTICES } from "./story-scope-sources";
 
 const loadMoreReviews = fn();
 const retryReviews = fn();
+const REQUESTED_REVIEW_ID = "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01";
 
 function storyRequestActions(): ReviewRequestActions {
 	return {
@@ -129,6 +133,35 @@ export const RequestReviewFromARow: Story = {
 		await expect(
 			within(table).getAllByRole("button", { name: /^Request review of /u }).length,
 		).toBeGreaterThan(0);
+	},
+};
+
+/**
+ * A row's ask was accepted before the list reads the new review, or while a filter keeps it out:
+ * the way to it stands above the table all the same.
+ */
+export const WithRequestedReview: Story = {
+	args: {
+		requestReview: storyRequestActions(),
+		requestOutcome: (
+			<ReviewRequestedNotice
+				review={<DetailStackLink entry={reviewLevel(REQUESTED_REVIEW_ID)} single />}
+			/>
+		),
+	},
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		const table = await canvas.findByRole("table", LIST);
+		const note = within(canvas.getByRole("note"));
+		await expect(
+			levelsOpenedBy(note.getByRole("link", { name: "View requested review" })),
+		).toStrictEqual([`review:${REQUESTED_REVIEW_ID}`]);
+		// No row opens it: the note is the way there.
+		await expect(
+			within(table)
+				.queryAllByRole("link")
+				.flatMap((link) => levelsOpenedBy(link)),
+		).not.toContain(`review:${REQUESTED_REVIEW_ID}`);
 	},
 };
 

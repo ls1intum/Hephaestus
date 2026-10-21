@@ -15,8 +15,6 @@ import {
 	reviewsSearchSchema,
 } from "@/components/admin/practice-reviews/review-search";
 import { ReviewsPage } from "@/components/admin/practice-reviews/ReviewsPage";
-import { RefusalFixLink } from "@/components/practice-trace/RefusalFixLink";
-import { TraceRefusalAlert } from "@/components/practice-trace/TraceRefusalAlert";
 import { isActiveReview } from "@/components/practice-vocabulary/review-status-defs";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { useReviewScopeSources } from "@/hooks/use-review-scope-sources";
@@ -25,6 +23,8 @@ import { useSearchState } from "@/lib/search-params";
 import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { loadedPages, springPageParams } from "@/runtime/tanstack-query/spring-page";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
+
+import { RequestOutcome } from "./-PracticeReviewDrawer";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/reviews/")({
 	validateSearch: reviewsSearchSchema,
@@ -71,20 +71,13 @@ function ReviewsRoute() {
 				onRequest: (itemId) => review.ask(itemId),
 				isRequesting: (itemId) => review.asking === itemId,
 			}}
-			refusal={
-				review.refusal && (
-					<TraceRefusalAlert
-						refusal={review.refusal.outcome}
-						fix={
-							review.refusal.outcome.reason !== null && (
-								<RefusalFixLink
-									workspaceSlug={workspaceSlug}
-									reason={review.refusal.outcome.reason}
-								/>
-							)
-						}
-					/>
-				)
+			// Any row may have asked; the new review may sit outside the filters or finish before a read.
+			requestOutcome={
+				<RequestOutcome
+					workspaceSlug={workspaceSlug}
+					refusal={review.refusal?.outcome}
+					accepted={review.accepted}
+				/>
 			}
 			groups={groups}
 			practices={practices}

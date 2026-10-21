@@ -2,13 +2,16 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
 import type { PracticeScriptRun, ReviewDetail, ReviewJob } from "@/api/types.gen";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { eventLabel } from "@/components/practice-trace/fixtures";
+import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
+import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { minutesBefore } from "@/stories/story-clock";
-import { listOpenedBy } from "@/test/detail-stack";
+import { levelsOpenedBy, listOpenedBy } from "@/test/detail-stack";
 
 import {
 	reviewDetailBackingOff,
@@ -33,6 +36,8 @@ import { reviewLevel } from "./review-levels";
 import { ReviewLevel, type ReviewLevelProps, RUNTIME_EXPIRED } from "./ReviewLevel";
 
 const ready = (review: ReviewDetail): ReviewLevelProps["review"] => ({ status: "ready", review });
+
+const REQUESTED_REVIEW_ID = "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01";
 
 /** The value beside one of the sheet's fact labels. */
 const factValue = (panel: HTMLElement, label: string) =>
@@ -777,10 +782,36 @@ export const AnotherReviewActive: Story = {
 };
 
 export const WithRefusal: Story = {
-	args: { requestRefusal: <p role="alert">A review of this work started a minute ago.</p> },
+	args: { requestOutcome: <p role="alert">A review of this work started a minute ago.</p> },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		panel.getByRole("alert");
+	},
+};
+
+/**
+ * The ask was accepted: the sheet keeps this review's own status and offers the way to the new one,
+ * which says for itself whether it is queued or running.
+ */
+export const WithRequestedReview: Story = {
+	args: {
+		review: ready({ ...reviewDetailCompleted, status: "PARTIAL", stopReason: "RESULT_WITHHELD" }),
+		requestBlocked: REQUEST_BLOCKED.active,
+		requestOutcome: (
+			<ReviewRequestedNotice
+				review={<DetailStackLink entry={reviewLevel(REQUESTED_REVIEW_ID)} single />}
+			/>
+		),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const note = within(panel.getByRole("note"));
+		// In this sheet's place, so Back returns to it.
+		await expect(
+			levelsOpenedBy(note.getByRole("link", { name: "View requested review" })),
+		).toStrictEqual([`review:${REQUESTED_REVIEW_ID}`]);
+		await expect(panel.getAllByText(REVIEW_STATUS_DEFS.PARTIAL.label).length).toBeGreaterThan(0);
+		await expect(panel.queryByText(REVIEW_STATUS_DEFS.RUNNING.label)).toBeNull();
 	},
 };
 

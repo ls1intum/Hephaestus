@@ -75,10 +75,11 @@ export interface ProfileReviewLevelProps {
 	onReviewNow?: (itemId: string) => void;
 	requesting?: string;
 	/**
-	 * Why the last ask from this level started nothing, drawn by the route with the fix only an
-	 * admin can apply. It is said here rather than in a toast: it is the answer they asked for.
+	 * The answer to the last ask from this level, drawn by the route: why it started nothing, with
+	 * the fix only an admin can apply, or the way to the review it created. It is said here rather
+	 * than only in a toast: it is the answer they asked for.
 	 */
-	refusal?: ReactNode;
+	requestOutcome?: ReactNode;
 }
 
 const SKELETON_ROWS = 4;
@@ -126,7 +127,7 @@ export function ProfileReviewLevel({
 	responses,
 	onReviewNow,
 	requesting,
-	refusal,
+	requestOutcome,
 }: ProfileReviewLevelProps) {
 	const detail = state.status === "ready" ? state.detail : undefined;
 
@@ -215,7 +216,7 @@ export function ProfileReviewLevel({
 					positionOnWork={positionOnWork}
 					onReviewNow={onReviewNow}
 					requesting={requesting}
-					refusal={refusal}
+					requestOutcome={requestOutcome}
 				/>
 			</DetailDrawerHeader>
 			<DrawerBody className="flex flex-col gap-4 pt-2">{body}</DrawerBody>
@@ -229,7 +230,7 @@ interface ReviewHeadProps {
 	positionOnWork: number | undefined;
 	onReviewNow?: (itemId: string) => void;
 	requesting?: string;
-	refusal?: ReactNode;
+	requestOutcome?: ReactNode;
 }
 
 function ReviewHead({
@@ -238,7 +239,7 @@ function ReviewHead({
 	positionOnWork,
 	onReviewNow,
 	requesting,
-	refusal,
+	requestOutcome,
 }: ReviewHeadProps) {
 	const today = new Date(useNow());
 	const review = detail?.review;
@@ -264,7 +265,7 @@ function ReviewHead({
 			<div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
 				{at && (
 					<span>
-						Reviewed{" "}
+						{review?.completedAt === null ? "Created" : "Reviewed"}{" "}
 						<time dateTime={at.toISOString()} className="text-foreground">
 							{formatDayTime(at, today)}
 						</time>
@@ -300,7 +301,7 @@ function ReviewHead({
 					)}
 				</div>
 			)}
-			{refusal}
+			{requestOutcome}
 		</div>
 	);
 }

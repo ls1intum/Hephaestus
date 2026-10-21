@@ -11,6 +11,7 @@ import type { GroupRef } from "@/api/types.gen";
 import { combinePanelStates, queryLoadState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { parseDetailStack } from "@/components/layout/detail-drawer/detail-stack";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { isFocusSwitchStep } from "@/components/practice-focus/practice-focus";
 import { ProfileFocusFooter } from "@/components/practice-focus/profile-focus-footer";
@@ -29,11 +30,13 @@ import {
 	practiceLevel,
 	type PracticeProfileSearch,
 	practiceProfileSearchSchema,
+	REVIEW_SELECTION_CLEARED,
 	reviewLevel,
 } from "@/components/practice-profile/practice-profile-search";
 import { PracticeGroupDetailDrawer } from "@/components/practice-profile/PracticeGroupDetailDrawer";
 import { PracticeProfilePage } from "@/components/practice-profile/PracticeProfilePage";
 import { RefusalFixLink } from "@/components/practice-trace/RefusalFixLink";
+import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
 import { TraceRefusalAlert } from "@/components/practice-trace/TraceRefusalAlert";
 import { ReviewResultRow } from "@/components/profile/ReviewResultRow";
 import type { FeedbackResponseControls } from "@/components/profile/reviews";
@@ -136,6 +139,21 @@ function PracticeProfile() {
 	const composed = composeOverview(overview);
 	// A user view reads the developer's page; it never spends their workspace's budget.
 	const onReviewNow = readOnly ? undefined : reviews.onReviewNow;
+	const accepted = readOnly ? undefined : reviews.accepted;
+	// The new review opens over the list, or in the open review's place so Back returns to it; either
+	// way without the tab and filters chosen on the review it leaves.
+	const requestedReview = (inPlace: boolean) =>
+		accepted && (
+			<ReviewRequestedNotice
+				review={
+					<DetailStackLink
+						entry={reviewLevel(accepted.reviewId)}
+						single={inPlace}
+						levelSearch={REVIEW_SELECTION_CLEARED}
+					/>
+				}
+			/>
+		);
 	const openGroup = (group: GroupRef) => stackControls.open(practiceGroupLevel(group.slug));
 	const groupOf = (practiceSlug: string) => {
 		const groupSlug = practiceStandings.find((entry) => entry.slug === practiceSlug)?.groupSlug;
@@ -200,12 +218,14 @@ function PracticeProfile() {
 						onSinceChange: (reviewSince) => setView({ reviewSince }),
 						onReviewNow,
 						requesting: reviews.requesting,
+						// Only while no review is open over the list: that review says its own answer.
+						requestOutcome: openReviewId === undefined && requestedReview(false),
 					},
 					open: {
 						state: reviews.open,
 						onReviewNow,
 						requesting: reviews.requesting,
-						refusal: reviews.refusal && (
+						requestOutcome: reviews.refusal ? (
 							<TraceRefusalAlert
 								refusal={reviews.refusal}
 								fix={
@@ -215,6 +235,8 @@ function PracticeProfile() {
 									)
 								}
 							/>
+						) : (
+							requestedReview(true)
 						),
 						tab: search.reviewTab,
 						onTabChange: (reviewTab) => setView({ reviewTab }),
