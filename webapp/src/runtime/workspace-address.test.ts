@@ -45,6 +45,7 @@ describe("workspace URL rewrites", () => {
 		"/terms",
 		"/unsubscribe",
 		"/settings",
+		"/verify-passkey?returnTo=%2Fw%2Facme%2Fadmin",
 		"/workspaces/new",
 		"/integrations",
 		"/w/other/activity",

@@ -19,6 +19,8 @@ const APEX_PATHS = [
 	"/terms",
 	"/unsubscribe",
 	"/settings",
+	// The passkey challenge: one origin for every WebAuthn ceremony.
+	"/verify-passkey",
 	"/integrations",
 	"/about",
 	"/landing",
