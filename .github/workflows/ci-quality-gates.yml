@@ -121,7 +121,8 @@ jobs:
   webapp-stories:
     name: "Webapp: Stories"
     if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
-    runs-on: ubuntu-latest
+    # Browser rasterization depends on the OS; keep the canonical generated assets on one version.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read

@@ -1006,6 +1006,13 @@ void describe("CI contract", () => {
 		assert.equal(reporters.size, 6);
 	});
 
+	void test("generated brand assets use a versioned Linux renderer", async () => {
+		const workflow = parseDocument(
+			await readFile(".github/workflows/ci-quality-gates.yml", "utf8"),
+		);
+		assert.equal(workflow.getIn(["jobs", "webapp-stories", "runs-on"]), "ubuntu-24.04");
+	});
+
 	void test("Chromatic retains structured evidence without credential-bearing debug files", async () => {
 		const workflow = parseDocument(
 			await readFile(".github/workflows/ci-quality-gates.yml", "utf8"),

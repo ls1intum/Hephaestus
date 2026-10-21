@@ -39,7 +39,8 @@ It stops Storybook when it finishes, fails, or receives an interruption.
 
 Images with text include lockups, social cards, and README captures.
 These images rasterize slightly differently on macOS and CI's Linux runners.
-The committed files come from CI.
+The committed files come from the `webapp-stories` job in `.github/workflows/ci-quality-gates.yml`.
+That job pins the operating-system version because browser rasterization also differs between Linux versions.
 If a local run changes only those images without an intended change, restore them.
 Do not commit that difference.
 
