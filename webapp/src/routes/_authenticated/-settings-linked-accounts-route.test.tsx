@@ -174,6 +174,38 @@ describe("connected accounts on the settings page", () => {
 		expect(connectAction(both, "Research Outline")).toHaveLength(0);
 	});
 
+	it("keeps the only sign-in account beside a link-only one, and lets the link-only one go", async () => {
+		const account = serveAccount([github, acmeOutline]);
+		renderRouteAt("/settings");
+		const region = await connectedAccounts();
+
+		// GitLab is offered to connect, which would let GitHub go; Outline would not.
+		region.getByText(
+			"This is your only sign-in method. To remove it, first connect another sign-in account below.",
+		);
+		expect(region.queryByRole("button", { name: "Disconnect The Octocat" })).toBeNull();
+
+		fireEvent.click(region.getByRole("button", { name: "Disconnect Octo at ACME" }));
+		fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+		await waitFor(() => expect(account.disconnected).toStrictEqual([4]));
+		await waitFor(() => expect(region.queryByText("Octo at ACME")).toBeNull());
+		expect(region.queryByRole("button", { name: "Disconnect The Octocat" })).toBeNull();
+	});
+
+	it("lets either of two sign-in accounts go, and keeps the one left", async () => {
+		const account = serveAccount([github, publicGitLab, acmeOutline]);
+		renderRouteAt("/settings");
+		const region = await connectedAccounts();
+		expect(region.queryByText(/only sign-in method/u)).toBeNull();
+
+		fireEvent.click(region.getByRole("button", { name: "Disconnect Tux on GitLab.com" }));
+		fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+		await waitFor(() => expect(account.disconnected).toStrictEqual([2]));
+		await region.findByText(/only sign-in method/u);
+		expect(region.queryByRole("button", { name: "Disconnect The Octocat" })).toBeNull();
+		region.getByRole("button", { name: "Disconnect Octo at ACME" });
+	});
+
 	it("treats a connected account with no recorded origin as unknown, not as every instance", async () => {
 		serveAccount([
 			connected(1, "The Octocat", { type: "GITHUB" }),

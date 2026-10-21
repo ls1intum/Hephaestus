@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export type PasskeyAction = "register" | "verify" | "protection" | "remove" | "codes" | "recover";
 
@@ -30,6 +31,14 @@ export interface PasskeySectionProps {
 	onRemove: (id: string) => void;
 	onCreateRecoveryCodes: () => void;
 	onRecover: (code: string) => void;
+}
+
+interface Confirmation {
+	title: string;
+	description: string;
+	/** Names the action, so the button says what pressing it does. */
+	confirmLabel: string;
+	action: () => void;
 }
 
 /** The instance policy, scoped as it applies: instance administration and workspace administration differ. */
@@ -69,11 +78,13 @@ export function PasskeySection({
 	const id = useId();
 	const showSpinner = useSpinDelay(pending, { delay: 1000, minDuration: 500 });
 
-	const [confirmation, setConfirmation] = useState<{
-		title: string;
-		description: string;
-		action: () => void;
-	} | null>(null);
+	const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+	// The dialog keeps showing its last subject while it closes, so its button keeps that label too.
+	const [confirmLabel, setConfirmLabel] = useState("");
+	const ask = (next: Confirmation) => {
+		setConfirmLabel(next.confirmLabel);
+		setConfirmation(next);
+	};
 	const [label, setLabel] = useState("");
 	const [recoveryCode, setRecoveryCode] = useState("");
 	let content: ReactNode;
@@ -96,15 +107,18 @@ export function PasskeySection({
 		);
 	} else {
 		const { credentials } = status;
+		// The server asks for a recent confirmation before any change to an enrolled account: adding
+		// another passkey, removing one, protection and recovery codes. A first passkey needs none.
+		const locked = credentials.length > 0 && !status.verified;
+		const lockedReasonId = locked ? `${id}-locked` : undefined;
+		// Every change to the passkeys waits for the one in flight and for a recent confirmation.
+		const unavailable = pending || locked;
 		let verificationStatus = "";
 		if (pending && pendingAction === "protection") {
 			verificationStatus = "Saving personal protection…";
 		} else if (status.verified) {
 			// `verified` is a recent check, fresh enough for sensitive actions, not a session-long grant.
 			verificationStatus = "Recently confirmed.";
-		} else if (credentials.length > 0) {
-			verificationStatus =
-				"Verify a passkey to change protection, remove a passkey, or replace recovery codes.";
 		}
 		const requirement = passkeyRequirement(status);
 		content = (
@@ -118,6 +132,24 @@ export function PasskeySection({
 						Recovery is active. Register and verify a new passkey before you use admin access.
 					</p>
 				)}
+				{locked && (
+					<div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border p-4">
+						<p id={lockedReasonId} className="min-w-0 flex-1 text-sm">
+							Confirm it’s you with one of your passkeys before you add or remove a passkey, change
+							protection or create recovery codes.
+						</p>
+						<Button
+							disabled={pending || !supported}
+							focusableWhenDisabled
+							className="aria-disabled:opacity-50"
+							aria-busy={pending && pendingAction === "verify"}
+							onClick={onVerify}
+						>
+							{showSpinner && pendingAction === "verify" && <Spinner />}
+							{pending && pendingAction === "verify" ? "Verifying passkey…" : "Verify passkey"}
+						</Button>
+					</div>
+				)}
 				{credentials.length === 0 ? (
 					<p>No passkeys yet. Register a passkey to protect admin access.</p>
 				) : (
@@ -128,12 +160,16 @@ export function PasskeySection({
 								<Button
 									variant="outline"
 									aria-label={`Remove ${credential.label}`}
-									disabled={pending || !status.verified || credentials.length < 2}
+									disabled={unavailable || credentials.length < 2}
+									focusableWhenDisabled
+									className="aria-disabled:opacity-50"
+									aria-describedby={credentials.length < 2 ? `${id}-last` : lockedReasonId}
 									onClick={() =>
-										setConfirmation({
+										ask({
 											title: `Remove ${credential.label}?`,
 											description:
 												"This passkey will stop working. Other sessions will end. Verify a remaining passkey to restore protected access.",
+											confirmLabel: "Remove passkey",
 											action: () => onRemove(credential.id),
 										})
 									}
@@ -145,6 +181,11 @@ export function PasskeySection({
 							</li>
 						))}
 					</ul>
+				)}
+				{credentials.length === 1 && (
+					<p id={`${id}-last`} className="text-sm text-muted-foreground">
+						You cannot remove your last passkey. Add a second passkey on another device first.
+					</p>
 				)}
 				{!supported && (
 					<p role="alert">This browser cannot use passkeys here. Use a current browser on HTTPS.</p>
@@ -162,10 +203,21 @@ export function PasskeySection({
 					<p id={`${id}-label-hint`} className="text-sm text-muted-foreground">
 						Optional. Without a name, the passkey shows the date you added it.
 					</p>
+					<p id={`${id}-register-hint`} className="text-sm text-muted-foreground">
+						Adding a passkey turns on personal admin protection and signs you out of your other
+						sessions.
+					</p>
 					<Button
-						// Once a passkey exists, verifying it is the primary action.
+						// Once a passkey exists, confirming with it comes first.
 						variant={credentials.length > 0 ? "outline" : "default"}
-						disabled={pending || !supported}
+						disabled={unavailable || !supported}
+						focusableWhenDisabled
+						className="aria-disabled:opacity-50"
+						aria-describedby={
+							lockedReasonId === undefined
+								? `${id}-register-hint`
+								: `${lockedReasonId} ${id}-register-hint`
+						}
 						onClick={() => onRegister(label.trim())}
 					>
 						{showSpinner && pendingAction === "register" && <Spinner />}
@@ -173,28 +225,51 @@ export function PasskeySection({
 					</Button>
 				</div>
 				{credentials.length > 0 && (
-					<div className="flex flex-wrap gap-2">
-						<Button disabled={pending || !supported} onClick={onVerify}>
-							{showSpinner && pendingAction === "verify" && <Spinner />}
-							{pending && pendingAction === "verify" ? "Verifying passkey…" : "Verify passkey"}
-						</Button>
-
+					<div className="space-y-2">
 						<Button
 							variant="outline"
-							disabled={pending || !status.verified}
+							disabled={unavailable}
+							focusableWhenDisabled
+							className="aria-disabled:opacity-50"
+							aria-describedby={lockedReasonId}
 							onClick={() =>
-								setConfirmation({
-									title: "Replace recovery codes?",
+								ask({
+									title: "Create new recovery codes?",
 									description:
-										"All previous recovery codes will stop working. Save the replacement codes before you leave this page.",
+										"Any recovery codes you saved before stop working. Save the new codes before you leave this page.",
+									confirmLabel: "Create codes",
 									action: onCreateRecoveryCodes,
 								})
 							}
 						>
 							{pending && pendingAction === "codes"
-								? "Replacing recovery codes…"
-								: "Replace recovery codes"}
+								? "Creating recovery codes…"
+								: "Create new recovery codes"}
 						</Button>
+						{recoveryCodes && (
+							<div className="space-y-2">
+								<p>
+									Save these recovery codes somewhere safe. Hephaestus shows them only now. Each
+									code works once.
+								</p>
+								<ul aria-label="Recovery codes">
+									{recoveryCodes.map((code) => (
+										<li key={code}>
+											<code className="break-all">{code}</code>
+										</li>
+									))}
+								</ul>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() =>
+										copyToClipboard(recoveryCodes.join("\n"), "Recovery codes copied.")
+									}
+								>
+									Copy codes
+								</Button>
+							</div>
+						)}
 					</div>
 				)}
 				{credentials.length > 0 && (
@@ -202,14 +277,15 @@ export function PasskeySection({
 						<FieldContent>
 							<FieldLabel htmlFor={`${id}-protection`}>Personal admin protection</FieldLabel>
 							<FieldDescription>
-								Require passkey verification for your admin access. Mandatory instance and workspace
-								protection still applies when this is off.
+								Require passkey verification for your admin access. When this is off, any passkey
+								that this instance or a workspace requires is still asked for.
 							</FieldDescription>
 						</FieldContent>
 						<Switch
 							id={`${id}-protection`}
 							checked={status.protectionEnabled}
-							disabled={pending || !status.verified}
+							disabled={unavailable}
+							aria-describedby={lockedReasonId}
 							onCheckedChange={onProtection}
 						/>
 					</Field>
@@ -217,26 +293,6 @@ export function PasskeySection({
 				<p role="status" className="text-sm text-muted-foreground">
 					{verificationStatus}
 				</p>
-				{credentials.length === 1 && (
-					<p className="text-sm text-muted-foreground">
-						Add a second passkey on another device. You cannot remove your last passkey.
-					</p>
-				)}
-				{recoveryCodes && (
-					<div className="space-y-2">
-						<p>
-							Save these recovery codes somewhere safe. Each code works once. Replacement
-							invalidates previous codes.
-						</p>
-						<ul>
-							{recoveryCodes.map((code) => (
-								<li key={code}>
-									<code className="break-all">{code}</code>
-								</li>
-							))}
-						</ul>
-					</div>
-				)}
 				<details>
 					<summary>Recover passkeys</summary>
 					<div className="mt-3 space-y-2">
@@ -256,10 +312,11 @@ export function PasskeySection({
 							variant="outline"
 							disabled={pending || recoveryCode.trim().length === 0}
 							onClick={() => {
-								setConfirmation({
+								ask({
 									title: "Start passkey recovery?",
 									description:
 										"This removes all passkeys and ends your other sessions. Admin access stays blocked until you register and verify a new passkey.",
+									confirmLabel: "Start recovery",
 									action: () => {
 										onRecover(recoveryCode.trim());
 										setRecoveryCode("");
@@ -287,7 +344,7 @@ export function PasskeySection({
 				subject={confirmation}
 				title={(subject) => subject.title}
 				description={(subject) => subject.description}
-				confirmLabel="Confirm"
+				confirmLabel={confirmLabel}
 				onConfirm={(subject) => subject.action()}
 				onClose={() => setConfirmation(null)}
 			/>
