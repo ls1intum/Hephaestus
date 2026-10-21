@@ -133,7 +133,7 @@ export function PasskeySection({
 					</p>
 				)}
 				{locked && (
-					<div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border p-4">
+					<div className="flex flex-col items-start gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:gap-4">
 						<p id={lockedReasonId} className="min-w-0 flex-1 text-sm">
 							Confirm it’s you with one of your passkeys before you add or remove a passkey, change
 							protection or create recovery codes.
