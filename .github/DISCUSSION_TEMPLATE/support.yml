@@ -1,0 +1,25 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search [existing support questions](https://github.com/hephaestus-build/Hephaestus/discussions/categories/support) and the [documentation](https://docs.hephaestus.build/) first.
+        Use [Issues](https://github.com/hephaestus-build/Hephaestus/issues/new/choose) to report a reproducible bug.
+        Do not include tokens, passwords, personal data, or private work in a public discussion.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need help with?
+      description: State what you want to do. Describe what happens and where you need help.
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Version and setup
+      description: If you know them, include the release version and whether you use the hosted app or your own deployment.
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Include relevant documentation and error text. Remove secrets and private data first.

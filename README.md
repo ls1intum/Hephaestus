@@ -1,44 +1,43 @@
 <div align="center">
   <h1>
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/hephaestus-lockup-dark.png">
-      <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/brand/hephaestus-lockup-light.png">
-      <img alt="Hephaestus" width="484" src="./docs/static/img/brand/hephaestus-lockup-light.png">
-    </picture>
+    <img alt="Hephaestus" width="484" src="./docs/static/img/brand/hephaestus-lockup-dark.png#gh-dark-mode-only">
+    <img alt="Hephaestus" width="484" src="./docs/static/img/brand/hephaestus-lockup-light.png#gh-light-mode-only">
   </h1>
   <p><strong>Learn from the work you already do</strong></p>
 
   <p>
-    <a href="https://hephaestus.build"><img alt="Open the TUM-operated Hephaestus web app" src="https://img.shields.io/badge/web_app-try_it-493C83"></a>
-    <a href="https://docs.hephaestus.build/"><img alt="Read the Hephaestus documentation" src="https://img.shields.io/badge/docs-read_online-1F75CB?logo=docusaurus&logoColor=white"></a>
-    <a href="https://github.com/hephaestus-build/Hephaestus/releases/latest"><img alt="Latest Hephaestus release" src="https://img.shields.io/github/v/release/hephaestus-build/Hephaestus?display_name=tag&sort=semver"></a>
-    <a href="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml"><img alt="Hephaestus CI status" src="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml/badge.svg?branch=main"></a>
-    <a href="https://github.com/hephaestus-build/Hephaestus/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/hephaestus-build/Hephaestus"></a>
+    <a href="https://hephaestus.build"><strong>App</strong></a> ·
+    <a href="https://docs.hephaestus.build/"><strong>Docs</strong></a> ·
+    <a href="https://docs.hephaestus.build/admin/install"><strong>Self-host</strong></a> ·
+    <a href="https://github.com/hephaestus-build/Hephaestus/discussions"><strong>Discussions</strong></a>
+  </p>
+  <p>
+    <a href="https://github.com/hephaestus-build/Hephaestus/releases/latest"><img alt="Latest Hephaestus release" height="20" src="https://img.shields.io/github/v/release/hephaestus-build/Hephaestus?display_name=tag&amp;sort=semver"></a>
+    <a href="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml?query=branch%3Amain"><img alt="Hephaestus CI status on main" height="20" src="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml/badge.svg?branch=main"></a>
+    <a href="https://scorecard.dev/viewer/?uri=github.com/hephaestus-build/Hephaestus"><img alt="Hephaestus OpenSSF Scorecard report" height="20" src="https://img.shields.io/ossf-scorecard/github.com/hephaestus-build/Hephaestus?label=OpenSSF%20Scorecard&amp;style=flat"></a>
+    <a href="./LICENSE"><img alt="MIT license" height="20" src="https://img.shields.io/github/license/hephaestus-build/Hephaestus?style=flat"></a>
   </p>
 </div>
 
 Hephaestus is an open-source AI mentor for software teams.
 It checks developers' existing work against the engineering practices that their project values.
 This work includes issues, pull requests, reviews, and their related discussions.
-Hephaestus explains what went well, what could be better, and a way to improve it.
+Hephaestus explains where the work needs attention and suggests a next step.
 
 Every piece of feedback names its practice and points back to the reviewed work.
 Developers can ask why, disagree, or discuss the next step.
+
+<div align="center">
+  <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer asks a specific question. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-dark.png#gh-dark-mode-only" width="1280">
+  <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer asks a specific question. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png#gh-light-mode-only" width="1280">
+  <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://docs.hephaestus.build/user/ai-code-review">user guide</a> for the real interface.</sub></p>
+</div>
 
 A mentor gives feedback on how you work.
 Examples include a coach on a university capstone or an experienced maintainer on an open-source project.
 There is never enough of that attention for everyone.
 Hephaestus does the routine part so that everyone gets some.
 People keep responsibility for the harder judgment and the relationships.
-
-<div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-hero-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/landing-hero-light.png">
-    <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer asks a specific question. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png" width="1280">
-  </picture>
-  <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://docs.hephaestus.build/user/ai-code-review">user guide</a> for the real interface.</sub></p>
-</div>
 
 > [!IMPORTANT]
 > **Hephaestus is pre-1.0.** Releases are continuous.
@@ -130,13 +129,14 @@ The feedback is advisory: it does not approve a change for merge or grade anyone
 
 - **Contribute:** start with the
   [local development guide](https://docs.hephaestus.build/contributor/local-development).
-  The
-  web app's components are browsable in
-  [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.com/).
+  Explore the UI components with Storybook in the
+  [local development guide](https://docs.hephaestus.build/contributor/local-development#component-workflow-storybook--chromatic).
 
 ## Get help
 
-- Ask questions and share ideas in [GitHub Discussions](https://github.com/hephaestus-build/Hephaestus/discussions).
+- Ask usage and installation questions in [Support](https://github.com/hephaestus-build/Hephaestus/discussions/categories/support).
+- Propose a change in [Ideas](https://github.com/hephaestus-build/Hephaestus/discussions/categories/ideas).
+  A discussion can explore a proposal before it becomes selected work.
 - Report reproducible bugs in [GitHub Issues](https://github.com/hephaestus-build/Hephaestus/issues).
 - Report security vulnerabilities privately as described in [SECURITY.md](./SECURITY.md).
 
@@ -157,17 +157,17 @@ This let them make things for themselves.
 
 <p align="center">
   <strong>Developed by</strong><br><br>
-  <a href="https://aet.cit.tum.de/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/readme-brand/aet-mark-dark.svg">
-      <img alt="Applied Education Technologies" align="middle" hspace="12" src="./webapp/public/brand/aet-mark.svg" height="72">
-    </picture>
+  <a href="https://aet.cit.tum.de/#gh-dark-mode-only">
+    <img alt="Applied Education Technologies" align="middle" hspace="12" src="./docs/static/img/readme-brand/aet-mark-dark.svg#gh-dark-mode-only" height="72">
   </a>
-  <a href="https://www.tum.de/en/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/readme-brand/tum-logo-dark.svg">
-      <img alt="Technical University of Munich" align="middle" hspace="12" src="./webapp/public/brand/tum-logo.svg" height="56">
-    </picture>
+  <a href="https://aet.cit.tum.de/#gh-light-mode-only">
+    <img alt="Applied Education Technologies" align="middle" hspace="12" src="./webapp/public/brand/aet-mark.svg#gh-light-mode-only" height="72">
+  </a>
+  <a href="https://www.tum.de/en/#gh-dark-mode-only">
+    <img alt="Technical University of Munich" align="middle" hspace="12" src="./docs/static/img/readme-brand/tum-logo-dark.svg#gh-dark-mode-only" height="56">
+  </a>
+  <a href="https://www.tum.de/en/#gh-light-mode-only">
+    <img alt="Technical University of Munich" align="middle" hspace="12" src="./webapp/public/brand/tum-logo.svg#gh-light-mode-only" height="56">
   </a>
   <br>
   <sub><a href="https://aet.cit.tum.de/">Research Group for Applied Education Technologies</a> · <a href="https://www.tum.de/en/">Technical University of Munich</a></sub>

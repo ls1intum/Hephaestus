@@ -84,6 +84,7 @@
 	".claude/skills/storybook-components/traps.md",
 	".claude/skills/web-design-guidelines/SKILL.md",
 	".github/DISCUSSION_TEMPLATE/ideas.yml",
+	".github/DISCUSSION_TEMPLATE/support.yml",
 	".github/ISSUE_TEMPLATE/bug.yml",
 	".github/ISSUE_TEMPLATE/config.yml",
 	".github/ISSUE_TEMPLATE/feature.yml",
