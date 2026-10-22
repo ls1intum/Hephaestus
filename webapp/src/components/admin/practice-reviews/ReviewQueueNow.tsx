@@ -124,7 +124,7 @@ function queueInfo(queue: ReviewQueue | undefined) {
 		},
 		{
 			term: "Oldest wait",
-			text: "is how long the first waiting review has waited; from 30 minutes it is marked. It opens that review. It is left out while nothing waits.",
+			text: "is how long the first waiting review has waited; from 30 minutes it is marked. It opens that review while the review is among the first in line. It is left out while nothing waits.",
 		},
 		{
 			term: "Since / Waited",
@@ -179,14 +179,21 @@ function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: 
 	];
 	// While nothing waits there is no oldest wait to tell: "0 waiting" says it already.
 	if (oldest !== undefined) {
+		const longest = longestWaiting(queue);
 		figures.push({
 			key: "oldest",
 			term: "oldest wait",
-			value: (
-				<OldestWait queue={queue}>
-					<QueueHold show={waitsLong(queue)}>{durationText(oldest)}</QueueHold>
-				</OldestWait>
-			),
+			value: <QueueHold show={waitsLong(queue)}>{durationText(oldest)}</QueueHold>,
+			// It counts no rows but times one review: the whole figure opens that review, so it reads
+			// as the other figures that open something. Not among the head, it opens nothing.
+			link:
+				longest === undefined
+					? undefined
+					: {
+							render: <DetailStackLink entry={reviewLevel(longest.reviewId)} single />,
+							// The name says the figure too: the link's own name hides the hold's words.
+							label: `Oldest wait ${durationText(oldest)}${waitsLong(queue) ? ", needs a look" : ""}: open that review`,
+						},
 		});
 	}
 	return (
@@ -240,25 +247,13 @@ function queueLink(
 }
 
 /**
- * The oldest wait as the link to the review that waits: the first waiting review of the queue's head
- * whose wait began then. Not among the head, it is plain text.
+ * The review the oldest wait belongs to: the first waiting review of the queue's head whose wait
+ * began then; undefined when it is not among the head.
  */
-function OldestWait({ queue, children }: { queue: ReviewQueue; children: ReactNode }) {
+function longestWaiting(queue: ReviewQueue): ReviewQueueItem | undefined {
 	const since = queue.oldestWaitingSince?.getTime();
-	const item = queue.head.find(
+	return queue.head.find(
 		(candidate) => queueItemState(candidate) === "waiting" && candidate.since.getTime() === since,
-	);
-	if (item === undefined) {
-		return <span>{children}</span>;
-	}
-	return (
-		<InlineLink
-			tone="count"
-			aria-label="Open the review that has waited longest"
-			render={<DetailStackLink entry={reviewLevel(item.reviewId)} single />}
-		>
-			{children}
-		</InlineLink>
 	);
 }
 

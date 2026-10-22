@@ -102,6 +102,10 @@ export const Busy: Story = {
 		await expect(getComputedStyle(running).color).not.toBe(getComputedStyle(number).color);
 		// Nothing on hold: a quiet zero opens nothing.
 		await expect(canvas.queryByRole("link", { name: /on hold/u })).toBeNull();
+		// The oldest wait opens the review that waits, number and word as one link too.
+		const oldest = canvas.getByRole("link", { name: "Oldest wait 4 min: open that review" });
+		await expect(oldest.textContent).toBe("4 min oldest wait");
+		await expect(levelsOpenedBy(oldest)).toEqual(["review:0c0c0c0c-0000-4000-8000-000000000003"]);
 		const rows = rowsOf(canvas);
 		await expect(rows).toHaveLength(3);
 		// A small table: work, developer, state and how long, each column lined up down the rows.
@@ -183,6 +187,10 @@ export const LongWait: Story = {
 		await expect(wait).toHaveTextContent("Needs a look: 45 min");
 		await expect(wait?.querySelector(".lucide-triangle-alert")).not.toBeNull();
 		await expect(wait?.querySelector(".text-warning, .text-destructive")).toBeNull();
+		// The link's name keeps the mark its own name would hide.
+		await expect(
+			canvas.getByRole("link", { name: "Oldest wait 45 min, needs a look: open that review" }),
+		).toHaveTextContent("Needs a look: 45 min oldest wait");
 		await expect(canvas.queryByRole("link", { name: /^See all/u })).toBeNull();
 	},
 };
@@ -206,6 +214,8 @@ export const WaitBelowMark: Story = {
 	play: async ({ canvas }) => {
 		const now = canvas.getByRole("region", { name: "The queue" });
 		await expect(figuresOf(canvas)).toContain("oldest wait: 15 min");
+		// That review is not among the first in line, so the wait opens nothing.
+		await expect(canvas.queryByRole("link", { name: /^Oldest wait/u })).toBeNull();
 		await expect(now.querySelector(".lucide-triangle-alert")).toBeNull();
 	},
 };
