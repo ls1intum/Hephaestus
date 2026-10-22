@@ -75,7 +75,7 @@ const onReviewNow = fn();
  * the issues assigned to her; a request to review someone else's work offers none.
  */
 export const ReviewNow: Story = {
-	args: { reviewNow: { onReviewNow, requesting: 104 } },
+	args: { reviewNow: { onReviewNow, requesting: new Set([104]) } },
 	play: async ({ canvas, userEvent }) => {
 		// Her three own pull requests returned or approved and her other assigned issue; the two
 		// review requests shown above them offer none, and the issue being asked about waits.
