@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.spi;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -28,4 +29,30 @@ public interface ReviewAssignmentQuery {
      * cannot be read, or attribution is unreadable. A partial selection never stands for a complete run.
      */
     List<Retained> retained(long workspaceId, UUID reviewId, UUID jobId, Collection<ReviewAssignmentId> ids);
+
+    /** One review's reviewed item. */
+    record ReviewedItem(UUID reviewId, long itemId) {}
+
+    /**
+     * A review's recorded state, and its assignments about one developer on one reviewed item. These are
+     * recorded states, not a verdict on the work.
+     *
+     * @param stopReason why the review stopped; {@code null} where it recorded none
+     * @param counts {@code null} where one of the item's assignments in the review cannot say whose work it was, so a
+     *     count could miss the developer's own, or where none of them names the developer; also for a scan
+     */
+    record Recorded(
+            ReviewStatus status,
+            @Nullable ReviewStopReason stopReason,
+            @Nullable AssignmentCounts counts) {}
+
+    /** A developer's assignments on one reviewed item of one review, by recorded state. */
+    record AssignmentCounts(long total, long judged, long reused, long withheld, long pending) {}
+
+    /**
+     * The state of each asked review and its assignments about {@code developerId} on the asked item, including those it
+     * withheld before any job ran. Each pair is read as a pair: no other item of the review and no other review of the
+     * item. A pair whose review is not in the workspace has no entry.
+     */
+    Map<ReviewedItem, Recorded> recorded(long workspaceId, long developerId, Collection<ReviewedItem> reviewed);
 }

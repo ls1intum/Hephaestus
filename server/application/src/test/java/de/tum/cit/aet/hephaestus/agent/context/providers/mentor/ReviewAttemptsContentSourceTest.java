@@ -2,8 +2,11 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
@@ -18,10 +21,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -92,6 +98,50 @@ class ReviewAttemptsContentSourceTest extends BaseUnitTest {
         assertThat(attempts.overview(1, 5).path("attempts"))
                 .as("the source no longer permits mentoring on the reviewed work")
                 .isEmpty();
+    }
+
+    @Test
+    void shouldStateHowEachRunsReviewEndedFromOneReadAndKeepARunWhoseReviewCannotBeRead() {
+        var first = RuntimeReviewTestData.job();
+        var retry = RuntimeReviewTestData.job();
+        var unreadable = RuntimeReviewTestData.job();
+        unreadable.setReviewId(UUID.randomUUID());
+        for (var job : List.of(first, retry, unreadable)) {
+            job.setStatus(ReviewJobStatus.COMPLETED);
+            attributed(job, List.of(about(5L)));
+        }
+        listed(first, retry, unreadable);
+        when(labels.labels(eq(1L), any())).thenReturn(Map.of());
+        var reviewed = new ReviewAssignmentQuery.ReviewedItem(RuntimeReviewTestData.REVIEW, ASSIGNMENT.itemId());
+        when(assignments.recorded(
+                        1L,
+                        5L,
+                        Set.of(
+                                reviewed,
+                                new ReviewAssignmentQuery.ReviewedItem(unreadable.getReviewId(), ASSIGNMENT.itemId()))))
+                .thenReturn(Map.of(
+                        reviewed,
+                        new ReviewAssignmentQuery.Recorded(
+                                ReviewStatus.PARTIAL, ReviewStopReason.EXECUTION_INCOMPLETE, null)));
+
+        var rows = attempts().overview(1, 5).path("attempts");
+
+        assertThat(rows)
+                .hasSize(3)
+                .allSatisfy(row -> assertThat(row.path("status").asString()).isEqualTo("COMPLETED"));
+        assertThat(List.of(rows.path(0), rows.path(1))).allSatisfy(row -> {
+            assertThat(row.path("reviewStatus").asString()).isEqualTo("PARTIAL");
+            assertThat(row.path("reviewStopReason").asString()).isEqualTo("EXECUTION_INCOMPLETE");
+            assertThat(row.has("assignmentCounts"))
+                    .as("counts that could miss the developer's own are left out, not stated as zero")
+                    .isFalse();
+        });
+        assertThat(rows.path(2).path("jobId").asString())
+                .isEqualTo(unreadable.getId().toString());
+        assertThat(rows.path(2).has("reviewStatus"))
+                .as("the run stays listed; its review's end is not guessed from its own state")
+                .isFalse();
+        verify(assignments, times(1)).recorded(anyLong(), anyLong(), any());
     }
 
     @Test

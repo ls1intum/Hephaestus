@@ -239,8 +239,12 @@ do not retry, and say what you cannot see. `NOT_VISIBLE` means that you cannot r
 - `inputs/context/review_attempts.json` — retained review executions about this developer within `coverage`.
   Each `attempts` entry gives `reviewId`, `jobId`, `itemId`, `itemKind`, `attempt`, execution `status`,
   `processingStatus` and available timestamps. These describe execution, not the result of a practice or delivery
-  of feedback. `listingComplete: false` and `hasMore: true` mean the listing is incomplete. The file holds no
-  source evidence or results.
+  of feedback. `reviewStatus` gives the review's recorded state, with `reviewStopReason` where it recorded one; a
+  `COMPLETED` run can belong to a `PARTIAL` review. `assignmentCounts` (`scope: REVIEWED_ITEM`) counts that
+  review's practice assignments about this developer on this work: `total`, then by recorded state `judged`,
+  `reused`, `withheld` (also before any run) and `pending`. They are not outcomes. A field is absent where it
+  could not be read completely. `listingComplete: false` and `hasMore: true` mean the listing is incomplete. The
+  file holds no source evidence or results.
 - `inputs/context/slack_conversations.json` — the newest Slack threads they took part in, in channels whose consent
   lets Hephaestus read them, with the newest 40 messages of each. Each message has `sentAt` and `byYou`; a
   thread's `truncated` means older messages were left out, and the file's `truncated` means older threads were.
