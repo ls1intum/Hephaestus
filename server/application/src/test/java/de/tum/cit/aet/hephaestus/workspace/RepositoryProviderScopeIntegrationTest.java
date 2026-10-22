@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.SoftAssertions.assertSoftly;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -12,9 +13,11 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -169,6 +172,9 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Autowired
     private TransactionTemplate transactions;
+
+    @Autowired
+    private CredentialBundleConverter credentialConverter;
 
     @MockitoBean
     private GitLabGraphQlClientProvider clients;
@@ -357,13 +363,20 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
         Connection connection = connect(own, source);
         monitor(own, null);
         monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
-        when(clients.forScope(own.getId())).thenThrow(new IllegalStateException("Canonical lookup unavailable"));
         String addedPath = "shared-org/new-project";
+        // GitLab confirms the added project to this workspace's credential once, then cannot be asked again.
+        var answers = new ArrayDeque<>(List.of("""
+                {"data":{"project":{"id":"gid://gitlab/Project/%s","fullPath":"%s","name":"new-project",
+                  "webUrl":"%s/%s","visibility":"private","group":null}}}
+                """.formatted(NATIVE_ID + 5, addedPath, origin, addedPath)));
+        when(clients.forScope(own.getId()))
+                .thenReturn(projectClient(origin, answers))
+                .thenThrow(new IllegalStateException("Canonical lookup unavailable"));
 
         monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), addedPath);
 
         assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), addedPath))
-                .hasValueSatisfying(added -> assertThat(added.getNativeId()).isNull());
+                .hasValueSatisfying(added -> assertThat(added.getNativeId()).isEqualTo(NATIVE_ID + 5));
         assertThat(repositories.findByNameWithOwnerAndProviderId(addedPath, providerId))
                 .isEmpty();
         assertThatThrownBy(() -> monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME))
@@ -644,6 +657,13 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
                 .thenReturn(projectClient(origin, new ArrayDeque<>())
                         .mutate()
                         .webClient(builder -> builder.exchangeFunction(request -> {
+                            if (requested.getCount() == 0) {
+                                // The Add after the Stop confirms the project with this workspace's credential.
+                                return Mono.just(ClientResponse.create(HttpStatus.OK)
+                                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                                        .body(projectResponse(origin, NATIVE_ID))
+                                        .build());
+                            }
                             requested.countDown();
                             return Mono.fromFuture(held);
                         }))
@@ -751,7 +771,10 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
                 .exchangeFunction(request -> Mono.deferContextual(context -> {
                     String path = context.get("projectPath");
                     Mono<String> body;
-                    if (NAME.equals(path)) {
+                    if (Boolean.TRUE.equals(context.<Boolean>getOrDefault("projectLookup", false))) {
+                        // An explicit Add confirms the project with this workspace's credential; only the sync is held.
+                        body = Mono.just(projectResponse(origin, NATIVE_ID));
+                    } else if (NAME.equals(path)) {
                         requested.countDown();
                         body = Mono.fromFuture(held);
                     } else {
@@ -766,7 +789,10 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
             @Override
             public Mono<ClientGraphQlResponse> intercept(ClientGraphQlRequest request, Chain chain) {
                 Object path = Objects.requireNonNull(request.getVariables().get("fullPath"));
-                return chain.next(request).contextWrite(context -> context.put("projectPath", path));
+                boolean lookup = request.getDocument().contains("query GetProject(");
+                return chain.next(request)
+                        .contextWrite(
+                                context -> context.put("projectPath", path).put("projectLookup", lookup));
             }
         };
         return HttpGraphQlClient.builder(web)
@@ -872,6 +898,10 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
         monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
         assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME))
                 .isEmpty();
+        when(clients.forScope(own.getId()))
+                .thenReturn(projectClient(
+                        source.getServerUrl(),
+                        new ArrayDeque<>(List.of(projectResponse(source.getServerUrl(), NATIVE_ID)))));
 
         monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME);
 
@@ -1380,7 +1410,7 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private Connection connect(Workspace workspace, IdentityProvider provider) {
-        Connection connection = connections.saveAndFlush(new Connection(
+        Connection unsaved = new Connection(
                 workspace,
                 IntegrationKind.GITLAB,
                 provider.getServerUrl(),
@@ -1390,7 +1420,15 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
                         null,
                         ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                         Set.of(),
-                        null)));
+                        null));
+        // A synthetic token, so an explicit Add can ask GitLab with the token and server its connection stores.
+        String token = "synthetic-token-" + workspace.getWorkspaceSlug();
+        unsaved.setCredentials(new BearerToken(token, null), credentialConverter);
+        Connection connection = connections.saveAndFlush(unsaved);
+        // That client answers as each test arranged this workspace's scoped client, but only for this token and server.
+        long workspaceId = workspace.getId();
+        when(clients.forScope(eq(workspaceId), eq(token), eq(provider.getServerUrl())))
+                .thenAnswer(invocation -> clients.forScope(workspaceId));
         return connectionService.transition(
                 connection,
                 new ConnectionService.TransitionRequest(

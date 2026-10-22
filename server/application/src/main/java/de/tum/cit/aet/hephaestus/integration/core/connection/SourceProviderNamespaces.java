@@ -3,8 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProviderInstanceRegistered;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,5 +45,11 @@ public class SourceProviderNamespaces {
             case ConnectionConfig.SlackConfig ignored -> null;
             case ConnectionConfig.OutlineConfig c -> c.serverUrl();
         };
+    }
+
+    /** The canonical origin of the provider namespace recorded for this connection. */
+    public static Optional<String> originOf(IntegrationKind kind, ConnectionConfig config) {
+        return PersonSourceNamespace.from(kind.name(), configuredUrl(config))
+                .flatMap(namespace -> ScmOrigin.of(namespace.serverUrl()));
     }
 }

@@ -12,6 +12,6 @@ final class RepositorySelectionChangedException extends ResponseStatusException 
     RepositorySelectionChangedException() {
         super(
                 HttpStatus.CONFLICT,
-                "The GitLab connection, project selection or monitored projects changed while we checked them. Try again.");
+                "The connection, project selection or monitored projects changed while we checked them. Try again.");
     }
 }
