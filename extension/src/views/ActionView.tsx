@@ -46,13 +46,13 @@ function ActionContent({ intent, generation }: { intent: string | undefined; gen
 	const confirm = useMutation({
 		mutationFn: async () => ask({ type: "confirm-action", intent: intent ?? "" }),
 	});
+	const done = async () => {
+		if (intent !== undefined && confirm.isIdle) {
+			await ask({ type: "discard-action", intent }).catch(() => undefined);
+		}
+		window.close();
+	};
 	const close = () => {
-		const done = async () => {
-			if (intent !== undefined && confirm.isIdle) {
-				await ask({ type: "discard-action", intent }).catch(() => undefined);
-			}
-			window.close();
-		};
 		void done();
 	};
 

@@ -100,6 +100,42 @@ async function queueSteps(position: string) {
 	}, ROUTE_RENDER_WAIT);
 }
 
+/**
+ * Serves the queue as the server would: a decided proposal leaves it. A `refusal` answers every
+ * decision with a conflict — one that says someone else decided first, and so has taken the
+ * proposal out of the queue, or one that leaves it waiting.
+ */
+function serveQueue(approved: string[], refusal?: { title: string; decidedElsewhere: boolean }) {
+	const rows = awaitingApprovalFeedback.map((item) =>
+		approved.includes(item.id) ? { ...item, state: "READY" as const, stopReason: null } : item,
+	);
+	server.use(
+		...feedbackCountHandlers(),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", ({ params }) => {
+			const id = String(params.feedbackId);
+			return HttpResponse.json(
+				proposalWire(approved.includes(id) ? "READY" : "AWAITING_APPROVAL", id),
+			);
+		}),
+		http.post(DECISIONS, ({ params }) => {
+			const conflict = () =>
+				HttpResponse.json({ status: 409, title: refusal?.title }, { status: 409 });
+			if (refusal?.decidedElsewhere === false) {
+				return conflict();
+			}
+			const id = String(params.feedbackId);
+			approved.push(id);
+			const index = rows.findIndex((item) => item.id === id);
+			const row = rows[index];
+			if (row) {
+				rows[index] = { ...row, state: "READY", stopReason: null };
+			}
+			return refusal ? conflict() : HttpResponse.json(decisionWire(id, "APPROVE"), { status: 201 });
+		}),
+		...reviewHandlers({ feedback: rows }),
+	);
+}
+
 describe("feedback approval level", () => {
 	it("shows the exact proposal, approves it, and refreshes this workspace's counts of it", async () => {
 		let state: ProposalState = "AWAITING_APPROVAL";
@@ -312,50 +348,6 @@ describe("feedback approval level", () => {
 		const queue = [...awaitingApprovalFeedback].reverse();
 		const [oldest, second, newest] = queue;
 		assert(oldest && second && newest, "The fixtures hold three pieces of feedback to approve");
-
-		/**
-		 * Serves the queue as the server would: a decided proposal leaves it. A `refusal` answers every
-		 * decision with a conflict — one that says someone else decided first, and so has taken the
-		 * proposal out of the queue, or one that leaves it waiting.
-		 */
-		function serveQueue(
-			approved: string[],
-			refusal?: { title: string; decidedElsewhere: boolean },
-		) {
-			const rows = awaitingApprovalFeedback.map((item) =>
-				approved.includes(item.id) ? { ...item, state: "READY" as const, stopReason: null } : item,
-			);
-			server.use(
-				...feedbackCountHandlers(),
-				http.get(
-					"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId",
-					({ params }) => {
-						const id = String(params.feedbackId);
-						return HttpResponse.json(
-							proposalWire(approved.includes(id) ? "READY" : "AWAITING_APPROVAL", id),
-						);
-					},
-				),
-				http.post(DECISIONS, ({ params }) => {
-					const conflict = () =>
-						HttpResponse.json({ status: 409, title: refusal?.title }, { status: 409 });
-					if (refusal?.decidedElsewhere === false) {
-						return conflict();
-					}
-					const id = String(params.feedbackId);
-					approved.push(id);
-					const index = rows.findIndex((item) => item.id === id);
-					const row = rows[index];
-					if (row) {
-						rows[index] = { ...row, state: "READY", stopReason: null };
-					}
-					return refusal
-						? conflict()
-						: HttpResponse.json(decisionWire(id, "APPROVE"), { status: 201 });
-				}),
-				...reviewHandlers({ feedback: rows }),
-			);
-		}
 
 		it("approves and swaps the level for the next proposal", async () => {
 			const approved: string[] = [];

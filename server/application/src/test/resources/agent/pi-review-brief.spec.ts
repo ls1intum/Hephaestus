@@ -529,35 +529,38 @@ const RECORDED = PINNED_TEXT.replaceAll(/^\[L\d+\] /gmu, "");
 const CHANGE_RECORD = "context/change.json#/diff";
 const RECORD_PATH = `context/citable-records/scm.pull-request.diff/${sha(CHANGE_RECORD)}.txt`;
 const recordLine = (text: string) => RECORDED.split("\n").indexOf(text) + 1;
+const manifestText = (
+	path: string,
+	side: string,
+	commit: string | null,
+	bytes: string,
+	stagedPath: string,
+) => ({
+	source: "scm.pull-request.diff",
+	path,
+	side,
+	commit,
+	stagedPath,
+	sha256: sha(bytes),
+});
+const changedFileTexts = (path: string, side: string, commit: string, bytes: string) => {
+	const stagedPath = `context/citable/${side.toLowerCase()}/${path}`;
+	return [
+		manifestText(path, side, commit, bytes, stagedPath),
+		manifestText(path, side, null, bytes, stagedPath),
+	];
+};
 
 /** The capture with its change record staged and the manifest texts the server records for it. */
 function recordCapture(t: { after: (cleanup: () => void) => void }, recorded = RECORDED) {
 	const { root, index } = primaryCapture(t);
 	mkdirSync(nodePath.join(root, nodePath.dirname(RECORD_PATH)), { recursive: true });
 	writeFileSync(nodePath.join(root, RECORD_PATH), recorded);
-	const text = (
-		path: string,
-		side: string,
-		commit: string | null,
-		bytes: string,
-		stagedPath: string,
-	) => ({
-		source: "scm.pull-request.diff",
-		path,
-		side,
-		commit,
-		stagedPath,
-		sha256: sha(bytes),
-	});
-	const changed = (path: string, side: string, commit: string, bytes: string) => {
-		const stagedPath = `context/citable/${side.toLowerCase()}/${path}`;
-		return [text(path, side, commit, bytes, stagedPath), text(path, side, null, bytes, stagedPath)];
-	};
 	const citableTexts = [
-		text(CHANGE_RECORD, "NEW", null, RECORDED, RECORD_PATH),
-		...changed("App/Loader.swift", "NEW", HEAD, LOADER),
-		...changed("App/Loader.swift", "OLD", BASE, "old loader\n"),
-		...changed("App/Legacy.swift", "OLD", BASE, "func legacy() {}\n"),
+		manifestText(CHANGE_RECORD, "NEW", null, RECORDED, RECORD_PATH),
+		...changedFileTexts("App/Loader.swift", "NEW", HEAD, LOADER),
+		...changedFileTexts("App/Loader.swift", "OLD", BASE, "old loader\n"),
+		...changedFileTexts("App/Legacy.swift", "OLD", BASE, "func legacy() {}\n"),
 	];
 	return { root, index: { ...index, citableTexts } };
 }

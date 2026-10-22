@@ -97,11 +97,11 @@ function captureDownloads() {
 	URL.revokeObjectURL = (url: string) => {
 		revoked.push(url);
 	};
-	vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
-		function record(this: HTMLAnchorElement) {
-			downloads.push({ name: this.download, size: blob?.size ?? 0, attached: this.isConnected });
-		},
-	);
+	vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function record(
+		this: HTMLAnchorElement,
+	) {
+		downloads.push({ name: this.download, size: blob?.size ?? 0, attached: this.isConnected });
+	});
 	return { downloads, revoked };
 }
 

@@ -129,10 +129,10 @@ describe("clearedBySave", () => {
 	});
 });
 
-describe("draftErrors", () => {
-	const errorsOf = (value: PracticeDefinitionDraft, mode: "create" | "edit" = "edit") =>
-		draftErrors(value, mode, mockDefinitionOptions, reveals).summary.map((entry) => entry.message);
+const errorsOf = (value: PracticeDefinitionDraft, mode: "create" | "edit" = "edit") =>
+	draftErrors(value, mode, mockDefinitionOptions, reveals).summary.map((entry) => entry.message);
 
+describe("draftErrors", () => {
 	it("accepts a loaded practice", () => {
 		expect(errorsOf(draft())).toStrictEqual([]);
 	});

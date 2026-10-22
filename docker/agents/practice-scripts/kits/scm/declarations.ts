@@ -464,7 +464,7 @@ export function maskSource(language: string | null, source: string): string {
 	if (syntax === undefined) {
 		return source;
 	}
-	// oxlint-disable-next-line unicorn/prefer-spread -- RegExp offsets count UTF-16 code units.
+	// RegExp offsets count UTF-16 code units, so split by code unit, never spread by code point.
 	const chars = source.split("");
 	const blank = (start: number, end: number) => {
 		for (let at = start; at < end; at += 1) {

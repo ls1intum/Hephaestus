@@ -232,18 +232,19 @@ void test("normalization keeps the exact claim and only collapses summary whites
 	assert.deepEqual(normalized.problems?.[0]?.citations, [DIFF_CITATION]);
 });
 
+const citationAt = (path: string) => citationFixture({ path });
+
 void test("submissionCitations lists the result's, each problem's, the example's, then each open question's", () => {
-	const at = (path: string) => citationFixture({ path });
 	const submission = normalizeSubmission(
 		baseSubmission({
-			citations: [at("a.ts")],
+			citations: [citationAt("a.ts")],
 			problems: [
-				problemFixture({ citations: [at("b.ts"), at("c.ts")] }),
-				problemFixture({ citations: [at("d.ts")] }),
+				problemFixture({ citations: [citationAt("b.ts"), citationAt("c.ts")] }),
+				problemFixture({ citations: [citationAt("d.ts")] }),
 			],
-			example: { ...EXAMPLE, citation: at("e.ts") },
+			example: { ...EXAMPLE, citation: citationAt("e.ts") },
 			evidence: {
-				openQuestions: [UNDECIDABLE, { ...UNDECIDABLE, citation: at("f.ts") }],
+				openQuestions: [UNDECIDABLE, { ...UNDECIDABLE, citation: citationAt("f.ts") }],
 			},
 		}),
 	);
@@ -259,21 +260,22 @@ void test("submissionCitations lists the result's, each problem's, the example's
 	assert.equal(submission.evidence.openQuestions?.[1]?.citation?.quote, "repaired");
 });
 
+const citingLines = (lines: Record<string, unknown>) =>
+	citing(citationFixture({ startLine: undefined, endLine: undefined, ...lines }));
+
 void test("a line-number refusal names what was received, and an omitted line as omitted", () => {
-	const cited = (lines: Record<string, unknown>) =>
-		citing(citationFixture({ startLine: undefined, endLine: undefined, ...lines }));
 	assert.match(
-		refusal(cited({})),
+		refusal(citingLines({})),
 		/^citations\.0: evidence citation startLine is required: the 1-based line/u,
 	);
-	assert.match(refusal(cited({ startLine: null })), /startLine is required/u);
+	assert.match(refusal(citingLines({ startLine: null })), /startLine is required/u);
 	assert.match(
-		refusal(cited({ startLine: 0 })),
+		refusal(citingLines({ startLine: 0 })),
 		/startLine must be a positive integer, received 0; lines are 1-based/u,
 	);
-	assert.match(refusal(cited({ startLine: "ten" })), /received "ten"; lines are 1-based/u);
+	assert.match(refusal(citingLines({ startLine: "ten" })), /received "ten"; lines are 1-based/u);
 	assert.match(
-		refusal(cited({ startLine: 10, endLine: 4 })),
+		refusal(citingLines({ startLine: 10, endLine: 4 })),
 		/endLine must be an integer >= startLine, received 4 with startLine 10/u,
 	);
 });
@@ -1591,16 +1593,17 @@ void test("a conversation citation counts only inside a turn of the participant 
 	assert.equal(citesReviewedTurn([threadCitation(9)], "not json", "9007199254740993"), false);
 });
 
+const messageTextCitation = (index: number) => ({
+	...threadCitation(1),
+	path: `${CONVERSATION_THREAD}#/messages/${index}/text`,
+});
+
 void test("logical message text citations use the frozen native account rather than another author", () => {
-	const quote = (index: number) => ({
-		...threadCitation(1),
-		path: `${CONVERSATION_THREAD}#/messages/${index}/text`,
-	});
-	assert.equal(citesReviewedTurn([quote(0)], THREAD, "9007199254740993"), false);
-	assert.equal(citesReviewedTurn([quote(1)], THREAD, "9007199254740993"), true);
-	assert.equal(citesReviewedTurn([quote(1)], THREAD, "42"), false);
-	assert.equal(citesReviewedTurn([quote(0)], THREAD, "42"), true);
-	assert.equal(citesReviewedTurn([quote(1)], THREAD, "7"), false);
+	assert.equal(citesReviewedTurn([messageTextCitation(0)], THREAD, "9007199254740993"), false);
+	assert.equal(citesReviewedTurn([messageTextCitation(1)], THREAD, "9007199254740993"), true);
+	assert.equal(citesReviewedTurn([messageTextCitation(1)], THREAD, "42"), false);
+	assert.equal(citesReviewedTurn([messageTextCitation(0)], THREAD, "42"), true);
+	assert.equal(citesReviewedTurn([messageTextCitation(1)], THREAD, "7"), false);
 });
 
 void test("a thread whose messages are not all objects is refused, never read with shifted turns", () => {

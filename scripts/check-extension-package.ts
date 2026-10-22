@@ -87,6 +87,13 @@ function permissionProblems(manifest: Manifest): string[] {
 	return problems;
 }
 
+const narrow = (entry: unknown): boolean =>
+	isRecord(entry) &&
+	sameSet(entry.resources, ["inline.html"]) &&
+	sameSet(entry.matches, OPTIONAL_HOSTS) &&
+	entry.use_dynamic_url === true &&
+	!("extension_ids" in entry);
+
 /** What pages may load of it, and what it may execute. */
 function surfaceProblems(manifest: Manifest): string[] {
 	const problems: string[] = [];
@@ -108,12 +115,6 @@ function surfaceProblems(manifest: Manifest): string[] {
 		problems.push("minimum_chrome_version must be at least 130 for dynamic inline resource URLs");
 	}
 	const resources = manifest.web_accessible_resources;
-	const narrow = (entry: unknown): boolean =>
-		isRecord(entry) &&
-		sameSet(entry.resources, ["inline.html"]) &&
-		sameSet(entry.matches, OPTIONAL_HOSTS) &&
-		entry.use_dynamic_url === true &&
-		!("extension_ids" in entry);
 	if (!Array.isArray(resources) || resources.length !== 1 || !resources.every(narrow)) {
 		problems.push(
 			"web_accessible_resources must expose only inline.html to HTTPS pages through one dynamic URL entry",

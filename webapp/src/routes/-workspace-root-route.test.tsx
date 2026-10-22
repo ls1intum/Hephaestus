@@ -157,6 +157,10 @@ function names(): string[] {
 		.map((link) => link.textContent);
 }
 
+const answerPersonDetail = () => HttpResponse.json(personDetail());
+const workResponse: () => Response = () =>
+	HttpResponse.json(publicWork("Previously published work"));
+
 describe("the address of a workspace", () => {
 	it("shows a signed-out visitor the public activity page of a workspace that publishes", async () => {
 		server.use(unauthenticatedUser);
@@ -523,9 +527,7 @@ describe("the address of a workspace", () => {
 	});
 
 	it("does not restore denied person data or old work after a later network failure", async () => {
-		let detailResponse: () => Response = () => HttpResponse.json(personDetail());
-		const workResponse: () => Response = () =>
-			HttpResponse.json(publicWork("Previously published work"));
+		let detailResponse: () => Response = answerPersonDetail;
 		server.use(unauthenticatedUser);
 		publish();
 		server.use(
@@ -753,41 +755,41 @@ describe("refreshing public activity", () => {
 	});
 });
 
-describe("a signed-in person who is not a member", () => {
-	/** The page, the person's own workspace, and the answers the first-visit step records. */
-	function visit() {
-		const answers: unknown[] = [];
-		const requests: URL[] = [];
-		let hidden = false;
-		server.use(
-			http.get("*/public/workspaces/:slug/activity", ({ request }) => {
-				requests.push(new URL(request.url));
-				return HttpResponse.json(
-					publicActivity({
-						people: hidden
-							? [person("bob", "Bob Brenner")]
-							: [person("ada", "Ada Lovelace"), person("bob", "Bob Brenner")],
-					}),
-				);
-			}),
-			http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("other")])),
-			http.get("*/workspaces/other/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
-			http.get("*/user/public-activity/workspaces/acme/onboarding", () =>
-				HttpResponse.json({ seen: answers.length > 0, visible: !hidden }),
-			),
-			http.put<PathParams, PublicActivityOnboardingRequest>(
-				"*/user/public-activity/workspaces/acme/onboarding",
-				async ({ request }) => {
-					const body = await request.json();
-					answers.push(body);
-					hidden = !body.visible;
-					return HttpResponse.json({ seen: true, visible: body.visible });
-				},
-			),
-		);
-		return { answers, requests };
-	}
+/** The page, the person's own workspace, and the answers the first-visit step records. */
+function visit() {
+	const answers: unknown[] = [];
+	const requests: URL[] = [];
+	let hidden = false;
+	server.use(
+		http.get("*/public/workspaces/:slug/activity", ({ request }) => {
+			requests.push(new URL(request.url));
+			return HttpResponse.json(
+				publicActivity({
+					people: hidden
+						? [person("bob", "Bob Brenner")]
+						: [person("ada", "Ada Lovelace"), person("bob", "Bob Brenner")],
+				}),
+			);
+		}),
+		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("other")])),
+		http.get("*/workspaces/other/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
+		http.get("*/user/public-activity/workspaces/acme/onboarding", () =>
+			HttpResponse.json({ seen: answers.length > 0, visible: !hidden }),
+		),
+		http.put<PathParams, PublicActivityOnboardingRequest>(
+			"*/user/public-activity/workspaces/acme/onboarding",
+			async ({ request }) => {
+				const body = await request.json();
+				answers.push(body);
+				hidden = !body.visible;
+				return HttpResponse.json({ seen: true, visible: body.visible });
+			},
+		),
+	);
+	return { answers, requests };
+}
 
+describe("a signed-in person who is not a member", () => {
 	it("sees the page, and the step to show or hide themselves", async () => {
 		const user = userEvent.setup();
 		const { answers } = visit();

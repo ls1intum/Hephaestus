@@ -1021,6 +1021,11 @@ function mockOwnProviders(models: () => Wire<WorkspaceLlmModel>[]) {
 	);
 }
 
+const inHousePicker = () =>
+	within(
+		within(purposeRegion("Embedding model")).getByRole("group", { name: "In-house" }),
+	).getByRole("combobox");
+
 it("offers a model added under the workspace's own provider in the pickers above, without a reload", async () => {
 	const user = userEvent.setup();
 	let added: Wire<WorkspaceLlmModel>[] = [];
@@ -1047,10 +1052,6 @@ it("offers a model added under the workspace's own provider in the pickers above
 	);
 	renderRouteAt("/w/acme/admin/models");
 	const card = within(await screen.findByRole("region", { name: "Own OpenAI" }, ROUTE_RENDER_WAIT));
-	const inHousePicker = () =>
-		within(
-			within(purposeRegion("Embedding model")).getByRole("group", { name: "In-house" }),
-		).getByRole("combobox");
 	expect(inHousePicker().hasAttribute("disabled")).toBe(true);
 
 	await user.click(card.getByRole("button", { name: "Add model to Own OpenAI" }));

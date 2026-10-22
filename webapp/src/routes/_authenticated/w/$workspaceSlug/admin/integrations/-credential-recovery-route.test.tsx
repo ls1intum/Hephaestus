@@ -482,26 +482,26 @@ async function reread(queryClient: QueryClient, ...queryKeys: QueryKey[]) {
 	});
 }
 
+/** An active GitLab connection whose catalog and monitored repositories the test answers. */
+function serveGitLabReads(monitored: string[]) {
+	const { entry } = mockConnection("GITLAB");
+	entry.credentialsUnreadableSince = undefined;
+	return {
+		entry,
+		catalog: serveScmRead("*/workspaces/acme/connections/catalog", {
+			status: 200,
+			body: [entry],
+		}),
+		repositories: serveScmRead("*/workspaces/acme/repositories", {
+			status: 200,
+			body: monitored,
+		}),
+	};
+}
+
 describe("source-control management reads", () => {
 	const catalogKey = getIntegrationCatalogQueryKey({ path: { workspaceSlug: "acme" } });
 	const repositoriesKey = getRepositoriesToMonitorQueryKey({ path: { workspaceSlug: "acme" } });
-
-	/** An active GitLab connection whose catalog and monitored repositories the test answers. */
-	function serveGitLabReads(monitored: string[]) {
-		const { entry } = mockConnection("GITLAB");
-		entry.credentialsUnreadableSince = undefined;
-		return {
-			entry,
-			catalog: serveScmRead("*/workspaces/acme/connections/catalog", {
-				status: 200,
-				body: [entry],
-			}),
-			repositories: serveScmRead("*/workspaces/acme/repositories", {
-				status: 200,
-				body: monitored,
-			}),
-		};
-	}
 
 	it("withdraws a refused GitLab connection's open Stop and drafts, and an outage does not bring them back", async () => {
 		const { entry, catalog, repositories } = serveGitLabReads(["acme/platform/api"]);
@@ -1108,15 +1108,16 @@ const SYNC_READ_FAILURE = {
 	503: "The sync state is temporarily unavailable.",
 } as const;
 
+const failed = (status: 403 | 503) =>
+	HttpResponse.json(
+		{ status, title: "Sync read failed", detail: SYNC_READ_FAILURE[status] },
+		{ status },
+	);
+
 /** Serves connection 7's resources and jobs, counting each read. A held answer waits for `hold`. */
 function serveSyncReads(initial: SyncReads) {
 	const requests = { resources: 0, jobs: 0 };
 	const current = { reads: initial, hold: Promise.resolve() };
-	const failed = (status: 403 | 503) =>
-		HttpResponse.json(
-			{ status, title: "Sync read failed", detail: SYNC_READ_FAILURE[status] },
-			{ status },
-		);
 	server.use(
 		http.get("*/workspaces/acme/connections/7/sync/resources", async () => {
 			requests.resources += 1;

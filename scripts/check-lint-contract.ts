@@ -448,6 +448,18 @@ void test("formatting agrees at the repository, webapp and extension entry point
 	});
 	assert.ok(outputs.every((output) => output === outputs[0]));
 	assert.match(outputs[0] ?? "", /className="flex bg-background p-4 text-2xs/u);
+	for (const args of [
+		["fmt", "--stdin-filepath", "webapp/src/api/toolchain.tsx"],
+		["-C", "webapp", "fmt", "--stdin-filepath", "src/api/toolchain.tsx"],
+		["fmt", "--stdin-filepath", "extension/src/api/toolchain.tsx"],
+		["-C", "extension", "fmt", "--stdin-filepath", "src/api/toolchain.tsx"],
+		["fmt", "--stdin-filepath", "webapp/src/routeTree.gen.ts"],
+		["-C", "webapp", "fmt", "--stdin-filepath", "src/routeTree.gen.ts"],
+	]) {
+		const result = spawnSync("vp", args, { cwd: REPO_ROOT, input: source, encoding: "utf8" });
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stdout, source, args.join(" "));
+	}
 });
 
 /**

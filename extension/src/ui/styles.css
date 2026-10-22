@@ -218,16 +218,8 @@ html[data-surface="inline"][data-provider="github"] body {
 
 html[data-surface="inline"][data-provider="gitlab"] body {
 	font-family:
-		"GitLab Sans",
-		-apple-system,
-		BlinkMacSystemFont,
-		"Segoe UI",
-		Roboto,
-		"Noto Sans",
-		Ubuntu,
-		Cantarell,
-		"Helvetica Neue",
-		sans-serif;
+		"GitLab Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Ubuntu,
+		Cantarell, "Helvetica Neue", sans-serif;
 }
 
 html[data-surface="inline"][data-provider="github"] [data-variant="outline"] {

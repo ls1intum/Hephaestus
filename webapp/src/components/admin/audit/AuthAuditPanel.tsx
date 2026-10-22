@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
 import { adminExportAuthEvents } from "@/api/sdk.gen";
+import type { AdminExportAuthEventsData } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
 import { EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
 import { auditRows } from "@/components/admin/audit/audit-list";
@@ -38,6 +39,19 @@ const OUTCOME_OPTIONS = [
 	{ value: "FAILURE", label: "Failure" },
 ];
 const OUTCOMES: ("SUCCESS" | "FAILURE")[] = ["SUCCESS", "FAILURE"];
+
+/**
+ * Reads the auth events under `query` as CSV and hands them to the browser as a file named for the
+ * day the reader saved it.
+ */
+async function downloadAuditLog(query: AdminExportAuthEventsData["query"]): Promise<void> {
+	const { data, error } = await adminExportAuthEvents({ query });
+	if (error !== undefined || typeof data !== "string") {
+		throw new Error("Export failed");
+	}
+	const day = new Date().toISOString().slice(0, 10);
+	saveTextFile(data, `audit-log-${day}.csv`, "text/csv;charset=utf-8;");
+}
 
 export interface AuthAuditPanelProps {
 	search: AuditSearch;
@@ -87,14 +101,7 @@ export function AuthAuditPanel({
 		});
 
 	const exportCsv = useMutation({
-		mutationFn: async () => {
-			const { data, error } = await adminExportAuthEvents({ query: filters });
-			if (error !== undefined || typeof data !== "string") {
-				throw new Error("Export failed");
-			}
-			const day = new Date().toISOString().slice(0, 10);
-			saveTextFile(data, `audit-log-${day}.csv`, "text/csv;charset=utf-8;");
-		},
+		mutationFn: async () => downloadAuditLog(filters),
 		onError: () => toast.error("We could not export the audit log. Try again."),
 	});
 

@@ -269,23 +269,25 @@ describe("redirects", () => {
 	});
 });
 
-describe("the report's calls", () => {
-	async function api(respond: (request: Request) => Promise<Response>) {
-		const { store } = worker({ generation: 1, epoch: 1, credentials: family(A, "a") });
-		const requests: Request[] = [];
-		recordFetch(async (request) => {
-			requests.push(request);
-			return respond(request);
-		});
-		const built = AuthenticatedApi.fromSnapshot(await store.snapshot(), store);
-		if (built === undefined) {
-			throw new Error("No session");
-		}
-		return { built, requests };
+async function reportApi(respond: (request: Request) => Promise<Response>) {
+	const { store } = worker({ generation: 1, epoch: 1, credentials: family(A, "a") });
+	const requests: Request[] = [];
+	recordFetch(async (request) => {
+		requests.push(request);
+		return respond(request);
+	});
+	const built = AuthenticatedApi.fromSnapshot(await store.snapshot(), store);
+	if (built === undefined) {
+		throw new Error("No session");
 	}
+	return { built, requests };
+}
 
+describe("the report's calls", () => {
 	it("asks for the reader's own results on one exact item, most actionable first", async () => {
-		const { built, requests } = await api(async () => json({ content: [], totalElements: 0 }));
+		const { built, requests } = await reportApi(async () =>
+			json({ content: [], totalElements: 0 }),
+		);
 		await built.ownResults("team", "16", 25);
 		const url = new URL(required(requests[0], "the request").url);
 		expect(url.pathname).toBe("/api/workspaces/team/practices/results");
@@ -299,7 +301,7 @@ describe("the report's calls", () => {
 
 	it("names the newest own review of the item instead of requesting an aggregate trace", async () => {
 		const answer = ownTrace(reviewRef(REVIEW, itemRef("16")));
-		const { built, requests } = await api(ownReviewResponse(() => answer.review, answer));
+		const { built, requests } = await reportApi(ownReviewResponse(() => answer.review, answer));
 		await expect(built.trace("team", "16")).resolves.toStrictEqual(answer);
 		const urls = requests.map((request) => new URL(request.url));
 		expect(urls.map((url) => url.pathname)).toStrictEqual([
@@ -315,23 +317,23 @@ describe("the report's calls", () => {
 	});
 
 	it("does not request an aggregate trace when the reader has no own review", async () => {
-		const { built, requests } = await api(async () => json(ownReviews()));
+		const { built, requests } = await reportApi(async () => json(ownReviews()));
 		await expect(built.trace("team", "16")).resolves.toBeNull();
 		expect(requests).toHaveLength(1);
 	});
 
 	it("keeps a missing named trace unavailable and a refused own-review read an error", async () => {
-		const missing = await api(
+		const missing = await reportApi(
 			ownReviewResponse(() => reviewRef(REVIEW, itemRef("16")), { title: "Not found" }, 404),
 		);
 		await expect(missing.built.trace("team", "16")).resolves.toBeNull();
-		const refused = await api(async () => json({ title: "Forbidden" }, 403));
+		const refused = await reportApi(async () => json({ title: "Forbidden" }, 403));
 		await expect(refused.built.trace("team", "16")).rejects.toMatchObject({ code: "server" });
 		expect(refused.requests).toHaveLength(1);
 	});
 
 	it("refuses an own review returned for another item before asking for its trace", async () => {
-		const { built, requests } = await api(async () =>
+		const { built, requests } = await reportApi(async () =>
 			json(ownReviews(reviewRef(LATER_REVIEW, itemRef("99")))),
 		);
 		await expect(built.trace("team", "16")).rejects.toMatchObject({ code: "server" });
@@ -342,13 +344,15 @@ describe("the report's calls", () => {
 		["about another item", ownTrace(reviewRef(REVIEW, itemRef("16")), itemRef("99"))],
 		["of another review", ownTrace(reviewRef(LATER_REVIEW, itemRef("16")))],
 	])("refuses a trace %s than the one named", async (_name, trace) => {
-		const { built } = await api(ownReviewResponse(() => reviewRef(REVIEW, itemRef("16")), trace));
+		const { built } = await reportApi(
+			ownReviewResponse(() => reviewRef(REVIEW, itemRef("16")), trace),
+		);
 		await expect(built.trace("team", "16")).rejects.toMatchObject({ code: "server" });
 	});
 
 	it("discovers a newly recorded own review on the next read", async () => {
 		let latest = reviewRef(REVIEW, itemRef("16"));
-		const { built, requests } = await api(latestOwnReview(() => latest));
+		const { built, requests } = await reportApi(latestOwnReview(() => latest));
 		await built.trace("team", "16");
 		latest = reviewRef(LATER_REVIEW, itemRef("16"));
 		await built.trace("team", "16");
@@ -365,7 +369,7 @@ describe("the report's calls", () => {
 			reviewId: null,
 			reason: "COOLDOWN_ACTIVE",
 		};
-		const { built, requests } = await api(async () => json(refusal));
+		const { built, requests } = await reportApi(async () => json(refusal));
 		await expect(built.requestReview("team", "16")).resolves.toStrictEqual(refusal);
 		expect(requests).toHaveLength(1);
 		const [request] = requests;
@@ -378,7 +382,7 @@ describe("the report's calls", () => {
 
 	it("says a forbidden request as such, not as a server failure", async () => {
 		for (const status of [403, 404]) {
-			const forbidden = await api(async () => json({ title: "Forbidden" }, status));
+			const forbidden = await reportApi(async () => json({ title: "Forbidden" }, status));
 			await expect(forbidden.built.requestReview("team", "1")).rejects.toMatchObject({
 				code: "forbidden",
 			});
@@ -409,7 +413,7 @@ describe("the report's calls", () => {
 				},
 			],
 		};
-		const { built, requests } = await api(async () => json(answer));
+		const { built, requests } = await reportApi(async () => json(answer));
 		const work = "https://github.com/octo/app/pull/16";
 		await expect(built.workFeedback("team", work)).resolves.toStrictEqual(answer);
 		expect(requests).toHaveLength(1);
@@ -425,7 +429,7 @@ describe("the report's calls", () => {
 
 	it("fails a refused read of the reader's comments rather than answering with none", async () => {
 		for (const status of [403, 404]) {
-			const { built } = await api(async () => json({ title: "Refused" }, status));
+			const { built } = await reportApi(async () => json({ title: "Refused" }, status));
 			await expect(
 				built.workFeedback("team", "https://github.com/octo/app/pull/16"),
 			).rejects.toMatchObject({
@@ -437,7 +441,9 @@ describe("the report's calls", () => {
 	});
 
 	it("never reads the in-app feedback endpoint, which records delivery", async () => {
-		const { built, requests } = await api(async () => json({ content: [], totalElements: 0 }));
+		const { built, requests } = await reportApi(async () =>
+			json({ content: [], totalElements: 0 }),
+		);
 		await built.ownResults("team", "16", 25);
 		await built.workFeedback("team", "https://github.com/octo/app/pull/16").catch(() => undefined);
 		expect(requests.some((request) => request.url.includes("/feedback/in-app"))).toBe(false);

@@ -5,12 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HexFormat;
+import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -32,10 +30,13 @@ class PracticeV1DefinitionMigrationTest {
             for (var binding : bindings) {
                 var mapping = Objects.requireNonNull(
                         mapped.get(binding.path("sourceSha256").asString()));
-                try (var target = Objects.requireNonNull(getClass()
-                        .getResourceAsStream(binding.path("targetResource").asString()))) {
-                    assertThat(mapping.target()).isEqualTo(new String(target.readAllBytes(), StandardCharsets.UTF_8));
-                }
+                // The pinned digest, not today's bundled script: a later edit to the script leaves the
+                // released migration's target unchanged.
+                assertThat(mapping.targetSha256())
+                        .as(
+                                "historical target %s",
+                                binding.path("targetResource").asString())
+                        .isEqualTo(binding.path("targetSha256").asString());
                 programs.add(mapping);
             }
         }
@@ -113,6 +114,8 @@ class PracticeV1DefinitionMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldTransformEverySupportedProgramWithoutChangingItsPinnedSource(String context) throws Exception {
+        // The released migration's own mapping owns each target; today's bundled script may have moved on.
+        var mapped = PracticeMigrationFixture.mappedPrograms();
         var database = PracticeMigrationFixture.releasedDatabase(context);
         try (var input =
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/released-programs.json"))) {
@@ -160,6 +163,7 @@ class PracticeV1DefinitionMigrationTest {
             PracticeMigrationFixture.upgrade(database, context);
             int index = 0;
             for (var program : programs) {
+                var mapping = releasedMapping(mapped, program);
                 assertThat(PracticeMigrationFixture.column(
                                 database,
                                 "SELECT encode(sha256(convert_to(definition->>'script','UTF8')),'hex') FROM"
@@ -172,7 +176,7 @@ class PracticeV1DefinitionMigrationTest {
                                         + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
                                         + " WHERE p.id="
                                         + (1000000L + index)))
-                        .containsExactly(shippedProgramSha(program) + "|2");
+                        .containsExactly(mapping.targetSha256() + "|2");
                 index++;
             }
         }
@@ -186,6 +190,7 @@ class PracticeV1DefinitionMigrationTest {
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/released-programs.json"))) {
             var program = Objects.requireNonNull(
                     JsonMapper.builder().build().readTree(input).get(0));
+            var mapping = releasedMapping(PracticeMigrationFixture.mappedPrograms(), program);
             installProgram(database, program.path("source").asString());
             PracticeMigrationFixture.upgrade(database, context);
             assertThat(PracticeMigrationFixture.column(
@@ -198,7 +203,7 @@ class PracticeV1DefinitionMigrationTest {
                             "SELECT encode(sha256(convert_to(v.definition->>'script','UTF8')),'hex') || '|' ||"
                                     + " v.number || '|' || (v.definition->'reads'->>'contract') FROM practice p"
                                     + " JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=992121"))
-                    .containsExactly(shippedProgramSha(program) + "|3|2.0.0");
+                    .containsExactly(mapping.targetSha256() + "|3|2.0.0");
             assertThat(PracticeMigrationFixture.column(
                             database,
                             "SELECT practice_version_id::text FROM result WHERE"
@@ -430,14 +435,15 @@ class PracticeV1DefinitionMigrationTest {
                 .containsExactly("The workspace's customized standard.");
     }
 
-    private String shippedProgramSha(JsonNode program) throws Exception {
-        try (var input = Objects.requireNonNull(getClass()
-                .getResourceAsStream(
-                        "/practices/scripts/" + program.path("slug").asString() + ".ts"))) {
-            String digest = HexFormat.of()
-                    .formatHex(MessageDigest.getInstance("SHA-256").digest(input.readAllBytes()));
-            assertThat(program.path("targetSha256").asString()).isEqualTo(digest);
-            return digest;
-        }
+    /** The released migration's mapping of a pinned released program, checked against the pinned bytes. */
+    private static PracticeMigrationFixture.ProgramMapping releasedMapping(
+            Map<String, PracticeMigrationFixture.ProgramMapping> mapped, JsonNode program) {
+        var mapping = Objects.requireNonNull(
+                mapped.get(program.path("sourceSha256").asString()),
+                () -> program.path("slug").asString() + " has no mapping in the released migration");
+        assertThat(mapping.source()).isEqualTo(program.path("source").asString());
+        assertThat(mapping.targetSha256())
+                .isEqualTo(program.path("targetSha256").asString());
+        return mapping;
     }
 }

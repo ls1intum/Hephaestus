@@ -6,6 +6,7 @@ import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { adminListAuthEventsInfiniteQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { AuthEventView, ConfigAuditEntryView } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
+import * as download from "@/lib/download";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
@@ -231,5 +232,81 @@ describe("audit read lifecycle", () => {
 				status,
 			})),
 		);
+	});
+});
+
+/** The Access tab filtered to one account, once its events have loaded and the export can start. */
+async function exportButtonForAccount7() {
+	const { queryClient } = renderRouteAtWithRouter("/admin/audit?accountId=7");
+	const button = await screen.findByRole<HTMLButtonElement>(
+		"button",
+		{ name: "Export CSV" },
+		ROUTE_RENDER_WAIT,
+	);
+	await waitFor(() => expect(button.disabled).toBe(false));
+	return { button, queryClient };
+}
+
+describe("Access export", () => {
+	it("reads the filtered export only on request, and saves the CSV once the server answers", async () => {
+		const user = userEvent.setup();
+		serveAuthEvents([[authEvent]]);
+		const exportAnswer = deferred<Response>();
+		const exported: (string | null)[] = [];
+		server.use(
+			http.get("*/admin/audit/export", async ({ request }) => {
+				exported.push(new URL(request.url).searchParams.get("accountId"));
+				return exportAnswer.promise;
+			}),
+		);
+		const { button, queryClient } = await exportButtonForAccount7();
+		// The browser download itself is `download.test.ts`'s; here only what the page hands it.
+		const save = vi.spyOn(download, "saveTextFile").mockReturnValue(undefined);
+		const csv = "id,eventType,result\n31,LOGIN,SUCCESS\n";
+		try {
+			expect(exported).toStrictEqual([]);
+			expect(save).not.toHaveBeenCalled();
+
+			await user.click(button);
+			await waitFor(() => expect(exported).toStrictEqual(["7"]));
+			expect(save).not.toHaveBeenCalled();
+
+			exportAnswer.resolve(HttpResponse.text(csv, { headers: { "Content-Type": "text/csv" } }));
+			await waitFor(() => expect(save).toHaveBeenCalledOnce());
+			expect(save).toHaveBeenCalledWith(
+				csv,
+				expect.stringMatching(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/u),
+				"text/csv;charset=utf-8;",
+			);
+		} finally {
+			exportAnswer.resolve(
+				HttpResponse.json({ status: 503, detail: "Export unavailable." }, { status: 503 }),
+			);
+			try {
+				await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			} finally {
+				save.mockRestore();
+			}
+		}
+	});
+
+	it("says the export failed and saves nothing when the server refuses it", async () => {
+		const user = userEvent.setup();
+		serveAuthEvents([[authEvent]]);
+		server.use(
+			http.get("*/admin/audit/export", () =>
+				HttpResponse.json({ status: 503, detail: "Export unavailable." }, { status: 503 }),
+			),
+		);
+		const save = vi.spyOn(download, "saveTextFile").mockReturnValue(undefined);
+		try {
+			const { button } = await exportButtonForAccount7();
+			await user.click(button);
+
+			await screen.findByText("We could not export the audit log. Try again.");
+			expect(save).not.toHaveBeenCalled();
+		} finally {
+			save.mockRestore();
+		}
 	});
 });

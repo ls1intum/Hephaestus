@@ -31,16 +31,16 @@ function captureDownloads() {
 	URL.revokeObjectURL = (url: string) => {
 		revoked.push(url);
 	};
-	vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
-		function record(this: HTMLAnchorElement) {
-			clicks.push({
-				href: this.href,
-				download: this.download,
-				attached: this.isConnected,
-				revokedBefore: [...revoked],
-			});
-		},
-	);
+	vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function record(
+		this: HTMLAnchorElement,
+	) {
+		clicks.push({
+			href: this.href,
+			download: this.download,
+			attached: this.isConnected,
+			revokedBefore: [...revoked],
+		});
+	});
 	return { created, revoked, clicks };
 }
 

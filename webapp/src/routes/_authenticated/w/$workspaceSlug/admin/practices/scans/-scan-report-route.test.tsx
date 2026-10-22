@@ -299,11 +299,11 @@ function captureDownloads() {
 	URL.revokeObjectURL = (url: string) => {
 		revoked.push(url);
 	};
-	vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
-		function record(this: HTMLAnchorElement) {
-			downloads.push({ name: this.download, href: this.getAttribute("href") ?? "" });
-		},
-	);
+	vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function record(
+		this: HTMLAnchorElement,
+	) {
+		downloads.push({ name: this.download, href: this.getAttribute("href") ?? "" });
+	});
 	return { created, revoked, downloads };
 }
 

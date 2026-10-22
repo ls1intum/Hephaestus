@@ -297,6 +297,14 @@ export const BareTextareaHasNoEdgeOrRing: Story = {
 	},
 };
 
+// Tailwind composes a ring from five shadow slots, and a slot not in use serialises as a
+// zero-extent layer, so the layers that paint are the ones with any length above 0px. Layers
+// and the channels inside an `rgb(…)` are both comma-separated.
+const paintedLayers = (shadow: string) =>
+	shadow
+		.split(/,(?![^(]*\))/u)
+		.filter((layer) => (layer.match(/-?\d*\.?\d+px/gu) ?? []).some((length) => px(length) !== 0));
+
 export const OutlineMenuButtonRingsOnFocus: Story = {
 	render: () => (
 		<SidebarProvider className="min-h-0 w-64">
@@ -309,15 +317,6 @@ export const OutlineMenuButtonRingsOnFocus: Story = {
 	),
 	play: async ({ canvas, userEvent }) => {
 		const button = canvas.getByRole("button", { name: "Workspace overview" });
-		// Tailwind composes a ring from five shadow slots, and a slot not in use serialises as a
-		// zero-extent layer, so the layers that paint are the ones with any length above 0px. Layers
-		// and the channels inside an `rgb(…)` are both comma-separated.
-		const paintedLayers = (shadow: string) =>
-			shadow
-				.split(/,(?![^(]*\))/u)
-				.filter((layer) =>
-					(layer.match(/-?\d*\.?\d+px/gu) ?? []).some((length) => px(length) !== 0),
-				);
 		const rest = style(button).boxShadow;
 		await expect(paintedLayers(rest)).toHaveLength(1);
 		await userEvent.tab();

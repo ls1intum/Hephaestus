@@ -41,16 +41,15 @@ allowBuilds:
 
 # The tools vite-plus bundles, at the versions it bundles; `vp run sync:toolchain-pins` writes them.
 catalog:
-  oxfmt: 0.67.0
-  oxlint: 1.82.0
-  oxlint-tsgolint: 7.0.2001
+  oxfmt: 0.72.0
+  oxlint: 1.87.0
+  oxlint-tsgolint: 7.0.2003
   "@oxlint/plugins": 1.79.0
-  vitest: 4.1.11
-  "@vitest/browser": 4.1.11
-  "@vitest/browser-playwright": 4.1.11
-  "@vitest/coverage-v8": 4.1.11
-  "@vitest/runner": 4.1.11
-  vite: npm:@voidzero-dev/vite-plus-core@0.3.2
+  vitest: 5.0.3
+  "@vitest/browser": 5.0.3
+  "@vitest/browser-playwright": 5.0.3
+  "@vitest/coverage-v8": 5.0.3
+  vite: npm:@voidzero-dev/vite-plus-core@1.1.0
 
 overrides:
   "get-uri>basic-ftp": 6.2.1
@@ -58,7 +57,6 @@ overrides:
   mermaid: 11.17.2
   vitest: "catalog:"
   "@vitest/browser": "catalog:"
-  "@vitest/runner": "catalog:"
   "browserslist@<=4.28.6": 4.28.9
   dompurify: 3.4.16
   "js-yaml@>=4.0.0": 4.3.2

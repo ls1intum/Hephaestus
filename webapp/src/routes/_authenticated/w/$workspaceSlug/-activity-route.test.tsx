@@ -831,6 +831,28 @@ describe("Workspace activity", () => {
 		);
 	});
 
+	/** The timeline's filter reads answer in turn; its work read always answers. */
+	function serveFacets(
+		answers: readonly ({ teams: unknown[]; repositories: unknown[] } | { status: number })[],
+	) {
+		const served: number[] = [];
+		server.use(
+			http.get("*/workspaces/acme/activity/facets", ({ request }) => {
+				record(request);
+				const answer = answers[served.length];
+				assert(answer, "Filter read exceeded the prepared responses");
+				const status = "status" in answer ? answer.status : 200;
+				served.push(status);
+				return HttpResponse.json(answer, { status });
+			}),
+			http.get("*/workspaces/acme/activity/work", ({ request }) => {
+				record(request);
+				return HttpResponse.json({ content: [workItem(1)] });
+			}),
+		);
+		return served;
+	}
+
 	describe("Timeline filter read recovery", () => {
 		const freshFacets = {
 			teams: [{ id: 30, key: "platform", name: "Platform" }],
@@ -840,28 +862,6 @@ describe("Workspace activity", () => {
 			],
 		};
 		const facetsKey = getActivityFacetsQueryKey({ path: { workspaceSlug: "acme" } });
-
-		/** The timeline's filter reads answer in turn; its work read always answers. */
-		function serveFacets(
-			answers: readonly ({ teams: unknown[]; repositories: unknown[] } | { status: number })[],
-		) {
-			const served: number[] = [];
-			server.use(
-				http.get("*/workspaces/acme/activity/facets", ({ request }) => {
-					record(request);
-					const answer = answers[served.length];
-					assert(answer, "Filter read exceeded the prepared responses");
-					const status = "status" in answer ? answer.status : 200;
-					served.push(status);
-					return HttpResponse.json(answer, { status });
-				}),
-				http.get("*/workspaces/acme/activity/work", ({ request }) => {
-					record(request);
-					return HttpResponse.json({ content: [workItem(1)] });
-				}),
-			);
-			return served;
-		}
 
 		it("hides refused filter options from a timeline, keeps them hidden through an outage, and shows only a fresh read", async () => {
 			const served = serveFacets([

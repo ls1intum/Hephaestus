@@ -142,8 +142,7 @@
 				"vitest",
 				"@vitest/browser",
 				"@vitest/browser-playwright",
-				"@vitest/coverage-v8",
-				"@vitest/runner"
+				"@vitest/coverage-v8"
 			],
 			"enabled": false
 		}

@@ -75,6 +75,92 @@ function selectedSettings(overrides: Partial<Settings> = {}): Settings {
 	});
 }
 
+function RollbackHarness() {
+	const [current, setCurrent] = useState(settings);
+	return (
+		<PracticeReviewSettings
+			workspaceSlug="acme"
+			model={{ status: "ready", binding: readyBinding }}
+			workspace={{
+				enabled: true,
+				startsFromActivity: true,
+				startsOnRequest: true,
+				isSaving: false,
+				onUpdate: vi.fn(),
+			}}
+			policy={{
+				settings: current,
+				isSaving: false,
+				onReset: vi.fn(),
+				onUpdate: async (request) => {
+					assert(request.reviewScope);
+					setCurrent({ ...settings, reviewScope: request.reviewScope });
+					await Promise.resolve();
+					setCurrent(settings);
+					throw new Error("conflict");
+				},
+			}}
+			scope={{
+				preview: vi.fn(async () => ({
+					current: settings.scopeSummary,
+					proposed: settings.scopeSummary,
+					widens: false,
+				})),
+				repositories,
+				people,
+			}}
+		/>
+	);
+}
+
+function RebaseHarness() {
+	const [current, setCurrent] = useState(settings);
+	return (
+		<>
+			<button
+				type="button"
+				onClick={() =>
+					setCurrent({
+						...selectedSettings(),
+						etag: '"newer"',
+					})
+				}
+			>
+				Receive a newer review scope
+			</button>
+			<PracticeReviewSettings
+				workspaceSlug="acme"
+				model={{ status: "ready", binding: readyBinding }}
+				workspace={{
+					enabled: true,
+					startsFromActivity: true,
+					startsOnRequest: true,
+					isSaving: false,
+					onUpdate: vi.fn(),
+				}}
+				policy={{
+					settings: current,
+					isSaving: false,
+					onReset: vi.fn(),
+					onUpdate: async (request) => {
+						assert(request.reviewScope);
+						setCurrent({ ...current, reviewScope: request.reviewScope, etag: '"saved"' });
+					},
+				}}
+				scope={{
+					preview: vi.fn(async () => ({
+						current: settings.scopeSummary,
+						proposed: settings.scopeSummary,
+						widens: false,
+					})),
+					repositories,
+					people,
+				}}
+			/>
+		</>
+	);
+}
+
 describe("PracticeReviewSettings", () => {
 	it("collects a cumulative draft before previewing or saving", async () => {
 		const preview = vi.fn(async () => ({
@@ -224,43 +310,6 @@ describe("PracticeReviewSettings", () => {
 	});
 
 	it("preserves the draft when an optimistic scope save rolls back", async () => {
-		function RollbackHarness() {
-			const [current, setCurrent] = useState(settings);
-			return (
-				<PracticeReviewSettings
-					workspaceSlug="acme"
-					model={{ status: "ready", binding: readyBinding }}
-					workspace={{
-						enabled: true,
-						startsFromActivity: true,
-						startsOnRequest: true,
-						isSaving: false,
-						onUpdate: vi.fn(),
-					}}
-					policy={{
-						settings: current,
-						isSaving: false,
-						onReset: vi.fn(),
-						onUpdate: async (request) => {
-							assert(request.reviewScope);
-							setCurrent({ ...settings, reviewScope: request.reviewScope });
-							await Promise.resolve();
-							setCurrent(settings);
-							throw new Error("conflict");
-						},
-					}}
-					scope={{
-						preview: vi.fn(async () => ({
-							current: settings.scopeSummary,
-							proposed: settings.scopeSummary,
-							widens: false,
-						})),
-						repositories,
-						people,
-					}}
-				/>
-			);
-		}
 		await renderWithRouter(<RollbackHarness />, "/w/acme/admin/practices");
 		fireEvent.click(screen.getByRole("radio", { name: "Selected repositories" }));
 		fireEvent.click(screen.getByRole("radio", { name: "Selected people" }));
@@ -277,54 +326,6 @@ describe("PracticeReviewSettings", () => {
 	});
 
 	it("rebases a clean draft when a newer review scope arrives after a save", async () => {
-		function RebaseHarness() {
-			const [current, setCurrent] = useState(settings);
-			return (
-				<>
-					<button
-						type="button"
-						onClick={() =>
-							setCurrent({
-								...selectedSettings(),
-								etag: '"newer"',
-							})
-						}
-					>
-						Receive a newer review scope
-					</button>
-					<PracticeReviewSettings
-						workspaceSlug="acme"
-						model={{ status: "ready", binding: readyBinding }}
-						workspace={{
-							enabled: true,
-							startsFromActivity: true,
-							startsOnRequest: true,
-							isSaving: false,
-							onUpdate: vi.fn(),
-						}}
-						policy={{
-							settings: current,
-							isSaving: false,
-							onReset: vi.fn(),
-							onUpdate: async (request) => {
-								assert(request.reviewScope);
-								setCurrent({ ...current, reviewScope: request.reviewScope, etag: '"saved"' });
-							},
-						}}
-						scope={{
-							preview: vi.fn(async () => ({
-								current: settings.scopeSummary,
-								proposed: settings.scopeSummary,
-								widens: false,
-							})),
-							repositories,
-							people,
-						}}
-					/>
-				</>
-			);
-		}
-
 		await renderWithRouter(<RebaseHarness />, "/w/acme/admin/practices");
 		fireEvent.click(screen.getByRole("radio", { name: "Selected repositories" }));
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));

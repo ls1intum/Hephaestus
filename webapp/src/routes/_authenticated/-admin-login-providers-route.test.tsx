@@ -241,6 +241,8 @@ async function dismissForm(form: HTMLElement, name: string) {
 	await waitFor(() => expect(screen.queryByRole("dialog", { name })).toBeNull());
 }
 
+const answerBothProviders = () => HttpResponse.json([github, acmeGitLab]);
+
 describe("instance login provider dialogs", () => {
 	it("keeps another provider's open edit when a row toggle settles, and closes it on its own save", async () => {
 		let githubRow: Wire<LoginProviderView> = github;
@@ -431,7 +433,7 @@ describe("instance login provider dialogs", () => {
 	});
 
 	it("withdraws an open edit when the provider list is refused, and does not bring it back", async () => {
-		let answer = () => HttpResponse.json([github, acmeGitLab]);
+		let answer = answerBothProviders;
 		const reads = serveProviderList(() => answer());
 		const writes: ProviderWrite[] = [];
 		server.use(

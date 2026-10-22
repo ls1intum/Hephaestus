@@ -28,7 +28,7 @@ type CacheableCommand<Command extends string> =
 // pnpm rewrites node_modules/.modules.yaml on every install; no verdict reads it.
 const cached = <Command extends string>(command: CacheableCommand<Command>) => ({
 	command,
-	input: [{ auto: true }, "!node_modules/.modules.yaml"],
+	cache: { input: [{ auto: true }, "!node_modules/.modules.yaml"] },
 });
 // For a verdict the tracker cannot see through a subprocess: the inputs are named. A cached task
 // runs with a filtered environment, so anything the command reads from it is named in `env` and
@@ -37,7 +37,7 @@ const cachedOn = <Command extends string>(
 	command: CacheableCommand<Command>,
 	input: string[],
 	{ env = [], dependsOn = [] }: { env?: string[]; dependsOn?: string[] } = {},
-) => ({ command, input, output: [], env, dependsOn });
+) => ({ command, cache: { input, output: [], env }, dependsOn });
 // A rejection nothing exercises stops rejecting: these two calls must not compile.
 // @ts-expect-error `vp run <task>` resolves to another node, which the runner never caches
 void cached("vp run check");

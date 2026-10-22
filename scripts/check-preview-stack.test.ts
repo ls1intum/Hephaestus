@@ -73,22 +73,22 @@ function mutated(change: (stack: Stack) => void): Stack {
 	return copy;
 }
 
-void describe("the API path and the OAuth prefix", () => {
-	/** A stack whose webapp is served the API at `path` and whose appserver overrides the prefix. */
-	function addressed(path: string, override?: string): Stack {
-		return mutated((stack) => {
-			stack.services.webapp = {
-				environment: { APPLICATION_SERVER_URL: `https://pr1.example.com${path}` },
-				security_opt: ["no-new-privileges:true"],
-				cap_drop: ["ALL"],
-				deploy: { resources: { limits: { memory: "1" } } },
-			};
-			if (override !== undefined) {
-				stack.services.appserver.environment.HEPHAESTUS_AUTH_API_BASE_PATH = override;
-			}
-		});
-	}
+/** A stack whose webapp is served the API at `path` and whose appserver overrides the prefix. */
+function addressed(path: string, override?: string): Stack {
+	return mutated((stack) => {
+		stack.services.webapp = {
+			environment: { APPLICATION_SERVER_URL: `https://pr1.example.com${path}` },
+			security_opt: ["no-new-privileges:true"],
+			cap_drop: ["ALL"],
+			deploy: { resources: { limits: { memory: "1" } } },
+		};
+		if (override !== undefined) {
+			stack.services.appserver.environment.HEPHAESTUS_AUTH_API_BASE_PATH = override;
+		}
+	});
+}
 
+void describe("the API path and the OAuth prefix", () => {
 	// The server normalizes the prefix before it builds a URL with it, so these all mean `/api` and
 	// none of them is a mismatch.
 	for (const override of ["/api", "api", "/api/", "//api", "  /api  "]) {
@@ -433,29 +433,29 @@ void describe("preview agent image interpolation", () => {
 	}
 });
 
-void describe("owned preview reviews", () => {
-	function enabled(): Stack {
-		return mutated((stack) => {
-			for (const key of [
-				"AGENT_ENABLED",
-				"GIT_CHECKOUT_ENABLED",
-				"GITLAB_ENABLED",
-				"GITLAB_WORKSPACE_CREATION",
-				"HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST",
-			]) {
-				stack.services.appserver.environment[key] = "true";
+function enabled(): Stack {
+	return mutated((stack) => {
+		for (const key of [
+			"AGENT_ENABLED",
+			"GIT_CHECKOUT_ENABLED",
+			"GITLAB_ENABLED",
+			"GITLAB_WORKSPACE_CREATION",
+			"HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST",
+		]) {
+			stack.services.appserver.environment[key] = "true";
+		}
+		stack.services.appserver.environment.HEPHAESTUS_AGENT_IMAGE_REFERENCE = `ghcr.io/hephaestus-build/agent-pi@sha256:${"b".repeat(64)}`;
+		stack.services.appserver.environment.HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN =
+			"private-test-token";
+		for (const service of [stack.services.appserver, stack.services.postgres]) {
+			for (const port of service.ports ?? []) {
+				port.host_ip = "172.19.0.1";
 			}
-			stack.services.appserver.environment.HEPHAESTUS_AGENT_IMAGE_REFERENCE = `ghcr.io/hephaestus-build/agent-pi@sha256:${"b".repeat(64)}`;
-			stack.services.appserver.environment.HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN =
-				"private-test-token";
-			for (const service of [stack.services.appserver, stack.services.postgres]) {
-				for (const port of service.ports ?? []) {
-					port.host_ip = "172.19.0.1";
-				}
-			}
-		});
-	}
+		}
+	});
+}
 
+void describe("owned preview reviews", () => {
 	void test("requires an explicit mode, a pinned agent and a private registration token", () => {
 		assert.deepEqual(findViolations(enabled(), true), []);
 		assert.ok(findViolations(enabled()).length > 0);
