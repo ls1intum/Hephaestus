@@ -199,7 +199,10 @@ export const RefreshFailed: Story = {
 	},
 };
 
-/** A long nested namespace wraps on a phone, in the row and in its confirmation. */
+/**
+ * A long nested namespace wraps on a phone, in the row and in its confirmation. The path keeps the
+ * width of the row and Remove moves below it, rather than squeezing the path beside the button.
+ */
 export const LongNamespaceOnPhone: Story = {
 	args: {
 		projects: [
@@ -210,9 +213,20 @@ export const LongNamespaceOnPhone: Story = {
 			},
 		],
 	},
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	globals: { viewport: { value: "reflow", isRotated: false } },
+	parameters: { chromatic: { viewports: [320] } },
 	play: async ({ canvas }) => {
-		canvas.getByText(LONG_PATH);
+		await expect(window.innerWidth).toBe(320);
+		const row = canvas.getByRole("listitem").getBoundingClientRect();
+		const name = canvas.getByText(LONG_PATH).getBoundingClientRect();
+		const remove = canvas
+			.getByRole("button", { name: `Remove synced work from ${LONG_PATH}` })
+			.getBoundingClientRect();
+		await expect(name.width, "The path is squeezed beside Remove").toBeGreaterThan(row.width / 2);
+		await expect(
+			remove.top,
+			"Remove overlaps the path instead of sitting below it",
+		).toBeGreaterThanOrEqual(name.bottom);
 		await expectNoPageOverflow();
 		await openRemove(canvas, LONG_PATH);
 		await expectDialogFitsViewport();

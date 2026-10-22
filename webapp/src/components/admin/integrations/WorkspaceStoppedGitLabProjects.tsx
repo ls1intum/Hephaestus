@@ -81,7 +81,7 @@ function StoppedProjectRow({
 
 	return (
 		<Item variant="outline" size="sm" role="listitem">
-			<ItemContent className="min-w-0">
+			<ItemContent className="min-w-0 basis-48">
 				<ItemTitle className="line-clamp-none font-mono wrap-anywhere">
 					{project.nameWithOwner}
 				</ItemTitle>
