@@ -7,10 +7,13 @@ import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCaptureFixtures;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -18,9 +21,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -125,6 +130,46 @@ class DocumentContentSourceTest extends BaseUnitTest {
         }
         assertThat(capture.citableTexts().stream().map(CitableText::path).toList())
                 .doesNotHaveDuplicates();
+    }
+
+    @Test
+    void shouldGiveEachBundledDocumentPracticeTheWholeBodyItReads() {
+        String body = "# Use PostgreSQL for search\n\n## Decision\nUse PostgreSQL full-text search.\n\n"
+                + "## Alternatives considered\n- Elasticsearch: rejected, because it adds a cluster to operate.\n";
+        var documentPractices = ScmCaptureFixtures.bundledPractices().entrySet().stream()
+                .filter(entry -> entry.getValue().kind().equals(DocumentEvents.DOCUMENT))
+                .toList();
+
+        assertThat(documentPractices)
+                .extracting(Map.Entry::getKey)
+                .containsExactly("published-decisions-name-the-alternatives");
+        for (var entry : documentPractices) {
+            var reads = entry.getValue().definition().reads().sources();
+            assertThat(reads).as(entry.getKey()).anySatisfy(read -> {
+                assertThat(read.source()).isEqualTo(DocumentContentSource.SOURCE);
+                assertThat(read.need()).isEqualTo(ReadNeed.COMPLETE);
+            });
+            Set<SourceKind> selected = reads.stream().map(read -> read.source()).collect(Collectors.toSet());
+            var captured = source.capture(
+                    new CaptureRequest(UUID.randomUUID(), UUID.randomUUID(), 1, selected, "2.0.0", 3),
+                    new ItemVersion("body-version", null),
+                    body,
+                    "{}".getBytes(StandardCharsets.UTF_8),
+                    null,
+                    SourceAbsenceReason.NOT_FOUND);
+
+            assertThat(new String(
+                            Objects.requireNonNull(captured.files().get(DocumentContentSource.BODY_KEY)),
+                            StandardCharsets.UTF_8))
+                    .as(entry.getKey())
+                    .isEqualTo(body);
+            assertThat(captured.completeness())
+                    .as(entry.getKey())
+                    .containsEntry(DocumentContentSource.SOURCE, SourceCompleteness.COMPLETE);
+            assertThat(captured.contentStates())
+                    .as(entry.getKey())
+                    .containsEntry(DocumentContentSource.SOURCE, SourceContentState.NON_EMPTY);
+        }
     }
 
     @Test
