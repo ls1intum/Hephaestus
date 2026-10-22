@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValid
 import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -142,6 +143,64 @@ class GitLabIssueSyncServiceTest extends BaseUnitTest {
         assertThat(scriptedResponses).isEmpty();
     }
 
+    @Test
+    void shouldAbortWithoutReadingTheNextPageAndAllowAFreshSyncWhenANoteWriteConflicts() {
+        Repository repository = repository();
+        scriptedResponses.add(page("GetProjectIssues", true, 1));
+        scriptedResponses.add(page("GetProjectIssues", false, 1));
+        when(issueProcessor.processFromSync(any(), any(), any())).thenReturn(new Issue());
+        when(noteSyncService.syncNotesForIssue(any(), any(), anyInt(), any(), any()))
+                .thenThrow(
+                        new ObjectOptimisticLockingFailureException("private-repository-canary", "private-row-canary"))
+                .thenReturn(1);
+
+        assertThat(service.syncIssues(SCOPE_ID, repository, null)).isEqualTo(SyncResult.abortedError(0));
+        assertThat(scriptedResponses).hasSize(1);
+        assertConcurrentWriteStayedLocal();
+
+        assertThat(service.syncIssues(SCOPE_ID, repository, null)).isEqualTo(SyncResult.completed(1));
+        assertThat(scriptedResponses).isEmpty();
+    }
+
+    @Test
+    void shouldAbortWithoutAdvancingTheCheckpointAndAllowAFreshBatchWhenAHistoricalNoteWriteConflicts() {
+        Repository repository = repository();
+        scriptedResponses.add(page("GetProjectIssuesHistorical", true, 1));
+        scriptedResponses.add(page("GetProjectIssuesHistorical", false, 1));
+        when(issueProcessor.processFromSync(any(), any(), any())).thenReturn(new Issue());
+        when(noteSyncService.syncNotesForIssue(any(), any(), anyInt(), any(), any()))
+                .thenThrow(
+                        new ObjectOptimisticLockingFailureException("private-repository-canary", "private-row-canary"))
+                .thenReturn(1);
+
+        assertThat(service.backfillIssues(SCOPE_ID, repository, null, 1))
+                .isEqualTo(BackfillBatchResult.abortedWithError());
+        assertThat(scriptedResponses).hasSize(1);
+        assertConcurrentWriteStayedLocal();
+
+        assertThat(service.backfillIssues(SCOPE_ID, repository, null, 1))
+                .isEqualTo(new BackfillBatchResult(1, 3, 3, null, true, false));
+        assertThat(scriptedResponses).isEmpty();
+    }
+
+    @Test
+    void shouldKeepTheIssueAndReadTheNextPageWhenItsNoteSyncFailsForAnotherReason() {
+        Repository repository = repository();
+        scriptedResponses.add(page("GetProjectIssues", true, 1));
+        scriptedResponses.add(page("GetProjectIssues", false, 1));
+        when(issueProcessor.processFromSync(any(), any(), any())).thenReturn(new Issue());
+        when(noteSyncService.syncNotesForIssue(any(), any(), anyInt(), any(), any()))
+                .thenThrow(new IllegalStateException("ordinary failure"))
+                .thenReturn(1);
+
+        assertThat(service.syncIssues(SCOPE_ID, repository, null)).isEqualTo(SyncResult.completed(2));
+        assertThat(scriptedResponses).isEmpty();
+        verify(graphQlClientProvider, never()).recordFailure(any());
+        assertThat(appender.list)
+                .noneMatch(
+                        event -> event.getFormattedMessage().equals("Mirror write conflicts with another transaction"));
+    }
+
     private void assertConcurrentWriteStayedLocal() {
         verify(graphQlClientProvider, never()).recordFailure(any());
         assertThat(appender.list)
@@ -177,13 +236,18 @@ class GitLabIssueSyncServiceTest extends BaseUnitTest {
     }
 
     private static ClientGraphQlResponse page(String document, boolean hasNextPage) {
+        return page(document, hasNextPage, 0);
+    }
+
+    /** One page holding issue #3; a nonzero {@code userNotesCount} makes the sync read its notes. */
+    private static ClientGraphQlResponse page(String document, boolean hasNextPage, int userNotesCount) {
         List<Map<String, Object>> nodes = List.of(Map.of(
                 "id", "gid://gitlab/Issue/3003",
                 "iid", "3",
                 "title", "Issue #3",
                 "state", "opened",
                 "confidential", false,
-                "userNotesCount", 0));
+                "userNotesCount", userNotesCount));
         assertVendorCouldReturn(GITLAB, document, "project.issues.nodes", nodes);
         Map<String, @Nullable Object> pageInfo = new HashMap<>();
         pageInfo.put("hasNextPage", hasNextPage);

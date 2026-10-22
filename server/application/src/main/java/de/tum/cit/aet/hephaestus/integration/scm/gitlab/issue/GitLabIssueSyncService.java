@@ -561,6 +561,8 @@ public class GitLabIssueSyncService {
         if (issue != null && userNotesCount > 0) {
             try {
                 noteSyncService.syncNotesForIssue(scopeId, repository, Integer.parseInt(iid), issue, read);
+            } catch (ConcurrencyFailureException conflict) {
+                throw conflict;
             } catch (Exception e) {
                 log.error("Note sync failed for issue: context={}", issueContext, e);
             }

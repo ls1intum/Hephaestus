@@ -826,7 +826,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Test
     @WithMentorUser
-    void shouldLetOnlyThatWorkspacesAdminListOrRemoveTheWorkKeptFromAStoppedProject() {
+    void shouldAllowListingAndRemovalOnlyWhenTheCallerAdministersTheProjectsWorkspace() {
         User mentor = persistUser("mentor");
         Workspace joined = seedActiveGitLabWorkspace("stopped-member", 7701L);
         ensureMembership(joined, mentor, Membership.WorkspaceRole.MEMBER);
@@ -911,7 +911,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Test
     @WithAdminUser
-    void shouldRefuseToRemoveKeptProjectWorkUntilThePausedGitLabConnectionResumes() {
+    void shouldRefuseToRemoveKeptProjectWorkWhenTheGitLabConnectionIsPaused() {
         Workspace workspace = seedActiveGitLabWorkspace("stopped-paused", 7801L);
         long root = stopKeptProject(workspace, 7801L);
         long repositoryId = Objects.requireNonNull(itemRepository

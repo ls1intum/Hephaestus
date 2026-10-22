@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValid
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
@@ -162,6 +163,77 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
         assertThat(service.backfillMergeRequests(SCOPE_ID, repository, null, 1))
                 .isEqualTo(new BackfillBatchResult(1, 3, 3, null, true, false));
         assertThat(scriptedResponses).isEmpty();
+    }
+
+    @Test
+    void shouldAbortWithoutReadingTheNextPageAndAllowAFreshSyncWhenADiscussionWriteConflicts() {
+        Repository repository = repository();
+        List<Map<String, Object>> nodes = nullable(List.of(commentedMergeRequest(3)));
+        assertVendorCouldReturn(GITLAB, LISTING, "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(nodes, List.of(), true));
+        scriptedResponses.add(response(nodes));
+        when(mergeRequestProcessor.processFromSync(any(), any())).thenReturn(new PullRequest());
+        when(discussionSyncService.syncDiscussionsForMergeRequest(any(), any(), anyInt(), any(), any()))
+                .thenThrow(new PessimisticLockingFailureException(
+                        "private-statement-canary", new SQLException("private-row-canary", "55P03")))
+                .thenReturn(1);
+
+        assertThat(service.syncMergeRequests(SCOPE_ID, repository, null)).isEqualTo(SyncResult.abortedError(0));
+        assertThat(scriptedResponses).hasSize(1);
+        assertConcurrentWriteStayedLocal();
+
+        assertThat(service.syncMergeRequests(SCOPE_ID, repository, null)).isEqualTo(SyncResult.completed(1));
+        assertThat(scriptedResponses).isEmpty();
+    }
+
+    @Test
+    void shouldAbortWithoutAdvancingTheCheckpointAndAllowAFreshBatchWhenAHistoricalDiscussionWriteConflicts() {
+        Repository repository = repository();
+        List<Map<String, Object>> nodes = nullable(List.of(commentedMergeRequest(3)));
+        assertVendorCouldReturn(GITLAB, "GetProjectMergeRequestsHistorical", "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(nodes, List.of(), true));
+        scriptedResponses.add(response(nodes));
+        when(mergeRequestProcessor.processFromSync(any(), any())).thenReturn(new PullRequest());
+        when(discussionSyncService.syncDiscussionsForMergeRequest(any(), any(), anyInt(), any(), any()))
+                .thenThrow(new PessimisticLockingFailureException(
+                        "private-statement-canary", new SQLException("private-row-canary", "55P03")))
+                .thenReturn(1);
+
+        assertThat(service.backfillMergeRequests(SCOPE_ID, repository, null, 1))
+                .isEqualTo(BackfillBatchResult.abortedWithError());
+        assertThat(scriptedResponses).hasSize(1);
+        assertConcurrentWriteStayedLocal();
+
+        assertThat(service.backfillMergeRequests(SCOPE_ID, repository, null, 1))
+                .isEqualTo(new BackfillBatchResult(1, 3, 3, null, true, false));
+        assertThat(scriptedResponses).isEmpty();
+    }
+
+    @Test
+    void shouldKeepTheMergeRequestAndReadTheNextPageWhenItsDiscussionSyncFailsForAnotherReason() {
+        Repository repository = repository();
+        List<Map<String, Object>> nodes = nullable(List.of(commentedMergeRequest(3)));
+        assertVendorCouldReturn(GITLAB, LISTING, "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(nodes, List.of(), true));
+        scriptedResponses.add(response(nodes));
+        when(mergeRequestProcessor.processFromSync(any(), any())).thenReturn(new PullRequest());
+        when(discussionSyncService.syncDiscussionsForMergeRequest(any(), any(), anyInt(), any(), any()))
+                .thenThrow(new IllegalStateException("ordinary failure"))
+                .thenReturn(1);
+
+        assertThat(service.syncMergeRequests(SCOPE_ID, repository, null)).isEqualTo(SyncResult.completed(2));
+        assertThat(scriptedResponses).isEmpty();
+        verify(graphQlClientProvider, never()).recordFailure(any());
+        assertThat(appender.list)
+                .noneMatch(
+                        event -> event.getFormattedMessage().equals("Mirror write conflicts with another transaction"));
+    }
+
+    /** Merge request !{@code iid} with a user note, so the sync reads its discussions. */
+    private static Map<String, @Nullable Object> commentedMergeRequest(int iid) {
+        Map<String, @Nullable Object> node = mergeRequest(iid);
+        node.put("userNotesCount", 1);
+        return node;
     }
 
     @Test

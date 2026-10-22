@@ -614,6 +614,8 @@ public class GitLabMergeRequestSyncService {
                         fields.userNotesCount(), syncApprovers != null && !syncApprovers.isEmpty(), fields.state())) {
             try {
                 discussionSyncService.syncDiscussionsForMergeRequest(scopeId, repository, iid, pr, read);
+            } catch (ConcurrencyFailureException conflict) {
+                throw conflict;
             } catch (Exception e) {
                 log.error("Discussion sync failed for MR: context={}", mrContext, e);
             }

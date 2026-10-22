@@ -18,6 +18,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -209,6 +210,9 @@ public class GitLabNoteSyncService {
                     break;
                 }
             } while (true);
+        } catch (ConcurrencyFailureException conflict) {
+            // A local write conflict is not a provider failure; the parent sync aborts on it.
+            throw conflict;
         } catch (Exception e) {
             graphQlClientProvider.recordFailure(e);
             log.error("Note sync failed: context={}", safeContext, e);

@@ -165,7 +165,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldRefuseARemovalPreparedForAnEarlierStopOfTheSameProject() {
+    void shouldRefuseTheRemovalWhenItsReceiptNamesAnEarlierStopOfTheSameProject() {
         var own = gitLabWorkspace();
         var repository = repository(own.getAccountLogin() + "/restopped");
         long root = monitorAndIndex(own, repository);
@@ -273,7 +273,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldRefuseARemovalFromAnotherWorkspaceOrAWorkspaceWithoutGitLab() {
+    void shouldRefuseTheRemovalWhenTheWorkspaceDoesNotKeepTheProjectOrHasNoGitLabConnection() {
         var own = gitLabWorkspace();
         var repository = repository(own.getAccountLogin() + "/foreign-request");
         long root = monitorAndIndex(own, repository);
@@ -300,7 +300,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldKeepASharedSourceUntilTheLastWorkspaceReleasesItAndRestoreTheItemOnAdd() {
+    void shouldKeepTheSharedSourceUntilItsLastReleaseAndRestoreItsItemWhenTheProjectIsAddedAgain() {
         var keeping = gitLabWorkspace();
         var removing = gitLabWorkspace();
         var monitoring = gitLabWorkspace();
@@ -391,7 +391,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldLetTwoWorkspacesClaimTheSameSourceWithoutAnExclusiveLock() throws Exception {
+    void shouldAllowConcurrentSourceClaimsWhenTwoWorkspacesAddTheSameProject() throws Exception {
         var owner = gitLabWorkspace();
         var first = gitLabWorkspace();
         var second = gitLabWorkspace();
@@ -491,7 +491,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldRefuseToPinAnEventAfterItsSourceWasRemoved() {
+    void shouldRefuseToPinTheEventWhenItsSourceWasRemoved() {
         var workspace = gitLabWorkspace();
         var repository = repository(workspace.getAccountLogin() + "/removed");
         long pullId = pull(repository);
