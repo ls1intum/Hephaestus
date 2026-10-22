@@ -65,4 +65,35 @@ class CatalogCriteriaCasesTest extends BaseUnitTest {
             }
         }
     }
+
+    // The cases stage only an issue or a pull request. A review, a chat thread or a document has its witness in the
+    // test of its capture source, and a practice that people review is never captured.
+    @Test
+    void shouldGiveEachAutomatedIssueAndPullRequestPracticeACase() throws IOException {
+        var mapper = JsonMapper.builder().build();
+        try (var catalogueStream = getClass().getResourceAsStream("/practices/default-catalog.json");
+                var casesStream = getClass().getResourceAsStream("/practices/criteria-cases.json")) {
+            Set<String> automated = new HashSet<>();
+            for (var group :
+                    mapper.readTree(Objects.requireNonNull(catalogueStream)).path("groups")) {
+                for (var practice : group.path("practices")) {
+                    if (Set.of("scm.issue", "scm.pull_request")
+                                    .contains(practice.path("kind").asString())
+                            && practice.path("definition")
+                                    .path("reviewedBy")
+                                    .path("by")
+                                    .asString()
+                                    .equals("HEPHAESTUS")) {
+                        automated.add(practice.path("slug").asString());
+                    }
+                }
+            }
+            Set<String> covered = new HashSet<>();
+            for (var scenario : mapper.readTree(Objects.requireNonNull(casesStream))) {
+                covered.addAll(scenario.path("expected").propertyNames());
+            }
+            assertThat(automated).isNotEmpty();
+            assertThat(covered).containsAll(automated);
+        }
+    }
 }

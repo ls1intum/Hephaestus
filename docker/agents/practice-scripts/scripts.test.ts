@@ -756,6 +756,34 @@ void describe("migrated workspace practice programs", () => {
 		assert.match(result.directions?.join(" ") ?? "", /Never repeat a suspected value/u);
 	});
 
+	void it("reads a source file in each selected language and each configuration file type it names, and no unnamed file type", async () => {
+		const line = 'database = "postgres://app:fixture@db/app"';
+		const read = [
+			..."plist json yml yaml xcconfig env properties toml xml ini conf cfg sh"
+				.split(" ")
+				.map((extension) => `config/app.${extension}`),
+			"src/Db.kt",
+			"src/db.go",
+			"src/db.php",
+			"src/db.py",
+			"src/db.rb",
+		];
+		const unread = ["docs/db.md", "notes/db.txt", "Dockerfile"];
+		const result = await runBundled(
+			"keeps-credentials-out-of-source",
+			addedSources(Object.fromEntries([...read, ...unread].map((file) => [file, line]))),
+		);
+		assert.deepEqual(
+			(result.leads ?? []).map((lead) => ("file" in lead.at ? lead.at.file : "")).toSorted(),
+			read.toSorted(),
+		);
+		assert.deepEqual(result.facts, { connectionString: read.length });
+		assert.match(
+			result.directions?.join(" ") ?? "",
+			new RegExp(`Scanned the added lines of ${String(read.length)} changed`, "u"),
+		);
+	});
+
 	void it("measures long changed view bodies and a repeated refresh", async () => {
 		const filler = Array.from({ length: 52 }, () => 'Text("row")').join("\n");
 		const result = await runBundled(

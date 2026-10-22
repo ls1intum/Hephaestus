@@ -88,8 +88,11 @@ They include these checks:
 
 - The catalog loader and the definition validator accept every bundled definition.
 - `ScmCapturedApplicabilityTest` has fixtures for each bundled Applies when gate. Its fixtures cover when the gate applies, does not apply, and cannot decide.
-- The error-handling script finds a written construct in each language that it names. A file in another language gets no lead, and the review still runs.
+- Each script with a table for each language has a fixture for each language in the table. Add a matching fixture when you add or change a language row. A file in another language does not show that the practice does not apply.
+- Each automated practice about an issue or a pull request has a case in `criteria-cases.json`. `PracticeCriteriaCaseStagingIntegrationTest` stages each case through the export path.
 - Each bundled practice about a reviewer captures their identity and inline comments from its declared sources. It also captures their review decision with its body.
+- Each bundled practice about a chat thread or a document captures its whole body from its declared source.
+- A practice that people review is not captured, so it has no captured witness.
 
 A passing check does not prove a judgment.
 [ADR 0050](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0050-one-practice-standard-one-outcome.md) records that structural validation does not prove an assessment accurate.
