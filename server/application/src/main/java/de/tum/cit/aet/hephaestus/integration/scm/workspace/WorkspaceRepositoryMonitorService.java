@@ -92,6 +92,7 @@ public class WorkspaceRepositoryMonitorService {
     private final ConnectionRepository connectionRepository;
     private final TransactionTemplate transactionTemplate;
     private final Map<IntegrationKind, RepositoryIdentityLookup> repositoryIdentityLookups;
+    private final GitLabRepositorySelectionService selection;
 
     public WorkspaceRepositoryMonitorService(
             NatsConnectionProperties natsProperties,
@@ -109,8 +110,10 @@ public class WorkspaceRepositoryMonitorService {
             List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
             ApplicationEventPublisher eventPublisher,
             TransactionTemplate transactionTemplate,
-            List<RepositoryIdentityLookup> repositoryIdentityLookupList) {
+            List<RepositoryIdentityLookup> repositoryIdentityLookupList,
+            GitLabRepositorySelectionService selection) {
         this.natsProperties = natsProperties;
+        this.selection = selection;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
@@ -280,6 +283,9 @@ public class WorkspaceRepositoryMonitorService {
                             .filter(current -> Objects.equals(current.getId(), connection.getId()))
                             .isEmpty()) {
                 throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
+            }
+            if (!selected && selection.storedSelection(workspaceId) == RepositorySelection.SELECTED) {
+                throw new RepositorySelectionChangedException();
             }
             Long nativeId = resolvedNativeId;
             if (connectionService

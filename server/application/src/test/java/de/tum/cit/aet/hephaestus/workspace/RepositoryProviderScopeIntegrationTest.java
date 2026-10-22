@@ -48,10 +48,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectA
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRepositoryMonitors;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.GitLabRepositorySelectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceSyncTargetProvider;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import io.nats.client.Message;
 import io.nats.client.impl.Headers;
 import java.nio.charset.StandardCharsets;
@@ -122,6 +124,9 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Autowired
     private WorkspaceRepositoryMonitorService monitorService;
+
+    @Autowired
+    private GitLabRepositorySelectionService selectionService;
 
     @Autowired
     private GitLabRepositoryMonitors gitLabMonitors;
@@ -446,6 +451,55 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
             } finally {
                 resume.complete(true);
                 writer.cancel(true);
+            }
+        }
+    }
+
+    @Test
+    void shouldKeepTheProjectSelectionWhenASyncTimestampWriterLoadedTheWorkspaceBeforeTheChange() throws Exception {
+        User owner = persistUser("stale-selection-owner");
+        Workspace own = workspace("stale-selection", owner);
+        own.setRepositorySelection(RepositorySelection.ALL);
+        workspaces.saveAndFlush(own);
+        connect(own, provider("https://stale-selection.example.test"));
+        monitor(own, NATIVE_ID);
+        Instant syncedAt = Instant.parse("2026-10-22T08:00:00Z");
+        CountDownLatch loaded = new CountDownLatch(1);
+        CompletableFuture<Boolean> resume = new CompletableFuture<>();
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var sync = executor.submit(() -> transactions.executeWithoutResult(status -> {
+                // The sync's transaction manages the workspace as it stood before the admin's change.
+                Workspace cached = workspaces.findById(own.getId()).orElseThrow();
+                assertThat(cached.getRepositorySelection()).isEqualTo(RepositorySelection.ALL);
+                loaded.countDown();
+                resume.join();
+                syncTargets.updateUsersSyncTimestamp(own.getId(), syncedAt);
+            }));
+            try {
+                assertThat(loaded.await(10, TimeUnit.SECONDS)).isTrue();
+                assertThat(selectionService.updateGitLabRepositorySelection(
+                                WorkspaceContext.fromWorkspace(own, null, null),
+                                RepositorySelection.SELECTED,
+                                accountId(owner)))
+                        .isEqualTo(RepositorySelection.SELECTED);
+                assertThat(workspaces
+                                .findMonitorPolicy(own.getId())
+                                .orElseThrow()
+                                .getRepositorySelection())
+                        .isEqualTo(RepositorySelection.SELECTED);
+                resume.complete(true);
+                sync.get(20, TimeUnit.SECONDS);
+
+                assertThat(workspaces.findById(own.getId()).orElseThrow().getUsersSyncedAt())
+                        .isEqualTo(syncedAt);
+                assertThat(workspaces
+                                .findMonitorPolicy(own.getId())
+                                .orElseThrow()
+                                .getRepositorySelection())
+                        .isEqualTo(RepositorySelection.SELECTED);
+            } finally {
+                resume.complete(true);
+                sync.cancel(true);
             }
         }
     }

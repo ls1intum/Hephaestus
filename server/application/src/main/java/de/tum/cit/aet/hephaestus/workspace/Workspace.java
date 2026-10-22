@@ -28,11 +28,14 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicUpdate;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 // Integration credentials and provider configuration belong to connection rows, outside the tenant entity.
 @Entity
+// Sync timestamps must not restore administrative fields from an earlier managed snapshot.
+@DynamicUpdate
 @Table(name = "workspace")
 @Getter
 @Setter

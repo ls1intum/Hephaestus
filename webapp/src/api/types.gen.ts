@@ -1878,6 +1878,16 @@ export type GitLabProvider = {
     defaultServerUrl?: string;
 };
 
+/**
+ * Whether a GitLab workspace follows every project of its group or only the projects it monitors
+ */
+export type GitLabRepositorySelection = {
+    /**
+     * ALL admits projects that discovery later finds in the group, except stopped ones. SELECTED admits only the projects the workspace monitors.
+     */
+    repositorySelection: 'ALL' | 'SELECTED';
+};
+
 export type GroupDefinition = {
     color: string | null;
     description: string | null;
@@ -15096,6 +15106,48 @@ export type AddRepositoryToMonitorResponses = {
      */
     200: unknown;
 };
+
+export type GetGitLabRepositorySelectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/repositories/selection';
+};
+
+export type GetGitLabRepositorySelectionResponses = {
+    /**
+     * OK
+     */
+    200: GitLabRepositorySelection;
+};
+
+export type GetGitLabRepositorySelectionResponse = GetGitLabRepositorySelectionResponses[keyof GetGitLabRepositorySelectionResponses];
+
+export type UpdateGitLabRepositorySelectionData = {
+    body: GitLabRepositorySelection;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/repositories/selection';
+};
+
+export type UpdateGitLabRepositorySelectionResponses = {
+    /**
+     * OK
+     */
+    200: GitLabRepositorySelection;
+};
+
+export type UpdateGitLabRepositorySelectionResponse = UpdateGitLabRepositorySelectionResponses[keyof UpdateGitLabRepositorySelectionResponses];
 
 export type ListSlackChannelsData = {
     body?: never;

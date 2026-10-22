@@ -11023,6 +11023,59 @@ paths:
       summary: Add a repository to a workspace monitor list
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/repositories/selection:
+    get:
+      operationId: getGitLabRepositorySelection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitLabRepositorySelection"
+          description: OK
+      summary: Read whether a GitLab workspace follows every project of its group
+        or only selected ones
+      tags:
+      - workspace
+    patch:
+      operationId: updateGitLabRepositorySelection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitLabRepositorySelection"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitLabRepositorySelection"
+          description: OK
+      summary: Choose whether a GitLab workspace follows every project of its group
+        or only the projects it monitors
+      tags:
+      - workspace
   /workspaces/{workspaceSlug}/slack/channels:
     get:
       operationId: listSlackChannels
@@ -16215,6 +16268,21 @@ components:
           type: string
           description: Origin of the one GitLab instance workspaces are created on
           example: https://gitlab.lrz.de
+    GitLabRepositorySelection:
+      type: object
+      description: Whether a GitLab workspace follows every project of its group or
+        only the projects it monitors
+      properties:
+        repositorySelection:
+          type: string
+          description: "ALL admits projects that discovery later finds in the group,\
+            \ except stopped ones. SELECTED admits only the projects the workspace\
+            \ monitors."
+          enum:
+          - ALL
+          - SELECTED
+      required:
+      - repositorySelection
     GroupDefinition:
       type: object
       properties:

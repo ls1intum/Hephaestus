@@ -6,6 +6,7 @@ import { IntegrationCardHeading } from "@/components/admin/integrations/Integrat
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
+import { WorkspaceGitLabProjectSelection } from "@/components/admin/integrations/WorkspaceGitLabProjectSelection";
 import { WorkspaceRepositoriesSettings } from "@/components/admin/integrations/WorkspaceRepositoriesSettings";
 import { WorkspaceScmTokenSettings } from "@/components/admin/integrations/WorkspaceScmTokenSettings";
 import { GitHubIcon, GitLabIcon } from "@/components/icons/brand";
@@ -86,6 +87,8 @@ function ScmIntegrationPage() {
 					</CardContent>
 				</Card>
 			)}
+
+			{scm.followsGitLabGroup && <WorkspaceGitLabProjectSelection {...scm.projectSelectionProps} />}
 
 			{isConnectionActive && !isAppInstallationWorkspace && (
 				<WorkspaceRepositoriesSettings {...scm.repositoriesSettingsProps} />

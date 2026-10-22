@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+	getGitLabRepositorySelectionQueryKey,
 	getIntegrationCatalogQueryKey,
 	getRepositoriesToMonitorQueryKey,
 	listConnectionSyncJobsQueryKey,
@@ -16,6 +17,7 @@ import {
 import type {
 	ConnectionSyncStatus,
 	ConnectionDetail,
+	GitLabRepositorySelection,
 	IntegrationCatalogEntry,
 	SlackChannelCandidate,
 	SlackMonitoredChannel,
@@ -23,6 +25,7 @@ import type {
 	SyncResourceState,
 	Workspace,
 } from "@/api/types.gen";
+import { zGitLabRepositorySelection } from "@/api/zod.gen";
 import type { Wire } from "@/lib/dates";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
@@ -81,6 +84,9 @@ function mockConnection(kind: "GITHUB" | "GITLAB", installationId?: number) {
 			HttpResponse.json({ content: [], totalPages: 0 }),
 		),
 		http.get("*/workspaces/:workspaceSlug/repositories", () => HttpResponse.json([])),
+		http.get("*/workspaces/:workspaceSlug/repositories/selection", () =>
+			HttpResponse.json({ repositorySelection: "ALL" } satisfies GitLabRepositorySelection),
+		),
 	);
 	return { entry, workspace, detail, status };
 }
@@ -420,6 +426,262 @@ describe("monitored repositories", () => {
 		expect(description.textContent).toContain("To sync it again, add it below.");
 		expect(description.textContent).not.toContain("stays stopped");
 		expect(description.textContent).not.toContain("permanently");
+	});
+});
+
+type ProjectChoice = GitLabRepositorySelection["repositorySelection"];
+
+function problem(status: number, detail: string) {
+	return HttpResponse.json({ status, title: "Project choice failed", detail }, { status });
+}
+
+/**
+ * The workspace's stored project choice as the server keeps it, every change the page sends, and
+ * the next answers the test chose: a read failure, a refused change, or a change held until `hold`.
+ */
+function serveProjectChoice(initial: ProjectChoice) {
+	const stored: GitLabRepositorySelection = { repositorySelection: initial };
+	const changes: ProjectChoice[] = [];
+	const reads = { count: 0 };
+	const next: {
+		read: 200 | 403 | 503;
+		refusal: { status: 409 | 503; detail: string } | undefined;
+		hold: Promise<void>;
+	} = { read: 200, refusal: undefined, hold: Promise.resolve() };
+	server.use(
+		http.get("*/workspaces/acme/repositories/selection", () => {
+			reads.count += 1;
+			if (next.read === 403) {
+				return problem(403, "You cannot manage this workspace's source control.");
+			}
+			if (next.read === 503) {
+				return problem(503, "GitLab is unavailable.");
+			}
+			return HttpResponse.json(stored);
+		}),
+		http.patch("*/workspaces/acme/repositories/selection", async ({ request }) => {
+			const { repositorySelection } = zGitLabRepositorySelection.parse(await request.json());
+			changes.push(repositorySelection);
+			await next.hold;
+			const { refusal } = next;
+			if (refusal !== undefined) {
+				next.refusal = undefined;
+				return problem(refusal.status, refusal.detail);
+			}
+			stored.repositorySelection = repositorySelection;
+			return HttpResponse.json(stored);
+		}),
+	);
+	return { changes, reads, next, stored };
+}
+
+function projectChoice(name: "All projects in the group" | "Only the projects listed below") {
+	return screen.getByRole("radio", { name });
+}
+
+function isChosen(name: "All projects in the group" | "Only the projects listed below") {
+	return projectChoice(name).getAttribute("aria-checked") === "true";
+}
+
+/** An active GitLab connection whose stored project choice the test answers. */
+function serveGitLab(initial: ProjectChoice) {
+	const { entry } = mockConnection("GITLAB");
+	entry.credentialsUnreadableSince = undefined;
+	return serveProjectChoice(initial);
+}
+
+describe("GitLab project choice", () => {
+	it("keeps the stored choice while a narrowing is saved, then shows the server's answer", async () => {
+		const choice = serveGitLab("ALL");
+		const saved = deferred();
+		choice.next.hold = saved.promise;
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await user.click(
+			await screen.findByRole(
+				"radio",
+				{ name: "Only the projects listed below" },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+		const readsBefore = choice.reads.count;
+		try {
+			await screen.findByText("Saving the project choice…");
+			expect(choice.changes).toStrictEqual(["SELECTED"]);
+			expect(isChosen("All projects in the group")).toBe(true);
+			expect(
+				Object.hasOwn(projectChoice("Only the projects listed below").dataset, "disabled"),
+			).toBe(true);
+			// A second press while the first is saved sends nothing.
+			await user.click(projectChoice("Only the projects listed below"));
+			expect(choice.changes).toStrictEqual(["SELECTED"]);
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+		} finally {
+			saved.resolve();
+		}
+
+		await waitFor(() => expect(isChosen("Only the projects listed below")).toBe(true));
+		await waitFor(() => expect(choice.reads.count).toBe(readsBefore + 1));
+		expect(screen.queryByText("Saving the project choice…")).toBeNull();
+		expect(choice.changes).toStrictEqual(["SELECTED"]);
+	});
+
+	it("does not ask again after the question closed because the choice widened elsewhere", async () => {
+		const choice = serveGitLab("SELECTED");
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		const all = await screen.findByRole(
+			"radio",
+			{ name: "All projects in the group" },
+			ROUTE_RENDER_WAIT,
+		);
+		// Taken while the page is not behind a modal; an open dialog makes it inert.
+		const selected = projectChoice("Only the projects listed below");
+		await user.click(all);
+		await screen.findByRole("alertdialog", { name: "Add new projects from the group?" });
+
+		// Another admin widens the choice while the question is open, and the page reads it again.
+		choice.stored.repositorySelection = "ALL";
+		await reread(
+			queryClient,
+			getGitLabRepositorySelectionQueryKey({ path: { workspaceSlug: "acme" } }),
+		);
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(all.getAttribute("aria-checked")).toBe("true");
+		expect(selected.getAttribute("aria-checked")).toBe("false");
+		expect(choice.changes).toStrictEqual([]);
+
+		const readsBefore = choice.reads.count;
+		await user.click(selected);
+		await waitFor(() => expect(choice.changes).toStrictEqual(["SELECTED"]));
+		await waitFor(() => expect(choice.reads.count).toBe(readsBefore + 1));
+		await waitFor(() => expect(selected.getAttribute("aria-checked")).toBe("true"));
+
+		// The admin's own narrowing asks nothing, and the closed question does not come back.
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(choice.changes).toStrictEqual(["SELECTED"]);
+	});
+
+	it("asks before adding new projects: Cancel sends nothing, and confirming widens the choice", async () => {
+		const choice = serveGitLab("SELECTED");
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await user.click(
+			await screen.findByRole("radio", { name: "All projects in the group" }, ROUTE_RENDER_WAIT),
+		);
+		const question = await screen.findByRole("alertdialog", {
+			name: "Add new projects from the group?",
+		});
+		expect(question.textContent).toContain(
+			"Projects you stopped stay stopped until you add them again.",
+		);
+		await user.click(within(question).getByRole("button", { name: "Cancel" }));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(choice.changes).toStrictEqual([]);
+		expect(isChosen("Only the projects listed below")).toBe(true);
+
+		await user.click(projectChoice("All projects in the group"));
+		const again = await screen.findByRole("alertdialog", {
+			name: "Add new projects from the group?",
+		});
+		await user.click(within(again).getByRole("button", { name: "Add new projects" }));
+
+		await waitFor(() => expect(isChosen("All projects in the group")).toBe(true));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(choice.changes).toStrictEqual(["ALL"]);
+	});
+
+	it("keeps the stored choice when a change is refused, changes it on a second try, and widens it back", async () => {
+		const choice = serveGitLab("ALL");
+		const conflict =
+			"The GitLab connection, project selection or monitored projects changed while we checked them. Try again.";
+		choice.next.refusal = { status: 409, detail: conflict };
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await user.click(
+			await screen.findByRole(
+				"radio",
+				{ name: "Only the projects listed below" },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+
+		await screen.findByText("We could not change the project choice");
+		screen.getByText(conflict);
+		expect(isChosen("All projects in the group")).toBe(true);
+
+		await user.click(projectChoice("Only the projects listed below"));
+		await waitFor(() => expect(isChosen("Only the projects listed below")).toBe(true));
+		await waitFor(() =>
+			expect(screen.queryByText("We could not change the project choice")).toBeNull(),
+		);
+
+		await user.click(projectChoice("All projects in the group"));
+		const question = await screen.findByRole("alertdialog", {
+			name: "Add new projects from the group?",
+		});
+		await user.click(within(question).getByRole("button", { name: "Add new projects" }));
+		await waitFor(() => expect(isChosen("All projects in the group")).toBe(true));
+		expect(choice.changes).toStrictEqual(["SELECTED", "SELECTED", "ALL"]);
+	});
+
+	it("offers no choice while it cannot be read, and shows it once Retry reads it", async () => {
+		const choice = serveGitLab("SELECTED");
+		choice.next.read = 503;
+		renderRouteAt("/w/acme/admin/integrations/scm");
+
+		await screen.findByText("We could not load the project choice", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("radio")).toBeNull();
+		choice.next.read = 200;
+		await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+
+		await waitFor(() => expect(isChosen("Only the projects listed below")).toBe(true));
+		expect(screen.queryByText("We could not load the project choice")).toBeNull();
+		expect(choice.changes).toStrictEqual([]);
+	});
+
+	it("offers no choice and no Retry when the read is refused", async () => {
+		const choice = serveGitLab("ALL");
+		choice.next.read = 403;
+		renderRouteAt("/w/acme/admin/integrations/scm");
+
+		await screen.findByText(
+			"You do not have access to the project choice",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		expect(screen.queryByRole("radio")).toBeNull();
+		screen.getByLabelText("Add a repository");
+		expect(choice.changes).toStrictEqual([]);
+	});
+
+	it("does not ask for a project choice on a GitHub connection", async () => {
+		const { entry } = mockConnection("GITHUB");
+		entry.credentialsUnreadableSince = undefined;
+		const choice = serveProjectChoice("ALL");
+		renderRouteAt("/w/acme/admin/integrations/scm");
+
+		await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText("Projects to follow")).toBeNull();
+		expect(choice.reads.count).toBe(0);
+	});
+
+	it("does not ask for a project choice while the GitLab connection is paused", async () => {
+		const { entry } = mockConnection("GITLAB");
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/connections/catalog", () =>
+				HttpResponse.json([
+					{ ...entry, connectionState: "SUSPENDED", credentialsUnreadableSince: undefined },
+				]),
+			),
+		);
+		const choice = serveProjectChoice("ALL");
+		renderRouteAt("/w/acme/admin/integrations/scm");
+
+		await screen.findByText("Repository sync state", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText("Projects to follow")).toBeNull();
+		expect(screen.queryByLabelText("Add a repository")).toBeNull();
+		expect(choice.reads.count).toBe(0);
 	});
 });
 

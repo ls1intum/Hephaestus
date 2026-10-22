@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,6 +29,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAudit;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAuditRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -93,6 +96,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabConnectionWebhookController;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabRouteCredential;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabSubjectKeyDeriver;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.GitLabRepositorySelectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.RepositoryProviderNotConnectedException;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
@@ -109,6 +113,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActivationService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
@@ -136,10 +141,12 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -155,6 +162,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -274,6 +282,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     private ConnectionRepository connectionRepository;
 
     @Autowired
+    private ConnectionAuditRepository connectionAuditRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -304,6 +315,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     private TransactionTemplate transactionTemplate;
 
     @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
     private GitLabRepositoryMonitors repositoryMonitors;
 
     @Autowired
@@ -330,6 +344,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
+
+    @Autowired
+    private GitLabRepositorySelectionService gitLabRepositorySelectionService;
 
     @Autowired
     private PracticeReviewCoverageService practiceReviewCoverageService;
@@ -970,6 +987,413 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .untilAsserted(() -> assertThat(issueRepository.findByRepositoryIdAndNumber(selectedRepositoryId, 5))
                         .hasValueSatisfying(
                                 issue -> assertThat(issue.getNativeId()).isEqualTo(NATIVE_ISSUE_ID)));
+    }
+
+    @Test
+    void shouldStoreNothingFromANewProjectAfterAnAdminNarrowsTheWorkspaceToItsMonitoredProjects() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        long kept = repositoryToMonitorRepository
+                .findByWorkspaceIdAndNameWithOwner(workspaceId, REPOSITORY)
+                .orElseThrow()
+                .getId();
+        long actor = selectionAdmin("narrowing-admin");
+
+        assertThat(selectProjects(connected, RepositorySelection.SELECTED, actor))
+                .isEqualTo(RepositorySelection.SELECTED);
+
+        long createdId = 2_216_040L;
+        String created = GROUP + "/created-after-narrowing";
+        doReturn(Optional.of(reported(createdId, created)))
+                .when(projectSyncService)
+                .fetchProjectById(workspaceId, createdId);
+        doReturn(Optional.of(reported(createdId, created)))
+                .when(projectSyncService)
+                .fetchProject(workspaceId, created);
+        deliver(connected, projectCreate(created, createdId), "created-after-narrowing");
+        long createdIssueId = 2_216_041L;
+        JsonNode createdIssue = onProject(fixture("gitlab/issue.open.json"), created, createdId);
+        ((ObjectNode) createdIssue.get("object_attributes")).put("id", createdIssueId);
+        deliver(connected, createdIssue, "issue-after-narrowing");
+        awaitAcknowledged();
+        long siblingId = 2_216_042L;
+        Repository sibling = foreignRepository(GROUP + "/discovered-after-narrowing", siblingId);
+        when(groupSync.syncGroupProjects(anyLong(), eq(GROUP), eq(SERVER_URL)))
+                .thenAnswer(
+                        invocation -> GitLabSyncResult.completed(List.of(discoveredRepository(), sibling), 1, 0, 0));
+        initializationService.initialize(
+                workspaceRepository.findById(workspaceId).orElseThrow());
+
+        assertThat(repositoryRepository.findByNativeIdAndProviderId(createdId, gitLabProviderId()))
+                .isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, createdId))
+                .isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, siblingId))
+                .isEmpty();
+        assertThat(issueRepository.findAll()).noneMatch(issue -> Objects.equals(createdIssueId, issue.getNativeId()));
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, REPOSITORY_NATIVE_ID))
+                .singleElement()
+                .satisfies(monitor -> assertThat(monitor.getId()).isEqualTo(kept));
+
+        deliver(connected, fixture("gitlab/issue.open.json"), "kept-issue-after-narrowing");
+        long keptRepositoryId = discoveredRepository().getId();
+        await().atMost(Duration.ofSeconds(20))
+                .untilAsserted(() -> assertThat(issueRepository.findByRepositoryIdAndNumber(keptRepositoryId, 5))
+                        .hasValueSatisfying(
+                                issue -> assertThat(issue.getNativeId()).isEqualTo(NATIVE_ISSUE_ID)));
+    }
+
+    @Test
+    void shouldAdmitANewSiblingButKeepAStoppedProjectOutWhenAnAdminWidensTheSelection() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        long kept = repositoryToMonitorRepository
+                .findByWorkspaceIdAndNameWithOwner(workspaceId, REPOSITORY)
+                .orElseThrow()
+                .getId();
+        String stoppedPath = GROUP + "/stopped-before-widening";
+        long stoppedId = 2_216_050L;
+        Workspace holder = workspaceRepository.save(
+                WorkspaceTestFixtures.gitLabPatWorkspace("selection-holder").build());
+        RepositoryToMonitor held = new RepositoryToMonitor();
+        held.setNameWithOwner(stoppedPath);
+        held.setNativeId(stoppedId);
+        held.setWorkspace(holder);
+        held = repositoryToMonitorRepository.save(held);
+        Repository stopped = foreignRepository(stoppedPath, stoppedId);
+        RepositoryToMonitor stopping = new RepositoryToMonitor();
+        stopping.setNameWithOwner(stoppedPath);
+        stopping.setNativeId(stoppedId);
+        stopping.setWorkspace(connected);
+        repositoryToMonitorRepository.save(stopping);
+        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(connected.getWorkspaceSlug(), stoppedPath);
+        long actor = selectionAdmin("widening-admin");
+
+        assertThat(selectProjects(connected, RepositorySelection.SELECTED, actor))
+                .isEqualTo(RepositorySelection.SELECTED);
+        assertThat(selectProjects(connected, RepositorySelection.ALL, actor)).isEqualTo(RepositorySelection.ALL);
+
+        long siblingId = 2_216_051L;
+        Repository sibling = foreignRepository(GROUP + "/discovered-after-widening", siblingId);
+        Repository rediscovered = repositoryRepository
+                .findById(stopped.getId())
+                .orElseGet(() -> foreignRepository(stoppedPath, stoppedId));
+        when(groupSync.syncGroupProjects(anyLong(), eq(GROUP), eq(SERVER_URL)))
+                .thenAnswer(invocation ->
+                        GitLabSyncResult.completed(List.of(discoveredRepository(), sibling, rediscovered), 1, 0, 0));
+        initializationService.initialize(
+                workspaceRepository.findById(workspaceId).orElseThrow());
+
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, siblingId))
+                .singleElement()
+                .satisfies(monitor ->
+                        assertThat(monitor.getNameWithOwner()).isEqualTo(GROUP + "/discovered-after-widening"));
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, stoppedId))
+                .isEmpty();
+        assertThat(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspaceId, stoppedPath))
+                .isFalse();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, REPOSITORY_NATIVE_ID))
+                .singleElement()
+                .satisfies(monitor -> assertThat(monitor.getId()).isEqualTo(kept));
+        assertThat(repositoryToMonitorRepository.findById(held.getId())).hasValueSatisfying(monitor -> {
+            assertThat(monitor.getNativeId()).isEqualTo(stoppedId);
+            assertThat(monitor.getNameWithOwner()).isEqualTo(stoppedPath);
+        });
+        assertThat(workspaceRepository.findById(holder.getId()).orElseThrow().getRepositorySelection())
+                .isEqualTo(holder.getRepositorySelection());
+        assertThat(selectionChanges(connected))
+                .extracting(ConnectionAudit::getDetail, ConnectionAudit::getActorAccountId)
+                .containsExactlyInAnyOrder(tuple("ALL → SELECTED", actor), tuple("SELECTED → ALL", actor));
+    }
+
+    @Test
+    void shouldTakeAPathOnlyMonitorsIdFromGitLabRatherThanFromAMirrorWithTheSamePath() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        String legacy = GROUP + "/legacy-project";
+        long mirroredId = 2_216_060L;
+        long reportedId = 2_216_061L;
+        // Another workspace recorded a different project at this path.
+        Repository mirror = foreignRepository(legacy, mirroredId);
+        RepositoryToMonitor unresolved = pathOnlyMonitor(connected, legacy);
+        doReturn(Optional.of(reported(reportedId, legacy)))
+                .when(projectSyncService)
+                .fetchProject(workspaceId, legacy);
+        long actor = selectionAdmin("resolving-admin");
+
+        assertThat(selectProjects(connected, RepositorySelection.SELECTED, actor))
+                .isEqualTo(RepositorySelection.SELECTED);
+
+        assertThat(repositoryToMonitorRepository.findById(unresolved.getId())).hasValueSatisfying(monitor -> {
+            assertThat(monitor.getNativeId()).isEqualTo(reportedId);
+            assertThat(monitor.getNameWithOwner()).isEqualTo(legacy);
+        });
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, mirroredId))
+                .isEmpty();
+        assertThat(repositoryRepository.findById(mirror.getId()))
+                .hasValueSatisfying(
+                        repository -> assertThat(repository.getNativeId()).isEqualTo(mirroredId));
+        assertThat(workspaceRepository.findById(workspaceId).orElseThrow().getRepositorySelection())
+                .isEqualTo(RepositorySelection.SELECTED);
+        assertThat(selectionChanges(connected))
+                .extracting(ConnectionAudit::getDetail, ConnectionAudit::getActorAccountId)
+                .containsExactly(tuple("ALL → SELECTED", actor));
+    }
+
+    @Test
+    void shouldChangeNothingWhenGitLabCannotConfirmOneOfThePathOnlyMonitors() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        String confirmed = GROUP + "/confirmed-legacy";
+        String unknown = GROUP + "/unknown-legacy";
+        RepositoryToMonitor first = pathOnlyMonitor(connected, confirmed);
+        RepositoryToMonitor second = pathOnlyMonitor(connected, unknown);
+        doReturn(Optional.of(reported(2_216_065L, confirmed)))
+                .when(projectSyncService)
+                .fetchProject(workspaceId, confirmed);
+        doReturn(Optional.empty()).when(projectSyncService).fetchProject(workspaceId, unknown);
+        long actor = selectionAdmin("unconfirmed-admin");
+
+        assertThatThrownBy(() -> selectProjects(connected, RepositorySelection.SELECTED, actor))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining(unknown);
+
+        assertThat(repositoryToMonitorRepository.findAllById(List.of(first.getId(), second.getId())))
+                .extracting(RepositoryToMonitor::getNativeId)
+                .containsOnlyNulls();
+        assertThat(workspaceRepository.findById(workspaceId).orElseThrow().getRepositorySelection())
+                .isNotEqualTo(RepositorySelection.SELECTED);
+        assertThat(selectionChanges(connected)).isEmpty();
+    }
+
+    @Test
+    void shouldWriteNothingWhenTheConnectionIsPausedAndResumedWhileGitLabConfirmsAProject() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        String legacy = GROUP + "/held-legacy-project";
+        long reportedId = 2_216_070L;
+        RepositoryToMonitor unresolved = pathOnlyMonitor(connected, legacy);
+        CountDownLatch asked = new CountDownLatch(1);
+        CountDownLatch answer = new CountDownLatch(1);
+        doAnswer(invocation -> {
+                    asked.countDown();
+                    awaitUninterruptibly(answer);
+                    return Optional.of(reported(reportedId, legacy));
+                })
+                .when(projectSyncService)
+                .fetchProject(workspaceId, legacy);
+        long actor = selectionAdmin("paused-narrowing-admin");
+        ExecutorService narrowing = Executors.newSingleThreadExecutor();
+        try {
+            Future<RepositorySelection> narrowed =
+                    narrowing.submit(() -> selectProjects(connected, RepositorySelection.SELECTED, actor));
+            assertThat(asked.await(20, SECONDS)).isTrue();
+            // The row returns to ACTIVE under the same id; GitLab answered for the connection before the pause.
+            Connection active =
+                    connectionRepository.findById(connectionId(connected)).orElseThrow();
+            Connection paused = connectionService.transition(
+                    active,
+                    new ConnectionService.TransitionRequest(
+                            IntegrationState.SUSPENDED,
+                            "TEST_SUSPENDED",
+                            "SYSTEM",
+                            "selection-race",
+                            UUID.randomUUID().toString(),
+                            "Paused while GitLab answered"));
+            connectionService.transition(
+                    paused,
+                    new ConnectionService.TransitionRequest(
+                            IntegrationState.ACTIVE,
+                            "TEST_RESUMED",
+                            "SYSTEM",
+                            "selection-race",
+                            UUID.randomUUID().toString(),
+                            "Resumed while GitLab answered"));
+            answer.countDown();
+
+            assertThatThrownBy(() -> narrowed.get(20, SECONDS))
+                    .hasCauseInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("changed while we checked");
+        } finally {
+            answer.countDown();
+            narrowing.shutdownNow();
+        }
+        awaitMonitoringIdle();
+
+        assertThat(repositoryToMonitorRepository.findById(unresolved.getId()))
+                .hasValueSatisfying(monitor -> assertThat(monitor.getNativeId()).isNull());
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, reportedId))
+                .isEmpty();
+        assertThat(workspaceRepository.findById(workspaceId).orElseThrow().getRepositorySelection())
+                .isNotEqualTo(RepositorySelection.SELECTED);
+        assertThat(selectionChanges(connected)).isEmpty();
+    }
+
+    @Test
+    void shouldNotNarrowOnAProjectStoppedAndAddedAgainWhileGitLabConfirmedIt() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        String legacy = GROUP + "/re-added-legacy-project";
+        long reportedId = 2_216_080L;
+        RepositoryToMonitor unresolved = pathOnlyMonitor(connected, legacy);
+        CountDownLatch asked = new CountDownLatch(1);
+        CountDownLatch answer = new CountDownLatch(1);
+        AtomicInteger lookups = new AtomicInteger();
+        // Only the narrowing's lookup is held; the Add after the Stop asks GitLab again and is answered at once.
+        doAnswer(invocation -> {
+                    if (lookups.getAndIncrement() == 0) {
+                        asked.countDown();
+                        awaitUninterruptibly(answer);
+                    }
+                    return Optional.of(reported(reportedId, legacy));
+                })
+                .when(projectSyncService)
+                .fetchProject(workspaceId, legacy);
+        long actor = selectionAdmin("re-added-narrowing-admin");
+        ExecutorService narrowing = Executors.newSingleThreadExecutor();
+        try {
+            Future<RepositorySelection> narrowed =
+                    narrowing.submit(() -> selectProjects(connected, RepositorySelection.SELECTED, actor));
+            assertThat(asked.await(20, SECONDS)).isTrue();
+            workspaceRepositoryMonitorService.removeRepositoryFromMonitor(connected.getWorkspaceSlug(), legacy);
+            workspaceRepositoryMonitorService.addRepositoryToMonitor(connected.getWorkspaceSlug(), legacy);
+            answer.countDown();
+
+            assertThatThrownBy(() -> narrowed.get(20, SECONDS))
+                    .hasCauseInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("changed while we checked");
+        } finally {
+            answer.countDown();
+            narrowing.shutdownNow();
+        }
+        awaitMonitoringIdle();
+
+        assertThat(repositoryToMonitorRepository.findById(unresolved.getId())).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, reportedId))
+                .singleElement()
+                .satisfies(monitor -> {
+                    assertThat(monitor.getId()).isNotEqualTo(unresolved.getId());
+                    assertThat(monitor.getNameWithOwner()).isEqualTo(legacy);
+                });
+        assertThat(workspaceRepository.findById(workspaceId).orElseThrow().getRepositorySelection())
+                .isNotEqualTo(RepositorySelection.SELECTED);
+        assertThat(selectionChanges(connected)).isEmpty();
+    }
+
+    @Test
+    void shouldRefuseAnAddThatReadAllProjectsWhenANarrowingCommitsWhileItWaitsForTheLock() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        long connectionId = connectionId(connected);
+        long kept = repositoryToMonitorRepository
+                .findByWorkspaceIdAndNameWithOwner(workspaceId, REPOSITORY)
+                .orElseThrow()
+                .getId();
+        String target = GROUP + "/added-during-narrowing";
+        long mirroredId = 2_216_090L;
+        // Another workspace recorded this path; GitLab never confirmed the id to this one.
+        foreignRepository(target, mirroredId);
+        long actor = selectionAdmin("racing-narrowing-admin");
+        CompletableFuture<Integer> lockedBy = new CompletableFuture<>();
+        CountDownLatch narrow = new CountDownLatch(1);
+        ExecutorService threads = Executors.newFixedThreadPool(2);
+        try {
+            var holder = threads.submit(() -> transactionTemplate.execute(status -> {
+                connectionRepository.acquireLifecycleLock(connectionId, workspaceId);
+                lockedBy.complete(
+                        Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                awaitUninterruptibly(narrow);
+                // Joins this transaction, so the narrowing commits only when the lock is released.
+                return selectProjects(connected, RepositorySelection.SELECTED, actor);
+            }));
+            int holderPid = lockedBy.get(20, SECONDS);
+            assertThat(holderPid).isPositive();
+            Future<?> add = threads.submit(() ->
+                    workspaceRepositoryMonitorService.addRepositoryToMonitor(connected.getWorkspaceSlug(), target));
+            // The Add has read ALL and waits on the lifecycle lock the holder owns.
+            await().atMost(Duration.ofSeconds(20))
+                    .until(() -> Objects.requireNonNull(jdbc.queryForObject(
+                                    "SELECT count(*) FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid))",
+                                    Long.class,
+                                    holderPid))
+                            > 0);
+            assertThat(add.isDone()).isFalse();
+            narrow.countDown();
+
+            assertThat(holder.get(20, SECONDS)).isEqualTo(RepositorySelection.SELECTED);
+            assertThat(workspaceRepository
+                            .findMonitorPolicy(workspaceId)
+                            .orElseThrow()
+                            .getRepositorySelection())
+                    .isEqualTo(RepositorySelection.SELECTED);
+            Throwable addOutcome = catchThrowable(() -> add.get(20, SECONDS));
+            List<RepositoryToMonitor> addedAtTarget =
+                    repositoryToMonitorRepository.findByWorkspaceId(workspaceId).stream()
+                            .filter(monitor -> monitor.getNameWithOwner().equals(target))
+                            .toList();
+            String created = addedAtTarget.stream()
+                    .map(monitor -> monitor.getId() + ":" + monitor.getNativeId())
+                    .toList()
+                    .toString();
+            // The Add took the mirror's id without asking GitLab, in either outcome.
+            verify(projectSyncService, never()).fetchProject(workspaceId, target);
+
+            assertThat(addOutcome)
+                    .as("Add outcome; monitors created at %s as id:nativeId %s", target, created)
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("changed while we checked");
+            assertThat(addedAtTarget).isEmpty();
+            assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, mirroredId))
+                    .isEmpty();
+            assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, REPOSITORY_NATIVE_ID))
+                    .singleElement()
+                    .satisfies(monitor -> assertThat(monitor.getId()).isEqualTo(kept));
+        } finally {
+            lockedBy.complete(-1);
+            narrow.countDown();
+            threads.shutdownNow();
+        }
+        awaitMonitoringIdle();
+    }
+
+    /** Changes the selection as the workspace admin's PATCH does. */
+    private RepositorySelection selectProjects(Workspace target, RepositorySelection selection, long actorAccountId) {
+        return gitLabRepositorySelectionService.updateGitLabRepositorySelection(
+                WorkspaceContext.fromWorkspace(target, Set.of(), null), selection, actorAccountId);
+    }
+
+    private long selectionAdmin(String displayName) {
+        return Objects.requireNonNull(
+                accountRepository.save(new Account(displayName)).getId());
+    }
+
+    /** A monitor from before monitors carried GitLab's project id. */
+    private RepositoryToMonitor pathOnlyMonitor(Workspace target, String nameWithOwner) {
+        RepositoryToMonitor monitor = new RepositoryToMonitor();
+        monitor.setNameWithOwner(nameWithOwner);
+        monitor.setWorkspace(target);
+        return repositoryToMonitorRepository.save(monitor);
+    }
+
+    private List<ConnectionAudit> selectionChanges(Workspace target) {
+        return connectionAuditRepository.findByConnectionIdOrderByOccurredAtDesc(connectionId(target)).stream()
+                .filter(audit -> audit.getEventType().equals("PROJECT_SELECTION_CHANGED"))
+                .toList();
     }
 
     @Test

@@ -4,15 +4,19 @@ import { toast } from "sonner";
 
 import {
 	addRepositoryToMonitorMutation,
+	getGitLabRepositorySelectionOptions,
+	getGitLabRepositorySelectionQueryKey,
 	getIntegrationCatalogOptions,
 	getRepositoriesToMonitorOptions,
 	getWorkspaceOptions,
 	removeRepositoryToMonitorMutation,
 	readOptions,
+	updateGitLabRepositorySelectionMutation,
 	updateTokenMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { Workspace } from "@/api/types.gen";
+import type { GitLabRepositorySelection, Workspace } from "@/api/types.gen";
 import { SCM_CLASS_KEYS } from "@/components/admin/integrations/SyncResourcesTable";
+import type { WorkspaceGitLabProjectSelection } from "@/components/admin/integrations/WorkspaceGitLabProjectSelection";
 import type { WorkspaceRepositoriesSettings } from "@/components/admin/integrations/WorkspaceRepositoriesSettings";
 import type { WorkspaceScmTokenSettings } from "@/components/admin/integrations/WorkspaceScmTokenSettings";
 import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
@@ -125,6 +129,41 @@ export function useScmIntegration(workspaceSlug: string) {
 		},
 	});
 
+	// Only an active GitLab connection has a project choice; the server refuses the read for any other.
+	const followsGitLabGroup = kind === "GITLAB" && isConnectionActive;
+	const selectionQueryOptions = getGitLabRepositorySelectionOptions({ path: { workspaceSlug } });
+	const selectionQuery = useQuery({ ...selectionQueryOptions, enabled: followsGitLabGroup });
+	useQueryReadRefusal(selectionQueryOptions.queryKey, selectionQuery.isError, selectionQuery.error);
+	const selectionRetained = refreshRetryable(selectionQuery);
+	const selectionFailed = selectionQuery.isError && !selectionRetained;
+
+	const changeSelection = useMutation({
+		...updateGitLabRepositorySelectionMutation(),
+		// The answer is the stored choice; reading it again afterwards catches a change made meanwhile.
+		onSuccess: (stored, { path }) => {
+			queryClient.setQueryData(getGitLabRepositorySelectionQueryKey({ path }), stored);
+		},
+		onSettled: async (_stored, _error, { path }) => {
+			await queryClient.invalidateQueries({
+				queryKey: getGitLabRepositorySelectionQueryKey({ path }),
+			});
+		},
+	});
+
+	const handleSelectionChange = async (
+		repositorySelection: GitLabRepositorySelection["repositorySelection"],
+	) => {
+		if (changeSelection.isPending) {
+			return false;
+		}
+		try {
+			await changeSelection.mutateAsync({ path: { workspaceSlug }, body: { repositorySelection } });
+			return true;
+		} catch {
+			return false;
+		}
+	};
+
 	const replaceToken = useMutation({
 		...updateTokenMutation(),
 		gcTime: 0,
@@ -157,6 +196,27 @@ export function useScmIntegration(workspaceSlug: string) {
 		isConnectionActive,
 		connectionState: entry?.connectionState,
 		credentialsUnreadableSince: entry?.credentialsUnreadableSince,
+		followsGitLabGroup,
+		projectSelectionProps: {
+			selection: selectionFailed ? undefined : selectionQuery.data?.repositorySelection,
+			isLoading: selectionQuery.isLoading,
+			error: selectionFailed ? selectionQuery.error : null,
+			refreshFailure: selectionRetained
+				? {
+						error: selectionQuery.error,
+						pending: selectionQuery.isFetching,
+						onRetry: () => {
+							void selectionQuery.refetch();
+						},
+					}
+				: undefined,
+			onRetry: () => {
+				void selectionQuery.refetch();
+			},
+			isSaving: changeSelection.isPending,
+			saveError: changeSelection.error,
+			onSelectionChange: handleSelectionChange,
+		} satisfies ComponentProps<typeof WorkspaceGitLabProjectSelection>,
 		syncStatusHeaderProps: sync.syncStatusHeaderProps,
 		syncResourcesProps: sync.syncResourcesProps,
 		jobHistoryProps: sync.jobHistoryProps,
