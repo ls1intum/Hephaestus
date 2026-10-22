@@ -11,6 +11,7 @@ import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authorization.AllRequiredFactorsAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.authorization.AuthorizationResult;
@@ -44,12 +45,14 @@ public class RecentSignInPolicy {
     private final AuthEventLogger authEventLogger;
     private final AuthMetrics metrics;
     private final Duration maxAge;
+    private final boolean assuranceEnforced;
 
     public RecentSignInPolicy(
             AuthProperties properties, AuthEventLogger authEventLogger, AuthMetrics metrics, Clock clock) {
         this.authEventLogger = authEventLogger;
         this.metrics = metrics;
         this.maxAge = properties.stepUpMaxAge();
+        this.assuranceEnforced = properties.assuranceEnforced();
         if (maxAge.isNegative() || maxAge.isZero()) {
             throw new IllegalStateException("hephaestus.auth.step-up-max-age must be a positive duration");
         }
@@ -88,7 +91,11 @@ public class RecentSignInPolicy {
      */
     public void require(
             @Nullable Authentication authentication, AuthEvent.EventType auditType, @Nullable Long actingAccountId) {
-        if (isRecent(authentication)) {
+        if ((!assuranceEnforced
+                        && authentication != null
+                        && authentication.isAuthenticated()
+                        && !(authentication instanceof AnonymousAuthenticationToken))
+                || isRecent(authentication)) {
             return;
         }
         log.info("auth.step-up: refused {} for actingAccountId={} (max-age={})", auditType, actingAccountId, maxAge);

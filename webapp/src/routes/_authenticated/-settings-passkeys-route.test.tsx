@@ -62,6 +62,7 @@ function servePasskeys(verified: boolean) {
 	server.use(
 		http.get("*/user/passkeys", () =>
 			HttpResponse.json({
+				assuranceEnforced: true,
 				protectionEnabled: true,
 				recoveryRequired: false,
 				instanceAdminRequired: false,
@@ -100,6 +101,7 @@ function serveLastPasskey(answer: "removed" | "refused") {
 	server.use(
 		http.get("*/user/passkeys", () =>
 			HttpResponse.json({
+				assuranceEnforced: true,
 				protectionEnabled: account.protectionEnabled,
 				recoveryRequired: false,
 				instanceAdminRequired: true,

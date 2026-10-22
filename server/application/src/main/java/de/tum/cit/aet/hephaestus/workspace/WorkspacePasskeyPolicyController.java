@@ -29,6 +29,9 @@ public class WorkspacePasskeyPolicyController {
 
     public record WorkspacePasskeyPolicyDTO(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean assuranceEnforced,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             boolean required,
 
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
@@ -43,6 +46,7 @@ public class WorkspacePasskeyPolicyController {
     @Operation(operationId = "getWorkspacePasskeyPolicy", summary = "Get workspace admin passkey policy")
     public WorkspacePasskeyPolicyDTO get(WorkspaceContext context) {
         return new WorkspacePasskeyPolicyDTO(
+                assurance.assuranceEnforced(),
                 workspaces.findById(context.id()).orElseThrow().isAdminPasskeyRequired(),
                 assurance.workspaceAdminRequired());
     }

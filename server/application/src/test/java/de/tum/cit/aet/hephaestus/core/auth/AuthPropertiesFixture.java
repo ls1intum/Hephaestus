@@ -48,6 +48,19 @@ public final class AuthPropertiesFixture {
             Map<String, AuthProperties.LoginProviderSeed> providers,
             Duration stepUpMaxAge,
             List<String> browserExtensionIds) {
+        return build(apiBasePath, providers, stepUpMaxAge, browserExtensionIds, true);
+    }
+
+    public static AuthProperties withoutAssurance() {
+        return build("", Map.of(), Duration.ofMinutes(5), List.of(), false);
+    }
+
+    private static AuthProperties build(
+            String apiBasePath,
+            Map<String, AuthProperties.LoginProviderSeed> providers,
+            Duration stepUpMaxAge,
+            List<String> browserExtensionIds,
+            boolean assuranceEnforced) {
         return new AuthProperties(
                 URI.create("http://localhost:8080"),
                 apiBasePath,
@@ -61,6 +74,7 @@ public final class AuthPropertiesFixture {
                 "",
                 Duration.ofDays(7),
                 stepUpMaxAge,
+                assuranceEnforced,
                 false,
                 true,
                 browserExtensionIds);

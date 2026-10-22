@@ -72,6 +72,9 @@ public class PasskeyAssurancePolicy implements AdminPasskeyAccess {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "The token subject is not an account ID.", e);
         }
         Account account = accounts.findById(accountId).orElseThrow(PasskeyRequiredException::new);
+        if (!auth.assuranceEnforced()) {
+            return;
+        }
         boolean needsProof = account.isPasskeyProtectionEnabled()
                 || account.isPasskeyRecoveryRequired()
                 || ((instanceAdmin || account.getAppRole() == Account.AppRole.APP_ADMIN)
@@ -88,6 +91,11 @@ public class PasskeyAssurancePolicy implements AdminPasskeyAccess {
     }
 
     @Override
+    public boolean assuranceEnforced() {
+        return auth.assuranceEnforced();
+    }
+
+    @Override
     public boolean workspaceAdminRequired() {
         return properties.workspaceAdminRequired();
     }
@@ -98,7 +106,15 @@ public class PasskeyAssurancePolicy implements AdminPasskeyAccess {
         if (UserViewContextHolder.get() != null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This action is not available in a user view.");
         }
-        if (!verified(SecurityContextHolder.getContext().getAuthentication(), auth.stepUpMaxAge())) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!auth.assuranceEnforced()) {
+            if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt) || jwt.hasClaim("sid")) {
+                throw new PasskeyRequiredException();
+            }
+            requirePersonal(authentication);
+            return;
+        }
+        if (!verified(authentication, auth.stepUpMaxAge())) {
             Long accountId = CurrentAccount.idOrNull();
             if (accountId != null) {
                 events.required(accountId);
@@ -112,6 +128,10 @@ public class PasskeyAssurancePolicy implements AdminPasskeyAccess {
     }
 
     public void requireEnrollment(boolean enrolled, boolean recovering) {
+        if (!auth.assuranceEnforced()) {
+            requireFresh();
+            return;
+        }
         if (enrolled) {
             requireFresh();
             return;

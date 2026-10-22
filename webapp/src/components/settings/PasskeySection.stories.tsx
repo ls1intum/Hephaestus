@@ -3,6 +3,7 @@ import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { PasskeySection } from "./PasskeySection";
 
 const status = {
+	assuranceEnforced: true,
 	protectionEnabled: false,
 	recoveryRequired: false,
 	instanceAdminRequired: true,
@@ -48,6 +49,7 @@ export const Enrolled: Story = {
 	args: {
 		status: {
 			...status,
+			assuranceEnforced: true,
 			protectionEnabled: true,
 			credentials: [{ id: "test-credential", label: "Personal device" }],
 		},
@@ -74,6 +76,7 @@ export const Verified: Story = {
 		status: {
 			...status,
 			verified: true,
+			assuranceEnforced: true,
 			protectionEnabled: true,
 			credentials: [
 				{ id: "test-credential", label: "Personal device" },
@@ -156,6 +159,7 @@ export const Unsupported: Story = { args: { supported: false } };
 export const LongCredentialName: Story = {
 	args: {
 		status: {
+			assuranceEnforced: true,
 			protectionEnabled: true,
 			recoveryRequired: false,
 			instanceAdminRequired: true,
@@ -169,5 +173,27 @@ export const LongCredentialName: Story = {
 				},
 			],
 		},
+	},
+};
+
+export const AssuranceDisabled: Story = {
+	args: {
+		status: {
+			...status,
+			assuranceEnforced: false,
+			protectionEnabled: true,
+			credentials: lastPasskey,
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("button", { name: "Verify passkey" })).toBeNull();
+		await expect(canvas.queryByText("Recently confirmed.")).toBeNull();
+		await expect(canvas.getByRole("button", { name: "Register passkey" })).not.toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(
+			canvas.getByRole("switch", { name: "Personal admin protection" }),
+		).not.toHaveAttribute("aria-disabled", "true");
 	},
 };
