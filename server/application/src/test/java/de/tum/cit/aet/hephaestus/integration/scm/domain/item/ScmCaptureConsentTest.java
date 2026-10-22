@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -12,11 +13,15 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
+import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
@@ -25,9 +30,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.GeneralReviewCommentContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewRepositoryPreparer;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCaptureContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewThreadContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -145,6 +154,40 @@ class ScmCaptureConsentTest extends BaseUnitTest {
         verifyNoInteractions(copies);
     }
 
+    @Test
+    void shouldDecideAndRecordARetainedFormerContributorByTheNativeIdentityTheOccasionKept() {
+        var identities = mock(PersonIdentityResolver.class);
+        var accounts = mock(AccountDirectory.class);
+        var suppression = mock(PersonProcessingSuppression.class);
+        var copies = mock(PersonDataCopyRecorder.class);
+        // No mirror row: the person left the work, and only the occasion still names them.
+        var former = new ScmCaptureConsent.Contributor(
+                new PersonIdentity(1L, "33", null),
+                new PersonCopyIdentity("GITLAB", "https://gitlab.example", "33", null));
+        when(identities.accountFor(former.identity())).thenReturn(Optional.of(103L));
+        when(accounts.find(103))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        103, Account.Status.ACTIVE, "Former", AiChoice.CLOUD, Instant.now(), true)));
+        var consent = new ScmCaptureConsent(identities, accounts, suppression, copies);
+
+        consent.requireContributors(List.of(former, former));
+        verify(copies, times(1)).recordIdentity(former.copy());
+
+        when(accounts.find(103))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        103, Account.Status.ACTIVE, "Former", AiChoice.NO_AI, Instant.now(), true)));
+        assertThatThrownBy(() -> consent.requireContributors(List.of(former)))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        e -> assertThat(e.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
+        when(suppression.isSuppressed(1L, "33", null)).thenReturn(true);
+        assertThatThrownBy(() -> consent.requireContributors(List.of(former)))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        e -> assertThat(e.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
+        verify(copies, times(1)).recordIdentity(any());
+    }
+
     @ParameterizedTest
     @EnumSource(
             value = IdentityProviderType.class,
@@ -213,11 +256,28 @@ class ScmCaptureConsentTest extends BaseUnitTest {
                 mock(PullRequestReviewCommentRepository.class),
                 preparer,
                 mock(DeliveredPullRequestCommentLookup.class));
-        var capture = mock(ScmWorkCapture.class);
-        when(capture.capture(any())).thenAnswer(invocation -> {
-            ScmCaptureContext context = invocation.getArgument(0);
-            return content.capture(context, context.request().sources());
-        });
+        // The real capture owner applies consent; the sources this request does not select contribute nothing. A pull
+        // request capture never asks the issue source.
+        var general = mock(GeneralReviewCommentContentSource.class);
+        var threads = mock(ReviewThreadContentSource.class);
+        var linked = mock(LinkedWorkItemContentSource.class);
+        var tree = mock(RepositoryTreeContentSource.class);
+        when(general.capture(any(), any())).thenReturn(CaptureContribution.empty());
+        when(threads.capture(any(), any())).thenReturn(CaptureContribution.empty());
+        when(linked.capture(any(), any())).thenReturn(CaptureContribution.empty());
+        when(tree.capture(any(), any())).thenReturn(CaptureContribution.empty());
+        var capture = new ScmWorkCapture(
+                content,
+                mock(IssueContentSource.class),
+                general,
+                threads,
+                linked,
+                tree,
+                consent,
+                mock(ItemEventService.class),
+                mock(PersonDataWriteFence.class),
+                mapper,
+                Clock.systemUTC());
         var service = new ScmItemService(
                 items,
                 access,
@@ -229,7 +289,6 @@ class ScmCaptureConsentTest extends BaseUnitTest {
                 mock(ScmFileVersions.class),
                 mapper,
                 capture,
-                consent,
                 Clock.systemUTC());
         var pinned = service.pin(item, null);
         var core = PullRequestContentSource.CORE;

@@ -56,7 +56,8 @@ public interface ProductItemRepository extends Repository<Review, UUID> {
     List<Long> scopeItemsInWindow(long workspaceId, String kind, Instant from, Instant to, Pageable page);
 
     @Query(
-            value = "SELECT name,occurred_at AS occurredAt,item_version AS itemVersion FROM item_event"
+            value = "SELECT name,occurred_at AS occurredAt,item_version AS itemVersion,"
+                    + "evidence_expires_at AS evidenceExpiresAt FROM item_event"
                     + " WHERE workspace_id=:workspaceId AND item_id=:itemId AND id=:eventId",
             nativeQuery = true)
     EventFact event(long workspaceId, long itemId, UUID eventId);
@@ -68,6 +69,10 @@ public interface ProductItemRepository extends Repository<Review, UUID> {
 
         @Nullable
         String getItemVersion();
+
+        /** When the occasion's retained record may no longer be used, also once it is removed; null when it kept none. */
+        @Nullable
+        Instant getEvidenceExpiresAt();
     }
 
     @Query(

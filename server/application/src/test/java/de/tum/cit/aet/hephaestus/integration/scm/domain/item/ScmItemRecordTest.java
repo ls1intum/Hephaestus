@@ -84,7 +84,6 @@ class ScmItemRecordTest extends BaseUnitTest {
             mock(ScmFileVersions.class),
             mapper,
             mock(ScmWorkCapture.class),
-            mock(ScmCaptureContributors.class),
             Clock.systemUTC());
 
     @Test

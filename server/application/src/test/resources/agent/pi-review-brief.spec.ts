@@ -1208,6 +1208,21 @@ void test("a record read whole at capture states its capture time and no admissi
 	assert.ok(isRecord(unstated), malformed);
 	assert.deepEqual(unstated.basis, { other_fields: "CAPTURE" });
 	assert.doesNotMatch(malformed, /sometime-captured|captured_at/u);
+
+	// An occasion's record states when Hephaestus stored it; no capture time is added to it.
+	const occasion = contextOf({
+		other_fields: "OCCASION",
+		observed_at: "2026-10-01T09:10:00Z",
+		mirror_synced_at: "2026-10-01T09:05:00Z",
+	});
+	const retained = shownRecord(occasion);
+	assert.ok(isRecord(retained), occasion);
+	assert.deepEqual(retained.basis, {
+		other_fields: "OCCASION",
+		observed_at: "2026-10-01T09:10:00Z",
+		mirror_synced_at: "2026-10-01T09:05:00Z",
+	});
+	assert.doesNotMatch(occasion, /captured_at/u);
 });
 
 void test("a record that is not shown is named with why, never cut or read as empty", (t) => {
@@ -2002,6 +2017,7 @@ void test("native inline and review decision revisions are not replaced by the c
 						authorId: 12,
 						body: "Check the error path.",
 						submittedAt: BEFORE_CAPTURE,
+						observedAt: BEFORE_CAPTURE,
 						commitId: "original-decision-head",
 						state: "CHANGES_REQUESTED",
 						dismissed: true,
@@ -2028,6 +2044,7 @@ void test("native inline and review decision revisions are not replaced by the c
 			);
 			assert.ok(!("path" in statement) && !("line" in statement) && !("side" in statement));
 			assert.equal(statement.state, "CHANGES_REQUESTED");
+			assert.equal(statement.observedAt, BEFORE_CAPTURE);
 			assert.equal(statement.dismissed, true);
 			assert.ok(
 				history.sources.some((source) =>
@@ -2036,6 +2053,37 @@ void test("native inline and review decision revisions are not replaced by the c
 			);
 		}
 	}
+});
+
+void test("a review submission date does not invent an occasion read time", (t) => {
+	const path = "context/review_threads.json";
+	const decision = {
+		state: "COMMENTED",
+		authorId: 12,
+		body: "Check the error path.",
+		submittedAt: BEFORE_CAPTURE,
+	};
+	const root = workspace({
+		"context/metadata.json": discussionMetadata(),
+		[path]: JSON.stringify({
+			reviewDecisions: [
+				{ ...decision, nativeId: 22 },
+				{ ...decision, nativeId: 23, observedAt: "not-a-date" },
+			],
+		}),
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const history = buildPublicReviewHistory(
+		root,
+		"context",
+		discussionIndex("scm.review-threads", path),
+		FRAMING,
+	);
+	assert.equal(history.statements.length, 2);
+	assert.deepEqual(
+		history.statements.map((statement) => statement.observedAt),
+		[undefined, undefined],
+	);
 });
 
 void test("unlisted, unavailable, malformed and oversized discussion never becomes empty complete history", (t) => {

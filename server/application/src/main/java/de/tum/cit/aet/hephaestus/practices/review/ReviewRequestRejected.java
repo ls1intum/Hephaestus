@@ -37,7 +37,13 @@ public final class ReviewRequestRejected extends ErrorResponseException {
     }
 
     public ReviewRequestRejected(Reason reason, String message, @Nullable ReviewRequestReason eventReason) {
-        super(status(reason), ProblemDetail.forStatusAndDetail(status(reason), message), null);
+        this(reason, message, eventReason, null);
+    }
+
+    /** @param cause the failure this rejection settles; it stays out of the problem detail */
+    public ReviewRequestRejected(
+            Reason reason, String message, @Nullable ReviewRequestReason eventReason, @Nullable Throwable cause) {
+        super(status(reason), ProblemDetail.forStatusAndDetail(status(reason), message), cause);
         this.eventReason = eventReason;
         this.reason = reason;
     }

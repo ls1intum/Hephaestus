@@ -445,9 +445,10 @@ function datedOf(value: unknown): string | undefined {
 
 /**
  * When each part of the record was read, as its producer states it. A current record reads every field at capture and
- * dates that read with `captured_at`, which is not the provider event time. Older records may contain
- * `admission_fields` and `admitted_at` declarations, which readers preserve as recorded. Only fields this block shows
- * may be named; a malformed part stays unstated, and no time is inferred.
+ * dates that read with `captured_at`, which is not the provider event time. The record of an event review's occasion
+ * (`OCCASION`) was read when Hephaestus stored the occasion and dates that read with `observed_at`, also not a provider
+ * time. Older records may contain `admission_fields` and `admitted_at` declarations, which readers preserve as
+ * recorded. Only fields this block shows may be named; a malformed part stays unstated, and no time is inferred.
  */
 function basisOf(value: unknown, shown: ReadonlySet<string>): Record<string, unknown> | undefined {
 	if (!isRecord(value)) {
@@ -459,12 +460,18 @@ function basisOf(value: unknown, shown: ReadonlySet<string>): Record<string, unk
 		: [];
 	const admittedAt = datedOf(value.admitted_at);
 	const capturedAt = datedOf(value.captured_at);
+	const observedAt = datedOf(value.observed_at);
 	const mirrorSyncedAt = datedOf(value.mirror_synced_at);
+	const otherFields =
+		value.other_fields === "CAPTURE" || value.other_fields === "OCCASION"
+			? value.other_fields
+			: undefined;
 	const basis = {
 		...(admissionFields.length > 0 ? { admission_fields: admissionFields } : {}),
 		...(admittedAt === undefined ? {} : { admitted_at: admittedAt }),
-		...(value.other_fields === "CAPTURE" ? { other_fields: "CAPTURE" } : {}),
+		...(otherFields === undefined ? {} : { other_fields: otherFields }),
 		...(capturedAt === undefined ? {} : { captured_at: capturedAt }),
+		...(observedAt === undefined ? {} : { observed_at: observedAt }),
 		...(mirrorSyncedAt === undefined ? {} : { mirror_synced_at: mirrorSyncedAt }),
 	};
 	return Object.keys(basis).length > 0 ? basis : undefined;
@@ -598,6 +605,8 @@ export interface CapturedPublicStatement {
 	statedAt: string | null;
 	/** When the words were last edited, as captured: the body is as of this time, not of statedAt. */
 	updatedAt: string | null;
+	/** When Hephaestus read a retained decision; not when its words were written or submitted. */
+	observedAt?: string;
 	/** The head the provider bound the words to, where it records one; no snapshot of the code then. */
 	itemVersion: string | null;
 	/** A captured, dated statement by a known different author; relevance and repetition are not decided here. */
@@ -732,6 +741,24 @@ function omittedParentOf(entry: Record<string, unknown>): {
 		: {};
 }
 
+/** The captured mirror links and position of one pull request comment, as its collector writes them. */
+function pullRequestCommentHandlesOf(
+	entry: Record<string, unknown>,
+): Pick<
+	CapturedPublicStatement,
+	"capturedId" | "threadId" | "inReplyToId" | "inReplyToOmittedReason" | "path" | "line" | "side"
+> {
+	return {
+		capturedId: idOf(entry.id),
+		threadId: idOf(entry.thread),
+		inReplyToId: idOf(entry.in_reply_to),
+		...omittedParentOf(entry),
+		path: textOf(entry.path),
+		line: lineOf(entry.line),
+		side: entry.side === "LEFT" || entry.side === "RIGHT" ? entry.side : null,
+	};
+}
+
 function readDiscussion(
 	root: string,
 	index: Record<string, unknown>,
@@ -769,6 +796,7 @@ function readDiscussion(
 		}
 		const statedAt = instantOf(entry[file.keys.statedAt]);
 		const updatedAt = instantOf(entry[file.keys.updatedAt]);
+		const observedAt = file.kind === "scm.review-threads" ? instantOf(entry.observedAt) : null;
 		// An edit after the cutoff replaced the words the capture time would show; createdAt cannot vouch for them.
 		if (
 			cutoff !== null &&
@@ -789,17 +817,7 @@ function readDiscussion(
 				: `comment:${sourcePath}:ordinal:${ordinal + 1}`;
 		witnesses.add(witnessId);
 		statements.push({
-			...(file.kind === "scm.pull-request.comments"
-				? {
-						capturedId: idOf(entry.id),
-						threadId: idOf(entry.thread),
-						inReplyToId: idOf(entry.in_reply_to),
-						...omittedParentOf(entry),
-						path: textOf(entry.path),
-						line: lineOf(entry.line),
-						side: entry.side === "LEFT" || entry.side === "RIGHT" ? entry.side : null,
-					}
-				: {}),
+			...(file.kind === "scm.pull-request.comments" ? pullRequestCommentHandlesOf(entry) : {}),
 			witnessId,
 			sourcePath,
 			sourceKind: file.kind,
@@ -810,6 +828,7 @@ function readDiscussion(
 			body: entry.body,
 			statedAt,
 			updatedAt,
+			...(observedAt === null ? {} : { observedAt }),
 			itemVersion: file.keys.commit === null ? null : textOf(entry[file.keys.commit]),
 			eligibleForPriorAdvice:
 				cutoff !== null &&

@@ -75,6 +75,23 @@ const readers = [
 	},
 ];
 
+void test("review decisions preserve the retained read time separately from provider submission time", async () => {
+	const decision = {
+		state: "CHANGES_REQUESTED",
+		author: "reviewer",
+		body: "Check the error path.",
+		submittedAt: "2026-10-20T10:00:00Z",
+		observedAt: "2026-10-21T11:00:00Z",
+	};
+	assert.deepEqual(
+		await readReviewThreads(evidence({ threads: [], reviewDecisions: [decision] })),
+		{
+			threads: [],
+			decisions: [{ ...decision, bot: false }],
+		},
+	);
+});
+
 for (const { name, read, empty, result, invalid } of readers) {
 	void test(`${name} distinguishes absent capture from measured empty data`, async () => {
 		assert.equal(await read({ record: async () => ({ status: "ABSENT" }) }), null);

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,11 @@ public class ProductItemQuery {
 
     public ItemSnapshot pin(ItemRef item, @Nullable ItemVersion version) {
         return source(item).pin(item, version);
+    }
+
+    /** The version, state and roles the occasion {@code eventId} recorded, as its source retained them. */
+    public ItemSnapshot pinOccasion(ItemRef item, ItemVersion version, UUID eventId) {
+        return source(item).pinOccasion(item, version, eventId);
     }
 
     public Optional<ItemSnapshot> current(ItemRef item) {
@@ -79,6 +85,9 @@ public class ProductItemQuery {
                 case SOURCE_NOT_READY, VERSION_UNAVAILABLE, ITEM_NOT_VISIBLE, ITEM_REMOVED, CONSENT_WITHHELD ->
                     CurrentWorkVersion.Unknown.INSTANCE;
                 case CAPTURE_FAILED -> throw unavailable;
+                // Only an event review reads an occasion; the current work never does.
+                case OCCASION_EVIDENCE_UNAVAILABLE ->
+                    throw new IllegalStateException("The current work does not read an occasion", unavailable);
             };
         }
     }

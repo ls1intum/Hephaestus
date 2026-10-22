@@ -14,6 +14,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
+    /** Only a kept record expires; a statement that none was kept holds no words and names no person. */
+    String RECORD_EXPIRY = "CASE WHEN CAST(:evidence AS jsonb)->'unretained' IS NULL "
+            + "THEN CAST(:evidenceExpiresAt AS timestamptz) END";
+
     Optional<ItemEvent> findByIdAndWorkspaceId(UUID id, long workspaceId);
 
     Optional<ItemEvent> findByWorkspaceIdAndItemIdAndNameAndItemVersion(
@@ -22,7 +26,8 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
     @Modifying
     @Query(
             value =
-                    "INSERT INTO item_event(id, workspace_id, item_id, name, item_version, occurred_at, found_by, actor_user_id, requested_by_id, state, decided_at) VALUES (:id, :workspaceId, :itemId, :name, :itemVersion, :occurredAt, :foundBy, :actorUserId, :requestedById, 'RECORDED', :now) ON CONFLICT (workspace_id, item_id, name, item_version) DO NOTHING",
+                    "INSERT INTO item_event(id, workspace_id, item_id, name, item_version, occurred_at, found_by, actor_user_id, requested_by_id, state, decided_at, evidence, evidence_expires_at) VALUES (:id, :workspaceId, :itemId, :name, :itemVersion, :occurredAt, :foundBy, :actorUserId, :requestedById, 'RECORDED', :now, CAST(:evidence AS jsonb), "
+                            + RECORD_EXPIRY + ") ON CONFLICT (workspace_id, item_id, name, item_version) DO NOTHING",
             nativeQuery = true)
     int insertIfAbsent(
             @Param("id") UUID id,
@@ -34,14 +39,17 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
             @Param("foundBy") String foundBy,
             @Param("actorUserId") @Nullable Long actorUserId,
             @Param("requestedById") @Nullable Long requestedById,
-            @Param("now") Instant now);
+            @Param("now") Instant now,
+            @Param("evidence") @Nullable String evidence,
+            @Param("evidenceExpiresAt") @Nullable Instant evidenceExpiresAt);
 
     /** Records an occasion with no pinned version once per name and fence; the caller holds the item lock. */
     @Modifying
     @Query(
             value =
-                    "INSERT INTO item_event(id, workspace_id, item_id, name, item_version, pending_fence, occurred_at, found_by, actor_user_id, state, decided_at) "
-                            + "SELECT :id, :workspaceId, :itemId, :name, NULL, :fence, :occurredAt, :foundBy, :actorUserId, 'RECORDED', :now "
+                    "INSERT INTO item_event(id, workspace_id, item_id, name, item_version, pending_fence, occurred_at, found_by, actor_user_id, state, decided_at, evidence, evidence_expires_at) "
+                            + "SELECT :id, :workspaceId, :itemId, :name, NULL, :fence, :occurredAt, :foundBy, :actorUserId, 'RECORDED', :now, CAST(:evidence AS jsonb), "
+                            + RECORD_EXPIRY + " "
                             + "WHERE NOT EXISTS (SELECT 1 FROM item_event e WHERE e.workspace_id = :workspaceId AND e.item_id = :itemId AND e.name = :name "
                             + "AND e.item_version IS NULL AND e.pending_fence = :fence)",
             nativeQuery = true)
@@ -54,30 +62,142 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
             @Param("occurredAt") Instant occurredAt,
             @Param("foundBy") String foundBy,
             @Param("actorUserId") @Nullable Long actorUserId,
-            @Param("now") Instant now);
+            @Param("now") Instant now,
+            @Param("evidence") @Nullable String evidence,
+            @Param("evidenceExpiresAt") @Nullable Instant evidenceExpiresAt);
+
+    /**
+     * The evidence of exactly this occasion of this item: its record, or the reason it keeps none, with its expiry.
+     * Any other workspace, item or event reads nothing.
+     */
+    @Query(
+            value = "SELECT " + EVIDENCE_COLUMNS
+                    + " FROM item_event WHERE workspace_id = :workspaceId AND item_id = :itemId AND id = :id",
+            nativeQuery = true)
+    Optional<EvidenceRow> findEvidence(
+            @Param("workspaceId") long workspaceId, @Param("itemId") long itemId, @Param("id") UUID id);
+
+    String EVIDENCE_COLUMNS = "item_version AS itemVersion, evidence IS NOT NULL AS retained, "
+            + "CASE WHEN evidence->'unretained' IS NULL THEN CAST(evidence AS text) END AS evidence, "
+            + "evidence->>'unretained' AS unretained, evidence_expires_at AS evidenceExpiresAt";
+
+    interface EvidenceRow {
+        @Nullable
+        String getItemVersion();
+
+        /** False for an occasion recorded before its source retained evidence, or by a source that retains none. */
+        boolean getRetained();
+
+        @Nullable
+        String getEvidence();
+
+        @Nullable
+        String getUnretained();
+
+        @Nullable
+        Instant getEvidenceExpiresAt();
+    }
+
+    /**
+     * Replaces the retained records on an item by a statement of why they are gone; the occasions stay. Each keeps its
+     * fixed expiry, which names no person, so no copy made from the record outlives it.
+     */
+    @Modifying
+    @Query(
+            value =
+                    "UPDATE item_event SET evidence = jsonb_build_object('unretained', CAST(:reason AS text)) "
+                            + "WHERE workspace_id = :workspaceId AND item_id = :itemId AND evidence IS NOT NULL AND evidence->'unretained' IS NULL",
+            nativeQuery = true)
+    int forgetItemEvidence(
+            @Param("workspaceId") long workspaceId, @Param("itemId") long itemId, @Param("reason") String reason);
+
+    @Modifying
+    @Query(
+            value =
+                    "UPDATE item_event SET evidence = jsonb_build_object('unretained', CAST(:reason AS text)) "
+                            + "WHERE workspace_id = :workspaceId AND name LIKE :prefix AND evidence IS NOT NULL AND evidence->'unretained' IS NULL",
+            nativeQuery = true)
+    int forgetWorkspaceEvidence(
+            @Param("workspaceId") long workspaceId, @Param("prefix") String prefix, @Param("reason") String reason);
+
+    /**
+     * Replaces expired retained records by a statement that they expired, also on an occasion a review still
+     * references; the occasion itself stays with its expiry. Only records that still keep words are selected, so a
+     * statement is never rewritten.
+     */
+    @Modifying
+    @Query(
+            value = "UPDATE item_event SET evidence = jsonb_build_object('unretained', 'EXPIRED') "
+                    + "WHERE id IN (SELECT e.id FROM item_event e WHERE e.evidence_expires_at <= :now "
+                    + "AND e.evidence IS NOT NULL AND e.evidence->'unretained' IS NULL "
+                    + "ORDER BY e.evidence_expires_at, e.id LIMIT :limit FOR UPDATE SKIP LOCKED)",
+            nativeQuery = true)
+    @WorkspaceAgnostic("Background reaper removes expired evidence across workspaces; each row keeps its workspace")
+    int forgetExpiredEvidence(@Param("now") Instant now, @Param("limit") int limit);
 
     Optional<ItemEvent> findByWorkspaceIdAndItemIdAndNameAndItemVersionIsNullAndPendingFence(
             long workspaceId, long itemId, String name, String pendingFence);
 
-    @Query(
-            "SELECT e FROM ItemEvent e WHERE e.workspaceId = :workspaceId AND e.itemId = :itemId AND e.itemVersion IS NULL "
-                    + "AND e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING) "
-                    + "ORDER BY e.occurredAt, e.id")
-    List<ItemEvent> findUnresolved(@Param("workspaceId") long workspaceId, @Param("itemId") long itemId);
-
-    @Modifying
-    @Query(
-            "UPDATE ItemEvent e SET e.itemVersion = :itemVersion WHERE e.workspaceId = :workspaceId AND e.id = :id "
-                    + "AND e.itemVersion IS NULL AND e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING)")
-    int pin(@Param("workspaceId") long workspaceId, @Param("id") UUID id, @Param("itemVersion") String itemVersion);
-
-    // An occasion with no pinned version waits for the source to store one, not for a retry.
+    /** Metadata of the open occasions without a version; their retained records are not read here. */
     @Query(
             value =
-                    "SELECT * FROM item_event WHERE state IN ('RECORDED','WAITING') AND item_version IS NOT NULL AND (retry_at IS NULL OR retry_at <= :now) ORDER BY occurred_at, id FOR UPDATE SKIP LOCKED LIMIT :limit",
+                    "SELECT id, name, state, pending_fence AS pendingFence FROM item_event WHERE workspace_id = :workspaceId AND item_id = :itemId "
+                            + "AND item_version IS NULL AND state IN ('RECORDED','WAITING') ORDER BY occurred_at, id",
+            nativeQuery = true)
+    List<UnresolvedRow> findUnresolved(@Param("workspaceId") long workspaceId, @Param("itemId") long itemId);
+
+    interface UnresolvedRow {
+        UUID getId();
+
+        String getName();
+
+        String getState();
+
+        @Nullable
+        String getPendingFence();
+    }
+
+    /**
+     * Pins the version and replaces retained evidence with its completed record. Null and durable removal statements
+     * survive even when completion read an earlier record; the expiry never moves.
+     */
+    @Modifying
+    @Query(
+            value =
+                    "UPDATE item_event SET item_version = :itemVersion, "
+                            + "evidence = CASE WHEN evidence IS NULL OR evidence -> 'unretained' IS NOT NULL "
+                            + "THEN evidence ELSE CAST(:evidence AS jsonb) END "
+                            + "WHERE workspace_id = :workspaceId AND id = :id AND item_version IS NULL AND state IN ('RECORDED','WAITING')",
+            nativeQuery = true)
+    int pin(
+            @Param("workspaceId") long workspaceId,
+            @Param("id") UUID id,
+            @Param("itemVersion") String itemVersion,
+            @Param("evidence") @Nullable String evidence);
+
+    /** The retained record of an occasion that waits for its version, as stored, with its expiry. */
+    @Query(
+            value = "SELECT " + EVIDENCE_COLUMNS
+                    + " FROM item_event WHERE workspace_id = :workspaceId AND id = :id AND item_version IS NULL",
+            nativeQuery = true)
+    Optional<EvidenceRow> findPendingEvidence(@Param("workspaceId") long workspaceId, @Param("id") UUID id);
+
+    // An occasion with no pinned version waits for the source to store one, not for a retry. A retry offers the
+    // occasion by its key; the claim reads no retained record.
+    @Query(
+            value =
+                    "SELECT id, workspace_id AS workspaceId, item_id AS itemId FROM item_event WHERE state IN ('RECORDED','WAITING') AND item_version IS NOT NULL AND (retry_at IS NULL OR retry_at <= :now) ORDER BY occurred_at, id FOR UPDATE SKIP LOCKED LIMIT :limit",
             nativeQuery = true)
     @WorkspaceAgnostic("Background reaper claims due events across workspaces and preserves each event workspace")
-    List<ItemEvent> claimDue(@Param("now") Instant now, @Param("limit") int limit);
+    List<DueEvent> claimDue(@Param("now") Instant now, @Param("limit") int limit);
+
+    interface DueEvent {
+        UUID getId();
+
+        long getWorkspaceId();
+
+        long getItemId();
+    }
 
     record Decision(
             ItemEventState from,

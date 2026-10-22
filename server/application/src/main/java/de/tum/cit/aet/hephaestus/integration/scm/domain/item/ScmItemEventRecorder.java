@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -37,9 +38,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @ConditionalOnServerRole
 @WorkspaceAgnostic("Fans out one exact provider mirror event to explicitly monitored workspace items")
 @RequiredArgsConstructor
+@Slf4j
 public class ScmItemEventRecorder {
     private final ItemIndexService writer;
     private final ScmItemService items;
+    private final ScmWorkCapture capture;
     private final ScmRepositoryAccess access;
     private final RepositoryRepository repositories;
     private final ScmItemSourceQuery queries;
@@ -188,6 +191,7 @@ public class ScmItemEventRecorder {
             // Serializes every event write on the item: an unresolved occasion has no unique key to settle a race.
             writer.lock(workspace, item.itemId());
             ItemVersion version;
+            FoundBy foundBy = context.isWebhook() ? FoundBy.WEBHOOK : FoundBy.SYNC;
             try {
                 version = items.pin(item, null).version();
             } catch (ItemCaptureException unavailable) {
@@ -208,20 +212,24 @@ public class ScmItemEventRecorder {
                         null,
                         fence,
                         context.occurredAt(),
-                        context.isWebhook() ? FoundBy.WEBHOOK : FoundBy.SYNC,
+                        foundBy,
                         context.actorUserId(),
-                        null));
+                        null,
+                        items.retain(item, null, foundBy)));
                 continue;
             }
+            // The occasion keeps the work as this transaction stores it, before its review is admitted later.
             writer.record(new ItemEventInput(
                     workspace,
                     item.itemId(),
                     name,
                     version.value(),
+                    null,
                     context.occurredAt(),
-                    context.isWebhook() ? FoundBy.WEBHOOK : FoundBy.SYNC,
+                    foundBy,
                     context.actorUserId(),
-                    null));
+                    null,
+                    items.retain(item, version, foundBy)));
         }
     }
 
@@ -262,7 +270,27 @@ public class ScmItemEventRecorder {
                             event.state(),
                             ItemEventState.WITHHELD,
                             ReviewRequestReason.VERSION_SUPERSEDED);
-                else if (version != null) events.pin(workspace, item.itemId(), event, version.value());
+                else if (version != null) {
+                    String completed;
+                    try {
+                        completed = capture.complete(events.pendingEvidence(workspace, event.id()), version);
+                    } catch (ItemCaptureException invalid) {
+                        if (invalid.code() != ItemCaptureCode.CAPTURE_FAILED) throw invalid;
+                        // A bad retained record is local to its occasion, not a failed shared provider read.
+                        ReviewRefusalRecorder.record(
+                                meters, "submission", invalid.code().name());
+                        log.warn(
+                                "Pending occasion evidence could not be completed: workspaceId={}, itemId={}, eventId={}, reason={}",
+                                workspace,
+                                item.itemId(),
+                                event.id(),
+                                invalid.code());
+                        continue;
+                    }
+                    // The equal fence proves the retained words, head and target unchanged; only the base is new. The
+                    // state and roles stay those the occasion retained, also when they changed since.
+                    events.pin(workspace, item.itemId(), event, version.value(), completed);
+                }
             }
         }
     }

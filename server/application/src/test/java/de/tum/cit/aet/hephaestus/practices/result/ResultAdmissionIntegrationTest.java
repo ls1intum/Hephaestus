@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -661,6 +662,8 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                         .build())
                 .build();
         doReturn(snapshot).when(productItems).pin(eq(ref), eq(version));
+        // Event admission pins the occasion; this stub stands for a source that retained it.
+        doReturn(snapshot).when(productItems).pinOccasion(eq(ref), eq(version), any(UUID.class));
         doReturn(Optional.of(snapshot)).when(productItems).current(ref);
         doReturn(new ProductItemQuery.CurrentWorkVersion.Known(version.value()))
                 .when(productItems)
@@ -741,7 +744,9 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                     input.foundBy().name(),
                     input.actorUserId(),
                     input.requestedById(),
-                    Instant.now());
+                    Instant.now(),
+                    null,
+                    null);
             publishedEvents.publishEvent(new ItemEventRecorded(input.workspaceId(), eventId, input.itemId()));
         });
         assertThat(eventRows
@@ -947,6 +952,7 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                         .build())
                 .build();
         doReturn(mismatch).when(productItems).pin(eq(ref), eq(wanted));
+        doReturn(mismatch).when(productItems).pinOccasion(eq(ref), eq(wanted), any(UUID.class));
         var id = itemEvents.record(input);
         var decision = eventRows.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
         assertThat(decision.getState()).isEqualTo(ItemEventState.WITHHELD);

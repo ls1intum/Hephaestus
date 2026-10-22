@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
@@ -17,7 +18,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.JsonNode;
 
 @Entity
 @Table(
@@ -29,7 +33,8 @@ import org.jspecify.annotations.Nullable;
             @UniqueConstraint(
                     name = "uk_item_event_key",
                     columnNames = {"workspace_id", "item_id", "name", "item_version"})
-        })
+        },
+        indexes = {@Index(name = "idx_item_event_evidence_expiry", columnList = "evidence_expires_at")})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -94,4 +99,23 @@ public class ItemEvent {
     @Nullable
     @Column(name = "retry_at")
     private Instant retryAt;
+
+    /**
+     * The source's own record of the occasion, retained with it before admission so a later change to the work cannot
+     * replace it. Opaque to core apart from the {@code participants} it indexes for erasure. Null when the source
+     * retains nothing; a statement of why it keeps no record when none could be kept, after its expiry, after the
+     * item left the source, and once a copied person is erased.
+     */
+    @Nullable
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "evidence", columnDefinition = "jsonb")
+    private JsonNode evidence;
+
+    /**
+     * Fixed when the evidence is recorded; the evidence and every copy made from it are unusable after it. It names no
+     * person, so it stays after the record is removed and still bounds those copies. Null when no record was kept.
+     */
+    @Nullable
+    @Column(name = "evidence_expires_at")
+    private Instant evidenceExpiresAt;
 }

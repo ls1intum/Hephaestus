@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -11,17 +12,25 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemSourceObserved;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IntegrationCoreConnectionPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEvent;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventLedgerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.PendingItemEventReaper;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
@@ -32,6 +41,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewThreadContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -39,6 +50,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmWorkCapture;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -94,12 +106,15 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -122,14 +137,19 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 @RecordApplicationEvents
 class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTest {
     @Autowired
     ApplicationEvents applicationEvents;
+
+    @Autowired
+    IntegrationCoreConnectionPersonDataCatalog itemEventCatalog;
 
     @Autowired
     IdentityProviderRepository providers;
@@ -169,6 +189,9 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
 
     @Autowired
     ScmItemService source;
+
+    @Autowired
+    ScmWorkCapture workCapture;
 
     @Autowired
     ApplicationEventPublisher publisher;
@@ -229,6 +252,21 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
 
     @Autowired
     FeedbackSendRepository sends;
+
+    @Autowired
+    PendingItemEventReaper reaper;
+
+    @Autowired
+    ItemEventLedgerProperties ledger;
+
+    @Autowired
+    ItemEventService itemEvents;
+
+    @Autowired
+    ReviewSnapshotQuery snapshots;
+
+    @Autowired
+    Clock clock;
 
     @BeforeEach
     void setUp() {
@@ -882,6 +920,819 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
             assertThat(event.getState()).isEqualTo(ItemEventState.STARTED);
             assertThat(admitted).isPresent();
         }
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldAdmitTheOriginalOpenedOccasionWhenReadyWorkMovesBeforeAdmission(IdentityProviderType type) {
+        var prepared = prepare(type, false, Map.of("draftStatus", Set.of("NOT_DRAFT")), false);
+        long workspaceId = prepared.item().workspaceId();
+        long author = Objects.requireNonNull(
+                jdbc.queryForObject("SELECT account_id FROM membership WHERE workspace_id=?", Long.class, workspaceId));
+        // The budget is out when the ready work is reported, so its occasion waits to be admitted.
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(false);
+        publish(prepared);
+        var occasion = event(prepared);
+        assertThat(occasion.getName()).isEqualTo(ScmItemEvents.PULL_REQUEST_OPENED.value());
+        assertThat(occasion.getState()).isEqualTo(ItemEventState.WAITING);
+        assertThat(occasion.getReason()).isEqualTo(ReviewRequestReason.BUDGET_EXHAUSTED);
+        assertThat(reviews.findByWorkspaceIdAndEventId(workspaceId, occasion.getId()))
+                .isEmpty();
+
+        // Before admission, the author retitles, rewrites and pushes the work and turns it back into a draft.
+        transactions.executeWithoutResult(ignored -> {
+            var moved = pulls.findById(Objects.requireNonNull(prepared.item().sourceId()))
+                    .orElseThrow();
+            moved.setTitle("A retitled change");
+            moved.setBody("A rewritten description");
+            moved.setDraft(true);
+            moved.setHeadRefOid("c".repeat(40));
+            moved.setBaseRefOid("d".repeat(40));
+            var data = ScmEventPayload.PullRequestData.from(pulls.saveAndFlush(moved));
+            publisher.publishEvent(
+                    new ScmDomainEvent.PullRequestUpdated(data, Set.of("title", "body", "draft"), context(prepared)));
+            publisher.publishEvent(new ScmDomainEvent.PullRequestSynchronized(data, context(prepared)));
+        });
+        // An ordinary pin still reads only the current work.
+        assertThatThrownBy(() -> source.pin(prepared.item(), prepared.version()))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(true);
+        var request = ReviewRequest.builder()
+                .workspaceId(workspaceId)
+                .itemId(prepared.item().itemId())
+                .kind(ReviewKind.ITEM)
+                .version(new ItemVersion(Objects.requireNonNull(occasion.getItemVersion()), null))
+                .origin(ReviewOrigin.EVENT)
+                .eventId(occasion.getId())
+                .practiceIds(List.of())
+                .build();
+
+        assertThatCode(() -> service.request(request))
+                .as("the occasion is admitted at the version, state and roles it was recorded with")
+                .doesNotThrowAnyException();
+        var admitted = reviews.findByWorkspaceIdAndEventId(workspaceId, occasion.getId())
+                .orElseThrow();
+        assertThat(admitted.getOrigin()).isEqualTo(ReviewOrigin.EVENT);
+        assertThat(admitted.getStatus()).isEqualTo(ReviewStatus.QUEUED);
+        assertThat(admitted.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(admitted.getBaseVersion()).isEqualTo("a".repeat(40));
+        assertThat(admitted.getOrderedAt()).isEqualTo(occasion.getOccurredAt());
+        var member = jdbc.queryForMap(
+                "SELECT state, detail->>'developerId' AS developer FROM review_item"
+                        + " WHERE workspace_id=? AND review_id=?",
+                workspaceId,
+                admitted.getId());
+        assertThat(member.get("state")).isEqualTo("LISTED");
+        assertThat(member.get("developer")).isEqualTo(Long.toString(author));
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldCaptureTheRetainedOccasionWhenTheWorkMovesAfterAdmission(IdentityProviderType type) throws Exception {
+        var prepared = prepare(type, false);
+        publish(prepared);
+        var occasion = event(prepared);
+        var admitted = reviews.findByWorkspaceIdAndEventId(prepared.item().workspaceId(), occasion.getId())
+                .orElseThrow();
+        moveWork(prepared);
+
+        var pinned = source.pinOccasion(
+                prepared.item(),
+                new ItemVersion(Objects.requireNonNull(occasion.getItemVersion()), null),
+                occasion.getId());
+        assertThat(pinned.version()).isEqualTo(prepared.version());
+        var core = PullRequestContentSource.CORE;
+        var captured = source.capture(
+                pinned,
+                new CaptureRequest(
+                        admitted.getId(),
+                        UUID.randomUUID(),
+                        1,
+                        Set.of(core),
+                        "2.0.0",
+                        3,
+                        null,
+                        Set.of(core),
+                        occasion.getId()));
+
+        var record = new JsonMapper()
+                .readTree(Objects.requireNonNull(captured.files().get("context/metadata.json")));
+        assertThat(record.path("title").asString()).isEqualTo("A bounded change");
+        assertThat(record.path("body").asString()).isEqualTo("Describe this change");
+        assertThat(record.path("commit_sha").asString()).isEqualTo("b".repeat(40));
+        assertThat(record.path("is_draft").asBoolean()).isFalse();
+        assertThat(record.path("basis").path("other_fields").asString()).isEqualTo("OCCASION");
+        assertThat(record.path("basis").has("observed_at")).isTrue();
+        assertThat(record.path("basis").has("captured_at")).isFalse();
+        assertThat(new String(
+                        Objects.requireNonNull(captured.files().get(PullRequestContentSource.DESCRIPTION_FILE)),
+                        StandardCharsets.UTF_8))
+                .isEqualTo("Describe this change");
+        assertThat(source.record(pinned, captured.files()).path("commit_sha").asString())
+                .isEqualTo("b".repeat(40));
+        // The same request without its occasion still captures only the current work, which no longer matches.
+        assertThatThrownBy(() -> source.capture(
+                        pinned,
+                        new CaptureRequest(
+                                admitted.getId(), UUID.randomUUID(), 1, Set.of(core), "2.0.0", 3, null, Set.of(core))))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+        // Another occasion ID names no occasion of this item, so nothing is pinned, neither old nor current work.
+        assertOccasionUnavailable(prepared, prepared.version(), UUID.randomUUID());
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldCaptureTheOriginalSubmittedDecisionWhenTheReviewIsEditedAfterItsOccasion(IdentityProviderType type)
+            throws Exception {
+        var prepared = prepare(type, true);
+        publish(prepared);
+        var occasion = event(prepared);
+        long workspaceId = prepared.item().workspaceId();
+        var admitted = reviews.findByWorkspaceIdAndEventId(workspaceId, occasion.getId())
+                .orElseThrow();
+        long reviewId = Objects.requireNonNull(prepared.item().sourceId());
+        var reviewer = users.findById(Objects.requireNonNull(
+                                providerReviews.findById(reviewId).orElseThrow().getAuthor())
+                        .getId())
+                .orElseThrow();
+        // After the occasion, the reviewer edits the submitted review's words and changes its decision.
+        transactions.executeWithoutResult(ignored -> {
+            var edited = providerReviews.findById(reviewId).orElseThrow();
+            edited.setBody("An edited later decision.");
+            edited.setState(PullRequestReview.State.APPROVED);
+            providerReviews.saveAndFlush(edited);
+        });
+        assertThat(source.pin(prepared.item(), null).state()).containsEntry("reviewState", "APPROVED");
+
+        var pinned = source.pinOccasion(prepared.item(), prepared.version(), occasion.getId());
+        assertThat(pinned.state()).containsEntry("reviewState", "COMMENTED");
+        var threads = ReviewThreadContentSource.KIND;
+        var request = new CaptureRequest(
+                admitted.getId(),
+                UUID.randomUUID(),
+                1,
+                Set.of(threads),
+                "2.0.0",
+                3,
+                null,
+                Set.of(threads),
+                occasion.getId());
+        var captured = source.capture(pinned, request);
+
+        var staged = new JsonMapper()
+                .readTree(Objects.requireNonNull(captured.files().get("context/review_threads.json")));
+        assertThat(staged.path("reviewRecipient").path("author").asString()).isEqualTo(reviewer.getLogin());
+        assertThat(staged.path("reviewRecipient").path("authorId").asLong()).isEqualTo(reviewer.getNativeId());
+        var decisions = staged.path("reviewDecisions");
+        assertThat(decisions.size()).isEqualTo(1);
+        var decision = decisions.get(0);
+        assertThat(decision.path("state").asString()).isEqualTo("COMMENTED");
+        assertThat(decision.path("body").asString()).isEqualTo("Review this change");
+        assertThat(decision.path("authorId").asLong()).isEqualTo(reviewer.getNativeId());
+        // Dated when Hephaestus stored the occasion; the mirror's own dates stay as they were then.
+        assertThat(decision.has("observedAt")).isTrue();
+        assertThat(staged.toString()).doesNotContain("An edited later decision.");
+        // The same request without its occasion reads the edited review, which no longer has the pinned version.
+        var current = new CaptureRequest(
+                admitted.getId(), UUID.randomUUID(), 1, Set.of(threads), "2.0.0", 3, null, Set.of(threads));
+        assertThatThrownBy(() -> source.capture(pinned, current))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+        // The original words still need current access to the work: once it is gone, nothing is captured.
+        jdbc.update(
+                "UPDATE issue SET deleted_at = now() WHERE id = ?",
+                Objects.requireNonNull(
+                                providerReviews.findById(reviewId).orElseThrow().getPullRequest())
+                        .getId());
+        assertThatThrownBy(() -> source.capture(pinned, request))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.ITEM_REMOVED));
+    }
+
+    private void assertOccasionUnavailable(Prepared prepared, ItemVersion version, UUID occasion) {
+        assertThatThrownBy(() -> source.pinOccasion(prepared.item(), version, occasion))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.OCCASION_EVIDENCE_UNAVAILABLE));
+    }
+
+    private String unretained(UUID occasion) {
+        return Objects.requireNonNull(jdbc.queryForObject(
+                "SELECT evidence->>'unretained' FROM item_event WHERE id=?", String.class, occasion));
+    }
+
+    @Test
+    void shouldKeepTheFirstRecordedStateAndRolesWhenTheOccasionIsRedeliveredAfterTheyChange() {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        var original = source.pin(prepared.item(), null);
+        publish(prepared);
+        var occasion = event(prepared);
+        var provider = providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow();
+        var assignee =
+                users.saveAndFlush(TestUserFactory.createUser(nativeId(), "assignee-" + UUID.randomUUID(), provider));
+        // Neither change is part of the version, so the redelivered occasion has the same one.
+        transactions.executeWithoutResult(ignored -> {
+            var pull = pulls.findById(Objects.requireNonNull(prepared.item().sourceId()))
+                    .orElseThrow();
+            pull.setDraft(true);
+            pull.getAssignees().add(users.findById(assignee.getId()).orElseThrow());
+            pulls.saveAndFlush(pull);
+        });
+        var current = source.pin(prepared.item(), null);
+        assertThat(current.version()).isEqualTo(prepared.version());
+        assertThat(current.state()).isNotEqualTo(original.state());
+        assertThat(current.roles()).extracting(role -> role.role()).contains(AboutRole.ASSIGNEE);
+        publish(prepared);
+
+        assertThat(event(prepared).getId()).isEqualTo(occasion.getId());
+        var retained = source.pinOccasion(prepared.item(), prepared.version(), occasion.getId());
+        assertThat(retained.state()).isEqualTo(original.state());
+        assertThat(retained.roles()).isEqualTo(original.roles());
+
+        // Past its expiry the record is gone, and the current work at the very same version never takes its place.
+        jdbc.update(
+                "UPDATE item_event SET evidence_expires_at = now() - interval '1 minute' WHERE id = ?",
+                occasion.getId());
+        assertOccasionUnavailable(prepared, prepared.version(), occasion.getId());
+        assertThat(source.pin(prepared.item(), prepared.version()).state()).isEqualTo(current.state());
+    }
+
+    @Test
+    void shouldStateThatAReferencedOccasionsEvidenceExpiredAndNeverPinTheCurrentWorkInItsPlace() {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        publish(prepared);
+        var occasion = event(prepared);
+        assertThat(reviews.findByWorkspaceIdAndEventId(prepared.item().workspaceId(), occasion.getId()))
+                .isPresent();
+        assertThat(occasion.getEvidence()).isNotNull();
+        assertThat(occasion.getEvidenceExpiresAt()).isAfter(Instant.now());
+        moveWork(prepared);
+        assertThat(source.pinOccasion(prepared.item(), prepared.version(), occasion.getId())
+                        .version())
+                .isEqualTo(prepared.version());
+
+        jdbc.update(
+                "UPDATE item_event SET evidence_expires_at = now() - interval '1 minute' WHERE id = ?",
+                occasion.getId());
+        var deadline = events.findById(occasion.getId()).orElseThrow().getEvidenceExpiresAt();
+        // Past its expiry the evidence is no longer used, also before the reaper replaces it.
+        assertOccasionUnavailable(prepared, prepared.version(), occasion.getId());
+        reaper.sweep();
+
+        var swept = events.findById(occasion.getId()).orElseThrow();
+        assertThat(unretained(occasion.getId())).isEqualTo("EXPIRED");
+        assertThat(Objects.requireNonNull(swept.getEvidence()).has("record")).isFalse();
+        // The fixed expiry names no person and stays, so a later admission copies nothing for a new day.
+        assertThat(swept.getEvidenceExpiresAt()).isNotNull().isEqualTo(deadline);
+        assertThat(swept.getItemVersion()).isEqualTo(prepared.version().value());
+        var admitted = reviews.findByWorkspaceIdAndEventId(prepared.item().workspaceId(), occasion.getId())
+                .orElseThrow();
+        assertThat(snapshots
+                        .find(prepared.item().workspaceId(), admitted.getId())
+                        .orElseThrow()
+                        .evidenceExpiresAt())
+                .isEqualTo(deadline);
+        assertOccasionUnavailable(prepared, prepared.version(), occasion.getId());
+        // A second sweep no longer selects the statement: it stays as it is, with the same expiry.
+        reaper.sweep();
+        assertThat(unretained(occasion.getId())).isEqualTo("EXPIRED");
+        assertThat(events.findById(occasion.getId()).orElseThrow().getEvidenceExpiresAt())
+                .isEqualTo(deadline);
+    }
+
+    @Test
+    void shouldExpireRetainedEvidenceWithoutOfferingAnyOccasionAgainWhenTheAgentIsOff() {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(false);
+        publish(prepared);
+        var occasion = event(prepared);
+        assertThat(occasion.getState()).isEqualTo(ItemEventState.WAITING);
+        // Both are due: the record's expiry and the occasion's next offer.
+        jdbc.update(
+                "UPDATE item_event SET evidence_expires_at = now() - interval '1 minute',"
+                        + " retry_at = now() - interval '1 minute' WHERE id = ?",
+                occasion.getId());
+        var due = events.findById(occasion.getId()).orElseThrow();
+        long offered = offers(occasion.getId());
+        var agentOff = new PendingItemEventReaper(
+                events,
+                ledger,
+                publisher,
+                clock,
+                new MockEnvironment().withProperty(RuntimeRole.AGENT_ENABLED_PROPERTY, "false"));
+
+        transactions.executeWithoutResult(ignored -> agentOff.sweep());
+
+        var swept = events.findById(occasion.getId()).orElseThrow();
+        assertThat(unretained(occasion.getId())).isEqualTo("EXPIRED");
+        assertThat(swept.getEvidenceExpiresAt()).isEqualTo(due.getEvidenceExpiresAt());
+        assertThat(swept.getState()).isEqualTo(ItemEventState.WAITING);
+        assertThat(swept.getLastAttemptedAt()).isEqualTo(due.getLastAttemptedAt());
+        assertThat(swept.getRetryAt()).isEqualTo(due.getRetryAt());
+        assertThat(offers(occasion.getId())).isEqualTo(offered);
+
+        // Where the agent runs, the same sweep offers the due occasion again.
+        var agentOn = new PendingItemEventReaper(
+                events,
+                ledger,
+                publisher,
+                clock,
+                new MockEnvironment().withProperty(RuntimeRole.AGENT_ENABLED_PROPERTY, "true"));
+        transactions.executeWithoutResult(ignored -> agentOn.sweep());
+        assertThat(offers(occasion.getId())).isEqualTo(offered + 1);
+    }
+
+    @Test
+    void shouldReadAnOccasionsEvidenceOnlyInItsOwnWorkspaceItemAndEvent() {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        var other = prepare(IdentityProviderType.GITHUB, false);
+        publish(prepared);
+        publish(other);
+        var occasion = event(prepared);
+        var item = prepared.item();
+        assertThat(item.workspaceId()).isNotEqualTo(other.item().workspaceId());
+
+        assertThat(itemEvents
+                        .evidence(item.workspaceId(), item.itemId(), occasion.getId())
+                        .record())
+                .isNotNull();
+        assertThat(itemEvents
+                        .evidence(other.item().workspaceId(), item.itemId(), occasion.getId())
+                        .unretained())
+                .isEqualTo(ItemEventService.RetainedEvidence.UNKNOWN);
+        assertThat(itemEvents
+                        .evidence(item.workspaceId(), other.item().itemId(), occasion.getId())
+                        .unretained())
+                .isEqualTo(ItemEventService.RetainedEvidence.UNKNOWN);
+        assertThat(itemEvents
+                        .evidence(
+                                item.workspaceId(), item.itemId(), event(other).getId())
+                        .unretained())
+                .isEqualTo(ItemEventService.RetainedEvidence.UNKNOWN);
+        // The other workspace's own occasion of the same version is not this one.
+        assertOccasionUnavailable(prepared, prepared.version(), event(other).getId());
+    }
+
+    @Test
+    void shouldKeepTheFixedExpiryWhenTheItemLeavesTheSource() {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        publish(prepared);
+        var occasion = event(prepared);
+        var deadline = Objects.requireNonNull(occasion.getEvidenceExpiresAt());
+
+        transactions.executeWithoutResult(ignored -> itemEvents.forgetEvidence(
+                prepared.item().workspaceId(), prepared.item().itemId()));
+
+        assertThat(unretained(occasion.getId())).isEqualTo("REMOVED");
+        assertThat(events.findById(occasion.getId()).orElseThrow().getEvidenceExpiresAt())
+                .isEqualTo(deadline);
+        assertOccasionUnavailable(prepared, prepared.version(), occasion.getId());
+    }
+
+    private long offers(UUID occasion) {
+        return applicationEvents.stream(ItemEventRecorded.class)
+                .filter(recorded -> recorded.eventId().equals(occasion))
+                .count();
+    }
+
+    @Test
+    void shouldRefuseAnOccasionRecordedBeforeEvidenceWasRetainedInsteadOfPinningTheCurrentWork() {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        publish(prepared);
+        var occasion = event(prepared);
+        jdbc.update("UPDATE item_event SET evidence = NULL, evidence_expires_at = NULL WHERE id = ?", occasion.getId());
+        // The current work still has exactly the occasion's version; a legacy occasion still reviews none of it.
+        assertThat(source.pin(prepared.item(), prepared.version()).version()).isEqualTo(prepared.version());
+        assertOccasionUnavailable(prepared, prepared.version(), occasion.getId());
+    }
+
+    @Test
+    void shouldWithholdAWaitingOccasionWhoseEvidenceExpiredWhenItIsOfferedAgain() {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        long workspaceId = prepared.item().workspaceId();
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(false);
+        publish(prepared);
+        var occasion = event(prepared);
+        assertThat(occasion.getState()).isEqualTo(ItemEventState.WAITING);
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(true);
+        jdbc.update(
+                "UPDATE item_event SET evidence_expires_at = now() - interval '1 minute' WHERE id = ?",
+                occasion.getId());
+
+        transactions.executeWithoutResult(ignored -> publisher.publishEvent(new ItemEventRecorded(
+                workspaceId, occasion.getId(), prepared.item().itemId())));
+
+        var settled = events.findById(occasion.getId()).orElseThrow();
+        assertThat(settled.getState()).isEqualTo(ItemEventState.WITHHELD);
+        assertThat(settled.getReason()).isEqualTo(ReviewRequestReason.OCCASION_EVIDENCE_UNAVAILABLE);
+        assertThat(reviews.findByWorkspaceIdAndEventId(workspaceId, occasion.getId()))
+                .isEmpty();
+        // A manual request of the same work is not an occasion and still reviews the current work.
+        long account = Objects.requireNonNull(
+                jdbc.queryForObject("SELECT account_id FROM membership WHERE workspace_id=?", Long.class, workspaceId));
+        var manual = service.request(ReviewRequest.builder()
+                .workspaceId(workspaceId)
+                .itemId(prepared.item().itemId())
+                .kind(ReviewKind.ITEM)
+                .version(prepared.version())
+                .origin(ReviewOrigin.REQUEST)
+                .requestedById(account)
+                .requestKey(UUID.randomUUID())
+                .requestDigest("c".repeat(64))
+                .practiceIds(List.of())
+                .build());
+        assertThat(reviews.findById(manual).orElseThrow().getItemVersion())
+                .isEqualTo(prepared.version().value());
+    }
+
+    @Test
+    void shouldKeepAWaitingOccasionWaitingWhenItsRetainedRecordIsCorrupt() {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        long workspaceId = prepared.item().workspaceId();
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(false);
+        publish(prepared);
+        var occasion = event(prepared);
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(true);
+        jdbc.update("UPDATE item_event SET evidence = '{\"schema\":99}' WHERE id = ?", occasion.getId());
+
+        // A corrupt record is a fault, not a missing original: it fails and is offered again, never withheld.
+        assertThatThrownBy(() -> source.pinOccasion(prepared.item(), prepared.version(), occasion.getId()))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.CAPTURE_FAILED));
+        transactions.executeWithoutResult(ignored -> publisher.publishEvent(new ItemEventRecorded(
+                workspaceId, occasion.getId(), prepared.item().itemId())));
+        // The AFTER_COMMIT listener records its fault for retry; it does not throw back to the publisher.
+        assertThat(jdbc.queryForList(
+                        "SELECT status FROM event_publication WHERE event_type=?"
+                                + " AND serialized_event::jsonb->>'eventId'=? AND completion_date IS NULL",
+                        String.class,
+                        ItemEventRecorded.class.getName(),
+                        occasion.getId().toString()))
+                .containsExactly("FAILED");
+        assertThat(events.findById(occasion.getId()).orElseThrow().getState()).isEqualTo(ItemEventState.WAITING);
+        assertThat(reviews.findByWorkspaceIdAndEventId(workspaceId, occasion.getId()))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldEraseAFormerAssigneesOccasionByTheNativeIdentityItKeeps() {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        var provider = providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow();
+        var assignee =
+                users.saveAndFlush(TestUserFactory.createUser(nativeId(), "erased-" + UUID.randomUUID(), provider));
+        long pullId = Objects.requireNonNull(prepared.item().sourceId());
+        transactions.executeWithoutResult(ignored -> {
+            var pull = pulls.findById(pullId).orElseThrow();
+            pull.getAssignees().add(users.findById(assignee.getId()).orElseThrow());
+            pulls.saveAndFlush(pull);
+        });
+        var withAssignee = source.pin(prepared.item(), null);
+        var occasion = recordOccasion(prepared, withAssignee.version());
+        transactions.executeWithoutResult(ignored -> {
+            var pull = pulls.findById(pullId).orElseThrow();
+            pull.getAssignees().removeIf(user -> Objects.equals(user.getId(), assignee.getId()));
+            pulls.saveAndFlush(pull);
+        });
+        var store = itemEventCatalog.contributors().stream()
+                .filter(contributor -> contributor.store().equals("item_event_evidence"))
+                .findFirst()
+                .orElseThrow();
+        // Only the native identity: the mirror no longer links this person to the work.
+        var scope = new PersonScope(
+                null,
+                List.of(new PersonIdentity(providerId(assignee), Long.toString(assignee.getNativeId()), null)),
+                List.of());
+
+        var deadline = events.findById(occasion).orElseThrow().getEvidenceExpiresAt();
+        var selection = store.select(scope);
+        assertThat(selection.rows()).extracting(row -> row.columns().get("id")).contains(occasion.toString());
+        store.erase(selection, scope);
+
+        assertThat(unretained(occasion)).isEqualTo("ERASED");
+        // The fixed expiry names no person, so erasure keeps it to bound the copies made before.
+        assertThat(events.findById(occasion).orElseThrow().getEvidenceExpiresAt())
+                .isNotNull()
+                .isEqualTo(deadline);
+        assertThat(store.select(scope).rows())
+                .extracting(row -> row.columns().get("id"))
+                .doesNotContain(occasion.toString());
+        assertOccasionUnavailable(prepared, withAssignee.version(), occasion);
+    }
+
+    @Test
+    void shouldStateTheSizeLimitInsteadOfTruncatingAnOversizedOccasion() {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        // Each "é" is two UTF-8 bytes, so the description alone exceeds the 1 MiB limit.
+        transactions.executeWithoutResult(ignored -> {
+            var pull = pulls.findById(Objects.requireNonNull(prepared.item().sourceId()))
+                    .orElseThrow();
+            pull.setBody("é".repeat(600_000));
+            pulls.saveAndFlush(pull);
+        });
+        var oversized = source.pin(prepared.item(), null);
+        var occasion = recordOccasion(prepared, oversized.version());
+
+        assertThat(unretained(occasion)).isEqualTo("SIZE_LIMIT");
+        var settled = events.findById(occasion).orElseThrow();
+        assertThat(settled.getEvidenceExpiresAt()).isNull();
+        assertThat(settled.getState()).isEqualTo(ItemEventState.WITHHELD);
+        assertThat(settled.getReason()).isEqualTo(ReviewRequestReason.OCCASION_EVIDENCE_UNAVAILABLE);
+        assertOccasionUnavailable(prepared, oversized.version(), occasion);
+    }
+
+    @Test
+    void shouldStateThatNothingWasRetainedForAnOccasionWhosePersonIsSuppressedWhenItIsRecorded() {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        var author = Objects.requireNonNull(transactions.execute(ignored -> users.findById(
+                        Objects.requireNonNull(pulls.findById(Objects.requireNonNull(
+                                                prepared.item().sourceId()))
+                                        .orElseThrow()
+                                        .getAuthor())
+                                .getId())
+                .orElseThrow()));
+        UUID restriction = databaseTestUtils.erase(providerId(author), Long.toString(author.getNativeId()), "");
+        ItemEvent occasion;
+        try {
+            publish(prepared);
+            occasion = onlyEvent(prepared);
+        } finally {
+            jdbc.update("DELETE FROM identity_restriction WHERE id=?", restriction);
+        }
+        assertThat(unretained(occasion.getId())).isEqualTo("SUPPRESSED");
+        assertThat(occasion.getEvidenceExpiresAt()).isNull();
+        // Lifting the restriction later does not bring back words that were never kept.
+        assertOccasionUnavailable(
+                prepared, new ItemVersion(Objects.requireNonNull(occasion.getItemVersion()), null), occasion.getId());
+    }
+
+    @Test
+    void shouldRefuseToCaptureAnOccasionWhoseFormerAssigneeWithdrewAfterLeavingTheWork() throws Exception {
+        var prepared = prepare(IdentityProviderType.GITHUB, false);
+        var provider = providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow();
+        var assignee =
+                users.saveAndFlush(TestUserFactory.createUser(nativeId(), "former-" + UUID.randomUUID(), provider));
+        long pullId = Objects.requireNonNull(prepared.item().sourceId());
+        transactions.executeWithoutResult(ignored -> {
+            var pull = pulls.findById(pullId).orElseThrow();
+            pull.getAssignees().add(users.findById(assignee.getId()).orElseThrow());
+            pulls.saveAndFlush(pull);
+        });
+        var withAssignee = source.pin(prepared.item(), null);
+        var occasion = recordOccasion(prepared, withAssignee.version());
+        assertThat(jdbc.queryForObject(
+                        "SELECT evidence->'participants' @> CAST(? AS jsonb) FROM item_event WHERE id=?",
+                        Boolean.class,
+                        "[{\"userId\":" + assignee.getId() + "}]",
+                        occasion))
+                .isTrue();
+        // The assignee leaves the work; only the occasion still names them.
+        transactions.executeWithoutResult(ignored -> {
+            var pull = pulls.findById(pullId).orElseThrow();
+            pull.getAssignees().removeIf(user -> Objects.equals(user.getId(), assignee.getId()));
+            pulls.saveAndFlush(pull);
+        });
+        var pinned = source.pinOccasion(prepared.item(), withAssignee.version(), occasion);
+        var core = PullRequestContentSource.CORE;
+        var request = new CaptureRequest(
+                UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(core), "2.0.0", 3, null, Set.of(core), occasion);
+        UUID restriction = databaseTestUtils.erase(providerId(assignee), Long.toString(assignee.getNativeId()), "");
+        try {
+            assertThatThrownBy(() -> source.capture(pinned, request))
+                    .isInstanceOfSatisfying(
+                            ItemCaptureException.class,
+                            failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
+        } finally {
+            jdbc.update("DELETE FROM identity_restriction WHERE id=?", restriction);
+        }
+        assertThat(source.capture(pinned, request).files()).containsKey("context/metadata.json");
+    }
+
+    @Test
+    void shouldCompleteAPendingGitLabOccasionsEvidenceOnlyWithTheDiffBaseItsUnchangedFenceProves() {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        var pull = withoutBase(prepared);
+        publish(prepared);
+        var pending = onlyEvent(prepared);
+        assertThat(pending.getItemVersion()).isNull();
+        var retained = Objects.requireNonNull(pending.getEvidence());
+        assertThat(retained.path("itemVersion").isString()).isFalse();
+        assertThat(retained.path("work").path("base").isString()).isFalse();
+        // State and people are outside the fence: they change before the base arrives, and the occasion keeps its own.
+        var provider = providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test")
+                .orElseThrow();
+        var assignee =
+                users.saveAndFlush(TestUserFactory.createUser(nativeId(), "later-" + UUID.randomUUID(), provider));
+        transactions.executeWithoutResult(ignored -> {
+            var moved = pulls.findById(pull.getId()).orElseThrow();
+            moved.setDraft(true);
+            moved.getAssignees().add(users.findById(assignee.getId()).orElseThrow());
+            pulls.saveAndFlush(moved);
+        });
+
+        assertThat(readiness(pull, new GitLabMergeRequestReadinessReader.DiffRefs("b".repeat(40), "a".repeat(40))))
+                .isTrue();
+
+        var pinned = events.findById(pending.getId()).orElseThrow();
+        assertThat(pinned.getItemVersion()).isEqualTo(prepared.version().value());
+        var completed = Objects.requireNonNull(pinned.getEvidence());
+        assertThat(completed.path("itemVersion").asString())
+                .isEqualTo(prepared.version().value());
+        assertThat(completed.path("work").path("base").asString()).isEqualTo("a".repeat(40));
+        assertThat(completed.path("record")).isEqualTo(retained.path("record"));
+        assertThat(completed.path("state")).isEqualTo(retained.path("state"));
+        assertThat(completed.path("roles")).isEqualTo(retained.path("roles"));
+        assertThat(completed.path("participants")).isEqualTo(retained.path("participants"));
+        assertThat(pinned.getEvidenceExpiresAt()).isEqualTo(pending.getEvidenceExpiresAt());
+        moveWork(prepared);
+        var occasion = source.pinOccasion(prepared.item(), prepared.version(), pending.getId());
+        assertThat(occasion.version()).isEqualTo(prepared.version());
+        assertThat(occasion.roles()).extracting(role -> role.role()).doesNotContain(AboutRole.ASSIGNEE);
+    }
+
+    @Test
+    void shouldWithholdAPendingGitLabOccasionUnchangedWhenItsFenceChangesBeforeTheBaseArrives() {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        var pull = withoutBase(prepared);
+        publish(prepared);
+        var pending = onlyEvent(prepared);
+        var retained = Objects.requireNonNull(pending.getEvidence());
+        // The title is part of the fence, so the base GitLab pairs next belongs to different work.
+        jdbc.update("UPDATE issue SET title = ? WHERE id = ?", "A retitled change", pull.getId());
+
+        readiness(pull, new GitLabMergeRequestReadinessReader.DiffRefs("b".repeat(40), "a".repeat(40)));
+
+        var withheld = events.findById(pending.getId()).orElseThrow();
+        assertThat(withheld.getState()).isEqualTo(ItemEventState.WITHHELD);
+        assertThat(withheld.getReason()).isEqualTo(ReviewRequestReason.VERSION_SUPERSEDED);
+        assertThat(withheld.getItemVersion()).isNull();
+        assertThat(withheld.getEvidence()).isEqualTo(retained);
+        assertThat(withheld.getEvidenceExpiresAt()).isEqualTo(pending.getEvidenceExpiresAt());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ERASED", "EXPIRED", "REMOVED"})
+    void shouldKeepAnEvidenceRemovalStatementWhenAStaleCompletionArrives(String reason) {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        withoutBase(prepared);
+        publish(prepared);
+        var pending = onlyEvent(prepared);
+        var unresolved = itemEvents
+                .unresolved(prepared.item().workspaceId(), prepared.item().itemId())
+                .getFirst();
+        var staleCompletion = workCapture.complete(
+                itemEvents.pendingEvidence(prepared.item().workspaceId(), pending.getId()), prepared.version());
+        assertThat(staleCompletion).contains("Describe this change");
+        // Completion already read the words when erasure, expiry or removal commits its durable statement.
+        jdbc.update(
+                "UPDATE item_event SET evidence = jsonb_build_object('unretained', CAST(? AS text)) WHERE id=?",
+                reason,
+                pending.getId());
+
+        assertThat(itemEvents.pin(
+                        prepared.item().workspaceId(),
+                        prepared.item().itemId(),
+                        unresolved,
+                        prepared.version().value(),
+                        staleCompletion))
+                .isTrue();
+
+        var pinned = events.findById(pending.getId()).orElseThrow();
+        assertThat(jdbc.queryForObject(
+                        "SELECT evidence->>'unretained' FROM item_event WHERE id=?", String.class, pending.getId()))
+                .isEqualTo(reason);
+        assertThat(Objects.requireNonNull(pinned.getEvidence()).size()).isEqualTo(1);
+        assertThat(pinned.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(pinned.getEvidenceExpiresAt()).isEqualTo(pending.getEvidenceExpiresAt());
+        assertOccasionUnavailable(prepared, prepared.version(), pending.getId());
+    }
+
+    @Test
+    void shouldKeepALegacyNullRecordWhenAStaleCompletionArrives() {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        withoutBase(prepared);
+        publish(prepared);
+        var pending = onlyEvent(prepared);
+        var unresolved = itemEvents
+                .unresolved(prepared.item().workspaceId(), prepared.item().itemId())
+                .getFirst();
+        var staleCompletion = workCapture.complete(
+                itemEvents.pendingEvidence(prepared.item().workspaceId(), pending.getId()), prepared.version());
+        jdbc.update("UPDATE item_event SET evidence=NULL, evidence_expires_at=NULL WHERE id=?", pending.getId());
+
+        assertThat(itemEvents.pin(
+                        prepared.item().workspaceId(),
+                        prepared.item().itemId(),
+                        unresolved,
+                        prepared.version().value(),
+                        staleCompletion))
+                .isTrue();
+
+        var pinned = events.findById(pending.getId()).orElseThrow();
+        assertThat(pinned.getEvidence()).isNull();
+        assertThat(pinned.getEvidenceExpiresAt()).isNull();
+        assertThat(pinned.getItemVersion()).isEqualTo(prepared.version().value());
+        assertOccasionUnavailable(prepared, prepared.version(), pending.getId());
+    }
+
+    @Test
+    void shouldKeepCorruptPendingEvidenceUnresolvedWithoutRollingBackTheMirrorOrOtherOccasions() {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        var pull = withoutBase(prepared);
+        var repository = repositories
+                .findById(Objects.requireNonNull(pull.getRepository()).getId())
+                .orElseThrow();
+        var other = fixture(IdentityProviderType.GITLAB);
+        var monitor = WorkspaceTestFixtures.repositoryMonitor(other.workspace(), repository.getNameWithOwner());
+        monitor.setNativeId(repository.getNativeId());
+        monitors.saveAndFlush(monitor);
+        var holder = writer.upsert(new ItemRegistration(
+                other.workspace().getId(), ScmItemEvents.REPOSITORY, repository.getId(), null, null));
+        var otherItem = writer.upsert(new ItemRegistration(
+                other.workspace().getId(), ScmItemEvents.PULL_REQUEST, pull.getId(), holder.itemId(), null));
+        publish(prepared);
+        var pending = onlyEvent(prepared);
+        var otherPending = itemEvents
+                .unresolved(otherItem.workspaceId(), otherItem.itemId())
+                .getFirst();
+        // Corrupt only this workspace's retained record, not the shared mirror or the proved source fence.
+        jdbc.update(
+                "UPDATE item_event SET evidence = jsonb_set(evidence, '{work,body}', to_jsonb(CAST(? AS text))) "
+                        + "WHERE workspace_id=? AND id=?",
+                "Inconsistent retained words",
+                prepared.item().workspaceId(),
+                pending.getId());
+
+        assertThat(readiness(pull, new GitLabMergeRequestReadinessReader.DiffRefs("b".repeat(40), "a".repeat(40))))
+                .isTrue();
+
+        assertThat(pulls.findById(pull.getId()).orElseThrow().getBaseRefOid()).isEqualTo("a".repeat(40));
+        var unresolved = events.findById(pending.getId()).orElseThrow();
+        assertThat(unresolved.getState()).isEqualTo(ItemEventState.RECORDED);
+        assertThat(unresolved.getItemVersion()).isNull();
+        var evidence = Objects.requireNonNull(unresolved.getEvidence());
+        assertThat(evidence.path("work").path("body").asString()).isEqualTo("Inconsistent retained words");
+        assertThat(evidence.has("unretained")).isFalse();
+        assertThat(unresolved.getEvidenceExpiresAt()).isEqualTo(pending.getEvidenceExpiresAt());
+        assertThat(reviews.findByWorkspaceIdAndEventId(prepared.item().workspaceId(), pending.getId()))
+                .isEmpty();
+        var completed = events.findById(otherPending.id()).orElseThrow();
+        assertThat(completed.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(Objects.requireNonNull(completed.getEvidence())
+                        .path("work")
+                        .path("base")
+                        .asString())
+                .isEqualTo("a".repeat(40));
+        assertThat(completed.getEvidenceExpiresAt()).isNotNull();
+    }
+
+    /** Records the occasion of {@code prepared} at {@code version}, as the provider event would. */
+    private UUID recordOccasion(Prepared prepared, ItemVersion version) {
+        publish(prepared);
+        return events.findByWorkspaceIdAndItemIdAndNameAndItemVersion(
+                        prepared.item().workspaceId(),
+                        prepared.item().itemId(),
+                        prepared.name().value(),
+                        version.value())
+                .orElseThrow()
+                .getId();
+    }
+
+    /** The author retitles, rewrites and pushes the work, and its diff base moves with the push. */
+    private void moveWork(Prepared prepared) {
+        transactions.executeWithoutResult(ignored -> {
+            var moved = pulls.findById(Objects.requireNonNull(prepared.item().sourceId()))
+                    .orElseThrow();
+            moved.setTitle("A retitled change");
+            moved.setBody("A rewritten description");
+            moved.setDraft(true);
+            moved.setHeadRefOid("c".repeat(40));
+            moved.setBaseRefOid("d".repeat(40));
+            var data = ScmEventPayload.PullRequestData.from(pulls.saveAndFlush(moved));
+            publisher.publishEvent(
+                    new ScmDomainEvent.PullRequestUpdated(data, Set.of("title", "body", "draft"), context(prepared)));
+            publisher.publishEvent(new ScmDomainEvent.PullRequestSynchronized(data, context(prepared)));
+        });
     }
 
     @Test

@@ -10,6 +10,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * @param scanPaths exact frozen paths permitted for a scan job; null for other captures
  * @param permittedSources the governance-permitted capture plan; sources selects only this contribution
+ * @param eventId the occasion an event review captures; a source that retained it captures that record
  */
 public record CaptureRequest(
         UUID reviewId,
@@ -19,7 +20,8 @@ public record CaptureRequest(
         String sourceContractVersion,
         int scriptContractVersion,
         @Nullable Set<String> scanPaths,
-        Set<SourceKind> permittedSources) {
+        Set<SourceKind> permittedSources,
+        @Nullable UUID eventId) {
     public CaptureRequest(
             UUID reviewId,
             UUID jobId,
@@ -41,6 +43,27 @@ public record CaptureRequest(
         this(reviewId, jobId, attempt, sources, sourceContractVersion, scriptContractVersion, scanPaths, sources);
     }
 
+    public CaptureRequest(
+            UUID reviewId,
+            UUID jobId,
+            int attempt,
+            Set<SourceKind> sources,
+            String sourceContractVersion,
+            int scriptContractVersion,
+            @Nullable Set<String> scanPaths,
+            Set<SourceKind> permittedSources) {
+        this(
+                reviewId,
+                jobId,
+                attempt,
+                sources,
+                sourceContractVersion,
+                scriptContractVersion,
+                scanPaths,
+                permittedSources,
+                null);
+    }
+
     public CaptureRequest {
         Objects.requireNonNull(reviewId, "reviewId");
         Objects.requireNonNull(jobId, "jobId");
@@ -49,8 +72,23 @@ public record CaptureRequest(
         if (!permittedSources.containsAll(sources))
             throw new IllegalArgumentException("Selected capture sources are outside the permitted plan");
         scanPaths = scanPaths == null ? null : Set.copyOf(scanPaths);
+        if (eventId != null && scanPaths != null) throw new IllegalArgumentException("A scan has no occasion");
         new SourceContractVersion(sourceContractVersion);
         if (attempt < 0) throw new IllegalArgumentException("Attempt must not be negative");
         if (scriptContractVersion != 3) throw new IllegalArgumentException("Unsupported practice script contract");
+    }
+
+    /** This request for another selection of sources, under the same plan and occasion. */
+    public CaptureRequest withPermittedSources(Set<SourceKind> permitted) {
+        return new CaptureRequest(
+                reviewId,
+                jobId,
+                attempt,
+                sources,
+                sourceContractVersion,
+                scriptContractVersion,
+                scanPaths,
+                permitted,
+                eventId);
     }
 }

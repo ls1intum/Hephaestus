@@ -47,6 +47,8 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -86,6 +88,14 @@ public class JobEvidenceFiles implements SandboxResultListener {
 
     /** How long an attempt's debug transcript stays for next-day investigation. */
     public static final Duration TRACE_RETENTION = Duration.ofHours(24);
+
+    /**
+     * The field of a job's capture record that states when the occasion record its inputs copy expires. A transcript
+     * that may repeat those words is kept no longer; the record's {@code expiresAt} states that earlier deadline.
+     */
+    public static final String COPIES_EXPIRE_AT = "copiesExpireAt";
+
+    private static final JsonMapper TRACE_RECORDS = new JsonMapper();
 
     /** Where the gateway runner puts the native session transcripts in a result. */
     private static final String TRACES = "traces/";
@@ -605,7 +615,11 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 result -> copies.apply(result).records());
     }
 
-    /** What a review attempt was launched as, captured before its sandbox existed. */
+    /**
+     * What a review attempt was launched as, captured before its sandbox existed.
+     *
+     * @param copiesExpireAt when the occasion record the attempt's inputs copy expires; null when they copy none
+     */
     private record LaunchedAttempt(
             long workspaceId,
             UUID jobId,
@@ -614,7 +628,8 @@ public class JobEvidenceFiles implements SandboxResultListener {
             String image,
             @Nullable String model,
             @Nullable String promptDigest,
-            @Nullable String inputsDigest) {}
+            @Nullable String inputsDigest,
+            @Nullable Instant copiesExpireAt) {}
 
     /**
      * Binds the attempt the executor is launching: the job must be RUNNING as exactly this attempt. Anything else, and
@@ -643,10 +658,21 @@ public class JobEvidenceFiles implements SandboxResultListener {
                                 : job.getCapture().path("promptDigest").asString(null),
                         job.getCapture() == null
                                 ? null
-                                : job.getCapture().path("inputsDigest").asString(null)));
+                                : job.getCapture().path("inputsDigest").asString(null),
+                        copiesExpireAt(job.getCapture())));
         if (launched.isEmpty()) return files -> {};
         var bound = launched.get();
         return files -> keepTranscript(bound, files);
+    }
+
+    /** A stated expiry that cannot be read keeps no copy, as if it had passed. */
+    private static @Nullable Instant copiesExpireAt(@Nullable JsonNode capture) {
+        if (capture == null || !capture.has(COPIES_EXPIRE_AT)) return null;
+        try {
+            return Instant.parse(capture.path(COPIES_EXPIRE_AT).asString(""));
+        } catch (DateTimeParseException unreadable) {
+            return Instant.EPOCH;
+        }
     }
 
     /**
@@ -678,8 +704,17 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 Files.createDirectories(root.getParent());
                 Path staging = Files.createTempDirectory(root.getParent(), "." + trace.getFileName() + ".preparing-");
                 try {
+                    Instant now = clock.instant();
+                    Instant expiresAt = now.plus(TRACE_RETENTION);
+                    var occasionExpiry = launched.copiesExpireAt();
+                    boolean occasionKept = occasionExpiry == null || occasionExpiry.isAfter(now);
                     boolean withinBudget = boundedTraces(traces);
-                    boolean raw = custody == EvidenceFolderPersonDataCatalog.TraceCustody.INDEXED && withinBudget;
+                    boolean raw = custody == EvidenceFolderPersonDataCatalog.TraceCustody.INDEXED
+                            && withinBudget
+                            && occasionKept;
+                    // The sessions' words may repeat the occasion's record, so they go when it expires. The summary
+                    // that replaces them names no person and copies none of those words.
+                    if (raw && occasionExpiry != null && occasionExpiry.isBefore(expiresAt)) expiresAt = occasionExpiry;
                     ObjectNode record = JsonNodeFactory.instance.objectNode();
                     record.put("jobId", launched.jobId().toString());
                     record.put("workspaceId", launched.workspaceId());
@@ -692,9 +727,11 @@ public class JobEvidenceFiles implements SandboxResultListener {
                     // A copied row whose source cannot vouch for the people it names keeps every session's words out.
                     if (!raw)
                         record.put(
-                                "contentUnavailable", withinBudget ? "OWNERSHIP_INCOMPLETE" : "TRACE_OUTPUT_INVALID");
-                    record.put(
-                            "expiresAt", clock.instant().plus(TRACE_RETENTION).toString());
+                                "contentUnavailable",
+                                !occasionKept
+                                        ? "OCCASION_EVIDENCE_UNAVAILABLE"
+                                        : withinBudget ? "OWNERSHIP_INCOMPLETE" : "TRACE_OUTPUT_INVALID");
+                    record.put("expiresAt", expiresAt.toString());
                     if (raw) {
                         for (var entry : traces.entrySet()) {
                             Path target = safePath(staging, entry.getKey());
@@ -709,8 +746,9 @@ public class JobEvidenceFiles implements SandboxResultListener {
                     }
                     Path recordFile = staging.resolve(TRACE_RECORD);
                     Files.writeString(recordFile, record.toString(), StandardOpenOption.CREATE_NEW);
-                    // The sweep counts the retention from this timestamp, as it counts the grace from an ended marker.
-                    Files.setLastModifiedTime(recordFile, FileTime.from(clock.instant()));
+                    // The sweep counts the retention from this timestamp, as it counts the grace from an ended marker,
+                    // and ends it sooner when the record states an earlier expiry.
+                    Files.setLastModifiedTime(recordFile, FileTime.from(now));
                     Files.move(staging, trace, StandardCopyOption.ATOMIC_MOVE);
                 } finally {
                     if (Files.exists(staging, LinkOption.NOFOLLOW_LINKS)) delete(staging);
@@ -814,7 +852,9 @@ public class JobEvidenceFiles implements SandboxResultListener {
 
     /**
      * A transcript outlives its attempt, its admitted inputs and a restart, whatever the job's status, until its day
-     * is over. A staging copy left by a stopped writer goes at once: the runtime that wrote it no longer holds the job.
+     * is over, or until the earlier expiry its record states. A staging copy left by a stopped writer goes at once: the
+     * runtime that wrote it no longer holds the job. The first pass after the expiry that gets the job's lease removes
+     * it, so the removal lags the expiry by up to the sweep interval or a lease holder's work.
      */
     private void cleanTrace(Path trace) {
         try {
@@ -826,16 +866,30 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 Path record = trace.resolve(TRACE_RECORD);
                 if (trace.getFileName().toString().startsWith(".")
                         || !Files.isRegularFile(record, LinkOption.NOFOLLOW_LINKS)
-                        || !Files.getLastModifiedTime(record, LinkOption.NOFOLLOW_LINKS)
-                                .toInstant()
-                                .plus(TRACE_RETENTION)
-                                .isAfter(clock.instant())) {
+                        || !keptUntil(record).isAfter(clock.instant())) {
                     delete(trace);
                 }
             }
         } catch (RuntimeException | IOException exception) {
             log.warn("Could not clean review transcript {}", trace, exception);
         }
+    }
+
+    /** The earlier of the record's day and the expiry it states; a record that states none readably keeps its day. */
+    private static Instant keptUntil(Path record) throws IOException {
+        Instant day = Files.getLastModifiedTime(record, LinkOption.NOFOLLOW_LINKS)
+                .toInstant()
+                .plus(TRACE_RETENTION);
+        Instant stated;
+        try {
+            stated = Instant.parse(TRACE_RECORDS
+                    .readTree(Files.readAllBytes(record))
+                    .path("expiresAt")
+                    .asString(""));
+        } catch (RuntimeException unreadable) {
+            return day;
+        }
+        return stated.isBefore(day) ? stated : day;
     }
 
     private Optional<EvidenceFolderLease> leaseJob(Path root) {

@@ -68,6 +68,12 @@ class ItemEventPendingFenceDatabaseTest {
         assertThat(PracticeMigrationFixture.column(
                         database, "SELECT pending_fence FROM item_event WHERE id='" + RELEASED + "'"))
                 .containsExactly((String) null);
+        assertThat(PracticeMigrationFixture.column(
+                        database,
+                        "SELECT (evidence IS NULL AND evidence_expires_at IS NULL)::text FROM item_event WHERE id='"
+                                + RELEASED + "'"))
+                .as("the upgrade preserves the released occasion without inventing original evidence")
+                .containsExactly("true");
 
         // An exact version never changes and never becomes pending again.
         refused(database, "UPDATE item_event SET item_version='other' WHERE id='" + RELEASED + "'", IMMUTABLE);
@@ -115,6 +121,15 @@ class ItemEventPendingFenceDatabaseTest {
                                 database,
                                 "SELECT count(*)::text FROM item_event WHERE item_id=979002 AND name='scm.pull_request.opened'"))
                 .containsExactly("2");
+
+        // The new reason is admitted without weakening the existing finite reason constraint.
+        PracticeMigrationFixture.execute(
+                database,
+                "UPDATE item_event SET state='WITHHELD',reason='OCCASION_EVIDENCE_UNAVAILABLE' WHERE id='" + TWIN
+                        + "'");
+        assertThat(PracticeMigrationFixture.column(database, "SELECT reason FROM item_event WHERE id='" + TWIN + "'"))
+                .containsExactly("OCCASION_EVIDENCE_UNAVAILABLE");
+        refused(database, "UPDATE item_event SET reason='UNKNOWN_REASON' WHERE id='" + TWIN + "'", "23514");
     }
 
     private static String insert(String id, String name, String fence, String state) {

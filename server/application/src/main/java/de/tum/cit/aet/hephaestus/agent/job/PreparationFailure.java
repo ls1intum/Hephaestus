@@ -74,7 +74,7 @@ record PreparationFailure(Stage stage, Kind kind, JobPreparationException.Reason
                         case ITEM_NOT_VISIBLE, CONSENT_WITHHELD ->
                             JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE;
                         case VERSION_UNAVAILABLE -> JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE;
-                        case SOURCE_NOT_READY, CAPTURE_FAILED ->
+                        case SOURCE_NOT_READY, CAPTURE_FAILED, OCCASION_EVIDENCE_UNAVAILABLE ->
                             JobPreparationException.Reason.REQUIRED_SOURCE_COLLECTION_FAILED;
                     };
             }

@@ -604,6 +604,8 @@ erDiagram
         TIMESTAMPTZ last_attempted_at
         TIMESTAMPTZ retry_at
         VARCHAR(1024) pending_fence
+        JSONB evidence
+        TIMESTAMPTZ evidence_expires_at
     }
 
     JwtSigningKey {

@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.PinnedInlineAnchorQuery;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedResults;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasis;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
@@ -40,17 +42,23 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import tools.jackson.databind.json.JsonMapper;
@@ -63,6 +71,7 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
     private final ReviewJobAssignments assignments = mock(ReviewJobAssignments.class);
     private final PublicReviewEligibility publicEligibility = mock(PublicReviewEligibility.class);
     private final JobEvidenceFiles files = mock(JobEvidenceFiles.class);
+    private final ReviewCompositionBasisRepository bases = mock(ReviewCompositionBasisRepository.class);
     private final FeedbackStore feedback = mock(FeedbackStore.class);
     private final ReviewAssignmentStore members = mock(ReviewAssignmentStore.class);
     private final FeedbackCompositionService composition = new FeedbackCompositionService(
@@ -98,7 +107,7 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                 mock(ReviewHistoryContentSource.class),
                 mapper,
                 manager,
-                mock(ReviewCompositionBasisRepository.class),
+                bases,
                 composition,
                 mock(ReviewWriteGuard.class));
         job.setStatus(ReviewJobStatus.RUNNING);
@@ -187,6 +196,81 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
         assertThat(writes.get()).isEqualTo(1);
         job.setAdmissionDigest("another-payload");
         assertThatThrownBy(() -> service.admit(identity(), request)).isInstanceOf(AdmissionConflictException.class);
+    }
+
+    @Test
+    void shouldBoundRetainedWriterInputsByTheirOriginalOccasionDeadline() {
+        var deadline = Instant.now().plusSeconds(3600);
+        var request = admissionWithRetainedInputs(deadline);
+        var copyId = UUID.randomUUID();
+        when(files.completeReceipt(identity())).thenReturn(Optional.of(copyId));
+        when(files.holdVouchingReceipt(identity(), copyId)).thenReturn(true);
+        when(files.originalPublicInputs(identity()))
+                .thenReturn(
+                        Optional.of(Map.of("context/original.txt", "Original work".getBytes(StandardCharsets.UTF_8))));
+
+        service.admit(identity(), request);
+
+        var saved = ArgumentCaptor.forClass(ReviewCompositionBasis.class);
+        verify(bases).save(saved.capture());
+        assertThat(saved.getValue().getExpiresAt()).isEqualTo(deadline);
+        assertThat(saved.getValue().getCopyId()).isEqualTo(copyId);
+        assertThat(saved.getValue().getPayload().path("files").has("context/original.txt"))
+                .isTrue();
+    }
+
+    @Test
+    void shouldKeepNoNewWriterInputCopyAfterTheOccasionDeadline() {
+        var request = admissionWithRetainedInputs(Instant.now().minusSeconds(1));
+
+        service.admit(identity(), request);
+
+        verifyNoInteractions(bases);
+    }
+
+    @Test
+    void shouldKeepTheExistingWriterRetentionForWorkWithoutARetainedOccasion() {
+        var request = admissionWithRetainedInputs(null);
+        var copyId = UUID.randomUUID();
+        when(files.completeReceipt(identity())).thenReturn(Optional.of(copyId));
+        when(files.holdVouchingReceipt(identity(), copyId)).thenReturn(true);
+        when(files.originalPublicInputs(identity()))
+                .thenReturn(
+                        Optional.of(Map.of("context/current.txt", "Current work".getBytes(StandardCharsets.UTF_8))));
+        var before = Instant.now();
+
+        service.admit(identity(), request);
+
+        var after = Instant.now();
+        var saved = ArgumentCaptor.forClass(ReviewCompositionBasis.class);
+        verify(bases).save(saved.capture());
+        assertThat(saved.getValue().getExpiresAt())
+                .isBetween(before.plus(ReviewCompositionBasis.RETENTION), after.plus(ReviewCompositionBasis.RETENTION));
+    }
+
+    private AdmissionRequestDTO admissionWithRetainedInputs(@Nullable Instant deadline) {
+        var assignment = RuntimeReviewTestData.assignment(5L, null);
+        var original = RuntimeReviewTestData.review(ReviewKind.ITEM, assignment);
+        var review = deadline == null
+                ? original
+                : new ReviewSnapshot(
+                        original.id(),
+                        original.workspaceId(),
+                        original.item(),
+                        original.kind(),
+                        original.version(),
+                        ReviewOrigin.EVENT,
+                        original.rolloutRevision(),
+                        original.practices(),
+                        UUID.randomUUID(),
+                        deadline);
+        when(assignments.review(job)).thenReturn(review);
+        when(assignments.load(job)).thenReturn(List.of(assignment));
+        when(proof.forAttempt(1, job.getReviewId(), job.getId(), 0)).thenReturn(List.of());
+        when(publicEligibility.publicResultIds(job, List.of())).thenReturn(Set.of());
+        var request = new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(), List.of());
+        when(output.prepare(job, request)).thenReturn(mock(PreparedResults.class));
+        return request;
     }
 
     @Test

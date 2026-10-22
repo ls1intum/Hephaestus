@@ -10,15 +10,18 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Bounds the event ledger on every server. Retained evidence expires even where reviews do not run; only offering
+ * due occasions for review again needs the agent.
+ */
 @Component
 @ConditionalOnServerRole
-@ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)
 @WorkspaceAgnostic("Selects due item events for all workspaces; consumers retain each event's workspace")
 @RequiredArgsConstructor
 public class PendingItemEventReaper {
@@ -26,15 +29,18 @@ public class PendingItemEventReaper {
     private final ItemEventLedgerProperties properties;
     private final ApplicationEventPublisher publisher;
     private final Clock clock;
+    private final Environment environment;
 
     @Scheduled(fixedDelay = 15, initialDelay = 5, timeUnit = TimeUnit.MINUTES)
     @SchedulerLock(name = "pending-item-event-reaper", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     @Transactional
     public void sweep() {
         Instant now = clock.instant();
+        repository.forgetExpiredEvidence(now, properties.sweepBatchSize());
         repository.expire(
                 now.minus(properties.pendingLapseAfter()), now, ReviewRequestReason.PENDING_DEADLINE_EXCEEDED);
         repository.deleteUnreferenced(now.minus(properties.retainFor()), properties.sweepBatchSize());
+        if (!environment.getProperty(RuntimeRole.AGENT_ENABLED_PROPERTY, Boolean.class, false)) return;
         for (var event : repository.claimDue(now, properties.sweepBatchSize())) {
             repository.attempted(event.getWorkspaceId(), event.getId(), now, now.plus(properties.pendingRetryAfter()));
             publisher.publishEvent(new ItemEventRecorded(event.getWorkspaceId(), event.getId(), event.getItemId()));
