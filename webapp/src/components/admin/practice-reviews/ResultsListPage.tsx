@@ -14,7 +14,7 @@ import {
 import { ResultRows, type ResultRowsState } from "./ResultRows";
 import { clearedScope } from "./review-scope";
 import type { ResultsSearch } from "./review-search";
-import { ReviewListEnd } from "./ReviewListEnd";
+import { loadingMoreRows, ReviewListEnd } from "./ReviewListEnd";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { ReviewTabIntro } from "./ReviewTabIntro";
@@ -84,7 +84,11 @@ export function ResultsListPage({
 			{results.status === "ready" && (
 				<>
 					<ReviewListRefresh failure={results.refreshFailure} noun="results" />
-					<ResultRows state={resultsState(rows, hasFilter ? reset : undefined)} byDay={byDay} />
+					<ResultRows
+						state={resultsState(rows, hasFilter ? reset : undefined)}
+						byDay={byDay}
+						loadingMore={loadingMoreRows(results)}
+					/>
 					{rows.length > 0 && <ReviewListEnd {...results} noun="results" />}
 				</>
 			)}

@@ -5,6 +5,7 @@ import type { ReviewResult } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
+import { expectPlaceholderRows } from "@/stories/loading-more";
 import { loadedList, narrowedList } from "@/stories/paged-list";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { StatefulPatch } from "@/stories/stateful";
@@ -303,6 +304,27 @@ export const LoadsMoreAtTheEnd: Story = {
 		const more = canvas.getByRole("button", { name: "Show more results" });
 		more.scrollIntoView();
 		await waitFor(async () => expect(loadMoreResults).toHaveBeenCalled());
+	},
+};
+
+/** The next page's placeholder rows continue the table in its own columns while it is busy. */
+export const LoadingMore: Story = {
+	args: { results: pool(reviewResults, { hasMore: true, isLoadingMore: true }) },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expectPlaceholderRows(canvas.getByRole("table", { name: "Results" }));
+	},
+};
+
+/** Ranked by actionability, the rows sit under ranks, and the placeholders still follow the last. */
+export const LoadingMoreByActionability: Story = {
+	args: {
+		search: { outcome: undefined, severity: undefined, order: "ACTIONABILITY" },
+		results: pool(reviewResults, { hasMore: true, isLoadingMore: true }),
+	},
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expectPlaceholderRows(canvas.getByRole("table", { name: "Results" }));
 	},
 };
 

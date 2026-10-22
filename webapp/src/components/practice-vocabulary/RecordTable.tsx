@@ -145,6 +145,8 @@ interface RecordRowsProps<TRow> {
 export interface RecordDayTableProps<TRow> extends RecordRowsProps<TRow> {
 	/** The moment a row is listed at, which picks its day. Rows come newest first. */
 	dateOf: (row: TRow) => Date;
+	/** See `RecordGroupedTableProps.loadingMore`. */
+	loadingMore?: number;
 }
 
 export function RecordDayTable<TRow>({ dateOf, rows, ...props }: RecordDayTableProps<TRow>) {

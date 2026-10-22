@@ -46,6 +46,8 @@ export interface ResultRowsProps {
 	 * back.
 	 */
 	byDay?: boolean;
+	/** Placeholder rows after the results while the next page loads. */
+	loadingMore?: number;
 }
 
 const LIST_LABEL = "Results";
@@ -67,7 +69,7 @@ const RESULT_WORDS: RecordResultsWords = {
 	emptyDescription: "Results appear after a practice review completes.",
 };
 
-export function ResultRows({ state, byDay = true }: ResultRowsProps) {
+export function ResultRows({ state, byDay = true, loadingMore }: ResultRowsProps) {
 	const rows = state.status === "ready" ? state.results : [];
 	return (
 		<RecordResults
@@ -86,6 +88,7 @@ export function ResultRows({ state, byDay = true }: ResultRowsProps) {
 						rowKey={(result) => result.id}
 						renderRow={(result) => <ResultRow result={result} />}
 						empty={empty}
+						loadingMore={loadingMore}
 					/>
 				) : (
 					<RecordGroupedTable
@@ -95,6 +98,7 @@ export function ResultRows({ state, byDay = true }: ResultRowsProps) {
 						rowKey={(result) => result.id}
 						renderRow={(result) => <ResultRow result={result} withDay />}
 						empty={empty}
+						loadingMore={loadingMore}
 					/>
 				)
 			}

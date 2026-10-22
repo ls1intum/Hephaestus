@@ -7,6 +7,7 @@ import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequest
 import { formatWeekdayDay } from "@/lib/dates";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
+import { expectPlaceholderRows } from "@/stories/loading-more";
 import { settledPopup } from "@/stories/overlay";
 import { loadedList, narrowedList } from "@/stories/paged-list";
 import { expectNoPageOverflow } from "@/stories/reflow";
@@ -233,5 +234,14 @@ export const LoadsMoreAtTheEnd: Story = {
 		const more = await canvas.findByRole("button", { name: "Show more reviews" });
 		more.scrollIntoView();
 		await waitFor(async () => expect(loadMoreReviews).toHaveBeenCalled());
+	},
+};
+
+/** The next page's placeholder rows continue the table in its own columns while it is busy. */
+export const LoadingMore: Story = {
+	args: { reviews: loadedList(reviews, { hasMore: true, isLoadingMore: true }) },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expectPlaceholderRows(canvas.getByRole("table", LIST));
 	},
 };

@@ -13,7 +13,7 @@ import { ProblemRows, type ProblemRowsState } from "./ProblemRows";
 import type { PracticeFacetOption } from "./ResultFilters";
 import { clearedScope } from "./review-scope";
 import type { ProblemsSearch } from "./review-search";
-import { ReviewListEnd } from "./ReviewListEnd";
+import { loadingMoreRows, ReviewListEnd } from "./ReviewListEnd";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { ReviewTabIntro } from "./ReviewTabIntro";
@@ -79,7 +79,10 @@ export function ProblemsListPage({
 			{problems.status === "ready" && (
 				<>
 					<ReviewListRefresh failure={problems.refreshFailure} noun="problems" />
-					<ProblemRows state={problemsState(rows, hasProblemFilter(search) ? reset : undefined)} />
+					<ProblemRows
+						state={problemsState(rows, hasProblemFilter(search) ? reset : undefined)}
+						loadingMore={loadingMoreRows(problems)}
+					/>
 					{rows.length > 0 && <ReviewListEnd {...problems} noun="problems" />}
 				</>
 			)}

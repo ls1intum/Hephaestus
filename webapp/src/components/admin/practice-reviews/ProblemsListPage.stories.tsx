@@ -3,6 +3,7 @@ import { expect, fn, screen, within } from "storybook/test";
 
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
+import { expectPlaceholderRows } from "@/stories/loading-more";
 import { loadedList } from "@/stories/paged-list";
 import { StatefulPatch } from "@/stories/stateful";
 
@@ -93,6 +94,15 @@ export const FilterToOneSeverity: Story = {
 
 export const Loading: Story = {
 	args: { problems: { status: "loading" } },
+};
+
+/** The next page's placeholder rows continue the table in its own columns while it is busy. */
+export const LoadingMore: Story = {
+	args: { problems: loadedList(reviewProblems, { hasMore: true, isLoadingMore: true }) },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expectPlaceholderRows(canvas.getByRole("table", { name: "Problems" }));
+	},
 };
 
 export const Empty: Story = {
