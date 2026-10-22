@@ -1,10 +1,22 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Decorator, Meta, StoryObj } from "@storybook/react";
 import { expect, userEvent, within } from "storybook/test";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 import { NavDashboards } from "./NavDashboards";
 import { withSidebarFrame } from "./sidebar-story-frame";
+
+/**
+ * The sidebar folded to icons, marked as the sidebar marks itself, so what hides there (an open
+ * section's pages) hides in the story too.
+ */
+const withIconOnlySidebar: Decorator = (Story) => (
+	<SidebarProvider defaultOpen={false} className="min-h-0">
+		<div className="group" data-collapsible="icon">
+			<Story />
+		</div>
+	</SidebarProvider>
+);
 
 const meta = {
 	component: NavDashboards,
@@ -22,23 +34,35 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** One press reaches the Practice profile from any page; the chevron beside it alone discloses the workspace view. */
+/** The Practice profile row folds like the admin sections; its pages, the profile first, sit under it. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		// The Practice profile is the workspace home, so it leads; Activity follows it.
-		const links = canvas.getAllByRole("link").map((link) => link.textContent);
-		await expect(links).toEqual(["Practice profile", "Activity", "Workspace activity", "Teams"]);
-		await expect(
-			canvas.getByRole("button", { name: "Pages under Practice profile" }),
-		).toHaveAttribute("aria-expanded", "false");
+		// The Practice profile is the workspace home, so its row leads; Activity follows it.
+		const section = canvas.getByRole("button", { name: "Practice profile" });
+		await expect(section).toHaveAttribute("aria-expanded", "false");
+		const links = canvas.getAllByRole("link");
+		await expect(links.map((link) => link.textContent)).toEqual([
+			"Activity",
+			"Workspace activity",
+			"Teams",
+		]);
+		await expect(canvas.getAllByRole("listitem")[0]).toContainElement(section);
 	},
 };
 
-/** Opened, the workspace's view of the same groups sits under the profile. */
+/** Opened, the profile and the workspace's view of the same groups sit under the row. */
 export const PracticePagesOpen: Story = {
 	play: async ({ canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Pages under Practice profile" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Practice profile" }));
 		const pages = within(canvas.getByRole("list", { name: "Practice profile" }));
+		await expect(pages.getAllByRole("link").map((link) => link.textContent)).toEqual([
+			"Practice profile",
+			"Across the workspace",
+		]);
+		await expect(pages.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
+			"href",
+			"/w/aet/practice-profile",
+		);
 		await expect(pages.getByRole("link", { name: "Across the workspace" })).toHaveAttribute(
 			"href",
 			"/w/aet/practices-across-the-workspace",
@@ -46,24 +70,49 @@ export const PracticePagesOpen: Story = {
 	},
 };
 
-/** Pressing the profile itself opens it and unfolds the pages under it, sparing the chevron press. */
-export const PressingTheProfileUnfoldsItsPages: Story = {
+/** A press on the row opens its pages, the next closes them, and neither leaves the current page. */
+export const PressingTheRowTogglesItsPages: Story = {
 	parameters: { router: { initialUrl: "/w/aet/activity" } },
 	play: async ({ canvas }) => {
-		const chevron = canvas.getByRole("button", { name: "Pages under Practice profile" });
-		await expect(chevron).toHaveAttribute("aria-expanded", "false");
-		await userEvent.click(canvas.getByRole("link", { name: "Practice profile" }));
-		await expect(chevron).toHaveAttribute("aria-expanded", "true");
+		const section = canvas.getByRole("button", { name: "Practice profile" });
+		await expect(section).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(section);
+		await expect(section).toHaveAttribute("aria-expanded", "true");
 		await expect(canvas.getByRole("link", { name: "Across the workspace" })).toBeVisible();
-		// The chevron still folds the pages away by itself, and the reader stays on the profile.
-		await userEvent.click(chevron);
-		await expect(chevron).toHaveAttribute("aria-expanded", "false");
-		await expect(canvas.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
+		await userEvent.click(section);
+		await expect(section).toHaveAttribute("aria-expanded", "false");
+		await expect(canvas.queryByRole("link", { name: "Across the workspace" })).toBeNull();
+		await expect(canvas.getByRole("link", { name: "Activity" })).toHaveAttribute("data-active");
+	},
+};
+
+/** The profile's own entry under the row leads to it, and the row stays open on arrival. */
+export const PressingTheProfileEntryOpensIt: Story = {
+	parameters: { router: { initialUrl: "/w/aet/activity" } },
+	play: async ({ canvas }) => {
+		const section = canvas.getByRole("button", { name: "Practice profile" });
+		await userEvent.click(section);
+		const pages = within(canvas.getByRole("list", { name: "Practice profile" }));
+		await userEvent.click(pages.getByRole("link", { name: "Practice profile" }));
+		await expect(pages.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
 			"data-active",
 		);
-		// A second press on the profile unfolds them again.
-		await userEvent.click(canvas.getByRole("link", { name: "Practice profile" }));
-		await expect(chevron).toHaveAttribute("aria-expanded", "true");
+		await expect(canvas.getByRole("link", { name: "Activity" })).not.toHaveAttribute("data-active");
+		await expect(section).toHaveAttribute("aria-expanded", "true");
+		await expect(section).not.toHaveAttribute("data-active");
+	},
+};
+
+/** Folded on the profile, the row stands in for it as the active entry. */
+export const PracticeProfileFolded: Story = {
+	parameters: { router: { initialUrl: "/w/aet/practice-profile" } },
+	play: async ({ canvas }) => {
+		const section = canvas.getByRole("button", { name: "Practice profile" });
+		await expect(section).toHaveAttribute("aria-expanded", "true");
+		await expect(section).not.toHaveAttribute("data-active");
+		await userEvent.click(section);
+		await expect(section).toHaveAttribute("aria-expanded", "false");
+		await expect(section).toHaveAttribute("data-active");
 	},
 };
 
@@ -76,24 +125,19 @@ export const PracticeProfileWithLayerOpen: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("button", { name: "Pages under Practice profile" }),
-		).toHaveAttribute("aria-expanded", "true");
+		await expect(canvas.getByRole("button", { name: "Practice profile" })).toHaveAttribute(
+			"aria-expanded",
+			"true",
+		);
 		await expect(canvas.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
 			"data-active",
 		);
 	},
 };
 
-/** Folded to icons, nothing can unfold, so each practice page is one icon and one press. */
+/** Folded to icons, nothing can unfold: the row links to the profile, and each page is one press. */
 export const PracticePagesFolded: Story = {
-	decorators: [
-		(Story) => (
-			<SidebarProvider defaultOpen={false} className="min-h-0">
-				<Story />
-			</SidebarProvider>
-		),
-	],
+	decorators: [withIconOnlySidebar],
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
 			"href",
@@ -109,13 +153,7 @@ export const PracticePagesFolded: Story = {
 /** On the workspace view, folded to icons: its own icon is the one active entry, not the profile's. */
 export const AcrossTheWorkspaceActiveFolded: Story = {
 	parameters: { router: { initialUrl: "/w/aet/practices-across-the-workspace" } },
-	decorators: [
-		(Story) => (
-			<SidebarProvider defaultOpen={false} className="min-h-0">
-				<Story />
-			</SidebarProvider>
-		),
-	],
+	decorators: [withIconOnlySidebar],
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("link", { name: "Across the workspace" })).toHaveAttribute(
 			"data-active",
@@ -126,7 +164,7 @@ export const AcrossTheWorkspaceActiveFolded: Story = {
 	},
 };
 
-/** On the workspace view with the sidebar open, the view's sub entry is active and its parent is not. */
+/** On the workspace view with the sidebar open, the view's sub entry is active, not the row or the profile. */
 export const AcrossTheWorkspaceActive: Story = {
 	parameters: { router: { initialUrl: "/w/aet/practices-across-the-workspace" } },
 	play: async ({ canvas }) => {
@@ -134,6 +172,9 @@ export const AcrossTheWorkspaceActive: Story = {
 			"data-active",
 		);
 		await expect(canvas.getByRole("link", { name: "Practice profile" })).not.toHaveAttribute(
+			"data-active",
+		);
+		await expect(canvas.getByRole("button", { name: "Practice profile" })).not.toHaveAttribute(
 			"data-active",
 		);
 	},
