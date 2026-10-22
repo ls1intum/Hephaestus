@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -9,20 +10,41 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemSourceAccess;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.SqlReadMeasurement;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Import({ReviewIntegrationData.class, ReviewLookupData.class})
 class ProductItemQueryIntegrationTest extends BaseIntegrationTest {
+    /** Stored pull request fields that are not part of its revision; a released mirror row can leave them NULL. */
+    private static final List<String> OUTSIDE_THE_REVISION =
+            List.of("additions", "deletions", "commits", "changed_files", "base_ref_name", "head_ref_name");
+
+    @Autowired
+    ScmItemSourceAccess sourceAccess;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    PlatformTransactionManager transactions;
+
     @Autowired
     ReviewIntegrationData data;
 
@@ -103,5 +125,101 @@ class ProductItemQueryIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
         monitors.delete(monitor);
         assertThat(items.atUrl(target.workspaceId(), url)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKnowTheStoredRevisionWhenOnlyFieldsOutsideItAreMissing(IdentityProviderType provider) {
+        var target = lookup.work(data.scenario().workspace(), provider, true);
+        long source = Objects.requireNonNull(target.sourceId());
+        String recorded = items.current(target).orElseThrow().version().value();
+        assertThat(recorded)
+                .isEqualTo(ScmVersion.pullRequest("a".repeat(40), "b".repeat(40), "Reviewed work", "Description")
+                        .value());
+        assertThat(items.currentWorkVersion(target.workspaceId(), target.itemId()))
+                .isEqualTo(new ProductItemQuery.CurrentWorkVersion.Known(recorded));
+
+        jdbc.update("UPDATE issue SET " + String.join("=NULL,", OUTSIDE_THE_REVISION) + "=NULL WHERE id=?", source);
+        assertThat(items.currentWorkVersion(target.workspaceId(), target.itemId()))
+                .isEqualTo(new ProductItemQuery.CurrentWorkVersion.Known(recorded));
+        assertThat(sourceAccess.permits(target, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isTrue();
+
+        jdbc.update("UPDATE issue SET body=? WHERE id=?", "Description that now explains why", source);
+        String edited = ScmVersion.pullRequest(
+                        "a".repeat(40), "b".repeat(40), "Reviewed work", "Description that now explains why")
+                .value();
+        assertThat(edited).isNotEqualTo(recorded);
+        assertThat(items.currentWorkVersion(target.workspaceId(), target.itemId()))
+                .isEqualTo(new ProductItemQuery.CurrentWorkVersion.Known(edited));
+        assertStillMissing(source, OUTSIDE_THE_REVISION);
+    }
+
+    @Test
+    void shouldLeaveAPullRequestWithoutAStoredRevisionUnknownAndItsReadUsable() {
+        var target = lookup.work(data.scenario().workspace(), IdentityProviderType.GITHUB, true);
+        long source = Objects.requireNonNull(target.sourceId());
+        var legacy = new ArrayList<>(OUTSIDE_THE_REVISION);
+        legacy.addAll(List.of("base_ref_oid", "head_ref_oid", "is_draft", "is_merged"));
+        jdbc.update("UPDATE issue SET " + String.join("=NULL,", legacy) + "=NULL WHERE id=?", source);
+
+        var read = new TransactionTemplate(transactions);
+        read.setReadOnly(true);
+        var version = read.execute(status -> {
+            var unknown = items.currentWorkVersion(target.workspaceId(), target.itemId());
+            assertThat(items.find(target.workspaceId(), target.itemId())).contains(target);
+            assertThat(status.isRollbackOnly()).isFalse();
+            return unknown;
+        });
+        assertThat(version).isEqualTo(ProductItemQuery.CurrentWorkVersion.Unknown.INSTANCE);
+        assertStillMissing(source, legacy);
+    }
+
+    @Test
+    void shouldKeepEverySourceAccessFenceWhenOnlyFieldsOutsideTheRevisionAreMissing() {
+        var target = lookup.work(data.scenario().workspace(), IdentityProviderType.GITLAB, true);
+        long source = Objects.requireNonNull(target.sourceId());
+        var repository = items.find(target.workspaceId(), Objects.requireNonNull(target.parentId()))
+                .orElseThrow();
+        var monitor = monitors.findByWorkspaceIdAndNameWithOwner(
+                        target.workspaceId(),
+                        Objects.requireNonNull(Objects.requireNonNull(references
+                                        .items(target.workspaceId(), List.of(target.itemId()))
+                                        .get(target.itemId()))
+                                .container()))
+                .orElseThrow();
+        jdbc.update("UPDATE issue SET " + String.join("=NULL,", OUTSIDE_THE_REVISION) + "=NULL WHERE id=?", source);
+        var purpose = SourceUsePurpose.CONVERSATIONAL_MENTORING;
+        assertThat(sourceAccess.permits(target, purpose)).isTrue();
+
+        long foreignWorkspace = data.scenario().workspace().getId();
+        var foreignRepository = index.upsert(new ItemRegistration(
+                foreignWorkspace, ScmItemEvents.REPOSITORY, Objects.requireNonNull(repository.sourceId()), null, null));
+        var foreign = index.upsert(new ItemRegistration(
+                foreignWorkspace, ScmItemEvents.PULL_REQUEST, source, foreignRepository.itemId(), null));
+        assertThat(sourceAccess.permits(foreign, purpose)).isFalse();
+        var forged = index.upsert(
+                new ItemRegistration(target.workspaceId(), ScmItemEvents.ISSUE, source, repository.itemId(), null));
+        assertThat(sourceAccess.permits(forged, purpose)).isFalse();
+
+        index.remove(target.workspaceId(), target.itemId(), Instant.now());
+        assertThat(sourceAccess.permits(target, purpose)).isFalse();
+        index.restore(target.workspaceId(), target.itemId());
+        jdbc.update("UPDATE issue SET deleted_at=now() WHERE id=?", source);
+        assertThat(sourceAccess.permits(target, purpose)).isFalse();
+        jdbc.update("UPDATE issue SET deleted_at=NULL WHERE id=?", source);
+        assertThat(sourceAccess.permits(target, purpose)).isTrue();
+        monitors.delete(monitor);
+        assertThat(sourceAccess.permits(target, purpose)).isFalse();
+        assertStillMissing(source, OUTSIDE_THE_REVISION);
+    }
+
+    /** No read fills a missing field: each stays NULL in the stored row. */
+    private void assertStillMissing(long source, List<String> columns) {
+        var row = jdbc.queryForMap("SELECT " + String.join(",", columns) + " FROM issue WHERE id=?", source);
+        assertThat(row).hasSize(columns.size());
+        assertThat(row.values()).containsOnlyNulls();
     }
 }

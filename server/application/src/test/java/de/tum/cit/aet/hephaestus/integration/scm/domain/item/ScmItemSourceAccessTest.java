@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SourceReadAudience;
 import de.tum.cit.aet.hephaestus.integration.scm.ScmPersonSourceIdentityContributor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
@@ -28,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -69,9 +69,8 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         var fixture = fixture();
         var ref = new ItemRef(1, 5, ScmItemEvents.ISSUE, 6L, ROOT.itemId(), null);
         when(fixture.items().parent(ref, ScmItemEvents.REPOSITORY)).thenReturn(ROOT);
-        var issue = new Issue();
-        issue.setRepository(fixture.repository());
-        when(fixture.workLookup().find(ScmItemEvents.ISSUE, 6L)).thenReturn(Optional.of(issue));
+        var issue = stored(ROOT.sourceId(), false);
+        when(fixture.items().work(ScmItemEvents.ISSUE, 6L)).thenReturn(Optional.of(issue));
         when(fixture.contributors().identitiesForSource(1, "scm.issue", 6))
                 .thenReturn(List.of(new PersonIdentity(7, "author", null), new PersonIdentity(7, "commenter", null)));
         when(fixture.suppression().isSuppressed(7, "author", null)).thenReturn(false);
@@ -156,8 +155,8 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         when(fixture.items().parent(reviewRef, ScmItemEvents.PULL_REQUEST)).thenReturn(pullRequestRef);
         var pullRequest = new PullRequest();
         pullRequest.setId(11L);
-        pullRequest.setRepository(fixture.repository());
-        when(fixture.workLookup().find(ScmItemEvents.PULL_REQUEST, 11L)).thenReturn(Optional.of(pullRequest));
+        var stored = stored(ROOT.sourceId(), false);
+        when(fixture.items().work(ScmItemEvents.PULL_REQUEST, 11L)).thenReturn(Optional.of(stored));
         var review = new PullRequestReview();
         review.setPullRequest(pullRequest);
         when(fixture.reviews().findById(13L)).thenReturn(Optional.of(review));
@@ -178,9 +177,8 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
     private ItemRef issueWithNoAiCommenter(Fixture fixture) {
         var ref = new ItemRef(1, 5, ScmItemEvents.ISSUE, 6L, ROOT.itemId(), null);
         when(fixture.items().parent(ref, ScmItemEvents.REPOSITORY)).thenReturn(ROOT);
-        var issue = new Issue();
-        issue.setRepository(fixture.repository());
-        when(fixture.workLookup().find(ScmItemEvents.ISSUE, 6L)).thenReturn(Optional.of(issue));
+        var issue = stored(ROOT.sourceId(), false);
+        when(fixture.items().work(ScmItemEvents.ISSUE, 6L)).thenReturn(Optional.of(issue));
         when(fixture.contributors().identitiesForSource(1, "scm.issue", 6))
                 .thenReturn(List.of(new PersonIdentity(7, "author", null), new PersonIdentity(7, "commenter", null)));
         when(fixture.identities().accountFor(new PersonIdentity(7L, "author", null)))
@@ -196,10 +194,34 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         return ref;
     }
 
+    @Test
+    void shouldRefuseWorkThatIsDeletedOfAnotherTypeOrInAnotherRepository() {
+        var fixture = fixture();
+        var ref = new ItemRef(1, 5, ScmItemEvents.PULL_REQUEST, 6L, ROOT.itemId(), null);
+        when(fixture.items().parent(ref, ScmItemEvents.REPOSITORY)).thenReturn(ROOT);
+        var deleted = stored(ROOT.sourceId(), true);
+        var elsewhere = stored(4L, false);
+        var unfiled = stored(null, false);
+        when(fixture.items().work(ScmItemEvents.PULL_REQUEST, 6L))
+                .thenReturn(Optional.of(deleted))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(elsewhere))
+                .thenReturn(Optional.of(unfiled));
+        for (int read = 0; read < 4; read++)
+            assertThat(fixture.service().permits(ref, PURPOSE)).isFalse();
+    }
+
+    /** The stored relation facts of one issue or pull request; Mockito leaves every other fact empty. */
+    private static ScmItemQueryRepository.WorkFacts stored(@Nullable Long repositoryId, boolean deleted) {
+        var facts = mock(ScmItemQueryRepository.WorkFacts.class);
+        lenient().when(facts.getRepositoryId()).thenReturn(repositoryId);
+        lenient().when(facts.getDeleted()).thenReturn(deleted);
+        return facts;
+    }
+
     private Fixture fixture() {
         var items = mock(ScmItemAccess.class);
         var repositories = mock(RepositoryRepository.class);
-        var workLookup = mock(ScmWorkLookup.class);
         var reviews = mock(PullRequestReviewRepository.class);
         var access = mock(ScmRepositoryAccess.class);
         var contributors = mock(ScmPersonSourceIdentityContributor.class);
@@ -212,24 +234,14 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         lenient().when(items.parent(FILE, ScmItemEvents.REPOSITORY)).thenReturn(ROOT);
         lenient().when(repositories.findById(3L)).thenReturn(Optional.of(repository));
         var service = new ScmItemSourceAccess(
-                items, repositories, workLookup, reviews, access, contributors, suppression, identities, accounts);
+                items, repositories, reviews, access, contributors, suppression, identities, accounts);
         return new Fixture(
-                service,
-                items,
-                workLookup,
-                reviews,
-                access,
-                contributors,
-                suppression,
-                identities,
-                accounts,
-                repository);
+                service, items, reviews, access, contributors, suppression, identities, accounts, repository);
     }
 
     private record Fixture(
             ScmItemSourceAccess service,
             ScmItemAccess items,
-            ScmWorkLookup workLookup,
             PullRequestReviewRepository reviews,
             ScmRepositoryAccess access,
             ScmPersonSourceIdentityContributor contributors,

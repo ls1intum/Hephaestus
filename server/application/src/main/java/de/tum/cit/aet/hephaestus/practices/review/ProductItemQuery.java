@@ -68,10 +68,11 @@ public class ProductItemQuery {
         var row = rows.items(workspaceId, List.of(itemId)).stream().findFirst().orElseThrow();
         if (!WORK_KINDS.contains(row.getKind())) return CurrentWorkVersion.Unknown.INSTANCE;
         if (row.getRemovedAt() != null) return CurrentWorkVersion.Removed.INSTANCE;
+        var item = row.ref(workspaceId);
         try {
-            return current(row.ref(workspaceId))
-                    .<CurrentWorkVersion>map(snapshot ->
-                            new CurrentWorkVersion.Known(snapshot.version().value()))
+            return source(item)
+                    .currentVersion(item)
+                    .<CurrentWorkVersion>map(version -> new CurrentWorkVersion.Known(version.value()))
                     .orElse(CurrentWorkVersion.Unknown.INSTANCE);
         } catch (ItemCaptureException unavailable) {
             return switch (unavailable.code()) {

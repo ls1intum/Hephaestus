@@ -193,13 +193,20 @@ public class LinkedWorkItemContentSource {
 
     public static Optional<ItemVersion> currentClosingMaterialVersion(
             PullRequest pullRequest, List<Issue> closingIssues) {
+        return currentClosingMaterialVersion(
+                pullRequest.getHeadRefOid(), pullRequest.getTitle(), pullRequest.getBody(), closingIssues);
+    }
+
+    /** The same context from a pull request's stored head, title and description, without its entity. */
+    public static Optional<ItemVersion> currentClosingMaterialVersion(
+            @Nullable String head, String title, @Nullable String body, List<Issue> closingIssues) {
         if (closingIssues.isEmpty() || closingIssues.stream().anyMatch(issue -> issue.getDeletedAt() != null)) {
             return Optional.empty();
         }
-        List<String> parts = new ArrayList<>();
-        parts.add(pullRequest.getHeadRefOid());
-        parts.add(pullRequest.getTitle());
-        parts.add(pullRequest.getBody());
+        List<@Nullable String> parts = new ArrayList<>();
+        parts.add(head);
+        parts.add(title);
+        parts.add(body);
         closingIssues.stream().sorted(Comparator.comparingInt(Issue::getNumber)).forEach(issue -> {
             parts.add(String.valueOf(issue.getNumber()));
             parts.add(text(issue));

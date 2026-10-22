@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +40,18 @@ public class ScmItemAccess {
             if (ref.workspaceId() != workspaceId || !ref.equals(actual.get(ref.itemId())))
                 throw new ItemCaptureException(
                         ItemCaptureCode.ITEM_NOT_VISIBLE, "Item reference does not match its workspace identity");
+    }
+
+    /**
+     * The stored facts of an issue or a pull request of {@code kind} that its version and source relation read,
+     * without loading the work; empty for another kind or a row of another type.
+     */
+    public Optional<ScmItemQueryRepository.WorkFacts> work(ItemKind kind, long sourceId) {
+        return queries.work(kind.value(), sourceId);
+    }
+
+    public List<Issue> closingIssues(long pullRequestId) {
+        return queries.closingIssues(pullRequestId);
     }
 
     public ItemRef require(ItemRef item) {

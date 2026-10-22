@@ -220,9 +220,9 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
                     known.value().equals(result.getItemVersion())
                             ? ResultHistoryEntry.StoredWorkVersion.SAME
                             : ResultHistoryEntry.StoredWorkVersion.DIFFERENT;
-                case ProductItemQuery.CurrentWorkVersion.Unknown ignored ->
+                case ProductItemQuery.CurrentWorkVersion.Unknown.INSTANCE ->
                     ResultHistoryEntry.StoredWorkVersion.UNKNOWN;
-                case ProductItemQuery.CurrentWorkVersion.Removed ignored ->
+                case ProductItemQuery.CurrentWorkVersion.Removed.INSTANCE ->
                     ResultHistoryEntry.StoredWorkVersion.UNKNOWN;
             };
         }

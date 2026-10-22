@@ -15,6 +15,14 @@ public interface ItemSource {
 
     Optional<ItemSnapshot> current(ItemRef item);
 
+    /**
+     * The version {@link #pin} would pin now, read from the stored work alone, without a snapshot, a capture or a
+     * provider call. Empty where the source states no such version; unavailable work fails as {@link #pin} does.
+     */
+    default Optional<ItemVersion> currentVersion(ItemRef item) {
+        return Optional.empty();
+    }
+
     ItemSnapshot pin(ItemRef item, @Nullable ItemVersion requested);
 
     CaptureContribution capture(ItemSnapshot pinned, CaptureRequest request);

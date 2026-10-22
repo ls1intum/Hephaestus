@@ -39,8 +39,8 @@ public class ResultCurrentness {
         return switch (source) {
             case ProductItemQuery.CurrentWorkVersion.Known known ->
                 known.value().equals(version) ? null : ResultEndReason.WORK_CHANGED;
-            case ProductItemQuery.CurrentWorkVersion.Removed ignored -> ResultEndReason.REMOVED;
-            case ProductItemQuery.CurrentWorkVersion.Unknown ignored -> null;
+            case ProductItemQuery.CurrentWorkVersion.Removed.INSTANCE -> ResultEndReason.REMOVED;
+            case ProductItemQuery.CurrentWorkVersion.Unknown.INSTANCE -> null;
         };
     }
 
@@ -53,8 +53,8 @@ public class ResultCurrentness {
                             Objects.equals(known.value(), result.getItemVersion())
                                     ? null
                                     : ResultEndReason.WORK_CHANGED;
-                        case ProductItemQuery.CurrentWorkVersion.Removed ignored -> ResultEndReason.REMOVED;
-                        case ProductItemQuery.CurrentWorkVersion.Unknown ignored -> null;
+                        case ProductItemQuery.CurrentWorkVersion.Removed.INSTANCE -> ResultEndReason.REMOVED;
+                        case ProductItemQuery.CurrentWorkVersion.Unknown.INSTANCE -> null;
                     };
             if (reason != null) {
                 result.end(reason, at.isBefore(result.getRecordedAt()) ? result.getRecordedAt() : at);

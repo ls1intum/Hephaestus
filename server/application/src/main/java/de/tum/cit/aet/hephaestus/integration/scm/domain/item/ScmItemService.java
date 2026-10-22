@@ -113,6 +113,40 @@ public class ScmItemService implements ItemSource {
         return pinItem(item, requested);
     }
 
+    /**
+     * The version {@link #pin} would pin now for an issue or a pull request, behind the same item and repository
+     * checks. A pull request's version reads only its stored revision, title, description and closing issues, so a
+     * stored field outside them may be missing. A review, a repository and a file state none here.
+     */
+    @Transactional(readOnly = true, noRollbackFor = ItemCaptureException.class)
+    @Override
+    public Optional<ItemVersion> currentVersion(ItemRef item) {
+        if (!item.kind().equals(ScmItemEvents.ISSUE) && !item.kind().equals(ScmItemEvents.PULL_REQUEST))
+            return Optional.empty();
+        items.require(item);
+        Long sourceId = item.sourceId();
+        if (sourceId == null) throw invisible();
+        if (item.kind().equals(ScmItemEvents.ISSUE)) {
+            Issue work = workLookup.find(item.kind(), sourceId).orElseThrow(ScmItemService::gone);
+            authorize(item, work);
+            title(work.getTitle());
+            return Optional.of(issueVersions.of(ScmEventPayload.IssueData.from(work)));
+        }
+        var work = items.work(item.kind(), sourceId).orElseThrow(ScmItemService::gone);
+        if (work.getDeleted()) throw gone();
+        long repositoryId = Objects.requireNonNull(work.getRepositoryId(), "Stored work has no repository");
+        authorize(item, repositoryRows.findById(repositoryId).orElseThrow(ScmItemService::gone));
+        String base = objectId(work.getBaseRefOid());
+        String head = objectId(work.getHeadRefOid());
+        String title = title(work.getTitle());
+        var version = ScmVersion.pullRequest(base, head, title, work.getBody());
+        var linkedVersion = LinkedWorkItemContentSource.currentClosingMaterialVersion(
+                head, title, work.getBody(), items.closingIssues(sourceId));
+        return Optional.of(linkedVersion
+                .map(context -> ScmVersion.withContext(version, context))
+                .orElse(version));
+    }
+
     private ItemSnapshot pinItem(ItemRef item, @Nullable ItemVersion requested) {
         items.require(item);
         if (item.kind().equals(ScmItemEvents.FILE) ? item.path() == null : item.sourceId() == null) throw invisible();
@@ -492,7 +526,10 @@ public class ScmItemService implements ItemSource {
 
     private IntegrationRef authorize(ItemRef workItem, Issue work) {
         if (work.getDeletedAt() != null) throw gone();
-        Repository repository = Objects.requireNonNull(work.getRepository());
+        return authorize(workItem, Objects.requireNonNull(work.getRepository()));
+    }
+
+    private IntegrationRef authorize(ItemRef workItem, Repository repository) {
         ItemRef holder = items.parent(workItem, ScmItemEvents.REPOSITORY);
         if (!Objects.equals(holder.sourceId(), repository.getId())) throw invisible();
         return repositories.authorize(workItem.workspaceId(), repository);
@@ -514,6 +551,12 @@ public class ScmItemService implements ItemSource {
     private static ItemCaptureException invisible() {
         return new ItemCaptureException(
                 ItemCaptureCode.ITEM_NOT_VISIBLE, "SCM item does not belong to this workspace reference");
+    }
+
+    // A pin labels the work with its title, so work without one has no version either.
+    private static String title(@Nullable String value) {
+        if (value == null || value.isBlank()) throw versionUnavailable();
+        return value;
     }
 
     private static ItemCaptureException versionUnavailable() {

@@ -63,6 +63,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultCurrentness;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
@@ -170,6 +171,9 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ScmItemSourceAccess sourceAccess;
+
+    @Autowired
+    private ProductItemQuery productItems;
 
     @Autowired
     private ItemMergeTimeQuery mergeTimes;
@@ -315,6 +319,9 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                 holder.workspaceId(), ScmItemEvents.PULL_REQUEST, pull.getId(), holder.itemId(), null));
         var issueSnapshot = sources.pin(issueRef, null);
         var pullSnapshot = sources.pin(pullRef, null);
+        // The stored-work version is the pinned one, with the issue's discussion and the closing-issue context.
+        assertThat(sources.currentVersion(issueRef)).contains(issueSnapshot.version());
+        assertThat(sources.currentVersion(pullRef)).contains(pullSnapshot.version());
         assertThat(issueSnapshot.label().noun()).isEqualTo("issue");
         assertThat(issueSnapshot.label().label()).isEqualTo("#7");
         assertThat(pullSnapshot.label().label()).isEqualTo(type == IdentityProviderType.GITLAB ? "!7" : "#7");
@@ -563,6 +570,92 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         assertThat(sources.current(issueRef)).isEmpty();
         writer.restore(holder.workspaceId(), issueRef.itemId());
         assertThat(sources.current(issueRef)).isPresent();
+
+        // It follows the pinned version through a base change, a closing-issue edit and a description-only edit.
+        var rebased = sources.pin(pullRef, null).version();
+        assertThat(sources.currentVersion(pullRef)).contains(rebased);
+        jdbc.update("UPDATE issue SET body=? WHERE id=?", "A changed issue body", issue.getId());
+        var relinked = sources.pin(pullRef, null).version();
+        assertThat(relinked).isNotEqualTo(rebased);
+        assertThat(sources.currentVersion(pullRef)).contains(relinked);
+        assertThat(sources.currentVersion(issueRef))
+                .contains(sources.pin(issueRef, null).version());
+        jdbc.update("UPDATE issue SET body=? WHERE id=?", "A changed description", pull.getId());
+        var described = sources.pin(pullRef, null).version();
+        assertThat(described).isNotEqualTo(relinked);
+        assertThat(sources.currentVersion(pullRef)).contains(described);
+        assertThat(sources.currentVersion(reviewRef)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldLeaveTheStoredVersionUnknownWhileTheWorkHasNoTitle(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var issue = new Issue();
+        issue.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+        issue.setProvider(fixture.provider());
+        issue.setRepository(fixture.repository());
+        issue.setNumber(8);
+        issue.setTitle("A titled issue");
+        issue.setBody("Issue body");
+        issue.setState(Issue.State.OPEN);
+        issue.setAuthor(fixture.author());
+        issue.setHtmlUrl(fixture.repository().getHtmlUrl() + "/issues/8");
+        issue.setCreatedAt(Instant.now());
+        issue.setUpdatedAt(Instant.now());
+        long issueId = issues.saveAndFlush(issue).getId();
+        var pull = new PullRequest();
+        pull.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+        pull.setProvider(fixture.provider());
+        pull.setRepository(fixture.repository());
+        pull.setNumber(9);
+        pull.setTitle("A titled pull request");
+        pull.setBody("Description");
+        pull.setState(Issue.State.OPEN);
+        pull.setAuthor(fixture.author());
+        pull.setHtmlUrl(fixture.repository().getHtmlUrl() + "/pull/9");
+        pull.setCreatedAt(Instant.now());
+        pull.setUpdatedAt(Instant.now());
+        pull.setHeadRefOid("a".repeat(40));
+        pull.setBaseRefOid("b".repeat(40));
+        pull.setHeadRefName("topic");
+        pull.setBaseRefName("main");
+        long pullId = pulls.saveAndFlush(pull).getId();
+        ItemRef holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var titledWork = Map.of(
+                writer.upsert(new ItemRegistration(
+                        holder.workspaceId(), ScmItemEvents.ISSUE, issueId, holder.itemId(), null)),
+                "A titled issue",
+                writer.upsert(new ItemRegistration(
+                        holder.workspaceId(), ScmItemEvents.PULL_REQUEST, pullId, holder.itemId(), null)),
+                "A titled pull request");
+        for (var work : titledWork.entrySet()) {
+            ItemRef ref = work.getKey();
+            long source = Objects.requireNonNull(ref.sourceId());
+            var titled = new ProductItemQuery.CurrentWorkVersion.Known(
+                    sources.pin(ref, null).version().value());
+            assertThat(productItems.currentWorkVersion(ref.workspaceId(), ref.itemId()))
+                    .isEqualTo(titled);
+            for (String missing : List.of("NULL", "'   '")) {
+                jdbc.update("UPDATE issue SET title=" + missing + " WHERE id=?", source);
+                assertThatThrownBy(() -> sources.currentVersion(ref))
+                        .isInstanceOfSatisfying(
+                                ItemCaptureException.class,
+                                failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+                assertThat(productItems.currentWorkVersion(ref.workspaceId(), ref.itemId()))
+                        .isEqualTo(ProductItemQuery.CurrentWorkVersion.Unknown.INSTANCE);
+            }
+            jdbc.update("UPDATE issue SET title=? WHERE id=?", work.getValue(), source);
+            assertThat(productItems.currentWorkVersion(ref.workspaceId(), ref.itemId()))
+                    .isEqualTo(titled);
+        }
     }
 
     @ParameterizedTest
