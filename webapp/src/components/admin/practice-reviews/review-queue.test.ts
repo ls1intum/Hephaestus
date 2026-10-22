@@ -5,7 +5,6 @@ import type { ReviewQueue } from "@/api/types.gen";
 import { reviewItem } from "./fixtures";
 import {
 	oldestWaitSeconds,
-	perHourText,
 	queueActive,
 	queueItemState,
 	queueTotal,
@@ -59,15 +58,5 @@ describe("review queue", () => {
 		expect(queueItemState({ ...item, status: "RUNNING", heldForBudget: false })).toBe("running");
 		expect(queueItemState({ ...item, status: "QUEUED", heldForBudget: false })).toBe("waiting");
 		expect(queueItemState({ ...item, status: "QUEUED", heldForBudget: true })).toBe("held");
-	});
-
-	it("says a rate in whole numbers from ten and to one decimal below", () => {
-		expect(perHourText(12.4)).toBe("12");
-		expect(perHourText(4)).toBe("4");
-		expect(perHourText(0.125)).toBe("0.1");
-		expect(perHourText(2.55)).toBe("2.6");
-		// One review in 24 h is 0.04 an hour: it finished, so the rate is not "0".
-		expect(perHourText(1 / 24)).toBe("less than 0.1");
-		expect(perHourText(0)).toBe("0");
 	});
 });

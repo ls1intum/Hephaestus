@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "cn";
 import type { ReviewQueue, ReviewQueueItem } from "@/api/types.gen";
-import { InfoLines, InfoTip } from "@/components/common/InfoTip";
+import { type InfoLine, InfoLines, InfoTip } from "@/components/common/InfoTip";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -19,7 +19,6 @@ import { OVERVIEW_TYPE } from "./overview-type-scale";
 import { reviewLevel } from "./review-levels";
 import {
 	oldestWaitSeconds,
-	perHourText,
 	QUEUE_ROWS,
 	type QueueItemState,
 	type QueueState,
@@ -93,7 +92,7 @@ export function ReviewQueueNow({ workspaceSlug, state }: ReviewQueueNowProps) {
 				icon={ListOrderedIcon}
 				info={
 					<InfoTip label="About the queue">
-						<InfoLines lines={queueInfo(state.status === "ready" ? state.queue : undefined)} />
+						<InfoLines lines={QUEUE_INFO} />
 					</InfoTip>
 				}
 			>
@@ -104,41 +103,32 @@ export function ReviewQueueNow({ workspaceSlug, state }: ReviewQueueNowProps) {
 	);
 }
 
-/** The (i) beside "Now": what each figure counts, and how fast the queue empties now. */
-function queueInfo(queue: ReviewQueue | undefined) {
-	return [
-		{
-			term: "Waiting",
-			text: "counts reviews that wait for a worker now, a retry included, but not those on hold. The count opens them.",
-		},
-		{
-			term: "Running",
-			text:
-				queue === undefined || queue.activeWorkers === 0
-					? "counts reviews a worker runs now. The count opens them."
-					: `counts reviews a worker runs now, on ${queue.activeWorkers} ${queue.activeWorkers === 1 ? "worker" : "workers"}. The count opens them.`,
-		},
-		{
-			term: "On hold for budget",
-			text: "counts reviews that wait now because the monthly AI budget is used up. A hold is red. The count opens them.",
-		},
-		{
-			term: "Oldest wait",
-			text: "is how long the first waiting review has waited; from 30 minutes it is marked. It opens that review while the review is among the first in line. It is left out while nothing waits.",
-		},
-		{
-			term: "Since / Waited",
-			text: "is how long a review has run or waited. For a review on hold, it counts from its request.",
-		},
-		{
-			term: "Pace",
-			text:
-				queue === undefined || queue.finishedLastDay === 0
-					? "Right now, no review finished in the last 24 hours."
-					: `Right now, ${perHourText(queue.finishedPerHourLastDay)} finish an hour, over the last 24 hours.`,
-		},
-	];
-}
+/**
+ * The (i) beside "Now": what each figure counts. It names no figure that no list opens exactly, so
+ * neither the pace nor the number of workers.
+ */
+const QUEUE_INFO: readonly InfoLine[] = [
+	{
+		term: "Waiting",
+		text: "counts reviews that wait for a worker now, a retry included, but not those on hold. The count opens them.",
+	},
+	{
+		term: "Running",
+		text: "counts reviews a worker runs now. The count opens them.",
+	},
+	{
+		term: "On hold for budget",
+		text: "counts reviews that wait now because the monthly AI budget is used up. A hold is red. The count opens them.",
+	},
+	{
+		term: "Oldest wait",
+		text: "is how long the first waiting review has waited; from 30 minutes it is marked. It opens that review while the review is among the first in line. It is left out while nothing waits.",
+	},
+	{
+		term: "Since / Waited",
+		text: "is how long a review has run or waited. For a review on hold, it counts from its request.",
+	},
+];
 
 function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: ReviewQueue }) {
 	const total = queueTotal(queue);
@@ -208,12 +198,13 @@ function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: 
 						render={
 							<ReviewListLink
 								workspaceSlug={workspaceSlug}
-								// The queue's own statuses, so the list holds exactly the reviews the total counts.
+								// The queue's statuses, by review and not by job, so the link names no count: the
+								// list need not hold as many reviews as the figures above add up to.
 								destination={{ list: "reviews", search: { status: ["RUNNING", "QUEUED"] } }}
 							/>
 						}
 					>
-						See all {total}
+						See all
 					</InlineLink>
 				</p>
 			)}

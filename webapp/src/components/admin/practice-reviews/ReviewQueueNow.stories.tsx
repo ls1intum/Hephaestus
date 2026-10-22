@@ -125,7 +125,8 @@ export const Busy: Story = {
 		await expect(levelsOpenedBy(canvas.getByRole("link", { name: "#1423" }))).toEqual([
 			"review:0c0c0c0c-0000-4000-8000-000000000001",
 		]);
-		const all = canvas.getByRole("link", { name: "See all 7" });
+		// The link names no count: it opens reviews by status, which need not add up to the figures.
+		const all = canvas.getByRole("link", { name: "See all" });
 		const search = new URL(all.getAttribute("href") ?? "", "http://x").searchParams;
 		await expect(search.getAll("status")).toStrictEqual(["RUNNING", "QUEUED"]);
 		await expect(now.querySelector(".lucide-triangle-alert")).toBeNull();
@@ -255,7 +256,7 @@ export const OnHold: Story = {
 	},
 };
 
-/** Many in line: still three rows, and the count opens them all. */
+/** Many in line: still three rows, and "See all" opens the rest. */
 export const ManyItems: Story = {
 	args: {
 		state: {
@@ -275,12 +276,14 @@ export const ManyItems: Story = {
 	},
 	play: async ({ canvas, userEvent }) => {
 		await expect(rowsOf(canvas)).toHaveLength(3);
-		canvas.getByRole("link", { name: "See all 43" });
-		// How fast the queue empties now is in the card's (i), not under the figures.
+		canvas.getByRole("link", { name: "See all" });
+		// The (i) names no figure that no list opens: neither the pace nor the number of workers.
 		await userEvent.click(canvas.getByRole("button", { name: "About the queue" }));
-		await expect(await screen.findByRole("dialog", { name: "About the queue" })).toHaveTextContent(
-			"Right now, 25 finish an hour, over the last 24 hours.",
+		const about = await screen.findByRole("dialog", { name: "About the queue" });
+		await expect(about).toHaveTextContent(
+			"counts reviews a worker runs now. The count opens them.",
 		);
+		await expect(about).not.toHaveTextContent(/Pace|an hour|4 workers/u);
 	},
 };
 
@@ -319,6 +322,6 @@ export const Dark: Story = {
 	},
 	globals: { theme: "dark" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("link", { name: "See all 7" })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: "See all" })).toBeVisible();
 	},
 };
