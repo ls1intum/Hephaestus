@@ -9,7 +9,6 @@ import type {
 } from "@/api/types.gen";
 import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import {
 	Dialog,
 	DialogBody,
@@ -21,6 +20,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
 import type { AdminLlmModelSaveBody } from "@/lib/admin-llm-model-save";
 import type { FieldErrors, LlmModelFormField } from "@/lib/llm-form-validation";
 import { reasoningEffortOf, reasoningEffortUpdateOf } from "@/lib/reasoning-effort";

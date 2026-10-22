@@ -138,12 +138,7 @@ export function WorkspaceLlmProviderPanel({
 			className="space-y-6"
 			actions={
 				registrationAllowed && connections.length > 0 ? (
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={addingConnection}
-						onClick={onAddConnection}
-					>
+					<Button size="sm" variant="outline" disabled={addingConnection} onClick={onAddConnection}>
 						<Plus className="size-4" aria-hidden /> Add provider
 					</Button>
 				) : undefined

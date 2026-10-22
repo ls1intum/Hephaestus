@@ -1373,9 +1373,7 @@ it.each([
 		renderRouteAt("/w/acme/admin/models");
 		// A failed assertion must still answer the held write, or the test leaves it open.
 		try {
-			await user.click(
-				await screen.findByRole("button", { name: openHeld }, ROUTE_RENDER_WAIT),
-			);
+			await user.click(await screen.findByRole("button", { name: openHeld }, ROUTE_RENDER_WAIT));
 			const held = within(await screen.findByRole("dialog", { name: heldTitle }));
 			for (const [label, value] of heldFields) {
 				await user.type(held.getByLabelText(label), value);

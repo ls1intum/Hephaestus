@@ -9,7 +9,6 @@ import type {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import {
 	Dialog,
 	DialogBody,
@@ -20,6 +19,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { listsNoModels, UNLISTED_MODELS } from "@/lib/llm-api-protocol-labels";
 import type { FieldErrors, LlmConnectionFormField } from "@/lib/llm-form-validation";
 import type { LlmApiProtocol, LlmAuthMode } from "@/lib/llm-provider-type";
