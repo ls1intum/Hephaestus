@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -25,6 +26,8 @@ import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.MarkdownBlock;
 import de.tum.cit.aet.hephaestus.agent.mentor.turn.ConversationReceiptsDue;
 import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorTurnCompletion;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.integration.core.sync.MutableClock;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
@@ -58,11 +61,19 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+import org.awaitility.Awaitility;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,6 +84,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -115,6 +127,12 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    @Autowired
+    private PersonDataWriteFence writeFence;
 
     private final SlackMessageService slack = mock(SlackMessageService.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
@@ -387,6 +405,44 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
         doThrow(refusal).when(slack).appendStream(anyLong(), anyString(), anyString(), anyString());
     }
 
+    /**
+     * Each Slack call that sets the session status of a thread, in the order Slack takes them: {@code status:<status>}
+     * for {@code agents.sessions.setStatus}, {@code stop:<ts>:<status>} for the status that a stream's end sets.
+     */
+    private final List<String> sessionCalls = new CopyOnWriteArrayList<>();
+
+    private static String status(boolean working) {
+        return working ? "processing" : "active";
+    }
+
+    private void recordSessionCalls() {
+        doAnswer(call -> {
+                    sessionCalls.add("status:" + status(call.<Boolean>getArgument(3)));
+                    return null;
+                })
+                .when(slack)
+                .setSessionStatus(anyLong(), anyString(), anyString(), anyBoolean());
+        doAnswer(call -> {
+                    recordStop(call.getArgument(2), call.getArgument(3));
+                    return null;
+                })
+                .when(slack)
+                .stopStream(anyLong(), anyString(), anyString(), any());
+    }
+
+    private void recordStop(String ts, SlackMessageService.StreamStop stop) {
+        sessionCalls.add("stop:" + ts + ":" + status(stop.working()));
+    }
+
+    /** Whether another transaction waits for a lock of the transaction on {@code backendPid}. */
+    private boolean blocksAnother(int backendPid) {
+        jdbc.execute("SELECT pg_stat_clear_snapshot()");
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid)))",
+                Boolean.class,
+                backendPid));
+    }
+
     @Test
     void shouldPostEveryMessageAndTheFeedbackHephShowedOnceWhenATopLevelTurnEnds() {
         MentorTurnService.Submission asked = ask(main, "How are my reviews?", "100.1");
@@ -539,7 +595,8 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
                         new SlackMessageService.StreamStop(
                                 null,
                                 SlackMentorPosts.feedbackButtons(answer.getId()),
-                                SlackMentorPosts.metadata(asked.question().getId())));
+                                SlackMentorPosts.metadata(asked.question().getId()),
+                                false));
         verify(slack, never()).postMessage(anyLong(), anyString(), any(), anyList(), anyString(), any());
         assertThat(answer.getSlackTs()).isEqualTo("300.1");
         assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.DELIVERED);
@@ -706,7 +763,8 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
                         new SlackMessageService.StreamStop(
                                 null,
                                 List.of(),
-                                SlackMentorPosts.metadata(asked.question().getId())));
+                                SlackMentorPosts.metadata(asked.question().getId()),
+                                false));
         verify(slack).updateMessage(eq(workspace.getId()), eq(CHANNEL), eq(opened), anyList(), anyString(), any());
         verify(slack, never()).postMessage(anyLong(), anyString(), any(), anyList(), anyString(), any());
         assertThat(question(asked).getSlackStreamTs()).isEqualTo(opened);
@@ -759,7 +817,8 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
                         new SlackMessageService.StreamStop(
                                 null,
                                 List.of(),
-                                SlackMentorPosts.metadata(asked.question().getId())));
+                                SlackMentorPosts.metadata(asked.question().getId()),
+                                false));
         assertThat(markdownOf(replacement(asked))).isEqualTo("Let me look again. Your reviews are quick.");
         assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.DELIVERED);
     }
@@ -832,7 +891,8 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
                         new SlackMessageService.StreamStop(
                                 null,
                                 List.of(),
-                                SlackMentorPosts.metadata(asked.question().getId())));
+                                SlackMentorPosts.metadata(asked.question().getId()),
+                                false));
         List<LayoutBlock> replacement = replacement(asked);
         assertThat(markdownOf(replacement)).isEqualTo("Your reviews are quick. Keep it up.");
         assertThat(replacement)
@@ -1041,6 +1101,312 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
     }
 
     @Test
+    void shouldShowTheThreadWorkingWhileItsTurnRunsAndEndItWhenNoOtherSlackWorkRuns() {
+        recordSessionCalls();
+        MentorTurnService.Submission asked = askInThread();
+        MentorTurn running = running(asked);
+        when(slack.startStream(workspace.getId(), CHANNEL, "100.1", "Your reviews"))
+                .thenReturn("300.1");
+
+        turns.updatePartial(running.getId(), running.getAttempt(), WORKER, partial("Your reviews"));
+        changed(running);
+        assertThat(sessionCalls).containsExactly("status:processing");
+        end(running, MentorTurn.Status.DONE, "Your reviews are quick.", "");
+        changed(running);
+
+        assertThat(sessionCalls).containsExactly("status:processing", "stop:300.1:active", "status:active");
+        verify(slack).setSessionStatus(workspace.getId(), CHANNEL, "100.1", true);
+        assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.DELIVERED);
+    }
+
+    @Test
+    void shouldEndTheSessionWhenOnlyAQueuedFollowUpWaits() {
+        recordSessionCalls();
+        MentorTurnService.Submission asked = askInThread();
+        MentorTurn running = running(asked);
+        MentorTurnService.Submission followUp =
+                ask(conversations.require(workspace.getId(), running.getConversationId()), "And next?", "100.6");
+        when(slack.startStream(workspace.getId(), CHANNEL, "100.1", "Your reviews"))
+                .thenReturn("300.1");
+        turns.updatePartial(running.getId(), running.getAttempt(), WORKER, partial("Your reviews"));
+        changed(running);
+
+        end(running, MentorTurn.Status.DONE, "Your reviews are quick.", "");
+        changed(running);
+
+        assertThat(turns.require(workspace.getId(), followUp.turn().getId()).getStatus())
+                .isEqualTo(MentorTurn.Status.QUEUED);
+        assertThat(sessionCalls).containsExactly("status:processing", "stop:300.1:active", "status:active");
+    }
+
+    @Test
+    void shouldKeepTheThreadWorkingWhenTheNextTurnRunsBeforeTheEarlierStreamEnds() {
+        recordSessionCalls();
+        MentorTurnService.Submission asked = askInThread();
+        MentorTurn first = running(asked);
+        MentorTurnService.Submission next =
+                ask(conversations.require(workspace.getId(), first.getConversationId()), "And next?", "100.6");
+        when(slack.startStream(workspace.getId(), CHANNEL, "100.1", "Your reviews"))
+                .thenReturn("300.1");
+        turns.updatePartial(first.getId(), first.getAttempt(), WORKER, partial("Your reviews"));
+        changed(first);
+        end(first, MentorTurn.Status.DONE, "Your reviews are quick.", "");
+        MentorTurn second = turns.claimNext(WORKER, LEASE).orElseThrow();
+        assertThat(second.getId()).isEqualTo(next.turn().getId());
+        changed(second);
+
+        changed(first);
+
+        assertThat(sessionCalls)
+                .containsExactly(
+                        "status:processing", "status:processing", "stop:300.1:processing", "status:processing");
+        assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.DELIVERED);
+    }
+
+    /**
+     * Two servers: one ends the earlier turn's stream while Slack holds the call, the other starts the next turn
+     * meanwhile. The claim does not wait for Slack, but the next turn's session call waits for the end of the stream,
+     * so Slack takes it last and the thread shows the next turn working.
+     */
+    @Test
+    void shouldKeepTheNextTurnWorkingWhenItsSessionCallWaitsForTheEndOfTheEarlierStream() throws Exception {
+        recordSessionCalls();
+        MentorTurnService.Submission asked = askInThread();
+        MentorTurn first = running(asked);
+        MentorTurnService.Submission next =
+                ask(conversations.require(workspace.getId(), first.getConversationId()), "And next?", "100.6");
+        when(slack.startStream(workspace.getId(), CHANNEL, "100.1", "Your reviews"))
+                .thenReturn("300.1");
+        turns.updatePartial(first.getId(), first.getAttempt(), WORKER, partial("Your reviews"));
+        changed(first);
+        CountDownLatch inSlack = new CountDownLatch(1);
+        CountDownLatch answer = new CountDownLatch(1);
+        AtomicInteger endingPid = new AtomicInteger();
+        doAnswer(call -> {
+                    endingPid.set(
+                            Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                    recordStop(call.getArgument(2), call.getArgument(3));
+                    inSlack.countDown();
+                    assertThat(answer.await(20, TimeUnit.SECONDS)).isTrue();
+                    return null;
+                })
+                .when(slack)
+                .stopStream(anyLong(), anyString(), anyString(), any());
+        end(first, MentorTurn.Status.DONE, "Your reviews are quick.", "");
+        CompletableFuture<Void> ending = CompletableFuture.runAsync(() -> changed(first));
+        CompletableFuture<Void> starting = null;
+        try {
+            assertThat(inSlack.await(20, TimeUnit.SECONDS)).isTrue();
+
+            MentorTurn second = turns.claimNext(WORKER, LEASE).orElseThrow();
+            assertThat(second.getId()).isEqualTo(next.turn().getId());
+            starting = CompletableFuture.runAsync(() -> changed(second));
+            Awaitility.await().atMost(20, TimeUnit.SECONDS).until(() -> blocksAnother(endingPid.get()));
+            assertThat(sessionCalls).containsExactly("status:processing", "stop:300.1:active");
+        } finally {
+            // Slack answers the held call even when an assertion above failed, so no server is left waiting.
+            answer.countDown();
+            ending.get(20, TimeUnit.SECONDS);
+            if (starting != null) {
+                starting.get(20, TimeUnit.SECONDS);
+            }
+        }
+
+        assertThat(sessionCalls.subList(0, 2)).containsExactly("status:processing", "stop:300.1:active");
+        assertThat(sessionCalls.subList(2, sessionCalls.size())).isNotEmpty().containsOnly("status:processing");
+        assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.DELIVERED);
+    }
+
+    /** The developer's identity as the person-data write fence and an erasure name it. */
+    private List<PersonIdentity> developerIdentity() {
+        return List.of(new PersonIdentity(
+                Objects.requireNonNull(developer.getProvider().getId()),
+                developer.getNativeId().toString(),
+                null));
+    }
+
+    /** A session call of the Heph thread on {@code 100.1} that only reports that it ran. */
+    private Optional<String> sessionCall(UUID threadId, AtomicBoolean called) {
+        return delivery.callInThreadSession(workspace.getId(), threadId, CHANNEL, "100.1", session -> {
+            called.set(true);
+            return "called";
+        });
+    }
+
+    /** Whether a transaction waits at the person-data fence (an advisory lock) that the one on {@code pid} holds. */
+    private boolean waitsAtTheFenceOf(int pid) {
+        jdbc.execute("SELECT pg_stat_clear_snapshot()");
+        return pid != 0
+                && Boolean.TRUE.equals(jdbc.queryForObject(
+                        "SELECT EXISTS (SELECT FROM pg_stat_activity"
+                                + " WHERE ? = ANY(pg_blocking_pids(pid)) AND wait_event = 'advisory')",
+                        Boolean.class,
+                        pid));
+    }
+
+    private static void awaitRelease(CountDownLatch release) {
+        try {
+            assertThat(release.await(20, TimeUnit.SECONDS)).isTrue();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(interrupted);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"erased", "deleting"})
+    void shouldMakeNoSessionCallForADeveloperThePersonDataFenceRefuses(String refusal) {
+        MentorTurnService.Submission asked = askInThread();
+        UUID threadId = running(asked).getConversationId();
+        AtomicBoolean admitted = new AtomicBoolean();
+        assertThat(sessionCall(threadId, admitted)).contains("called");
+        assertThat(admitted).isTrue();
+        if (refusal.equals("erased")) {
+            PersonIdentity identity = developerIdentity().getFirst();
+            databaseTestUtils.erase(identity.providerId(), identity.subject(), null);
+        } else {
+            jdbc.update("UPDATE account SET status = 'DELETING' WHERE id = ?", developerAccount);
+        }
+        AtomicBoolean refused = new AtomicBoolean();
+
+        assertThat(sessionCall(threadId, refused)).isEmpty();
+
+        assertThat(refused).isFalse();
+    }
+
+    /**
+     * An erasure holds the developer's person-data fence. A session call waits for it at the fence, before it shares
+     * the main conversation's row or locks the thread's row, and runs once the erasure's transaction ends.
+     */
+    @Test
+    void shouldWaitForAnErasureAtThePersonDataFenceBeforeItLocksTheConversation() throws Exception {
+        MentorTurnService.Submission asked = askInThread();
+        UUID threadId = running(asked).getConversationId();
+        CountDownLatch fenced = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger eraserPid = new AtomicInteger();
+        AtomicBoolean called = new AtomicBoolean();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<?> erasing = executor.submit(() -> transactions.executeWithoutResult(status -> {
+                eraserPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                writeFence.holdForErasure(developerIdentity());
+                fenced.countDown();
+                awaitRelease(release);
+            }));
+            Future<Optional<String>> session = null;
+            try {
+                assertThat(fenced.await(20, TimeUnit.SECONDS)).isTrue();
+                session = executor.submit(() -> sessionCall(threadId, called));
+                Awaitility.await().atMost(10, TimeUnit.SECONDS).until(() -> waitsAtTheFenceOf(eraserPid.get()));
+                // The waiting call holds no conversation row: another transaction locks both at once.
+                var lockedRows = Objects.requireNonNull(transactions.execute(status -> jdbc.queryForList(
+                        "SELECT id FROM mentor_conversation WHERE id IN (?, ?) FOR UPDATE NOWAIT",
+                        UUID.class,
+                        main.getId(),
+                        threadId)));
+                assertThat(lockedRows).containsExactlyInAnyOrder(main.getId(), threadId);
+                assertThat(called).isFalse();
+            } finally {
+                release.countDown();
+                erasing.get(20, TimeUnit.SECONDS);
+            }
+            assertThat(Objects.requireNonNull(session).get(20, TimeUnit.SECONDS))
+                    .contains("called");
+            assertThat(called).isTrue();
+        } finally {
+            release.countDown();
+        }
+    }
+
+    /**
+     * A session call holds the fence, then the conversation's rows, while Slack holds its call. An erasure waits at the
+     * fence, not at a row, so it never holds a row that the session call waits for; both end once Slack answers.
+     */
+    @Test
+    void shouldLetAnErasureWaitAtTheFenceWhileASessionCallIsInSlack() throws Exception {
+        MentorTurnService.Submission asked = askInThread();
+        UUID threadId = running(asked).getConversationId();
+        CountDownLatch inSlack = new CountDownLatch(1);
+        CountDownLatch answer = new CountDownLatch(1);
+        AtomicInteger sessionPid = new AtomicInteger();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<Optional<String>> session = executor.submit(() ->
+                    delivery.callInThreadSession(workspace.getId(), threadId, CHANNEL, "100.1", threadSession -> {
+                        sessionPid.set(
+                                Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                        inSlack.countDown();
+                        awaitRelease(answer);
+                        return "called";
+                    }));
+            Future<List<UUID>> erasing = null;
+            try {
+                assertThat(inSlack.await(20, TimeUnit.SECONDS)).isTrue();
+                erasing = executor.submit(() -> transactions.execute(status -> {
+                    writeFence.holdForErasure(developerIdentity());
+                    return jdbc.queryForList(
+                            "SELECT id FROM mentor_conversation WHERE id IN (?, ?) ORDER BY id FOR UPDATE",
+                            UUID.class,
+                            main.getId(),
+                            threadId);
+                }));
+                Awaitility.await().atMost(10, TimeUnit.SECONDS).until(() -> waitsAtTheFenceOf(sessionPid.get()));
+            } finally {
+                answer.countDown();
+            }
+            assertThat(session.get(20, TimeUnit.SECONDS)).contains("called");
+            assertThat(Objects.requireNonNull(erasing).get(20, TimeUnit.SECONDS))
+                    .containsExactlyInAnyOrder(main.getId(), threadId);
+        } finally {
+            answer.countDown();
+        }
+    }
+
+    @Test
+    void shouldNeverSetASessionStatusForATopLevelTurn() {
+        postsAt("400.1");
+        MentorTurnService.Submission asked = ask(main, "How are my reviews?", "100.1");
+        MentorTurn running = turns.claimNext(WORKER, LEASE).orElseThrow();
+        changed(running);
+        end(running, MentorTurn.Status.DONE, "Your reviews are quick.", "");
+        changed(running);
+
+        verify(slack, never()).setSessionStatus(anyLong(), anyString(), anyString(), anyBoolean());
+        verify(slack, never()).stopStream(anyLong(), anyString(), anyString(), any());
+        assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.DELIVERED);
+    }
+
+    @Test
+    void shouldDeliverTheStreamedAnswerAsBeforeWhenSlackRefusesTheSessionStatus() {
+        doThrow(new SlackSendException(workspace.getId(), CHANNEL, "transport_failure"))
+                .when(slack)
+                .setSessionStatus(anyLong(), anyString(), anyString(), anyBoolean());
+        MentorTurnService.Submission asked = askInThread();
+        MentorTurn running = running(asked);
+        when(slack.startStream(workspace.getId(), CHANNEL, "100.1", "Your reviews"))
+                .thenReturn("300.1");
+        turns.updatePartial(running.getId(), running.getAttempt(), WORKER, partial("Your reviews"));
+        changed(running);
+
+        end(running, MentorTurn.Status.DONE, "Your reviews are quick.", "");
+        changed(running);
+
+        MentorEntry answer = answerOf(running);
+        verify(slack).appendStream(workspace.getId(), CHANNEL, "300.1", " are quick.");
+        verify(slack)
+                .stopStream(
+                        workspace.getId(),
+                        CHANNEL,
+                        "300.1",
+                        new SlackMessageService.StreamStop(
+                                null,
+                                SlackMentorPosts.feedbackButtons(answer.getId()),
+                                SlackMentorPosts.metadata(asked.question().getId()),
+                                false));
+        assertThat(answer.getSlackTs()).isEqualTo("300.1");
+        assertThat(question(asked).getSlackDelivery()).isEqualTo(MentorEntry.SlackDelivery.DELIVERED);
+    }
+
+    @Test
     void shouldDeliverNoFeedbackWhenSlackStoppedTheStreamBeforeItsText() {
         MentorTurnService.Submission asked = askInThread();
         MentorTurn running = running(asked);
@@ -1112,7 +1478,8 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
                         new SlackMessageService.StreamStop(
                                 SlackMentorPosts.CUT_NOTE,
                                 SlackMentorPosts.feedbackButtons(answer.getId()),
-                                SlackMentorPosts.metadata(asked.question().getId())));
+                                SlackMentorPosts.metadata(asked.question().getId()),
+                                false));
         verify(slack, never()).postMessage(anyLong(), anyString(), any(), anyList(), anyString(), any());
         verify(slack, never()).updateMessage(anyLong(), anyString(), anyString(), anyList(), anyString(), any());
         assertThat(answer.getSlackTs()).isEqualTo("300.1");
@@ -1169,7 +1536,7 @@ class SlackMentorProjectorIntegrationTest extends AbstractWorkspaceIntegrationTe
                         workspace.getId(),
                         CHANNEL,
                         "300.1",
-                        new SlackMessageService.StreamStop(SlackMentorPosts.RESTART_NOTE, List.of(), null));
+                        new SlackMessageService.StreamStop(SlackMentorPosts.RESTART_NOTE, List.of(), null, false));
         verify(slack).startStream(workspace.getId(), CHANNEL, "100.1", "Second try");
         assertThat(question(asked).getSlackStreamTs()).isEqualTo("300.2");
     }

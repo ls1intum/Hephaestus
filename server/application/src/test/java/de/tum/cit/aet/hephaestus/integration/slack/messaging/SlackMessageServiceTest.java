@@ -7,7 +7,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.slack.api.methods.SlackApiException;
+import com.slack.api.Slack;
+import com.slack.api.SlackConfig;
 import com.slack.api.model.ResponseMetadata;
 import com.slack.api.model.view.View;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
@@ -18,16 +19,22 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-import okhttp3.Protocol;
-import okhttp3.Request;
-import okhttp3.Response;
+import mockwebserver3.Dispatcher;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
+import okio.ByteString;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class SlackMessageServiceTest extends BaseUnitTest {
 
@@ -36,7 +43,8 @@ class SlackMessageServiceTest extends BaseUnitTest {
 
     private SlackMessageService service;
 
-    private boolean silentModeEngaged;
+    /** Read by the guard on the test's thread, and set by a local Slack server's thread in one test. */
+    private volatile boolean silentModeEngaged;
 
     @BeforeEach
     void setUp() {
@@ -45,6 +53,11 @@ class SlackMessageServiceTest extends BaseUnitTest {
                 credentialProvider,
                 new SlackRateLimitTracker(new SimpleMeterRegistry()),
                 new OutboundEgressGuard(() -> silentModeEngaged));
+    }
+
+    @AfterEach
+    void closeService() {
+        service.close();
     }
 
     /** One guard fronts every content send; parameterizing pins each entry point without triplicating. */
@@ -74,7 +87,12 @@ class SlackMessageServiceTest extends BaseUnitTest {
                 Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
                 Arguments.of("appendStream", (ThrowingSend) s -> s.appendStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
                 Arguments.of("stopStream", (ThrowingSend) s -> s.stopStream(
-                        7L, "C1ABCDEFGH", "171234.5678", new SlackMessageService.StreamStop(null, List.of(), null))),
+                        7L,
+                        "C1ABCDEFGH",
+                        "171234.5678",
+                        new SlackMessageService.StreamStop(null, List.of(), null, false))),
+                Arguments.of("setSessionStatus", (ThrowingSend)
+                        s -> s.setSessionStatus(7L, "D1ABCDEFGH", "171234.5678", true)),
                 Arguments.of("postMessage", (ThrowingSend)
                         s -> s.postMessage(7L, "D1ABCDEFGH", null, List.of(), "hi", null)),
                 Arguments.of("setReaction", (ThrowingSend)
@@ -125,34 +143,173 @@ class SlackMessageServiceTest extends BaseUnitTest {
                         ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
     }
 
-    private static SlackApiException apiException(int code, String retryAfterHeader) {
-        Request request = new Request.Builder()
-                .url("https://slack.com/api/chat.postMessage")
-                .build();
-        Response.Builder builder = new Response.Builder()
-                .request(request)
-                .protocol(Protocol.HTTP_1_1)
-                .code(code)
-                .message("test");
-        if (retryAfterHeader != null) {
-            builder.header("Retry-After", retryAfterHeader);
+    @Test
+    void shouldGiveItsOwnSlackClientACallDeadlineAndLeaveTheSharedClientUnchanged() {
+        assertThat(ReflectionTestUtils.getField(service, "slack"))
+                .isInstanceOfSatisfying(
+                        Slack.class,
+                        own -> assertThat(own.getHttpClient().getOkHttpClient().callTimeoutMillis())
+                                .isEqualTo(SlackMessageService.NATIVE_CALL_TIMEOUT_MS));
+        assertThat(Slack.getInstance().getHttpClient().getOkHttpClient().callTimeoutMillis())
+                .isZero();
+        assertThat(Slack.getInstance().getConfig().getHttpClientCallTimeoutMillis())
+                .isNull();
+    }
+
+    @Test
+    void shouldFailAWriteOnceAsATransportFailureWhenSlackAnswersAfterTheCallDeadline() throws Exception {
+        try (MockWebServer slackApi = new MockWebServer()) {
+            slackApi.start();
+            slackApi.enqueue(json("{\"ok\":true,\"team_id\":\"T1\"}"));
+            slackApi.enqueue(new MockResponse.Builder()
+                    .code(200)
+                    .addHeader("Content-Type", "application/json")
+                    .body("{\"ok\":true,\"channel\":\"D1ABCDEFGH\",\"ts\":\"171234.5678\"}")
+                    .headersDelay(5, TimeUnit.SECONDS)
+                    .build());
+            SlackMessageService local = localService(slackApi, 300);
+            try {
+                assertThatThrownBy(() -> local.postMessage(7L, "D1ABCDEFGH", null, List.of(), "hi", null))
+                        .isInstanceOfSatisfying(
+                                SlackSendException.class,
+                                e -> assertThat(e.slackError()).isEqualTo("transport_failure"));
+            } finally {
+                local.close();
+            }
+
+            assertThat(slackApi.takeRequest().getUrl().encodedPath()).isEqualTo("/api/auth.test");
+            assertThat(slackApi.takeRequest().getUrl().encodedPath()).isEqualTo("/api/chat.postMessage");
+            assertThat(slackApi.getRequestCount()).isEqualTo(2);
         }
-        return new SlackApiException(builder.build(), "");
     }
 
-    private static Stream<Arguments> rateLimitCases() {
-        return Stream.of(
-                // A 429 with Retry-After: 3 → the caller must back off 3000 ms (honoring Slack, not a fixed tick).
-                Arguments.of(429, "3", 3000L),
-                Arguments.of(429, null, 1000L),
-                Arguments.of(500, "7", SlackSendException.NOT_RATE_LIMITED));
+    @Test
+    void shouldSendTheSessionStatusThatTheCallerNames() throws Exception {
+        try (MockWebServer slackApi = new MockWebServer()) {
+            slackApi.start();
+            slackApi.enqueue(json("{\"ok\":true,\"team_id\":\"T1\"}"));
+            slackApi.enqueue(json("{\"ok\":true}"));
+            slackApi.enqueue(json("{\"ok\":true}"));
+            SlackMessageService local = localService(slackApi, SlackMessageService.NATIVE_CALL_TIMEOUT_MS);
+            try {
+                local.setSessionStatus(7L, "D1ABCDEFGH", "171234.5678", true);
+                local.stopStream(
+                        7L,
+                        "D1ABCDEFGH",
+                        "171299.0001",
+                        new SlackMessageService.StreamStop(null, List.of(), null, false));
+            } finally {
+                local.close();
+            }
+
+            assertThat(slackApi.takeRequest().getUrl().encodedPath()).isEqualTo("/api/auth.test");
+            RecordedRequest status = slackApi.takeRequest();
+            assertThat(status.getUrl().encodedPath()).isEqualTo("/api/agents.sessions.setStatus");
+            assertThat(bodyOf(status)).contains("status=processing").contains("thread_ts=171234.5678");
+            RecordedRequest stop = slackApi.takeRequest();
+            assertThat(stop.getUrl().encodedPath()).isEqualTo("/api/chat.stopStream");
+            assertThat(bodyOf(stop)).contains("session_status=active");
+        }
     }
 
-    @ParameterizedTest(name = "code={0} retryAfterHeader={1} -> {2}ms")
-    @MethodSource("rateLimitCases")
-    void rateLimitRetryAfterMillis(int code, String retryAfterHeader, long expected) {
-        assertThat(SlackMessageService.rateLimitRetryAfterMillis(apiException(code, retryAfterHeader)))
-                .isEqualTo(expected);
+    // Slack's 429 here asks for no wait (Retry-After: 0), so the budget waits its fallback of about a second.
+
+    @Test
+    void shouldPostAThrottledWriteOnceAfterTheWholeWait() throws Exception {
+        try (MockWebServer slackApi = new MockWebServer()) {
+            slackApi.start();
+            slackApi.enqueue(json("{\"ok\":true,\"team_id\":\"T1\"}"));
+            slackApi.enqueue(throttled());
+            slackApi.enqueue(json("{\"ok\":true,\"channel\":\"D1ABCDEFGH\",\"ts\":\"171234.5678\"}"));
+            SlackMessageService local = localService(slackApi, SlackMessageService.NATIVE_CALL_TIMEOUT_MS);
+            long started = System.nanoTime();
+            SlackMessageService.Posted posted;
+            try {
+                posted = local.postMessage(7L, "D1ABCDEFGH", null, List.of(), "hi", null);
+            } finally {
+                local.close();
+            }
+
+            assertThat(posted).isEqualTo(new SlackMessageService.Posted("D1ABCDEFGH", "171234.5678"));
+            assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started))
+                    .isGreaterThanOrEqualTo(1_000);
+            assertThat(slackApi.takeRequest().getUrl().encodedPath()).isEqualTo("/api/auth.test");
+            assertThat(slackApi.takeRequest().getUrl().encodedPath()).isEqualTo("/api/chat.postMessage");
+            assertThat(slackApi.takeRequest().getUrl().encodedPath()).isEqualTo("/api/chat.postMessage");
+            assertThat(slackApi.getRequestCount()).isEqualTo(3);
+        }
+    }
+
+    @Test
+    void shouldNotTryAThrottledWriteAgainWhenSilentModeEngagesDuringTheWait() throws Exception {
+        try (MockWebServer slackApi = new MockWebServer()) {
+            slackApi.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    if (request.getUrl().encodedPath().equals("/api/auth.test")) {
+                        return json("{\"ok\":true,\"team_id\":\"T1\"}");
+                    }
+                    // An operator engages Silent Mode while Slack throttles the write.
+                    silentModeEngaged = true;
+                    return throttled();
+                }
+            });
+            slackApi.start();
+            SlackMessageService local = localService(slackApi, SlackMessageService.NATIVE_CALL_TIMEOUT_MS);
+            try {
+                assertThatThrownBy(() -> local.postMessage(7L, "D1ABCDEFGH", null, List.of(), "hi", null))
+                        .isInstanceOfSatisfying(
+                                SlackSendException.class,
+                                e -> assertThat(e.slackError()).isEqualTo("silent_mode_engaged"));
+            } finally {
+                local.close();
+            }
+
+            assertThat(slackApi.takeRequest().getUrl().encodedPath()).isEqualTo("/api/auth.test");
+            assertThat(slackApi.takeRequest().getUrl().encodedPath()).isEqualTo("/api/chat.postMessage");
+            assertThat(slackApi.getRequestCount()).isEqualTo(2);
+        }
+    }
+
+    private static MockResponse throttled() {
+        return new MockResponse.Builder()
+                .code(429)
+                .addHeader("Retry-After", "0")
+                .addHeader("Content-Type", "application/json")
+                .body("{\"ok\":false,\"error\":\"ratelimited\"}")
+                .build();
+    }
+
+    /**
+     * A gateway whose own Slack client calls {@code slackApi} with a deadline of {@code callTimeoutMs}. The test closes
+     * it.
+     */
+    private SlackMessageService localService(MockWebServer slackApi, int callTimeoutMs) {
+        SlackConfig config = new SlackConfig();
+        config.setHttpClientCallTimeoutMillis(callTimeoutMs);
+        config.setMethodsEndpointUrlPrefix(slackApi.url("/api/").toString());
+        // A token the SDK has not seen, so its team id cache asks auth.test first, as for a new workspace.
+        when(credentialProvider.resolve(any(IntegrationRef.class)))
+                .thenReturn(Optional.of(new BearerToken("xoxb-" + UUID.randomUUID(), null)));
+        return new SlackMessageService(
+                Slack.getInstance(config),
+                credentialProvider,
+                new SlackRateLimitTracker(new SimpleMeterRegistry()),
+                new OutboundEgressGuard(() -> silentModeEngaged));
+    }
+
+    private static MockResponse json(String body) {
+        return new MockResponse.Builder()
+                .code(200)
+                .addHeader("Content-Type", "application/json")
+                .body(body)
+                .build();
+    }
+
+    private static String bodyOf(RecordedRequest request) {
+        ByteString body = request.getBody();
+        assertThat(body).isNotNull();
+        return body == null ? "" : body.utf8();
     }
 
     @Test

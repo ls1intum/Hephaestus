@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.messaging;
 
 import com.slack.api.Slack;
+import com.slack.api.SlackConfig;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.SlackApiTextResponse;
@@ -24,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
+import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +37,7 @@ import okhttp3.Response;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -54,22 +57,19 @@ public class SlackMessageService {
     private static final int CONVERSATIONS_LIST_MAX_PAGES = 20;
 
     /**
-     * Total {@code Retry-After} budget for a single non-streaming send; a throttle beyond this gives up rather than
-     * blocking a request/worker thread unboundedly.
+     * The deadline of one HTTP call of the Slack client (OkHttp {@code callTimeout}): connecting, writing the request
+     * and reading the whole response. The SDK sets none by default.
      */
-    private static final long RATE_LIMIT_TOTAL_BUDGET_MS = 30_000L;
-    /** Never honor a single {@code Retry-After} longer than this — defends against an absurd/hostile header. */
-    private static final long RATE_LIMIT_MAX_WAIT_MS = 20_000L;
+    static final int NATIVE_CALL_TIMEOUT_MS = 10_000;
 
     /**
-     * Wider bounds for history reads that no one waits on: the nightly history reconciliation and the Heph reply
-     * reconciler's {@link #readWorkspaceMessages}. Slack's clamp on {@code conversations.history}/{@code conversations.replies}
-     * for distributed non-Marketplace apps (1 request per minute) answers with {@code Retry-After: 60}, which the
-     * interactive {@link #RATE_LIMIT_MAX_WAIT_MS} cap would retry too early and waste.
+     * The agent session status of a Slack thread while Heph works there. Slack shows it with its Stop control, which
+     * sends {@code agent_session_stopped}.
      */
-    private static final long SYNC_RATE_LIMIT_MAX_WAIT_MS = 90_000L;
+    private static final String SESSION_PROCESSING = "processing";
 
-    private static final long SYNC_RATE_LIMIT_TOTAL_BUDGET_MS = 150_000L;
+    /** The agent session status of a Slack thread in which Heph does not work now. */
+    private static final String SESSION_ACTIVE = "active";
 
     /**
      * The smallest {@code conversations.history} or {@code conversations.replies} page any install gets: Slack's clamp
@@ -85,14 +85,46 @@ public class SlackMessageService {
     private final OutboundEgressGuard egressGuard;
     private final ConcurrentMap<Long, BotIdentity> botCache = new ConcurrentHashMap<>();
 
+    @Autowired
     public SlackMessageService(
             SlackCredentialProvider credentialProvider,
             SlackRateLimitTracker rateLimitTracker,
             OutboundEgressGuard egressGuard) {
-        this.slack = Slack.getInstance();
+        this(Slack.getInstance(nativeConfig()), credentialProvider, rateLimitTracker, egressGuard);
+    }
+
+    /**
+     * @param slack the Slack client of this gateway; a test points one at a local server
+     */
+    SlackMessageService(
+            Slack slack,
+            SlackCredentialProvider credentialProvider,
+            SlackRateLimitTracker rateLimitTracker,
+            OutboundEgressGuard egressGuard) {
+        this.slack = slack;
         this.credentialProvider = credentialProvider;
         this.rateLimitTracker = rateLimitTracker;
         this.egressGuard = egressGuard;
+    }
+
+    /**
+     * The configuration of this gateway's own Slack client, with a deadline for each HTTP call
+     * ({@link #NATIVE_CALL_TIMEOUT_MS}). The SDK's shared default client and its configuration stay unchanged.
+     */
+    static SlackConfig nativeConfig() {
+        SlackConfig config = new SlackConfig();
+        config.setHttpClientCallTimeoutMillis(NATIVE_CALL_TIMEOUT_MS);
+        return config;
+    }
+
+    /** Closes this gateway's own Slack client: its HTTP client and the executors of its configuration. */
+    @PreDestroy
+    void close() {
+        try {
+            slack.close();
+        } catch (Exception e) {
+            log.warn("Slack client did not close: {}", e.getClass().getSimpleName());
+        }
     }
 
     public void sendForWorkspace(long workspaceId, String channelId, List<LayoutBlock> blocks, String fallback) {
@@ -207,7 +239,8 @@ public class SlackMessageService {
         }
         try {
             AuthTestResponse r = callHonoringRateLimit(
-                    workspaceId, () -> slack.methods(token.get()).authTest(req -> req));
+                    SlackBackoff.interactive(rateLimitTracker, workspaceId),
+                    () -> slack.methods(token.get()).authTest(req -> req));
             if (r.isOk() && r.getUserId() != null && !r.getUserId().isBlank()) {
                 BotIdentity bot = new BotIdentity(r.getUserId(), r.getBotId());
                 botCache.put(workspaceId, bot);
@@ -254,9 +287,14 @@ public class SlackMessageService {
      * @param markdownText a last piece of Markdown
      * @param blocks blocks under the text, such as feedback buttons
      * @param metadata metadata that tags the message for the reconciler
+     * @param working whether Heph still works in the stream's thread after it ends, for another attempt or turn: the
+     *     thread's agent session stays {@code processing}. Slack makes it {@code active} when the request does not say.
      */
     public record StreamStop(
-            @Nullable String markdownText, List<LayoutBlock> blocks, Message.@Nullable Metadata metadata) {}
+            @Nullable String markdownText,
+            List<LayoutBlock> blocks,
+            Message.@Nullable Metadata metadata,
+            boolean working) {}
 
     public void stopStream(long workspaceId, String channel, String ts, StreamStop stop) {
         callWrite(
@@ -266,7 +304,25 @@ public class SlackMessageService {
                         .ts(ts)
                         .markdownText(stop.markdownText())
                         .blocks(stop.blocks().isEmpty() ? null : stop.blocks())
-                        .metadata(stop.metadata())));
+                        .metadata(stop.metadata())
+                        .sessionStatus(sessionStatus(stop.working()))));
+    }
+
+    /**
+     * Sets the status of the app's agent session in the Slack thread {@code threadTs}
+     * ({@code agents.sessions.setStatus}): {@code processing} while Heph works there, which shows Slack's Stop, and
+     * {@code active} once it does not.
+     */
+    public void setSessionStatus(long workspaceId, String channel, String threadTs, boolean working) {
+        callWrite(
+                workspaceId,
+                channel,
+                methods -> methods.agentsSessionsSetStatus(
+                        req -> req.channelId(channel).threadTs(threadTs).status(sessionStatus(working))));
+    }
+
+    private static String sessionStatus(boolean working) {
+        return working ? SESSION_PROCESSING : SESSION_ACTIVE;
     }
 
     private interface WriteCall<T extends SlackApiTextResponse> {
@@ -274,9 +330,10 @@ public class SlackMessageService {
     }
 
     /**
-     * One Slack write; every write of this gateway goes through it. Silent Mode refuses it before a token is read. A
-     * 429 is retried after its {@code Retry-After}; one that outlives the retry budget is {@code ratelimited} and
-     * carries its wait. A failed transport is {@code transport_failure}.
+     * One Slack write; every write of this gateway goes through it. Silent Mode refuses it before a token is read, and
+     * again before each attempt, so Silent Mode engaged during a throttle wait refuses the next attempt. A 429 is
+     * retried after its {@code Retry-After} within the interactive budget; one that outlives the budget is
+     * {@code ratelimited} and carries its wait. A failed transport is {@code transport_failure}.
      */
     private <T extends SlackApiTextResponse> T callWrite(long workspaceId, String channel, WriteCall<T> call) {
         if (!egressGuard.deliveryAllowed("slack.write")) {
@@ -285,14 +342,24 @@ public class SlackMessageService {
         String token = resolveToken(workspaceId)
                 .orElseThrow(() -> new SlackSendException(workspaceId, channel, "no_active_slack_connection"));
         try {
-            T response = callOutboundHonoringRateLimit(workspaceId, channel, () -> call.call(slack.methods(token)));
+            T response = callHonoringRateLimit(SlackBackoff.interactive(rateLimitTracker, workspaceId), () -> {
+                try {
+                    egressGuard.requireDeliveryAllowed("slack.write");
+                    return call.call(slack.methods(token));
+                } catch (OutboundEgressSuppressedException e) {
+                    throw new SlackSendException(workspaceId, channel, "silent_mode_engaged", e);
+                }
+            });
             if (!response.isOk()) {
                 String error = response.getError();
                 throw new SlackSendException(workspaceId, channel, error == null ? "unknown" : error);
             }
             return response;
         } catch (SlackApiException e) {
-            long retryAfterMs = rateLimitRetryAfterMillis(e);
+            Response refused = e.getResponse();
+            long retryAfterMs = refused == null
+                    ? SlackSendException.NOT_RATE_LIMITED
+                    : SlackBackoff.retryAfterMillis(refused.code(), refused.header("Retry-After"));
             if (retryAfterMs != SlackSendException.NOT_RATE_LIMITED) {
                 throw new SlackSendException(workspaceId, channel, "ratelimited", retryAfterMs, e);
             }
@@ -362,30 +429,26 @@ public class SlackMessageService {
             boolean more;
             if (threadTs == null) {
                 var r = callHonoringRateLimit(
-                        workspaceId,
+                        SlackBackoff.history(rateLimitTracker, workspaceId),
                         () -> slack.methods(token)
                                 .conversationsHistory(req -> req.channel(channel)
                                         .oldest(oldest)
                                         .inclusive(true)
                                         .includeAllMetadata(true)
-                                        .limit(HISTORY_MATCH_LIMIT)),
-                        SYNC_RATE_LIMIT_MAX_WAIT_MS,
-                        SYNC_RATE_LIMIT_TOTAL_BUDGET_MS);
+                                        .limit(HISTORY_MATCH_LIMIT)));
                 messages = r.getMessages();
                 error = r.isOk() ? null : r.getError();
                 more = Matches.holdsMore(r.isHasMore(), r.getResponseMetadata());
             } else {
                 var r = callHonoringRateLimit(
-                        workspaceId,
+                        SlackBackoff.history(rateLimitTracker, workspaceId),
                         () -> slack.methods(token)
                                 .conversationsReplies(req -> req.channel(channel)
                                         .ts(threadTs)
                                         .oldest(oldest)
                                         .inclusive(true)
                                         .includeAllMetadata(true)
-                                        .limit(HISTORY_MATCH_LIMIT)),
-                        SYNC_RATE_LIMIT_MAX_WAIT_MS,
-                        SYNC_RATE_LIMIT_TOTAL_BUDGET_MS);
+                                        .limit(HISTORY_MATCH_LIMIT)));
                 messages = r.getMessages();
                 error = r.isOk() ? null : r.getError();
                 more = Matches.holdsMore(r.isHasMore(), r.getResponseMetadata());
@@ -434,7 +497,8 @@ public class SlackMessageService {
         if (token.isEmpty()) throw new SlackSendException(workspaceId, subject, "no_active_slack_connection");
         try {
             var response = callHonoringRateLimit(
-                    workspaceId, () -> slack.methods(token.get()).usersInfo(request -> request.user(subject)));
+                    SlackBackoff.interactive(rateLimitTracker, workspaceId),
+                    () -> slack.methods(token.get()).usersInfo(request -> request.user(subject)));
             if (!response.isOk())
                 throw new SlackSendException(
                         workspaceId, subject, response.getError() == null ? "unknown" : response.getError());
@@ -471,7 +535,7 @@ public class SlackMessageService {
             do {
                 String pageCursor = cursor;
                 ConversationsListResponse response = callHonoringRateLimit(
-                        workspaceId,
+                        SlackBackoff.interactive(rateLimitTracker, workspaceId),
                         () -> methods.conversationsList(req -> req.types(
                                         List.of(ConversationType.PUBLIC_CHANNEL, ConversationType.PRIVATE_CHANNEL))
                                 .excludeArchived(false)
@@ -517,7 +581,7 @@ public class SlackMessageService {
                 .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         try {
             ConversationsInfoResponse response = callHonoringRateLimit(
-                    workspaceId,
+                    SlackBackoff.interactive(rateLimitTracker, workspaceId),
                     () -> slack.methods(token)
                             .conversationsInfo(req -> req.channel(channelId).includeNumMembers(true)));
             if (!response.isOk()) {
@@ -551,7 +615,8 @@ public class SlackMessageService {
         }
         try {
             ConversationsInfoResponse response = callHonoringRateLimit(
-                    workspaceId, () -> slack.methods(token.get()).conversationsInfo(req -> req.channel(channelId)));
+                    SlackBackoff.interactive(rateLimitTracker, workspaceId),
+                    () -> slack.methods(token.get()).conversationsInfo(req -> req.channel(channelId)));
             if (!response.isOk()) {
                 String error = response.getError() == null ? "unknown" : response.getError();
                 return "channel_not_found".equals(error)
@@ -596,15 +661,13 @@ public class SlackMessageService {
                 .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         try {
             var response = callHonoringRateLimit(
-                    workspaceId,
+                    SlackBackoff.history(rateLimitTracker, workspaceId),
                     () -> slack.methods(token)
                             .conversationsHistory(req -> req.channel(channelId)
                                     .oldest(oldest)
                                     .latest(latest)
                                     .cursor(cursor == null || cursor.isBlank() ? null : cursor)
-                                    .limit(limit)),
-                    SYNC_RATE_LIMIT_MAX_WAIT_MS,
-                    SYNC_RATE_LIMIT_TOTAL_BUDGET_MS);
+                                    .limit(limit)));
             if (!response.isOk()) {
                 throw new SlackSendException(
                         workspaceId, channelId, response.getError() == null ? "unknown" : response.getError());
@@ -629,15 +692,13 @@ public class SlackMessageService {
                 .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         try {
             var response = callHonoringRateLimit(
-                    workspaceId,
+                    SlackBackoff.history(rateLimitTracker, workspaceId),
                     () -> slack.methods(token)
                             .conversationsReplies(req -> req.channel(channelId)
                                     .ts(threadTs)
                                     .oldest(oldest)
                                     .cursor(cursor == null || cursor.isBlank() ? null : cursor)
-                                    .limit(limit)),
-                    SYNC_RATE_LIMIT_MAX_WAIT_MS,
-                    SYNC_RATE_LIMIT_TOTAL_BUDGET_MS);
+                                    .limit(limit)));
             if (!response.isOk()) {
                 throw new SlackSendException(
                         workspaceId, channelId, response.getError() == null ? "unknown" : response.getError());
@@ -687,88 +748,27 @@ public class SlackMessageService {
     }
 
     /**
-     * Run a synchronous Slack Web API call, transparently honoring a 429 {@code Retry-After} (jittered, bounded by
-     * {@link #RATE_LIMIT_TOTAL_BUDGET_MS}). The SDK's synchronous {@code MethodsClient} surfaces a 429 as a
-     * {@link SlackApiException} and does <em>not</em> retry it (only the async client throttles), so the bounded
-     * wait-and-retry happens here. Non-429 {@link SlackApiException} and {@link IOException} propagate unchanged so
-     * the caller's existing error handling is preserved.
+     * Runs a synchronous Slack Web API call within {@code budget}. The SDK's synchronous {@code MethodsClient} surfaces
+     * a 429 as a {@link SlackApiException} and does <em>not</em> retry it (only the async client throttles), so the
+     * call is tried again here when the budget has waited Slack's whole {@code Retry-After}
+     * ({@link SlackBackoff#awaitRetry}). A 429 that the budget refuses, any other {@link SlackApiException} and an
+     * {@link IOException} propagate unchanged and are never tried again, so the caller's error handling is preserved.
      */
-    private <T> T callHonoringRateLimit(long workspaceId, SlackCall<T> call) throws SlackApiException, IOException {
-        return callHonoringRateLimit(workspaceId, call, RATE_LIMIT_MAX_WAIT_MS, RATE_LIMIT_TOTAL_BUDGET_MS);
-    }
-
-    private <T> T callOutboundHonoringRateLimit(long workspaceId, String target, SlackCall<T> call)
+    private static <T> T callHonoringRateLimit(SlackBackoff budget, SlackCall<T> call)
             throws SlackApiException, IOException {
-        return callHonoringRateLimit(workspaceId, () -> {
-            try {
-                egressGuard.requireDeliveryAllowed("slack.write");
-                return call.call();
-            } catch (OutboundEgressSuppressedException e) {
-                throw new SlackSendException(workspaceId, target, "silent_mode_engaged", e);
-            }
-        });
-    }
-
-    /**
-     * Variant with explicit wait/budget bounds: interactive callers keep the tight defaults (a user is waiting), and
-     * history reads that no one waits on pass the wider {@code SYNC_*} bounds (see {@link #SYNC_RATE_LIMIT_MAX_WAIT_MS}).
-     */
-    private <T> T callHonoringRateLimit(long workspaceId, SlackCall<T> call, long maxWaitMs, long totalBudgetMs)
-            throws SlackApiException, IOException {
-        long budgetLeftMs = totalBudgetMs;
-        int attempt = 0;
         while (true) {
             try {
                 return call.call();
             } catch (SlackApiException e) {
-                long retryAfterMs = rateLimitRetryAfterMillis(e);
-                if (retryAfterMs == SlackSendException.NOT_RATE_LIMITED) {
-                    throw e; // not a rate-limit — let the caller map it
-                }
-                // Report the throttle before deciding whether to retry: an admin needs to see a 429 even
-                // (especially) when the retry budget is spent and the call is about to fail.
-                rateLimitTracker.recordThrottle(workspaceId, retryAfterMs);
-                if (budgetLeftMs <= 0) {
-                    throw e; // retry budget spent — let the caller map it
-                }
-                long waitMs =
-                        Math.min(Math.min(SlackBackoff.withJitter(retryAfterMs, ++attempt), maxWaitMs), budgetLeftMs);
-                log.warn(
-                        "Slack rate-limited (429); backing off {} ms before retry (attempt {}, budget left {} ms)",
-                        waitMs,
-                        attempt,
-                        budgetLeftMs);
-                budgetLeftMs -= waitMs;
-                SlackBackoff.sleep(waitMs);
-                if (Thread.currentThread().isInterrupted()) {
-                    // Interrupted mid-backoff (e.g. a shutting-down worker thread): stop retrying immediately rather
-                    // than spinning the rest of the budget in a tight loop; surface the last 429 unchanged (the
-                    // interrupt flag stays set for the caller) so its error handling maps it.
+                Response response = e.getResponse();
+                long retryAfterMs = response == null
+                        ? SlackSendException.NOT_RATE_LIMITED
+                        : SlackBackoff.retryAfterMillis(response.code(), response.header("Retry-After"));
+                if (retryAfterMs == SlackSendException.NOT_RATE_LIMITED || !budget.awaitRetry(retryAfterMs)) {
                     throw e;
                 }
             }
         }
-    }
-
-    /**
-     * The {@code Retry-After} wait in ms for a 429, else {@link SlackSendException#NOT_RATE_LIMITED}. Slack always
-     * sends {@code Retry-After} on a 429; a missing/garbled header defaults to 1s.
-     */
-    static long rateLimitRetryAfterMillis(SlackApiException e) {
-        Response resp = e.getResponse();
-        if (resp == null || resp.code() != 429) {
-            return SlackSendException.NOT_RATE_LIMITED;
-        }
-        String header = resp.header("Retry-After");
-        long seconds = 1L;
-        if (header != null) {
-            try {
-                seconds = Long.parseLong(header.trim());
-            } catch (NumberFormatException ignored) {
-                // keep the 1s default
-            }
-        }
-        return Math.max(0L, seconds) * 1000L;
     }
 
     private Optional<String> resolveToken(long workspaceId) {

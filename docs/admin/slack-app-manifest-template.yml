@@ -58,6 +58,7 @@ settings:
       - group_left
       - group_rename
       - app_home_opened
+      - agent_session_stopped
       - app_uninstalled
       - tokens_revoked
   interactivity:
