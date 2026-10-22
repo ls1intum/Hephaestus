@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
@@ -39,6 +40,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
@@ -116,6 +118,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -141,6 +144,7 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @RecordApplicationEvents
@@ -1120,6 +1124,224 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
                 .isInstanceOfSatisfying(
                         ItemCaptureException.class,
                         failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.ITEM_REMOVED));
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldReviewTheMergerOfADelayedMergeAndNeverDateALaterApprovalBeforeIt(IdentityProviderType type)
+            throws Exception {
+        var merged = mergedWork(type);
+        var prepared = merged.prepared();
+        long workspaceId = prepared.item().workspaceId();
+        long pullId = Objects.requireNonNull(prepared.item().sourceId());
+        long authorAccount = account(merged.author());
+        long mergerAccount = account(merged.merger());
+        assertThat(mergerAccount).isNotEqualTo(authorAccount);
+
+        // The budget is out when the merge is reported, so its occasion waits to be admitted.
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(false);
+        publish(prepared);
+        var occasion = event(prepared);
+        assertThat(occasion.getName()).isEqualTo(ScmItemEvents.PULL_REQUEST_MERGED.value());
+        assertThat(occasion.getState()).isEqualTo(ItemEventState.WAITING);
+        assertThat(occasion.getReason()).isEqualTo(ReviewRequestReason.BUDGET_EXHAUSTED);
+        assertThat(occasion.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(reviews.findByWorkspaceIdAndEventId(workspaceId, occasion.getId()))
+                .isEmpty();
+
+        var retainedRecord =
+                Objects.requireNonNull(occasion.getEvidence()).path("record").deepCopy();
+        assertThat(retainedRecord.isObject()).isTrue();
+
+        // Before admission the merged work is retitled and rewritten, and a later observation that a third person
+        // reports stores another head and base. Neither the author nor this person merged it.
+        var pusher = users.saveAndFlush(
+                TestUserFactory.createUser(nativeId(), merged.author().getLogin() + "-pusher", merged.provider()));
+        var later = new EventContext(
+                UUID.randomUUID(),
+                Instant.now(),
+                workspaceId,
+                null,
+                DataSource.WEBHOOK,
+                "synchronize",
+                UUID.randomUUID().toString(),
+                type,
+                pusher.getId());
+        transactions.executeWithoutResult(ignored -> {
+            var moved = pulls.findById(pullId).orElseThrow();
+            moved.setTitle("A retitled change");
+            moved.setBody("A rewritten description");
+            moved.setHeadRefOid("c".repeat(40));
+            moved.setBaseRefOid("d".repeat(40));
+            var data = ScmEventPayload.PullRequestData.from(pulls.saveAndFlush(moved));
+            publisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(data, Set.of("title", "body"), later));
+            publisher.publishEvent(new ScmDomainEvent.PullRequestSynchronized(data, later));
+        });
+        assertThat(source.pin(prepared.item(), null).version()).isNotEqualTo(prepared.version());
+        assertThatThrownBy(() -> source.pin(prepared.item(), prepared.version()))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+
+        when(budget.canRequest(anyLong(), eq(ReviewKind.ITEM), isNull())).thenReturn(true);
+        var request = ReviewRequest.builder()
+                .workspaceId(workspaceId)
+                .itemId(prepared.item().itemId())
+                .kind(ReviewKind.ITEM)
+                .version(new ItemVersion(Objects.requireNonNull(occasion.getItemVersion()), null))
+                .origin(ReviewOrigin.EVENT)
+                .eventId(occasion.getId())
+                .practiceIds(List.of())
+                .build();
+        assertThatCode(() -> service.request(request))
+                .as("the merge is admitted at the version, state and roles it was recorded with")
+                .doesNotThrowAnyException();
+        var admitted = reviews.findByWorkspaceIdAndEventId(workspaceId, occasion.getId())
+                .orElseThrow();
+        assertThat(admitted.getOrigin()).isEqualTo(ReviewOrigin.EVENT);
+        assertThat(admitted.getStatus()).isEqualTo(ReviewStatus.QUEUED);
+        assertThat(admitted.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(admitted.getBaseVersion()).isEqualTo("a".repeat(40));
+        assertThat(admitted.getOrderedAt()).isEqualTo(occasion.getOccurredAt());
+        var member = jdbc.queryForMap(
+                "SELECT state, detail->>'developerId' AS developer FROM review_item"
+                        + " WHERE workspace_id=? AND review_id=?",
+                workspaceId,
+                admitted.getId());
+        assertThat(member.get("state")).isEqualTo("LISTED");
+        assertThat(member.get("developer"))
+                .as("the feedback is about the person who merged, not the author or a later pusher")
+                .isEqualTo(Long.toString(mergerAccount));
+
+        var pinned = source.pinOccasion(
+                prepared.item(),
+                new ItemVersion(Objects.requireNonNull(occasion.getItemVersion()), null),
+                occasion.getId());
+        assertThat(pinned.version()).isEqualTo(prepared.version());
+        assertThat(pinned.state()).containsEntry("state", "MERGED");
+        assertThat(pinned.roles())
+                .filteredOn(role -> role.role() == AboutRole.MERGER)
+                .extracting(role -> role.identity().subject())
+                .containsExactly(Long.toString(merged.merger().getNativeId()));
+        assertThat(pinned.roles())
+                .filteredOn(role -> role.role() == AboutRole.AUTHOR)
+                .extracting(role -> role.identity().subject())
+                .containsExactly(Long.toString(merged.author().getNativeId()));
+
+        var core = PullRequestContentSource.CORE;
+        var threads = ReviewThreadContentSource.KIND;
+        assertOriginalMergedRecord(merged, retainedRecord, captured(pinned, admitted, occasion, core));
+        var approvedBeforeMerge = captured(pinned, admitted, occasion, threads);
+        var mirror = new JsonMapper();
+        var staged = mirror.readTree(Objects.requireNonNull(approvedBeforeMerge.get("context/review_threads.json")));
+        assertThat(staged.path("decisionHistoryComplete").isBoolean()).isTrue();
+        assertThat(staged.path("decisionHistoryComplete").asBoolean()).isFalse();
+        var approval = decision(staged, merged.approval().getNativeId());
+        assertThat(approval.path("state").asString()).isEqualTo("APPROVED");
+        assertThat(approval.has("dismissed")).isFalse();
+        assertThat(approval.path("authorId").asLong())
+                .isEqualTo(merged.approver().getNativeId());
+        assertThat(approval.path("commitId").asString()).isEqualTo("b".repeat(40));
+        assertThat(Instant.parse(approval.path("submittedAt").asString()))
+                .isEqualTo(merged.approvedAt())
+                .isBefore(merged.mergedAt());
+        // Read at capture from the mirror; a merge occasion retains no decision of its own.
+        assertThat(approval.has("observedAt")).isFalse();
+
+        // After the merge the approval is withdrawn as each provider stores it, and the same person approves again.
+        transactions.executeWithoutResult(ignored -> {
+            var withdrawn = providerReviews
+                    .findById(Objects.requireNonNull(merged.approval().getId()))
+                    .orElseThrow();
+            // GitLab's unapproval replaces the state; a GitHub dismissal keeps the original APPROVED state.
+            if (type == IdentityProviderType.GITLAB) withdrawn.setState(PullRequestReview.State.DISMISSED);
+            withdrawn.setDismissed(true);
+            providerReviews.saveAndFlush(withdrawn);
+        });
+        Instant reapprovedAt = merged.mergedAt().plusSeconds(600);
+        var reapproval = approve(pullId, merged.approver(), reapprovedAt, "c".repeat(40));
+
+        assertOriginalMergedRecord(merged, retainedRecord, captured(pinned, admitted, occasion, core));
+        var restaged = mirror.readTree(Objects.requireNonNull(
+                captured(pinned, admitted, occasion, threads).get("context/review_threads.json")));
+        assertThat(restaged.path("decisionHistoryComplete").asBoolean())
+                .as("the decisions read now are no history of what stood at the merge")
+                .isFalse();
+        var earlier = decision(restaged, merged.approval().getNativeId());
+        assertThat(earlier.path("dismissed").asBoolean()).isTrue();
+        assertThat(earlier.path("state").asString())
+                .isEqualTo(type == IdentityProviderType.GITLAB ? "DISMISSED" : "APPROVED");
+        assertThat(Instant.parse(earlier.path("submittedAt").asString())).isEqualTo(merged.approvedAt());
+        var reapproved = decision(restaged, reapproval.getNativeId());
+        assertThat(reapproved.path("state").asString()).isEqualTo("APPROVED");
+        assertThat(reapproved.has("dismissed")).isFalse();
+        assertThat(reapproved.path("commitId").asString()).isEqualTo("c".repeat(40));
+        assertThat(Instant.parse(reapproved.path("submittedAt").asString()))
+                .isEqualTo(reapprovedAt)
+                .isAfter(merged.mergedAt());
+        // No standing approval is dated before the merge: the withdrawn one is not restored, the later one not moved.
+        var decisions = restaged.path("reviewDecisions");
+        for (int i = 0; i < decisions.size(); i++) {
+            var decision = decisions.get(i);
+            if (decision.path("state").asString().equals("APPROVED")
+                    && !decision.path("dismissed").asBoolean()) {
+                assertThat(Instant.parse(decision.path("submittedAt").asString()))
+                        .isAfter(merged.mergedAt());
+            }
+        }
+        // Another occasion ID names no occasion of this item, so neither the merged nor the current work is pinned.
+        assertOccasionUnavailable(prepared, prepared.version(), UUID.randomUUID());
+    }
+
+    /** The merged work as its merge occasion retained it, whatever the work says now. */
+    private static void assertOriginalMergedRecord(
+            MergedWork merged, JsonNode retainedRecord, Map<String, byte[]> files) throws Exception {
+        var record = new JsonMapper().readTree(Objects.requireNonNull(files.get("context/metadata.json")));
+        assertThat(record).isEqualTo(retainedRecord);
+        assertThat(record.path("title").asString()).isEqualTo("A bounded change");
+        assertThat(record.path("body").asString()).isEqualTo("Describe this change");
+        assertThat(record.path("commit_sha").asString()).isEqualTo("b".repeat(40));
+        assertThat(record.path("state").asString()).isEqualTo("MERGED");
+        assertThat(record.path("is_merged").asBoolean()).isTrue();
+        assertThat(Instant.parse(record.path("merged_at").asString())).isEqualTo(merged.mergedAt());
+        assertThat(record.path("merged_by").asString())
+                .isEqualTo(merged.merger().getLogin());
+        assertThat(record.path("author").asString()).isEqualTo(merged.author().getLogin());
+        assertThat(record.path("basis").path("other_fields").asString()).isEqualTo("OCCASION");
+        assertThat(record.path("basis").has("observed_at")).isTrue();
+        assertThat(record.path("basis").has("captured_at")).isFalse();
+        assertThat(record.toString()).doesNotContain("A retitled change", "A rewritten description");
+        assertThat(new String(
+                        Objects.requireNonNull(files.get(PullRequestContentSource.DESCRIPTION_FILE)),
+                        StandardCharsets.UTF_8))
+                .isEqualTo("Describe this change");
+    }
+
+    /** The files one source of the admitted event review captures for its occasion. */
+    private Map<String, byte[]> captured(ItemSnapshot pinned, Review admitted, ItemEvent occasion, SourceKind kind) {
+        return source.capture(
+                        pinned,
+                        new CaptureRequest(
+                                admitted.getId(),
+                                UUID.randomUUID(),
+                                1,
+                                Set.of(kind),
+                                "2.0.0",
+                                3,
+                                null,
+                                Set.of(kind),
+                                occasion.getId()))
+                .files();
+    }
+
+    private static JsonNode decision(JsonNode staged, long nativeId) {
+        var decisions = staged.path("reviewDecisions");
+        for (int i = 0; i < decisions.size(); i++) {
+            if (decisions.get(i).path("nativeId").asLong() == nativeId) return decisions.get(i);
+        }
+        throw new AssertionError("No captured decision " + nativeId + " in " + staged);
     }
 
     private void assertOccasionUnavailable(Prepared prepared, ItemVersion version, UUID occasion) {
@@ -2264,6 +2486,122 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
             event = new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pull), context);
         }
         return new Prepared(ref, source.pin(ref, null).version(), name, event);
+    }
+
+    /**
+     * A merged pull request reported by its merge. Its author, its merger and the person who approved it before the
+     * merge are three people; the practice is about the merger and keeps the fixture definition's criteria.
+     */
+    private MergedWork mergedWork(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var workspace = fixture.workspace();
+        workspace.getFeatures().setPracticesEnabled(true);
+        workspaces.saveAndFlush(workspace);
+        var author = fixture.author();
+        var merger = users.saveAndFlush(
+                TestUserFactory.createUser(nativeId(), author.getLogin() + "-merger", fixture.provider()));
+        var approver = users.saveAndFlush(
+                TestUserFactory.createUser(nativeId(), author.getLogin() + "-approver", fixture.provider()));
+        TestUserFactory.ensureAccountForUser(accounts, identities, author);
+        TestUserFactory.ensureAccountForUser(accounts, identities, merger);
+        long authorAccount = account(author);
+        jdbc.update(
+                "INSERT INTO membership(workspace_id,account_id,role,joined_at) VALUES (?,?,'OWNER',now())",
+                workspace.getId(),
+                authorAccount);
+        jdbc.update(
+                "INSERT INTO membership(workspace_id,account_id,role,joined_at) VALUES (?,?,'MEMBER',now())",
+                workspace.getId(),
+                account(merger));
+        var original = DefinitionTestFixtures.definition(
+                ScmItemEvents.PULL_REQUEST, "Describe the work", "Explain the work.", null);
+        var definition = new PracticeDefinition(
+                original.name(),
+                new ReviewOn(List.of(ScmItemEvents.PULL_REQUEST_MERGED), Map.of()),
+                original.appliesWhen(),
+                AboutRole.MERGER,
+                original.reads(),
+                original.reviewedBy(),
+                original.criteria(),
+                original.script(),
+                original.scan(),
+                original.lineNotes(),
+                original.guidance());
+        versions.create(new PracticeVersionService.NewPractice(
+                workspace, "event-test", ScmItemEvents.PULL_REQUEST, definition, null, 0, authorAccount));
+        // Whole seconds, so the stored and the captured times compare exactly.
+        Instant mergedAt = Instant.now().truncatedTo(ChronoUnit.SECONDS).minusSeconds(3600);
+        var pull = new PullRequest();
+        pull.setNativeId(nativeId());
+        pull.setProvider(fixture.provider());
+        pull.setRepository(fixture.repository());
+        pull.setNumber(3);
+        pull.setTitle("A bounded change");
+        pull.setBody("Describe this change");
+        pull.setState(Issue.State.MERGED);
+        pull.setMerged(true);
+        pull.setMergedAt(mergedAt);
+        pull.setClosedAt(mergedAt);
+        pull.setMergedBy(merger);
+        pull.setAuthor(author);
+        pull.setHtmlUrl(fixture.repository().getHtmlUrl() + "/pull/3");
+        pull.setCreatedAt(mergedAt.minusSeconds(7200));
+        pull.setUpdatedAt(mergedAt);
+        pull.setBaseRefName("main");
+        pull.setHeadRefName("topic");
+        pull.setBaseRefOid("a".repeat(40));
+        pull.setHeadRefOid("b".repeat(40));
+        pull = pulls.saveAndFlush(pull);
+        Instant approvedAt = mergedAt.minusSeconds(600);
+        var approval = approve(Objects.requireNonNull(pull.getId()), approver, approvedAt, "b".repeat(40));
+        var holder = writer.upsert(new ItemRegistration(
+                workspace.getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var ref = writer.upsert(new ItemRegistration(
+                workspace.getId(), ScmItemEvents.PULL_REQUEST, pull.getId(), holder.itemId(), null));
+        var context = new EventContext(
+                UUID.randomUUID(),
+                Instant.now(),
+                workspace.getId(),
+                null,
+                DataSource.WEBHOOK,
+                "merge",
+                UUID.randomUUID().toString(),
+                type,
+                merger.getId());
+        var event = new ScmDomainEvent.PullRequestMerged(ScmEventPayload.PullRequestData.from(pull), context);
+        var prepared = new Prepared(ref, source.pin(ref, null).version(), ScmItemEvents.PULL_REQUEST_MERGED, event);
+        return new MergedWork(prepared, fixture.provider(), author, merger, approver, approval, approvedAt, mergedAt);
+    }
+
+    private record MergedWork(
+            Prepared prepared,
+            IdentityProvider provider,
+            User author,
+            User merger,
+            User approver,
+            PullRequestReview approval,
+            Instant approvedAt,
+            Instant mergedAt) {}
+
+    /** An approval of the pull request {@code pullId} by {@code approver}, submitted on {@code commit}. */
+    private PullRequestReview approve(long pullId, User approver, Instant submittedAt, String commit) {
+        return Objects.requireNonNull(transactions.execute(ignored -> {
+            var pull = pulls.findById(pullId).orElseThrow();
+            var review = new PullRequestReview();
+            review.setProvider(pull.getProvider());
+            review.setNativeId(nativeId());
+            review.setPullRequest(pull);
+            review.setAuthor(users.findById(approver.getId()).orElseThrow());
+            review.setState(PullRequestReview.State.APPROVED);
+            review.setCommitId(commit);
+            review.setSubmittedAt(submittedAt);
+            review.setHtmlUrl(pull.getHtmlUrl() + "#approval-" + review.getNativeId());
+            return providerReviews.saveAndFlush(review);
+        }));
     }
 
     private static long nativeId() {
