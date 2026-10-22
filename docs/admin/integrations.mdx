@@ -28,6 +28,16 @@ The user also chooses which projects the workspace monitors.
 **Selected projects** monitors only the chosen projects. Hephaestus checks each chosen project with the user's token.
 The choice limits project content only. Workspace members and teams still come from the whole group.
 
+To change the choice later, open **Administration → Integrations → GitLab → Projects to follow**.
+This setting is available only while the GitLab connection is active.
+
+- **Only the repositories listed below** keeps the current monitored projects. Hephaestus adds no new projects from the group. The list can be empty.
+- **All projects in the group** lets Hephaestus add the projects that it finds in the group at its next check. Hephaestus asks you to confirm this change. Stopped projects stay stopped.
+
+Neither change removes synced work or changes group membership.
+Use **Add a repository** and **Stop monitoring** to change the list.
+If the connection or its projects change during the save, Hephaestus keeps the earlier choice. Then choose again.
+
 Hephaestus automatically registers group hooks with a signed routing token bound to the connection.
 Do not replace that token with `WEBHOOK_SECRET`.
 

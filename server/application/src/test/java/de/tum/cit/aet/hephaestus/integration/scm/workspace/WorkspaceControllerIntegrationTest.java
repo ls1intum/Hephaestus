@@ -1,9 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.scm.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAudit;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAuditRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -18,6 +21,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -33,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,6 +71,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Autowired
     private ConnectionService connectionService;
+
+    @Autowired
+    private ConnectionAuditRepository connectionAuditRepository;
 
     @Test
     @WithAdminUser
@@ -536,6 +544,286 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Repository already monitored");
         assertThat(problem.getDetail()).contains("acme/test-repo");
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldReadAllProjectsWhenAnActiveGitLabWorkspaceFollowsItsWholeGroup() {
+        Workspace workspace = seedActiveGitLabWorkspace("selection-read", 7101L);
+
+        webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories/selection", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.repositorySelection")
+                .isEqualTo("ALL");
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldKeepCurrentMonitorsWhenAnOwnerSwitchesAGitLabWorkspaceToSelectedProjects() {
+        Workspace workspace = seedActiveGitLabWorkspace("selection-narrow", 7201L);
+        RepositoryToMonitor monitor = repositoryToMonitorRepository
+                .findByWorkspaceIdAndNameWithOwner(workspace.getId(), "selection-narrow/kept-project")
+                .orElseThrow();
+
+        webTestClient
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/repositories/selection", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("repositorySelection", "SELECTED"))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.repositorySelection")
+                .isEqualTo("SELECTED");
+
+        webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories/selection", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.repositorySelection")
+                .isEqualTo("SELECTED");
+
+        Workspace narrowed = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(narrowed.getRepositorySelection()).isEqualTo(RepositorySelection.SELECTED);
+
+        RepositoryToMonitor kept =
+                repositoryToMonitorRepository.findById(monitor.getId()).orElseThrow();
+        assertThat(kept.getNameWithOwner()).isEqualTo("selection-narrow/kept-project");
+        assertThat(kept.getNativeId()).isEqualTo(7201L);
+
+        String[] monitored = webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String[].class)
+                .returnResult()
+                .getResponseBody();
+        assertThat(monitored).containsExactly("selection-narrow/kept-project");
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRecordEachRealChangeWithItsActorWhenAnOwnerNarrowsRepeatsAndWidens() {
+        Workspace workspace = seedActiveGitLabWorkspace("selection-audit", 7301L);
+        long actor =
+                Objects.requireNonNull(ensureOwnerMembership(workspace).getId().getAccountId());
+
+        for (String selection : List.of("SELECTED", "SELECTED", "ALL")) {
+            webTestClient
+                    .patch()
+                    .uri("/workspaces/{workspaceSlug}/repositories/selection", workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(Map.of("repositorySelection", selection))
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.repositorySelection")
+                    .isEqualTo(selection);
+        }
+
+        webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories/selection", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.repositorySelection")
+                .isEqualTo("ALL");
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getRepositorySelection())
+                .isEqualTo(RepositorySelection.ALL);
+        assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(
+                        workspace.getId(), "selection-audit/kept-project"))
+                .hasValueSatisfying(monitor -> assertThat(monitor.getNativeId()).isEqualTo(7301L));
+        // The repeated narrowing changed nothing, so it recorded nothing.
+        assertThat(selectionChanges(workspace))
+                .extracting(ConnectionAudit::getDetail, ConnectionAudit::getActorAccountId)
+                .containsExactlyInAnyOrder(tuple("ALL → SELECTED", actor), tuple("SELECTED → ALL", actor));
+    }
+
+    @Test
+    @WithMentorUser
+    void shouldLetOnlyAWorkspaceAdminReadOrChangeTheProjectSelection() {
+        User mentor = persistUser("mentor");
+        Workspace foreign = seedActiveGitLabWorkspace("selection-foreign", 7401L);
+        Workspace joined = seedActiveGitLabWorkspace("selection-member", 7402L);
+        ensureMembership(joined, mentor, Membership.WorkspaceRole.MEMBER);
+        Workspace administered = seedActiveGitLabWorkspace("selection-administered", 7403L);
+        ensureMembership(administered, mentor, Membership.WorkspaceRole.ADMIN);
+
+        for (Workspace refused : List.of(foreign, joined)) {
+            webTestClient
+                    .get()
+                    .uri("/workspaces/{workspaceSlug}/repositories/selection", refused.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden()
+                    .expectBody(Void.class);
+            webTestClient
+                    .patch()
+                    .uri("/workspaces/{workspaceSlug}/repositories/selection", refused.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(Map.of("repositorySelection", "SELECTED"))
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden()
+                    .expectBody(Void.class);
+            assertThat(workspaceRepository
+                            .findById(refused.getId())
+                            .orElseThrow()
+                            .getRepositorySelection())
+                    .isEqualTo(RepositorySelection.ALL);
+            assertThat(selectionChanges(refused)).isEmpty();
+        }
+
+        webTestClient
+                .patch()
+                .uri("/workspaces/{workspaceSlug}/repositories/selection", administered.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("repositorySelection", "SELECTED"))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.repositorySelection")
+                .isEqualTo("SELECTED");
+        assertThat(workspaceRepository
+                        .findById(administered.getId())
+                        .orElseThrow()
+                        .getRepositorySelection())
+                .isEqualTo(RepositorySelection.SELECTED);
+        assertThat(selectionChanges(administered))
+                .extracting(ConnectionAudit::getActorAccountId)
+                .containsExactly(accountId(mentor));
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRefuseTheProjectSelectionWhenTheWorkspaceHasNoActiveGitLabConnection() {
+        User gitHubOwner = persistUser("selection-github-owner");
+        Workspace gitHub = createWorkspace(
+                "selection-github", "Selection GitHub", "selection-github", AccountType.ORG, gitHubOwner);
+        ensureOwnerMembership(gitHub);
+        seedGitHubAppConnection(gitHub);
+        Workspace paused = seedActiveGitLabWorkspace("selection-paused", 7601L);
+        connectionService.transition(
+                connectionRepository
+                        .findActive(paused.getId(), IntegrationKind.GITLAB)
+                        .orElseThrow(),
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.SUSPENDED,
+                        "TEST_SUSPENDED",
+                        "SYSTEM",
+                        "selection-test",
+                        UUID.randomUUID().toString(),
+                        "Paused"));
+
+        for (Workspace refused : List.of(gitHub, paused)) {
+            webTestClient
+                    .get()
+                    .uri("/workspaces/{workspaceSlug}/repositories/selection", refused.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isEqualTo(HttpStatus.CONFLICT)
+                    .expectBody(Void.class);
+            ProblemDetail problem = webTestClient
+                    .patch()
+                    .uri("/workspaces/{workspaceSlug}/repositories/selection", refused.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(Map.of("repositorySelection", "SELECTED"))
+                    .exchange()
+                    .expectStatus()
+                    .isEqualTo(HttpStatus.CONFLICT)
+                    .expectHeader()
+                    .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                    .expectBody(ProblemDetail.class)
+                    .returnResult()
+                    .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            assertThat(problem.getDetail()).contains("no active GitLab connection");
+            assertThat(workspaceRepository
+                            .findById(refused.getId())
+                            .orElseThrow()
+                            .getRepositorySelection())
+                    .isNotEqualTo(RepositorySelection.SELECTED);
+        }
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRejectAProjectSelectionRequestWithoutAKnownSelection() {
+        Workspace workspace = seedActiveGitLabWorkspace("selection-invalid", 7501L);
+
+        for (String body : List.of("{}", "{\"repositorySelection\":null}", "{\"repositorySelection\":\"SOME\"}")) {
+            webTestClient
+                    .patch()
+                    .uri("/workspaces/{workspaceSlug}/repositories/selection", workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .exchange()
+                    .expectStatus()
+                    .isBadRequest()
+                    .expectBody(Void.class);
+        }
+
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getRepositorySelection())
+                .isEqualTo(RepositorySelection.ALL);
+        assertThat(selectionChanges(workspace)).isEmpty();
+    }
+
+    private List<ConnectionAudit> selectionChanges(Workspace workspace) {
+        Long connectionId = connectionRepository
+                .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        workspace.getId(), IntegrationKind.GITLAB, IntegrationState.ACTIVE)
+                .orElseThrow()
+                .getId();
+        return connectionAuditRepository.findByConnectionIdOrderByOccurredAtDesc(connectionId).stream()
+                .filter(audit -> audit.getEventType().equals("PROJECT_SELECTION_CHANGED"))
+                .toList();
+    }
+
+    // GitLab creation follows every project of the group unless the creator selects projects.
+    private Workspace seedActiveGitLabWorkspace(String slug, long projectNativeId) {
+        User owner = persistUser(slug + "-owner");
+        Workspace workspace = createWorkspace(slug, "Selection " + slug, slug, AccountType.ORG, owner);
+        ensureOwnerMembership(workspace);
+        workspace.setRepositorySelection(RepositorySelection.ALL);
+
+        RepositoryToMonitor monitor = new RepositoryToMonitor();
+        monitor.setNameWithOwner(slug + "/kept-project");
+        monitor.setNativeId(projectNativeId);
+        monitor.setWorkspace(workspace);
+        monitor = repositoryToMonitorRepository.save(monitor);
+        workspace.getRepositoriesToMonitor().add(monitor);
+        workspaceRepository.save(workspace);
+
+        connectActivitySource(workspace, ensureGitLabProvider());
+        return workspace;
     }
 
     @Test

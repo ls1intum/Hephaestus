@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
+import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
@@ -25,6 +27,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -331,6 +334,27 @@ public class ConnectionService {
                     connection.setConfig(config.withProjectExclusions(mutator.apply(config.projectExclusions())));
                     return connectionRepository.save(connection);
                 });
+    }
+
+    /**
+     * Records a workspace admin's change of which GitLab projects the workspace follows. The caller writes the change
+     * in the same transaction, under the connection's lifecycle lock.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordGitLabProjectSelectionChanged(
+            Connection connection, RepositorySelection from, RepositorySelection to, long actorAccountId) {
+        ConnectionAudit audit = new ConnectionAudit(
+                connection,
+                "PROJECT_SELECTION_CHANGED",
+                connection.getState(),
+                connection.getState(),
+                "ADMIN",
+                null,
+                // The idempotency index treats an absent correlation id as one value, so each change carries its own.
+                UUID.randomUUID().toString(),
+                from + " → " + to);
+        audit.setActorAccountId(actorAccountId);
+        auditRepository.save(audit);
     }
 
     /**

@@ -1549,6 +1549,13 @@ export const zGitLabProvider = z.object({
     defaultServerUrl: z.string().optional()
 });
 
+/**
+ * Whether a GitLab workspace follows every project of its group or only the projects it monitors
+ */
+export const zGitLabRepositorySelection = z.object({
+    repositorySelection: z.enum(['ALL', 'SELECTED'])
+});
+
 export const zGroupDefinition = z.object({
     color: z.string().nullable(),
     description: z.string().nullable(),
