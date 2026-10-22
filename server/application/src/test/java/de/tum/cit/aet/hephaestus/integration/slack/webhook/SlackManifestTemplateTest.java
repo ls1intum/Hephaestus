@@ -34,7 +34,7 @@ class SlackManifestTemplateTest extends BaseUnitTest {
                 .contains("agent_view:")
                 .contains("agent_description:")
                 .contains("- app_home_opened")
-                .doesNotContain("agent_session_stopped")
+                .contains("- agent_session_stopped")
                 .contains("- reactions:write")
                 .doesNotContain("app_context_changed")
                 .contains("- message.im")
@@ -81,6 +81,7 @@ class SlackManifestTemplateTest extends BaseUnitTest {
                 new SlackChannelMessageHandler(
                         mock(SlackIngestService.class), deserializer, mock(TransactionTemplate.class)),
                 new SlackMentorDmMessageHandler(mock(SlackMentorService.class), deserializer),
+                new SlackAgentSessionStoppedMessageHandler(mock(SlackMentorService.class), deserializer),
                 new SlackAppHomeOpenedMessageHandler(mock(SlackAppHomeService.class), deserializer),
                 new SlackMemberJoinedChannelMessageHandler(mock(SlackChannelJoinNoticeHandler.class), deserializer),
                 new SlackAppUninstalledMessageHandler(uninstall, deserializer),

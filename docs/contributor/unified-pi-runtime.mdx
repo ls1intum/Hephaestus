@@ -260,7 +260,7 @@ Thus, only a stream that no server ended is a Heph message without metadata.
 | Where the developer asked | While the turn runs | When the turn ends |
 | --- | --- | --- |
 | The top level of the direct message | Heph reacts with 👀. | One post with the reply, then Heph removes 👀. Slack shows at most 12,000 characters. A longer reply is cut and ends with "… The full answer is in Hephaestus." |
-| A Slack thread | Heph reacts with 👀, and the partial answer streams (`chat.startStream`, then `chat.appendStream`). The question's `slack_stream_ts` holds the stream's `ts`. | The rest of the answer, then `chat.stopStream` with the Helpful and Not helpful buttons, then Heph removes 👀. |
+| A Slack thread | Heph reacts with 👀 and sets the thread's agent session to `processing` (`agents.sessions.setStatus`), so Slack shows its Stop. The partial answer streams (`chat.startStream`, then `chat.appendStream`). The question's `slack_stream_ts` holds the stream's `ts`. | The rest of the answer, then `chat.stopStream` with the Helpful and Not helpful buttons, then the session's status, then Heph removes 👀. |
 
 A failed turn gets its reason as the reply.
 A stopped turn's reply is what Heph wrote before the stop.
@@ -269,9 +269,62 @@ If Heph wrote nothing, nothing is posted.
 A developer can stop any active turn in the app, also a turn asked in Slack.
 When Slack rejects a running turn's stream append with `stopped_by_user`, the projector calls the same workspace-scoped turn stop.
 The stream belongs to one claimed turn, so the stop changes that turn only. Queued follow-ups stay queued.
+Other stream failures do not mean the developer asked to stop the turn.
 
-Heph learns of a Slack stop only at the next append. An app stop remains available during a tool wait.
-A turn that already ended stays unchanged. Other stream failures do not mean the developer asked to stop the turn.
+### Stop in a Slack thread
+
+In a Slack thread, the developer can also press Slack's Stop, also before the first words and during a tool wait.
+Slack sends `agent_session_stopped`, and `SlackAgentSessionStoppedMessageHandler` hands it to `SlackMentorService.handleSessionStop`.
+
+- The event must come from the developer's own DM.
+  The team's current Slack connection must match.
+  The DM of the main conversation, the existing parent entry and its existing Heph thread must also match.
+  A thread is never opened, and no turn id is taken from the event.
+- An event that lacks a field, or has a field of another type, is acknowledged and changes nothing.
+- The event stops the thread's running Slack turn only, under the turn's lock (`MentorTurnService.stopRunning` with a predicate).
+  `event_ts` must be after the start of the running attempt.
+  When `streaming_message_ts` names streams, one of them must also be the question's `slack_stream_ts`.
+  Queued follow-ups and the main conversation stay as they are, and a turn that already ended stays unchanged.
+- The stop writes only to the ledger. It calls no Slack API.
+  The host aborts the turn on its own time, as for a stop in the app. The turn's end then ends the stream and the session's status.
+
+The time check has no margin.
+It compares Slack's clock (`event_ts`) with the database's clock (the attempt's `started_at`).
+A difference between the two clocks can make a stop just after a start do nothing.
+In a narrow window, it can also let a delayed stop of an earlier attempt stop the next attempt.
+The recorded stream is more evidence, but it names no attempt.
+After a lost lease, `slack_stream_ts` still names the lost attempt's stream until the projector starts the answer again.
+
+### The session's status
+
+The projector sets the status of a thread's agent session.
+`processing` means that a Slack turn of the thread runs now. A queued question alone shows `active`.
+
+- When it takes a running thread turn, the projector sets `processing`, if that attempt still runs.
+- It opens a stream only while the stream's attempt still runs.
+- When a stream ends, `chat.stopStream` sends the status of the thread's running Slack work as `session_status`. Slack's default is `active`.
+- At the end of the turn, `agents.sessions.setStatus` sends that status again, also for a reply that is posted instead of streamed.
+
+Slack keeps the status that it got last.
+Thus, each of these calls runs in `MentorSlackDelivery.callInThreadSession`.
+First it holds the developer's person-data write fence (`PersonDataWriteFence.holdForAccountWrite`).
+This precedes every ledger lock, as for other writes about the developer ([Personal data](#personal-data)).
+If the fence refuses the developer, for example after an erasure request, no Slack call is made.
+Then it shares the main conversation's row and locks the thread's row, until Slack answers.
+
+An erasure that holds the fence makes a session call wait before any row lock.
+An erasure also waits at the fence for an active session call.
+On every server, the session calls of one thread run one at a time.
+Each reads the thread's running Slack work after the preceding call ends.
+
+A worker's claim takes neither row, so the next turn can start while an earlier stream ends.
+Its own status call then comes after.
+While such a call waits for Slack, appends to that thread and writes that lock the main conversation's row wait.
+No turn, entry or receipt is written in the call.
+The projector records Slack's answer after it.
+A top-level question gets no session status.
+
+### Retries, rate limits and stream failures
 
 A retried attempt starts its answer again, in a new message.
 If Slack still streams the lost attempt's stream, it ends with "… Heph had to start again. The answer follows below."
@@ -281,6 +334,18 @@ A stream appends at most once each second.
 On one server, the appends of running turns in one workspace are at least 600 ms apart (`SlackMentorProjector.WORKSPACE_APPEND_SPACING`).
 Server replicas do not share this spacing, and the rest of an answer at the end of its turn is not spaced.
 For these appends, Slack's rate limit applies: the server waits for the `Retry-After` time, then tries again.
+
+Each HTTP call of the Slack gateway's own client (`SlackMessageService`) has a deadline of 10 seconds.
+One SDK call can make two HTTP calls: `auth.test` for a token that the SDK has not seen, then the requested call.
+A send has a budget of 30 seconds and a history read 150 seconds, counted on the monotonic clock with the time of the calls.
+
+After a 429, a retry waits for the whole `Retry-After`.
+The wait must be within its cap.
+It and two more HTTP calls must also fit in the remaining budget.
+Otherwise it gives up with the 429, and never tries earlier than Slack asked.
+
+The deadline does not end a call that already runs when the budget ends.
+A call that runs out of time is a `transport_failure`: Slack may still have applied the write, so the reply's outcome stays unknown.
 
 The table gives what the end of the turn does with the stream.
 It applies to a refused append and to an answer that no longer starts with what the stream shows.

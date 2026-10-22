@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorAdmission;
 import de.tum.cit.aet.hephaestus.agent.mentor.turn.MentorRefusal;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorPosts;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
@@ -19,6 +20,7 @@ import de.tum.cit.aet.hephaestus.mentor.MentorTimeline;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurn;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurnService;
 import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -196,6 +198,66 @@ public class SlackMentorService {
                 entries.deleteMessage(found.workspaceId(), found.entry().getId());
             }
         });
+    }
+
+    /**
+     * The developer pressed Stop on Heph's agent session in a Slack thread of their DM ({@code agent_session_stopped}).
+     * Stops the Slack turn that runs in the Heph thread on that Slack thread when the stop came after its running
+     * attempt started, and, when Slack names streams, one of them is the stream that the question records. Waiting
+     * follow-ups and the main conversation stay as they are, and a thread is never opened. Calls no Slack API: the
+     * projector of the turn ends its stream and the session's status once the turn ends.
+     *
+     * <p>The order of the stop and the attempt's start rests on two clocks, Slack's {@code event_ts} and the
+     * database's start of the attempt, with no margin for a difference between them. The recorded stream is more
+     * evidence but names no attempt: after a lost lease it still names the lost attempt's stream until the projector
+     * starts the answer again, so it never replaces the time check.
+     *
+     * @param threadTs the Slack thread's parent {@code ts}
+     * @param eventTs when Slack says the developer stopped the session
+     * @param streams the streams that Slack shows in the session; empty when none shows yet
+     */
+    public void handleSessionStop(
+            String teamId,
+            String channelId,
+            String slackUserId,
+            String threadTs,
+            String eventTs,
+            List<String> streams) {
+        Optional<Long> workspaceOpt = workspaceResolver.resolveWorkspaceId(teamId);
+        if (workspaceOpt.isEmpty()) {
+            return;
+        }
+        long workspaceId = workspaceOpt.get();
+        Optional<MentorTurn> stopped = workspaceResolver
+                .whileConnected(
+                        workspaceId,
+                        teamId,
+                        () -> conversations
+                                .findMainBySlack(workspaceId, teamId, slackUserId, channelId)
+                                .flatMap(main -> entries.findBySlackTs(workspaceId, main.getId(), threadTs))
+                                .flatMap(parent -> conversations.findThread(workspaceId, parent.getId()))
+                                .flatMap(thread -> turns.stopRunning(
+                                        workspaceId,
+                                        thread.getId(),
+                                        running -> stops(workspaceId, running, eventTs, streams))))
+                .flatMap(turn -> turn);
+        stopped.ifPresent(turn -> log.info(
+                "Stopped Slack Heph turn from its Slack session: workspace={} turn={}", workspaceId, turn.getId()));
+    }
+
+    /** Whether a session stop names this running attempt of a Slack turn. */
+    private boolean stops(long workspaceId, MentorTurn running, String eventTs, List<String> streams) {
+        Instant startedAt = running.getStartedAt();
+        if (running.getSurface() != MentorTurn.Surface.SLACK
+                || startedAt == null
+                || !SlackTs.isAfter(eventTs, startedAt)) {
+            return false;
+        }
+        if (streams.isEmpty()) {
+            return true;
+        }
+        String stream = turns.question(workspaceId, running.getId()).getSlackStreamTs();
+        return stream != null && streams.contains(stream);
     }
 
     /** The developer pressed Helpful or Not helpful under one of Heph's answers. */

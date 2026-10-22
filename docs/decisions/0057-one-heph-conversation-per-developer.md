@@ -86,8 +86,8 @@ Slack egress:
    Its Postgres state tables are created at run time, outside Liquibase and outside workspace scoping.
    It also needs a second Slack ingress beside the Java webhook role ([Chat SDK](https://chat-sdk.dev/)).
 2. **The Java Slack projector reads the ledger, and records each post as intent, effect and outcome.** Chosen.
-3. **Slack agent sessions with the native stop button in threads.** Rejected.
-   A stop event names no turn when no stream exists yet.
+3. **Slack agent sessions with the native stop button in threads.** First rejected, then chosen ([Amendment of 2026-10-22](#amendment-of-2026-10-22-slacks-stop-in-a-heph-thread)).
+   The first rejection said: a stop event names no turn when no stream exists yet.
    Binding it needed event receipts, session owners and a clock-skew rule.
    Threads use 👀 as the working signal, and Stop is in the app.
 
@@ -129,8 +129,8 @@ The answer appears where the developer asked. The app shows everything.
 - A developer can stop any active turn in the app.
   A `stopped_by_user` response to a running turn's stream append also stops that exact turn.
   The response identifies one stream and its owning turn. It does not stop queued follow-ups.
-  Heph learns of a Slack stop only at the next append. An app stop takes effect during a tool wait.
-  Heph does not use Slack's agent-session status or its stop event. These name a thread rather than one turn.
+- In a Slack thread, Slack's agent session shows that Heph works, with Slack's Stop.
+  Its stop event (`agent_session_stopped`) stops the thread's running Slack turn only ([Amendment of 2026-10-22](#amendment-of-2026-10-22-slacks-stop-in-a-heph-thread)).
 
 The app offers Helpful and Not helpful on each Heph answer.
 Ratings come from these buttons only. Heph's own 👀 reaction is its working signal, and Hephaestus does not read Slack reactions.
@@ -461,10 +461,57 @@ Thus, no old code reads a dropped table or column.
 It proves that a fresh and an upgraded database have the same schema.
 This exception does not change the rule for other tables and columns.
 
+### Amendment of 2026-10-22: Slack's Stop in a Heph thread
+
+The first decision rejected Slack's agent session and its stop event (option 3 of Slack egress).
+A stop event names no turn before a stream exists.
+Binding it was thought to need event receipts, session owners and a clock-skew rule.
+The maintainer later chose the stop event.
+While a reply streamed in a Slack thread, Slack showed its working indicator without a Stop control, and only the app could stop the turn.
+
+The binding is now as follows:
+
+- `SlackAgentSessionStoppedMessageHandler` takes the event only from the developer's own DM.
+  The team's current Slack connection must match.
+  The DM of the main conversation, the existing parent entry and its existing Heph thread must also match.
+  It opens no thread and takes no turn id from the event.
+- The event stops the thread's running Slack turn only, under the turn's lock.
+  The event time (`event_ts`) must be after the start of the running attempt.
+  When the event names streams, one of them must also be the stream that the question records.
+  Queued follow-ups stay queued.
+  The stop calls no Slack API.
+- There is no event receipt.
+  Webhook publication uses `event_id` for the configured JetStream deduplication window.
+  A stop of an ended turn changes nothing, and a stop from before the attempt started stops nothing.
+- There is no clock margin.
+  The comparison relies on Slack's clock and the database's clock.
+  A difference between them can make a stop just after a start do nothing.
+  In a narrow window, it can also let a delayed stop of an earlier attempt stop the next attempt.
+  The recorded stream is more evidence, but it names no attempt.
+  After a lost lease, it names the lost attempt's stream until the projector starts the answer again.
+- The projector owns the session's status.
+  It sets `processing` when a thread turn starts to run.
+  It ends a stream or turn with the status of the thread's running Slack work.
+  A turn that started meanwhile keeps `processing`.
+  Only running Slack work shows `processing`.
+  A queued question does not.
+- These Slack calls are made one at a time for each thread on every server (`MentorSlackDelivery#callInThreadSession`).
+  Each first holds the developer's person-data write fence, as every write about the developer does.
+  If the fence refuses the developer, for example after an erasure request, no Slack call is made.
+  Then each holds the main conversation's row shared, then the thread's row, until Slack answers.
+  An erasure waits at the fence for such a call, and the call waits at the fence for an erasure.
+  A claim of a turn takes neither row.
+  While such a call waits for Slack, appends to that thread and writes that lock the main conversation's row wait.
+- Each HTTP call of the Slack gateway's own client has a deadline of 10 seconds.
+  A throttled call waits for its whole `Retry-After`.
+  The wait and two more HTTP calls must fit in the remaining budget.
+  A call that runs out of time leaves the effect of its write unknown, as before.
+
 ## Consequences
 
 - The upgrade deletes all earlier Heph conversations. Slack keeps its own copy of the direct messages.
 - Operators reinstall the Slack app for `reactions:write`.
+- Operators add the `agent_session_stopped` event subscription to the Slack app. It needs no other OAuth scope.
 - The Traefik sticky cookie, the interactive sandbox, its configuration keys, and its metrics are removed.
 - `hephaestus.worker.capacity.mentor-max` gets a new meaning ([Runtime roles](../admin/runtime-roles.mdx#tunables)).
 - The worker control protocol carries no mentor frames.

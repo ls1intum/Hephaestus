@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -266,13 +267,26 @@ public class MentorTurnService {
     /** Stops the running turn of a conversation, if one runs. Queued follow-ups stay queued. */
     @Transactional
     public Optional<MentorTurn> stopRunning(long workspaceId, UUID conversationId) {
-        Optional<MentorTurn> running = turns
-                .findByWorkspaceIdAndConversationIdAndStatus(workspaceId, conversationId, MentorTurn.Status.RUNNING)
-                .stream()
-                .findFirst()
-                .flatMap(found -> turns.lockById(found.getId()))
-                .filter(locked ->
-                        locked.getStatus() == MentorTurn.Status.RUNNING && locked.stopIfActive(clock.instant()));
+        return stopRunningIf(workspaceId, conversationId, running -> true);
+    }
+
+    /**
+     * Stops the running turn of a conversation when {@code meant} accepts it. Queued follow-ups stay queued. The turns
+     * are read as they are locked, so {@code meant} sees the attempt that runs while the stop is written, and a claim
+     * starts none of them meanwhile.
+     */
+    @Transactional
+    public Optional<MentorTurn> stopRunning(long workspaceId, UUID conversationId, Predicate<MentorTurn> meant) {
+        return stopRunningIf(workspaceId, conversationId, meant);
+    }
+
+    /** The stop of both {@link #stopRunning} forms, in the caller's transaction. */
+    private Optional<MentorTurn> stopRunningIf(long workspaceId, UUID conversationId, Predicate<MentorTurn> meant) {
+        Optional<MentorTurn> running =
+                turns.lockActiveByWorkspaceIdAndConversationId(workspaceId, conversationId).stream()
+                        .filter(locked -> locked.getStatus() == MentorTurn.Status.RUNNING)
+                        .findFirst()
+                        .filter(locked -> meant.test(locked) && locked.stopIfActive(clock.instant()));
         running.ifPresent(this::changed);
         return running;
     }

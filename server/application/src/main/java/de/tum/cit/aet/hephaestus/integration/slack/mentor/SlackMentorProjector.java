@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -34,6 +35,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -97,6 +99,9 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
      */
     private static final String NOT_STREAMING = "message_not_in_streaming_state";
 
+    /** The gateway's error when the workspace has no Slack connection whose token it can use. */
+    private static final String NO_CONNECTION = "no_active_slack_connection";
+
     /**
      * Slack errors after which a stream takes no more text: its message, thread or channel is gone, Slack refuses to
      * change it, or Silent Mode or a lost connection keeps the text from Slack. The end of the turn tries to post the
@@ -110,7 +115,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
             "cant_update_message",
             "message_not_owned_by_app",
             SlackMentorPoster.SILENT_MODE,
-            "no_active_slack_connection");
+            NO_CONNECTION);
 
     private final MentorLedgerNotifications notifications;
     private final MentorSlackDelivery delivery;
@@ -352,12 +357,16 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
         if (status != MentorTurn.Status.RUNNING) {
             return true;
         }
+        ReplyStream stream = null;
         if (threadTs != null) {
-            projection.stream = new ReplyStream(
+            stream = new ReplyStream(
+                    turn.turn().getId(),
+                    turn.turn().getConversationId(),
                     turn.channelId(),
                     threadTs,
                     turn.question().getId(),
                     turn.turn().getAttempt());
+            projection.stream = stream;
         }
         try {
             if (turn.question().getSlackTs() != null) {
@@ -375,7 +384,56 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
                     projection.turnId,
                     e.slackError());
         }
+        if (stream != null) {
+            showWorking(workspaceId, stream);
+        }
         return true;
+    }
+
+    /**
+     * Shows in the reply's Slack thread that Heph works, with Slack's Stop, while this attempt is the thread's running
+     * Slack work. An attempt that no longer runs shows nothing.
+     */
+    private void showWorking(long workspaceId, ReplyStream stream) {
+        try {
+            delivery.callInThreadSession(
+                    workspaceId, stream.conversationId, stream.channelId, stream.threadTs, session -> {
+                        if (!session.runs(stream.turnId, stream.attempt)) {
+                            return null;
+                        }
+                        slack.setSessionStatus(workspaceId, stream.channelId, stream.threadTs, true);
+                        return Boolean.TRUE;
+                    });
+        } catch (SlackSendException e) {
+            log.warn(
+                    "Slack could not show that Heph works in its thread: workspaceId={}, turnId={}, error={}",
+                    workspaceId,
+                    stream.turnId,
+                    e.slackError());
+        }
+    }
+
+    /**
+     * Makes one Slack call that changes the agent session of a reply's Slack thread, under the thread's guard
+     * ({@link MentorSlackDelivery#callInThreadSession}).
+     *
+     * @throws SlackSendException {@code no_active_slack_connection}, without a call, when the turn's Heph thread no
+     *     longer belongs to that Slack thread of the DM, as after a Slack disconnect
+     */
+    private void inSession(
+            long workspaceId,
+            UUID conversationId,
+            String channelId,
+            String threadTs,
+            Consumer<MentorSlackDelivery.ThreadSession> call) {
+        boolean called = delivery.callInThreadSession(workspaceId, conversationId, channelId, threadTs, session -> {
+                    call.accept(session);
+                    return Boolean.TRUE;
+                })
+                .isPresent();
+        if (!called) {
+            throw new SlackSendException(workspaceId, channelId, NO_CONNECTION);
+        }
     }
 
     /** Sends the part of Heph's partial answer that Slack does not show yet. */
@@ -383,6 +441,7 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
         if (turn.getAttempt() != stream.attempt) {
             restart(projection, stream);
             stream.attempt = turn.getAttempt();
+            showWorking(projection.workspaceId, stream);
         }
         String text = MentorSlackDelivery.writing(turn);
         if (stream.end != StreamEnd.SEND_REST) {
@@ -449,7 +508,11 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
         return null;
     }
 
-    /** Opens the stream with the first text, then appends, in pieces Slack accepts. Each piece Slack takes is shown. */
+    /**
+     * Opens the stream with the first text, then appends, in pieces Slack accepts. Each piece Slack takes is shown. A
+     * stream opens only while its attempt is the thread's running Slack work; otherwise nothing is sent, and the end
+     * of the turn replies.
+     */
     private void write(long workspaceId, ReplyStream stream, String text) {
         for (int at = 0; at < text.length(); at += MAX_APPEND_CHARS) {
             String piece = text.substring(at, Math.min(text.length(), at + MAX_APPEND_CHARS));
@@ -460,10 +523,21 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
             } else {
                 Instant tried = clock.instant();
                 try {
-                    ts = slack.startStream(workspaceId, stream.channelId, stream.threadTs, piece);
+                    ts = delivery.callInThreadSession(
+                                    workspaceId,
+                                    stream.conversationId,
+                                    stream.channelId,
+                                    stream.threadTs,
+                                    session -> session.runs(stream.turnId, stream.attempt)
+                                            ? slack.startStream(workspaceId, stream.channelId, stream.threadTs, piece)
+                                            : null)
+                            .orElse(null);
                 } catch (SlackSendException e) {
                     stream.failedStart = new FailedStart(tried, clock.instant());
                     throw e;
+                }
+                if (ts == null) {
+                    return;
                 }
                 stream.ts = ts;
                 stream.sent += piece;
@@ -481,11 +555,17 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
         if (ts != null) {
             if (stream.end == StreamEnd.SEND_REST || stream.end == StreamEnd.REPLACE) {
                 try {
-                    slack.stopStream(
+                    inSession(
                             projection.workspaceId,
+                            stream.conversationId,
                             stream.channelId,
-                            ts,
-                            new SlackMessageService.StreamStop(SlackMentorPosts.RESTART_NOTE, List.of(), null));
+                            stream.threadTs,
+                            session -> slack.stopStream(
+                                    projection.workspaceId,
+                                    stream.channelId,
+                                    ts,
+                                    new SlackMessageService.StreamStop(
+                                            SlackMentorPosts.RESTART_NOTE, List.of(), null, session.working())));
                 } catch (SlackSendException e) {
                     log.debug("Slack stream of a lost attempt did not end: {}", e.slackError());
                 }
@@ -704,14 +784,19 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
                         : failure != null
                                 ? "\n\n" + failure
                                 : stream == null && whole != null ? SlackMentorPosts.CUT_NOTE : null;
-                slack.stopStream(
+                List<LayoutBlock> buttons =
+                        answerId == null || replace ? List.of() : SlackMentorPosts.feedbackButtons(answerId);
+                inSession(
                         workspaceId,
+                        turn.turn().getConversationId(),
                         turn.channelId(),
-                        ts,
-                        new SlackMessageService.StreamStop(
-                                last,
-                                answerId == null || replace ? List.of() : SlackMentorPosts.feedbackButtons(answerId),
-                                SlackMentorPosts.metadata(questionId)));
+                        Objects.requireNonNull(turn.threadTs(), "A reply streams only in a Slack thread"),
+                        session -> slack.stopStream(
+                                workspaceId,
+                                turn.channelId(),
+                                ts,
+                                new SlackMessageService.StreamStop(
+                                        last, buttons, SlackMentorPosts.metadata(questionId), session.working())));
             } catch (SlackSendException e) {
                 if (NOT_STREAMING.equals(e.slackError())) {
                     replace = whole != null;
@@ -810,8 +895,28 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
         }
     }
 
-    /** Removes 👀 from the question. */
+    /**
+     * Ends Slack's working state of the turn: in a Slack thread, the agent session's status shows the thread's Slack
+     * work as it is now, so a turn that started there meanwhile keeps its status; then 👀 leaves the question.
+     */
     private void endWorking(SlackTurn turn) {
+        long workspaceId = turn.turn().getWorkspaceId();
+        String threadTs = turn.threadTs();
+        if (threadTs != null) {
+            try {
+                inSession(
+                        workspaceId,
+                        turn.turn().getConversationId(),
+                        turn.channelId(),
+                        threadTs,
+                        session -> slack.setSessionStatus(workspaceId, turn.channelId(), threadTs, session.working()));
+            } catch (SlackSendException e) {
+                log.debug(
+                        "Slack session status of Heph turn {} did not settle: {}",
+                        turn.turn().getId(),
+                        e.slackError());
+            }
+        }
         String questionTs = turn.question().getSlackTs();
         if (questionTs == null || turn.question().isRedacted()) {
             return;
@@ -919,6 +1024,10 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
 
     /** The stream of a reply in a Slack thread that this server projects. Changes under its projection's lock. */
     private static final class ReplyStream {
+        final UUID turnId;
+        /** The Heph thread, whose session calls are guarded ({@link MentorSlackDelivery#callInThreadSession}). */
+        final UUID conversationId;
+
         final String channelId;
         final String threadTs;
         final UUID questionId;
@@ -939,7 +1048,9 @@ public class SlackMentorProjector implements MentorLedgerNotifications.Listener 
         int failures;
         Instant next = Instant.EPOCH;
 
-        ReplyStream(String channelId, String threadTs, UUID questionId, int attempt) {
+        ReplyStream(UUID turnId, UUID conversationId, String channelId, String threadTs, UUID questionId, int attempt) {
+            this.turnId = turnId;
+            this.conversationId = conversationId;
             this.channelId = channelId;
             this.threadTs = threadTs;
             this.questionId = questionId;

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +37,7 @@ public class MentorSlackDelivery {
     private final MentorSlackDeliveryRepository deliveries;
     private final MentorTurnRepository turns;
     private final MentorTimeline timeline;
+    private final PersonDataWriteFence writeFence;
 
     /**
      * A turn asked in Slack, with where its reply goes.
@@ -106,6 +108,90 @@ public class MentorSlackDelivery {
                 threadTs,
                 entries.findQuestion(turn.getWorkspaceId(), turn.getId()),
                 timeline.shown(conversation.get(), stored)));
+    }
+
+    /**
+     * The Slack work of a Heph thread when a session call reads it ({@link #callInThreadSession}).
+     *
+     * @param runningTurnId the thread's Slack turn that runs now; {@code null} when none runs, also when one waits
+     * @param runningAttempt the attempt of that turn that runs
+     */
+    public record ThreadSession(@Nullable UUID runningTurnId, int runningAttempt) {
+
+        /** Whether Heph works in the thread now: Slack shows its agent session as processing, with Stop. */
+        public boolean working() {
+            return runningTurnId != null;
+        }
+
+        /** Whether this attempt of this turn is the thread's running Slack work. */
+        public boolean runs(UUID turnId, int attempt) {
+            return turnId.equals(runningTurnId) && attempt == runningAttempt;
+        }
+    }
+
+    /** One Slack call that changes the agent session of a Heph thread's Slack thread. */
+    @FunctionalInterface
+    public interface ThreadSessionCall<T> {
+
+        /** @return what the call returned; {@code null} when it made no call */
+        @Nullable
+        T call(ThreadSession session);
+    }
+
+    /**
+     * Makes one Slack call that changes the agent session of the Slack thread of a Heph thread: its status, or the
+     * start or the end of a stream in it. The call reads the thread's Slack work and acts on it. Slack keeps the
+     * session status that the last such call set, so these calls must reach Slack in the order of the work they read.
+     *
+     * <p>First the developer's person-data write fence is held ({@link PersonDataWriteFence#holdForAccountWrite}), as
+     * for every write about the developer and before any ledger lock: a developer whose data is erased, or whose
+     * erasure was requested, gets no call, and an erasure waits for a call that it admitted. Then the main
+     * conversation's row is shared and the thread's row is locked, in the order of the conversation tree
+     * ({@link MentorConversationService#openThread}), until the call returns. Thus on every server the session calls
+     * of one thread run one at a time, and each reads the thread's Slack work after the call before it ended. A claim
+     * of a turn takes neither row, so a turn can start meanwhile; the next session call then sees it. Other threads of
+     * the main conversation share its row and do not wait. Inside, the turns and entries are only read: the caller
+     * records what Slack answered after this transaction ends.
+     *
+     * @param conversationId the Heph thread
+     * @param channelId the developer's DM that the call names
+     * @param threadTs the Slack thread that the call names
+     * @return what the call returned; empty, without a call, when the fence refuses the developer, or the conversation
+     *     is no longer a thread of that Slack thread in that DM
+     */
+    @Transactional
+    public <T> Optional<T> callInThreadSession(
+            long workspaceId, UUID conversationId, String channelId, String threadTs, ThreadSessionCall<T> call) {
+        Optional<MentorConversation> thread = conversations.findByIdAndWorkspaceId(conversationId, workspaceId);
+        if (thread.isEmpty()) {
+            return Optional.empty();
+        }
+        UUID parentEntryId = thread.get().getParentEntryId();
+        if (parentEntryId == null
+                || !writeFence.holdForAccountWrite(thread.get().getAccountId())) {
+            return Optional.empty();
+        }
+        UUID mainId = thread.get().rootId();
+        if (conversations.shareByIdAndWorkspaceId(mainId, workspaceId).isEmpty()
+                || conversations
+                        .lockByIdAndWorkspaceId(conversationId, workspaceId)
+                        .isEmpty()) {
+            return Optional.empty();
+        }
+        boolean bound = conversations
+                        .findByIdAndWorkspaceId(mainId, workspaceId)
+                        .map(main -> channelId.equals(main.getSlackChannelId()))
+                        .orElse(false)
+                && entries.findByIdAndWorkspaceId(parentEntryId, workspaceId)
+                        .map(parent -> threadTs.equals(parent.getSlackTs()))
+                        .orElse(false);
+        if (!bound) {
+            return Optional.empty();
+        }
+        ThreadSession session = turns.findRunningSlackTurn(workspaceId, conversationId)
+                .map(running -> new ThreadSession(running.getId(), running.getAttempt()))
+                .orElseGet(() -> new ThreadSession(null, 0));
+        return Optional.ofNullable(call.call(session));
     }
 
     /** The turn as it is now, with its partial answer: one read for each streamed piece. */

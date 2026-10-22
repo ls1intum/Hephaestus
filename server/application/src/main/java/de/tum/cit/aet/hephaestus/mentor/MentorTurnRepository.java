@@ -36,6 +36,26 @@ public interface MentorTurnRepository extends JpaRepository<MentorTurn, UUID> {
     List<TurnStatus> findStatusesByWorkspaceIdAndIdIn(
             @Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
 
+    interface RunningSlackTurn {
+        UUID getId();
+
+        int getAttempt();
+    }
+
+    /**
+     * The Slack turn of a conversation that runs now, as the database holds it at this statement: a projection, so no
+     * turn that the transaction loaded earlier answers with its older state. A claim lets at most one turn of a
+     * conversation run.
+     */
+    @Query("""
+            SELECT t.id AS id, t.attempt AS attempt FROM MentorTurn t
+            WHERE t.workspaceId = :workspaceId AND t.conversationId = :conversationId
+              AND t.status = de.tum.cit.aet.hephaestus.mentor.MentorTurn.Status.RUNNING
+              AND t.surface = de.tum.cit.aet.hephaestus.mentor.MentorTurn.Surface.SLACK
+            """)
+    Optional<RunningSlackTurn> findRunningSlackTurn(
+            @Param("workspaceId") Long workspaceId, @Param("conversationId") UUID conversationId);
+
     /** The queued and running turns of a main conversation and its threads, oldest first. */
     @Query("""
             SELECT t FROM MentorTurn t JOIN MentorConversation c ON c.id = t.conversationId
