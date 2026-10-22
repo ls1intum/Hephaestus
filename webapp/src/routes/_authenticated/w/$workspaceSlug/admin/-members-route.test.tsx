@@ -10,21 +10,19 @@ import type {
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
-import { ownMembership } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 15_000 });
 
-const WORKSPACE = {
-	id: 1,
-	workspaceSlug: "acme",
-	displayName: "Acme",
-	providerType: "GITHUB",
-	status: "ACTIVE",
+const WORKSPACE = workspaceListItem("acme", { displayName: "Acme", practicesEnabled: true });
+const TUTORS = workspaceListItem("tutors", {
+	id: 2,
+	displayName: "Tutors",
 	practicesEnabled: true,
-};
+});
 
 function member(
 	accountId: string,
@@ -419,7 +417,6 @@ describe("workspace members route", () => {
 
 	it("never shows one workspace's members while another workspace's load", async () => {
 		const tutorsMembers = deferred();
-		const TUTORS = { ...WORKSPACE, id: 2, workspaceSlug: "tutors", displayName: "Tutors" };
 		mockMembersRoute([ADA]);
 		server.use(
 			http.get("*/workspaces", () => HttpResponse.json([WORKSPACE, TUTORS])),
@@ -539,9 +536,7 @@ it("renders the verified nonmember target's members without adding that target t
 	mockMembersRoute();
 	server.use(
 		http.get("*/user", () => HttpResponse.json(currentUser)),
-		http.get("*/workspaces/tutors", () =>
-			HttpResponse.json({ ...WORKSPACE, workspaceSlug: "tutors", displayName: "Tutors" }),
-		),
+		http.get("*/workspaces/tutors", () => HttpResponse.json(TUTORS)),
 		http.get("*/workspaces/tutors/members/me", () =>
 			HttpResponse.json({ status: 403 }, { status: 403 }),
 		),
