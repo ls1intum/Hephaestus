@@ -483,14 +483,14 @@ function isChosen(name: "All projects in the group" | "Only the projects listed 
 	return projectChoice(name).getAttribute("aria-checked") === "true";
 }
 
-describe("GitLab project choice", () => {
-	/** An active GitLab connection whose stored project choice the test answers. */
-	function serveGitLab(initial: ProjectChoice) {
-		const { entry } = mockConnection("GITLAB");
-		entry.credentialsUnreadableSince = undefined;
-		return serveProjectChoice(initial);
-	}
+/** An active GitLab connection whose stored project choice the test answers. */
+function serveGitLab(initial: ProjectChoice) {
+	const { entry } = mockConnection("GITLAB");
+	entry.credentialsUnreadableSince = undefined;
+	return serveProjectChoice(initial);
+}
 
+describe("GitLab project choice", () => {
 	it("keeps the stored choice while a narrowing is saved, then shows the server's answer", async () => {
 		const choice = serveGitLab("ALL");
 		const saved = deferred();
