@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewListSort;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.LinkedHashMap;
@@ -59,7 +60,11 @@ public class ReviewQueriesImpl implements ReviewQueries {
                 .getSingleResult();
         var rows = session.createNativeQuery(
                         "SELECT q.* FROM review q" + where
-                                + " ORDER BY q.created_at DESC,q.id::text DESC LIMIT :limit OFFSET :offset",
+                                + " ORDER BY "
+                                + (filter.sort() == ReviewListSort.OLDEST
+                                        ? "q.created_at ASC,q.id::text ASC"
+                                        : "q.created_at DESC,q.id::text DESC")
+                                + " LIMIT :limit OFFSET :offset",
                         Review.class)
                 .setProperties(params)
                 .setParameter("limit", page.getPageSize())

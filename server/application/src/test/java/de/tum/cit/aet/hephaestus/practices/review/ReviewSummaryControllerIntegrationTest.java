@@ -122,6 +122,29 @@ class ReviewSummaryControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldListReviewsOldestFirstWhenSortIsOldest() {
+        var older = data.result(scenario, ResultOutcome.MET, Instant.parse("2026-10-12T00:00:00Z"));
+        data.end(older, Instant.parse("2026-10-13T00:00:00Z"));
+        var newer = data.result(scenario, ResultOutcome.NOT_MET, Instant.parse("2026-10-14T00:00:00Z"));
+        get("/practices/reviews")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content[0].id")
+                .isEqualTo(newer.getReviewId().toString());
+        get("/practices/reviews?sort=OLDEST")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content[0].id")
+                .isEqualTo(older.getReviewId().toString())
+                .jsonPath("$.content[1].id")
+                .isEqualTo(newer.getReviewId().toString())
+                .jsonPath("$.sort.sorted")
+                .isEqualTo(true);
+    }
+
+    @Test
     void shouldExcludeIncorrectProofFromPracticeFiltersAndRestoreItWhenTheMarkIsRemoved() {
         var result = data.result(scenario, ResultOutcome.MET, Instant.now());
         var mark = data.mark(result, ResultMarkKind.INCORRECT, scenarioAccountId);

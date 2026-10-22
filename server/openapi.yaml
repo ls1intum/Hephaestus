@@ -7818,6 +7818,7 @@ paths:
           type: string
           enum:
           - NEWEST
+          - OLDEST
           - ACTIONABILITY
       - in: query
         name: page
@@ -8360,7 +8361,8 @@ paths:
       - practice-catalog
   /workspaces/{workspaceSlug}/practices/reviews:
     get:
-      description: Results are ordered newest first.
+      description: "Reviews are ordered by when they were created, newest first unless\
+        \ sort is OLDEST."
       operationId: listReviews
       parameters:
       - description: Workspace slug
@@ -8452,6 +8454,14 @@ paths:
         schema:
           type: string
           format: date-time
+      - in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+          enum:
+          - NEWEST
+          - OLDEST
       responses:
         "200":
           content:
@@ -9312,6 +9322,8 @@ paths:
       - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/problems:
     get:
+      description: "Problems are ordered by when their result was recorded, newest\
+        \ first unless sort is OLDEST."
       operationId: listReviewProblems
       parameters:
       - description: Workspace slug
@@ -9433,6 +9445,14 @@ paths:
         required: false
         schema:
           type: boolean
+      - in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+          enum:
+          - NEWEST
+          - OLDEST
       - in: query
         name: page
         required: false
@@ -9631,6 +9651,7 @@ paths:
           default: NEWEST
           enum:
           - NEWEST
+          - OLDEST
           - ACTIONABILITY
       - in: query
         name: page

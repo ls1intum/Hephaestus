@@ -13278,7 +13278,7 @@ export type ListOwnResultsData = {
         itemId?: string;
         severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL'>;
         displayableOnly?: boolean;
-        sort?: 'NEWEST' | 'ACTIONABILITY';
+        sort?: 'NEWEST' | 'OLDEST' | 'ACTIONABILITY';
         page?: number;
         size?: number;
     };
@@ -13703,6 +13703,7 @@ export type ListReviewsData = {
         groupSlug?: string;
         from?: Date;
         to?: Date;
+        sort?: 'NEWEST' | 'OLDEST';
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews';
 };
@@ -14070,6 +14071,7 @@ export type ListReviewProblemsData = {
         resultId?: string;
         path?: string;
         openOnly?: boolean;
+        sort?: 'NEWEST' | 'OLDEST';
         page?: number;
         size?: number;
     };
@@ -14151,7 +14153,7 @@ export type ListReviewResultsData = {
         disagreed?: boolean;
         from?: Date;
         to?: Date;
-        sort?: 'NEWEST' | 'ACTIONABILITY';
+        sort?: 'NEWEST' | 'OLDEST' | 'ACTIONABILITY';
         page?: number;
         size?: number;
     };

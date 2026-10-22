@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.result;
 import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultSort;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewListSort;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -59,18 +60,21 @@ public class ResultQueriesImpl implements ResultQueries {
             long workspaceId, ResultQueryFilter filter, ResultSort sort, boolean displayableOnly, Pageable page) {
         var selection = selection(workspaceId, filter);
         String where = selection.where() + (displayableOnly ? " AND r.outcome <> 'DOES_NOT_APPLY'" : "");
-        String order = sort == ResultSort.ACTIONABILITY
-                ? "CASE r.severity WHEN 'CRITICAL' THEN 0 WHEN 'MAJOR' THEN 1 WHEN 'MINOR' THEN 2 WHEN 'TRIVIAL' THEN"
-                        + " 3 ELSE 4 END, "
-                : "";
+        String order =
+                switch (sort) {
+                    case ACTIONABILITY ->
+                        "CASE r.severity WHEN 'CRITICAL' THEN 0 WHEN 'MAJOR' THEN 1 WHEN 'MINOR' THEN 2 WHEN 'TRIVIAL'"
+                                + " THEN 3 ELSE 4 END,r.recorded_at DESC,r.id::text DESC";
+                    case OLDEST -> "r.recorded_at ASC,r.id::text ASC";
+                    case NEWEST -> "r.recorded_at DESC,r.id::text DESC";
+                };
         long total = session()
                 .createNativeQuery("SELECT count(*)" + JOIN + where, Long.class)
                 .setProperties(selection.params())
                 .getSingleResult();
         var rows = session()
                 .createNativeQuery(
-                        "SELECT r.*" + JOIN + where + " ORDER BY " + order
-                                + "r.recorded_at DESC,r.id::text DESC LIMIT :limit OFFSET :offset",
+                        "SELECT r.*" + JOIN + where + " ORDER BY " + order + " LIMIT :limit OFFSET :offset",
                         Result.class)
                 .setProperties(selection.params())
                 .setParameter("limit", page.getPageSize())
@@ -110,8 +114,11 @@ public class ResultQueriesImpl implements ResultQueries {
         var rows = session()
                 .createNativeQuery(
                         "SELECT child.*" + joined + where
-                                + " ORDER BY r.recorded_at DESC,r.id::text DESC,child.position ASC LIMIT :limit OFFSET"
-                                + " :offset",
+                                + " ORDER BY "
+                                + (child.sort() == ReviewListSort.OLDEST
+                                        ? "r.recorded_at ASC,r.id::text ASC"
+                                        : "r.recorded_at DESC,r.id::text DESC")
+                                + ",child.position ASC LIMIT :limit OFFSET :offset",
                         Problem.class)
                 .setProperties(params)
                 .setParameter("limit", page.getPageSize())
