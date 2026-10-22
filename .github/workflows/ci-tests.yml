@@ -63,7 +63,7 @@ jobs:
     name: "App Server: Integration (${{ matrix.shard }})"
     if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.shard == 'application' && 30 || 20 }}
+    timeout-minutes: ${{ matrix.shard == 'runtime-and-startup' && 20 || 30 }}
     strategy:
       fail-fast: false
       matrix:
