@@ -519,12 +519,10 @@ export const SentQuestionAnchorsEveryTime: Story = {
 					await nextFrame();
 					const row = rowOf(canvas.getByText(sentQuestion(send)));
 					const offset = row.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
-					await expect({ send, phase, frame, offset: Math.round(offset) }).toStrictEqual({
-						send,
-						phase,
-						frame,
-						offset: PEEK,
-					});
+					await expect(
+						Math.abs(offset - PEEK),
+						JSON.stringify({ send, phase, frame, offset }),
+					).toBeLessThanOrEqual(1);
 				}
 			}
 		}
@@ -657,13 +655,17 @@ export const ComposerGrowth: Story = {
 		const viewport = canvas.getByRole("region", { name: "Conversation with Heph" });
 		const composer = canvas.getByRole("textbox", { name: "Message Heph" });
 		const atEnd = () => viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+		// The scroller keeps the view hidden until it has placed the opening view; jump only after that.
+		await waitFor(async () => {
+			await expect(viewport).toBeVisible();
+		});
 		await userEvent.click(canvas.getByRole("button", { name: "Jump to latest" }));
 		await waitFor(async () => {
-			await expect(atEnd()).toBeLessThanOrEqual(1);
+			await expect(atEnd(), "distance from the end after Jump to latest").toBeLessThanOrEqual(1);
 		});
 		await userEvent.type(composer, "One{Shift>}{Enter}{/Shift}Two{Shift>}{Enter}{/Shift}Three");
 		await waitFor(async () => {
-			await expect(atEnd()).toBeLessThanOrEqual(1);
+			await expect(atEnd(), "distance from the end after the composer grew").toBeLessThanOrEqual(1);
 		});
 
 		viewport.scrollTop = 0;

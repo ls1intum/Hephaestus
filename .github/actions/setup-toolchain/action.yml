@@ -1,8 +1,8 @@
 name: "Setup toolchain"
-description: "The Node.js version package.json pins and, for a frozen install, its pnpm and Vite+ pins with the executable, package store and native lockfile-verification verdict cached; install is none or frozen."
+description: "The Node.js version package.json pins and, for a frozen install, its pnpm pin with the executable, package store and native lockfile-verification verdict cached, then the lockfile's Vite+ on PATH; install is none or frozen."
 inputs:
   install:
-    description: "none: the Node.js runtime alone, for dependency-free Node scripts or shell; frozen: pnpm and Vite+ as well, then pnpm install --frozen-lockfile --ignore-scripts. No lifecycle script runs in CI, so pnpm-workspace.yaml#allowBuilds is exercised only by a contributor's install."
+    description: "none: the Node.js runtime alone, for dependency-free Node scripts or shell; frozen: pnpm as well, then pnpm install --frozen-lockfile --ignore-scripts and the installed Vite+ on PATH. No lifecycle script runs in CI, so pnpm-workspace.yaml#allowBuilds is exercised only by a contributor's install."
     required: false
     default: "none"
 runs:
@@ -96,12 +96,6 @@ runs:
         node-version-file: package.json
         cache: ${{ inputs.install == 'frozen' && 'pnpm' || '' }}
         cache-dependency-path: pnpm-lock.yaml
-    - if: inputs.install == 'frozen'
-      uses: voidzero-dev/setup-vp@49c3e4e92c52e7f8392712a9267bbe71c5ab30e5 # v1.19.0
-      with:
-        node-manager: false
-        cache: false
-        run-install: false
     # setup-node caches package bytes, not pnpm's content-and-policy-validated verification record.
     # Without the latter, even a fully warm store repeats registry metadata checks on every runner.
     - name: Locate pnpm verification cache
@@ -124,6 +118,21 @@ runs:
       if: inputs.install == 'frozen'
       shell: bash
       run: pnpm install --frozen-lockfile --ignore-scripts
+    # Jobs run the Vite+ CLI that the lockfile installed. The global installer downloads a separate
+    # CLI package that the lockfile does not pin; the clean-install job still exercises that path.
+    - name: Use the installed Vite+
+      if: inputs.install == 'frozen'
+      shell: bash
+      run: |
+        pinned="$(node -p 'require("./package.json").devDependencies["vite-plus"]')"
+        installed="$(node -p 'JSON.parse(require("node:fs").readFileSync("node_modules/vite-plus/package.json", "utf8")).version')"
+        if [ "$installed" != "$pinned" ]; then
+          echo "::error::node_modules has vite-plus $installed, but package.json pins $pinned"
+          exit 1
+        fi
+        node_modules/.bin/vp --version | grep -F "vp v$pinned"
+        # The native path, not Git Bash's MSYS path, so that Windows child processes find vp.cmd.
+        node -p 'require("node:path").resolve("node_modules/.bin")' >> "$GITHUB_PATH"
     - name: Verify pnpm verification cache
       if: inputs.install == 'frozen'
       shell: bash
