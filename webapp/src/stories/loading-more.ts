@@ -7,9 +7,13 @@ import { LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
  * placeholder rows with a cell per column follow the loaded rows, and the list's end only says it
  * is loading, with no placeholder of its own.
  */
-export async function expectPlaceholderRows(table: HTMLElement, rows = LOADING_MORE_ROWS) {
+export async function expectPlaceholderRows(
+	canvasElement: HTMLElement,
+	table: HTMLElement,
+	rows = LOADING_MORE_ROWS,
+) {
 	await expectTablePlaceholders(table, rows);
-	const end = table.ownerDocument.querySelector<HTMLElement>("[data-list-end]");
+	const end = canvasElement.querySelector<HTMLElement>("[data-list-end]");
 	await expect(end).not.toBeNull();
 	if (end === null) {
 		return;

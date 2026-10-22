@@ -311,8 +311,8 @@ export const LoadsMoreAtTheEnd: Story = {
 export const LoadingMore: Story = {
 	args: { results: pool(reviewResults, { hasMore: true, isLoadingMore: true }) },
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		await expectPlaceholderRows(canvas.getByRole("table", { name: "Results" }));
+	play: async ({ canvas, canvasElement }) => {
+		await expectPlaceholderRows(canvasElement, canvas.getByRole("table", { name: "Results" }));
 	},
 };
 
@@ -323,8 +323,8 @@ export const LoadingMoreByActionability: Story = {
 		results: pool(reviewResults, { hasMore: true, isLoadingMore: true }),
 	},
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		await expectPlaceholderRows(canvas.getByRole("table", { name: "Results" }));
+	play: async ({ canvas, canvasElement }) => {
+		await expectPlaceholderRows(canvasElement, canvas.getByRole("table", { name: "Results" }));
 	},
 };
 

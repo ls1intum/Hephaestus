@@ -357,8 +357,8 @@ export const LoadsMoreAtTheEnd: Story = {
 export const LoadingMore: Story = {
 	args: { feedback: pool(reviewFeedback, { hasMore: true, isLoadingMore: true }) },
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		await expectPlaceholderRows(canvas.getByRole("table", { name: "Feedback" }));
+	play: async ({ canvas, canvasElement }) => {
+		await expectPlaceholderRows(canvasElement, canvas.getByRole("table", { name: "Feedback" }));
 	},
 };
 

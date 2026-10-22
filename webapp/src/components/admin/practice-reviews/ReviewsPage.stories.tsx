@@ -241,7 +241,7 @@ export const LoadsMoreAtTheEnd: Story = {
 export const LoadingMore: Story = {
 	args: { reviews: loadedList(reviews, { hasMore: true, isLoadingMore: true }) },
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		await expectPlaceholderRows(canvas.getByRole("table", LIST));
+	play: async ({ canvas, canvasElement }) => {
+		await expectPlaceholderRows(canvasElement, canvas.getByRole("table", LIST));
 	},
 };

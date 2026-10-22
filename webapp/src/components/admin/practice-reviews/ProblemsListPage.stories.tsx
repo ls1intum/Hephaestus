@@ -100,8 +100,8 @@ export const Loading: Story = {
 export const LoadingMore: Story = {
 	args: { problems: loadedList(reviewProblems, { hasMore: true, isLoadingMore: true }) },
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		await expectPlaceholderRows(canvas.getByRole("table", { name: "Problems" }));
+	play: async ({ canvas, canvasElement }) => {
+		await expectPlaceholderRows(canvasElement, canvas.getByRole("table", { name: "Problems" }));
 	},
 };
 
