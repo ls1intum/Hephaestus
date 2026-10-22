@@ -12,11 +12,12 @@ import { statusToneClass } from "@/components/common/status-def";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { CardTitleLink } from "./CardTitleLink";
 import { type BreakdownRow, deliveredByLocation, withheldByReason } from "./delivery-breakdown";
 import { OVERVIEW_TYPE } from "./overview-type-scale";
 import { type AttentionTone, percentText, shareOf } from "./review-attention";
 import { PROBLEM_THRESHOLDS } from "./review-attention-thresholds";
-import type { OutcomeScope } from "./review-outcomes";
+import { type OutcomeScope, scopeSearch } from "./review-outcomes";
 import type { OverviewRegionState, ReviewCountState } from "./review-states";
 import type { AttentionGroup, AttentionRange } from "./ReviewAttention";
 import { ReviewListLink } from "./ReviewListLink";
@@ -60,7 +61,12 @@ export function DeliveryBreakdownCard({
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-sm font-medium">
 					<SplitIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-					Delivered and withheld
+					<CardTitleLink
+						workspaceSlug={workspaceSlug}
+						destination={{ list: "feedback", search: scopeSearch(scope, "feedback") }}
+					>
+						Delivered and withheld
+					</CardTitleLink>
 					<InfoTip label="About delivered and withheld feedback">
 						<InfoLines lines={BREAKDOWN_INFO} />
 					</InfoTip>

@@ -11,6 +11,7 @@ import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-stat
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { CardTitleLink } from "./CardTitleLink";
 import { OutcomeMix, type OutcomeMixProps } from "./OutcomeMix";
 import { OVERVIEW_TYPE } from "./overview-type-scale";
 import { percentText, shareOf } from "./review-attention";
@@ -205,8 +206,12 @@ function StageTile({
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-sm font-medium">
 					<Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-					{/* No link: the tab above opens the same list. */}
-					{stage.title}
+					<CardTitleLink
+						workspaceSlug={workspaceSlug}
+						destination={{ list: stage.key, search: scopeSearch(scope, stage.key) }}
+					>
+						{stage.title}
+					</CardTitleLink>
 				</CardTitle>
 			</CardHeader>
 			<CardContent>

@@ -84,7 +84,8 @@ export const Default: Story = {
 		canvas.getByText("9 more than the previous 30 days");
 		canvas.getByText("Same as the previous 30 days");
 		canvas.getByText("5 fewer than the previous 30 days");
-		// No tile links to its list: the tab above opens the same one, so a second way there is noise.
+		// This preview has no workspace, so nothing links; with one, each title opens its tab
+		// (TitlesOpenTheirTabs).
 		await expect(within(stages).queryByRole("link")).not.toBeInTheDocument();
 		within(stages).getByText("Reviews");
 		await expect(
@@ -123,6 +124,39 @@ export const Default: Story = {
 				"listitem",
 			),
 		).toHaveTextContent("3 marked incorrect");
+	},
+};
+
+/**
+ * Each card's title opens its tab in the card's scope: the title is where one clicks, the tabs sit
+ * far above. It reads as a title, underlined on hover and focus only.
+ */
+export const TitlesOpenTheirTabs: Story = {
+	args: { workspaceSlug: "demo" },
+	play: async ({ canvas, userEvent }) => {
+		for (const [title, path] of [
+			["Reviews", "/w/demo/admin/practices/reviews"],
+			["Results", "/w/demo/admin/practices/reviews/results"],
+			["Feedback", "/w/demo/admin/practices/reviews/feedback"],
+		] as const) {
+			// The link's name is the title alone, not the title twice or with its icon.
+			const link = canvas.getByRole<HTMLAnchorElement>("link", { name: title });
+			const target = new URL(link.href);
+			await expect(target.pathname).toBe(path);
+			await expect(target.searchParams.get("from")).toBe(reviewOverviewScope.from);
+			await expect(target.searchParams.get("to")).toBe(reviewOverviewScope.to);
+		}
+		// At rest it reads as a title, not as an underlined count.
+		const results = canvas.getByRole("link", { name: "Results" });
+		const restColor = getComputedStyle(results).color;
+		await expect(getComputedStyle(results).textDecorationLine).toBe("none");
+		// Reached by Tab like any link, and drawn as every link on the page is when focused (and
+		// hovered): in the accent and underlined.
+		await userEvent.tab();
+		const reviews = canvas.getByRole("link", { name: "Reviews" });
+		await expect(reviews).toHaveFocus();
+		await expect(getComputedStyle(reviews).textDecorationLine).toBe("underline");
+		await expect(getComputedStyle(reviews).color).not.toBe(restColor);
 	},
 };
 
