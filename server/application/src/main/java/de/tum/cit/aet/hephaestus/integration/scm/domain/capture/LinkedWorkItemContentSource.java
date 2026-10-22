@@ -206,6 +206,11 @@ public class LinkedWorkItemContentSource {
         }
     }
 
+    /** The same context from the pull request's closing issues as it stores them now. */
+    public static Optional<ItemVersion> currentClosingMaterialVersion(PullRequest pullRequest) {
+        return currentClosingMaterialVersion(pullRequest, List.copyOf(pullRequest.getClosingIssues()));
+    }
+
     public static Optional<ItemVersion> currentClosingMaterialVersion(
             PullRequest pullRequest, List<Issue> closingIssues) {
         return currentClosingMaterialVersion(

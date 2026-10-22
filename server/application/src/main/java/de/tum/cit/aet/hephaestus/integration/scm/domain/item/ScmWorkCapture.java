@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
@@ -60,6 +61,11 @@ public class ScmWorkCapture {
     private final PersonDataWriteFence fence;
     private final ObjectMapper mapper;
     private final Clock clock;
+
+    /** The item kinds whose event reviews read only what their occasion retained. */
+    static boolean retains(ItemKind kind) {
+        return kind.equals(ScmItemEvents.PULL_REQUEST) || kind.equals(ScmItemEvents.PULL_REQUEST_REVIEW);
+    }
 
     /**
      * The serialized record of an occasion, or an {@link ItemEventInput#unretained} statement of why it is not kept: a

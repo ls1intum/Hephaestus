@@ -227,7 +227,7 @@ public class ScmItemService implements ItemSource {
             if (work instanceof PullRequest pull) {
                 add(roles, AboutRole.MERGER, pull.getMergedBy());
                 String head = objectId(pull.getHeadRefOid());
-                var linkedVersion = closingContext(pull);
+                var linkedVersion = LinkedWorkItemContentSource.currentClosingMaterialVersion(pull);
                 linkedContext = linkedVersion.map(ItemVersion::value).orElse(null);
                 if (!requireVersion && pull.getBaseRefOid() == null) version = null;
                 else {
@@ -263,11 +263,6 @@ public class ScmItemService implements ItemSource {
             List<RoleHolder> roles,
             ItemLabel label) {}
 
-    /** The item kinds whose event reviews read only what their occasion retained. */
-    private static boolean retains(ItemKind kind) {
-        return kind.equals(ScmItemEvents.PULL_REQUEST) || kind.equals(ScmItemEvents.PULL_REQUEST_REVIEW);
-    }
-
     /**
      * What an occasion on {@code item} retains, read in the transaction that records it: the work as this transaction
      * stores it at {@code version}, which the caller pinned under the item lock. Null for an item kind that retains
@@ -277,7 +272,7 @@ public class ScmItemService implements ItemSource {
      */
     @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = ItemCaptureException.class)
     public @Nullable String retain(ItemRef item, @Nullable ItemVersion version, FoundBy foundBy) {
-        if (!retains(item.kind())) return null;
+        if (!ScmWorkCapture.retains(item.kind())) return null;
         Observed observed;
         try {
             observed = observe(item, false);
@@ -332,7 +327,7 @@ public class ScmItemService implements ItemSource {
     @Transactional(readOnly = true, noRollbackFor = ItemCaptureException.class)
     @Override
     public ItemSnapshot pinOccasion(ItemRef item, ItemVersion requested, UUID eventId) {
-        if (!retains(item.kind())) return pinItem(item, requested);
+        if (!ScmWorkCapture.retains(item.kind())) return pinItem(item, requested);
         return occasion(item, requested, eventId).snapshot();
     }
 
@@ -457,7 +452,7 @@ public class ScmItemService implements ItemSource {
     public CaptureContribution capture(ItemSnapshot pinned, CaptureRequest request) {
         var eventId = request.eventId();
         // An event review captures its retained occasion: the same record, checked against current access again.
-        var occasion = eventId == null || !retains(pinned.item().kind())
+        var occasion = eventId == null || !ScmWorkCapture.retains(pinned.item().kind())
                 ? null
                 : occasion(pinned.item(), pinned.version(), eventId);
         ItemSnapshot verified = occasion != null ? occasion.snapshot() : pinItem(pinned.item(), pinned.version());
@@ -631,7 +626,7 @@ public class ScmItemService implements ItemSource {
                 pull.getBaseRefName(),
                 pull.getTitle(),
                 pull.getBody(),
-                closingContext(pull).orElse(null)));
+                LinkedWorkItemContentSource.currentClosingMaterialVersion(pull).orElse(null)));
     }
 
     private IntegrationRef authorize(ItemRef workItem, Issue work) {
@@ -645,10 +640,6 @@ public class ScmItemService implements ItemSource {
         ItemRef holder = items.parent(workItem, ScmItemEvents.REPOSITORY);
         if (!Objects.equals(holder.sourceId(), repository.getId())) throw invisible();
         return repositories.authorize(workItem.workspaceId(), repository);
-    }
-
-    private static Optional<ItemVersion> closingContext(PullRequest pull) {
-        return LinkedWorkItemContentSource.currentClosingMaterialVersion(pull, List.copyOf(pull.getClosingIssues()));
     }
 
     private static String objectId(@Nullable String value) {
