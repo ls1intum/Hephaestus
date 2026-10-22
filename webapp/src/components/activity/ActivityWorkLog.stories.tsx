@@ -9,6 +9,7 @@ import {
 	WORKSPACE_WORK_LOG,
 } from "@/stories/activity-story-data";
 import { withProvider, withStandardPage } from "@/stories/decorators";
+import { expectListPlaceholders } from "@/stories/loading-more";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
 import { ActivityWorkLog } from "./ActivityWorkLog";
@@ -139,6 +140,7 @@ export const Stale: Story = {
 	},
 };
 
+/** An earlier day of placeholder rows follows the last day, inside the busy log. */
 export const LoadingMore: Story = {
 	args: {
 		state: {
@@ -151,11 +153,21 @@ export const LoadingMore: Story = {
 			onCopy,
 		},
 	},
-	play: async ({ canvas }) => {
+	play: async ({ canvas, canvasElement }) => {
 		await expect(canvas.getByRole("button", { name: "Loading…" })).toHaveAttribute(
 			"aria-disabled",
 			"true",
 		);
+		const placeholder = canvasElement.querySelector("[data-loading-row]");
+		const log = placeholder?.parentElement;
+		await expect(log).not.toBeUndefined();
+		if (log == null) {
+			return;
+		}
+		// The day's label, then three rows of state icon, title, reference and time.
+		await expectListPlaceholders(log, { rows: 1, bars: 1 + 3 * 4 });
+		// After the last day, before the end of the list.
+		await expect(placeholder?.nextElementSibling).toHaveAttribute("data-list-end");
 	},
 };
 

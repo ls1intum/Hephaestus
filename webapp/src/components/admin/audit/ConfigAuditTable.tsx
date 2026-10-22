@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { ElevationBadge } from "@/components/admin/audit/ElevationBadge";
 import { FilterLink } from "@/components/admin/audit/FilterLink";
+import { LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
@@ -66,15 +67,8 @@ export function ConfigAuditTable({
 	}
 	if (state.status === "loading") {
 		return (
-			<ConfigEntriesTable showWorkspace={showWorkspace}>
-				<TableRowsSkeleton
-					columns={
-						showWorkspace
-							? ["w-24", "w-16", "w-32", "w-24", "w-24", null]
-							: ["w-24", "w-16", "w-32", "w-24", null]
-					}
-					rows={8}
-				/>
+			<ConfigEntriesTable showWorkspace={showWorkspace} busy>
+				<TableRowsSkeleton columns={skeletonColumns(showWorkspace)} rows={8} />
 			</ConfigEntriesTable>
 		);
 	}
@@ -114,15 +108,24 @@ export function ConfigAuditTable({
 	);
 }
 
+/** Time, action, setting, the workspace where shown, actor, and the details press. */
+function skeletonColumns(showWorkspace: boolean) {
+	return showWorkspace
+		? ["w-24", "w-16", "w-32", "w-24", "w-24", null]
+		: ["w-24", "w-16", "w-32", "w-24", null];
+}
+
 function ConfigEntriesTable({
 	showWorkspace,
+	busy = false,
 	children,
 }: {
 	showWorkspace: boolean;
+	busy?: boolean;
 	children: ReactNode;
 }) {
 	return (
-		<Table bordered>
+		<Table bordered aria-busy={busy || undefined}>
 			<TableCaption className="sr-only">Settings changes, newest first</TableCaption>
 			<TableHeader>
 				<TableRow>
@@ -159,7 +162,7 @@ function ConfigEntryRows({
 	const [detailOpen, setDetailOpen] = useState(false);
 	return (
 		<>
-			<ConfigEntriesTable showWorkspace={showWorkspace}>
+			<ConfigEntriesTable showWorkspace={showWorkspace} busy={list.isLoadingMore}>
 				<TableBody>
 					{list.rows.map((entry) => {
 						const actor = actorDisplay(entry);
@@ -214,6 +217,13 @@ function ConfigEntryRows({
 						);
 					})}
 				</TableBody>
+				{list.isLoadingMore && (
+					<TableRowsSkeleton
+						columns={skeletonColumns(showWorkspace)}
+						rows={LOADING_MORE_ROWS}
+						continues
+					/>
+				)}
 			</ConfigEntriesTable>
 
 			<AuditListEnd list={list} noun="changes" />

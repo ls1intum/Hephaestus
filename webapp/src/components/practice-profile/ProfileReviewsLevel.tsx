@@ -12,7 +12,6 @@ import { TraceKindFilter } from "@/components/practice-trace/TraceKindFilter";
 import { EarlierReviews } from "@/components/profile/ReviewFeed";
 import type { ReviewFeedState } from "@/components/profile/reviews";
 import { DrawerBody, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
-import { Skeleton } from "@/components/ui/skeleton";
 import { hasText } from "@/lib/text";
 
 import {
@@ -105,8 +104,10 @@ export function ProfileReviewsLevel({
 						onReviewNow={onReviewNow}
 						requesting={requesting}
 						positions={positions}
+						isLoadingMore={feed.isLoadingMore}
 					/>
-					<EarlierReviews {...feed} loadingRow={<Skeleton className="h-12 w-full" />} />
+					{/* The table draws the next page's placeholder rows itself, in its own columns. */}
+					<EarlierReviews {...feed} />
 				</>
 			);
 			break;

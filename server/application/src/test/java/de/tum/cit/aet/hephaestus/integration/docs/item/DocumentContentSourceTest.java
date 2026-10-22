@@ -2,7 +2,11 @@ package de.tum.cit.aet.hephaestus.integration.docs.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndexBuilder;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
@@ -27,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 class DocumentContentSourceTest extends BaseUnitTest {
@@ -143,6 +148,9 @@ class DocumentContentSourceTest extends BaseUnitTest {
         assertThat(documentPractices)
                 .extracting(Map.Entry::getKey)
                 .containsExactly("published-decisions-name-the-alternatives");
+        var mapper = JsonMapper.builder().build();
+        var exporter = new JobFolderIndexBuilder(
+                new ClasspathSourceCatalogRegistry(mapper, Clock.systemUTC()), mapper, Clock.systemUTC());
         for (var entry : documentPractices) {
             var reads = entry.getValue().definition().reads().sources();
             assertThat(reads).as(entry.getKey()).anySatisfy(read -> {
@@ -169,6 +177,40 @@ class DocumentContentSourceTest extends BaseUnitTest {
             assertThat(captured.contentStates())
                     .as(entry.getKey())
                     .containsEntry(DocumentContentSource.SOURCE, SourceContentState.NON_EMPTY);
+
+            // The body is the practice's only read, so this capture is the one preparation exports under it.
+            assertThat(selected).as(entry.getKey()).containsExactly(DocumentContentSource.SOURCE);
+            try (var prepared =
+                    exporter.build(DocumentEvents.DOCUMENT, Map.of(DocumentContentSource.SOURCE, captured))) {
+                JsonNode manifest =
+                        mapper.readTree(Objects.requireNonNull(prepared.files().get(SandboxLayout.MANIFEST_PATH)));
+                assertThat(manifest.path("itemKind").asString()).isEqualTo(DocumentEvents.DOCUMENT.value());
+                assertThat(manifest.path("sources")).singleElement().satisfies(exported -> {
+                    assertThat(exported.path("kind").asString()).isEqualTo(DocumentContentSource.SOURCE.value());
+                    assertThat(exported.path("state").path("availability").asString())
+                            .isEqualTo("AVAILABLE");
+                    assertThat(exported.path("state").path("completeness").asString())
+                            .isEqualTo("COMPLETE");
+                    assertThat(exported.path("state").path("content").asString())
+                            .isEqualTo("NON_EMPTY");
+                });
+                byte[] exportedBody = Objects.requireNonNull(prepared.files().get(DocumentContentSource.BODY_KEY));
+                assertThat(new String(exportedBody, StandardCharsets.UTF_8))
+                        .as(entry.getKey())
+                        .isEqualTo(body);
+                assertThat(manifest.path("files")).anySatisfy(file -> {
+                    assertThat(file.path("kind").asString()).isEqualTo(DocumentContentSource.SOURCE.value());
+                    assertThat(file.path("file").path("path").asString()).isEqualTo(DocumentContentSource.BODY_KEY);
+                    assertThat(file.path("file").path("sha256").asString())
+                            .isEqualTo(ProvenanceDigest.sha256Hex(exportedBody));
+                });
+                assertThat(manifest.path("citableTexts")).anySatisfy(text -> {
+                    assertThat(text.path("source").asString()).isEqualTo(DocumentContentSource.SOURCE.value());
+                    assertThat(text.path("path").asString()).isEqualTo("context/document.md");
+                    assertThat(text.path("stagedPath").asString()).isEqualTo(DocumentContentSource.BODY_KEY);
+                    assertThat(text.path("sha256").asString()).isEqualTo(ProvenanceDigest.sha256Hex(exportedBody));
+                });
+            }
         }
     }
 

@@ -28,6 +28,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
     private static final Map<String, String> FULL_CONTEXT_ASSIGNMENTS = Map.ofEntries(
             assignment("workspace.RepositoryProviderScopeIntegrationTest", "repository-provider-scope"),
+            assignment("workspace.ManualRepositoryAuthorityIntegrationTest", "manual-repository-authority"),
+            assignment("workspace.WorkspaceRepositoryCoverageIntegrationTest", "repository-coverage"),
             assignment("StartupBudgetIntegrationTest", "startup"),
             assignment("agent.mentor.live.HephTurnLiveTest", "heph-live"),
             assignment("agent.mentor.weeklydigest.WeeklyDigestIntegrationTest", "review-evidence"),
@@ -55,6 +57,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment(
                     "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
                     "gitlab-event-routing"),
+            assignment(
+                    "integration.scm.workspace.GitLabStoppedProjectServiceIntegrationTest",
+                    "gitlab-stopped-project"),
             assignment("integration.slack.SlackConsentLifecycleE2EIntegrationTest", "slack-lifecycle"),
             assignment("integration.slack.channel.SlackChannelAdminControllerIntegrationTest", "slack-signed"),
             assignment("integration.slack.item.SlackThreadProjectionIntegrationTest", "slack-ingest"),
@@ -124,6 +129,12 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "repository-provider-scope",
                     "real SQL provider, tenant and monitor lifetime enforcement with controlled GitLab transport and sync orchestration boundary"),
             Map.entry(
+                    "manual-repository-authority",
+                    "real encrypted credentials, connection lifecycle, tenant SQL and item directory with both provider transports controlled for denial and held-response proofs"),
+            Map.entry(
+                    "repository-coverage",
+                    "real installation and token monitor coverage with only the token repository confirmation transport controlled"),
+            Map.entry(
                     "consent-sign-in",
                     "real cookie and installed-client sign-in with the production consent" + " interceptor enabled"),
             Map.entry("dev-login", "dev-login feature-property behavior"),
@@ -136,6 +147,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "gitlab-event-routing",
                     "real JetStream scope consumer with GitLab discovery, webhook and sync"
                             + " held at the API boundary"),
+            Map.entry(
+                    "gitlab-stopped-project",
+                    "real stop receipts, kept items, encrypted credentials, connection locks and source deletion with only the GitLab transport that confirms a manual Add controlled"),
             Map.entry(
                     "gitlab-token-lifecycle",
                     "real credential storage, lifecycle locks and attention with only"
@@ -281,6 +295,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Set<String> DIRTY_CONTEXT_TESTS = Set.of();
 
     private static final Set<String> MOCKITO_BEAN_TESTS = names(
+            "workspace.ManualRepositoryAuthorityIntegrationTest",
+            "workspace.WorkspaceRepositoryCoverageIntegrationTest",
             "core.database.PracticeV1ReviewJobsIntegrationTest",
             "agent.adapter.EvidenceDeliveryAuthorizationIntegrationTest",
             "agent.mentor.weeklydigest.WeeklyDigestIntegrationTest",
@@ -288,6 +304,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "practices.result.MigratedHistoryReadIntegrationTest",
             "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest",
             "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
+            "integration.scm.workspace.GitLabStoppedProjectServiceIntegrationTest",
             "integration.slack.SlackConsentLifecycleE2EIntegrationTest",
             "practices.acrossworkspace.PracticesAcrossWorkspaceIntegrationTest",
             "practices.feedback.AbstractFeedbackDeliveryIntegrationTest",

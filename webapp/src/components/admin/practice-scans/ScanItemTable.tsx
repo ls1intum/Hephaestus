@@ -5,6 +5,7 @@ import type { ScanReportItem } from "@/api/types.gen";
 import { resultLevel } from "@/components/admin/practice-reviews/review-levels";
 import { EmptyState } from "@/components/common/EmptyState";
 import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
+import { LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
@@ -115,7 +116,11 @@ function ScanItemResults({
 	}
 	return (
 		<div className="space-y-4">
-			<Table bordered aria-label="Files and practices" aria-busy={state.status === "loading"}>
+			<Table
+				bordered
+				aria-label="Files and practices"
+				aria-busy={state.status === "loading" || state.loadingMore || undefined}
+			>
 				<TableHeader>
 					<TableRow>
 						<TableHead scope="col">File</TableHead>
@@ -172,6 +177,9 @@ function ScanItemResults({
 							);
 						})}
 					</TableBody>
+				)}
+				{state.status === "ready" && state.loadingMore && (
+					<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={LOADING_MORE_ROWS} continues />
 				)}
 			</Table>
 			{state.status === "ready" && (

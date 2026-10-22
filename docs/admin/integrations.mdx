@@ -17,6 +17,10 @@ See [Repositories](/user/workspace#repositories) for repository monitoring and r
 2. For an App connection, manage repository access in the GitHub installation.
 3. For a token-managed connection, open **Administration → Integrations → GitHub → Manage repositories → Add a repository**.
 
+Before Hephaestus adds a repository, it asks GitHub whether the connection's own token can read it.
+Another workspace that synced the same repository does not change this result.
+Hephaestus adds repositories this way only for a token connection on github.com.
+
 ## GitLab
 
 A deployment syncs one GitLab instance. **Create workspace** lets an eligible user select a group on
@@ -58,6 +62,9 @@ Do not replace that token with `WEBHOOK_SECRET`.
 
 1. Open **Administration → Integrations → GitLab → Manage repositories → Add a repository**.
 2. Add the project by its full namespace path.
+
+Before Hephaestus adds the project, it asks GitLab whether the connection's own token can read it.
+If the connection changes during the check, Hephaestus adds nothing. Then add the project again.
 
 The connection shows token expiry. Hephaestus checks the token each day and rotates it before expiry
 when GitLab permits it. If it cannot rotate the token, use **Personal access token → Replace token**.

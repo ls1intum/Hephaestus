@@ -4,14 +4,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -24,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.events.Reposi
 import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -32,6 +40,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -44,17 +53,28 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.PayloadApplicationEvent;
 import org.springframework.context.event.ApplicationEventMulticaster;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeFunction;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Mono;
 
 class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
     private static final String GITLAB_URL = "https://gitlab.example.test";
@@ -105,6 +125,16 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private ConnectionService connectionService;
+
+    @Autowired
+    private CredentialBundleConverter credentialConverter;
+
+    /** GitLab itself: a manual Add asks it whether the workspace's own stored token reads the project. */
+    @MockitoBean
+    private GitLabGraphQlClientProvider gitLabClients;
+
     @Test
     void shouldReactivateTheKeptItemsAndClearTheReceiptWhenAStoppedProjectIsAddedAgain() {
         var own = gitLabWorkspace();
@@ -120,6 +150,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
                     assertThat(project.repositoryItemId()).isEqualTo(String.valueOf(root));
                     assertThat(project.nameWithOwner()).isEqualTo(repository.getNameWithOwner());
                 });
+        confirmTo(own, repository);
         monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), repository.getNameWithOwner());
 
         assertThat(stoppedProjects.getStoppedProjects(own.getId())).isEmpty();
@@ -142,6 +173,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
 
         stop(own, repository);
         UUID first = receipt(own, root);
+        confirmTo(own, repository);
         monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), repository.getNameWithOwner());
         assertStatus(() -> stoppedProjects.removeStoppedProject(own.getId(), root, first, actor), HttpStatus.NOT_FOUND);
         stop(own, repository);
@@ -161,6 +193,85 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
                         .excludes(repository.getNativeId(), repository.getNameWithOwner()))
                 .isTrue();
         assertThat(stoppedProjects.getStoppedProjects(own.getId())).isEmpty();
+    }
+
+    /**
+     * An Add of a stopped project adds nothing unless GitLab confirms the project to the connection's current token:
+     * GitLab names no project to the token, or it answers for a token that was replaced while the answer was on the
+     * way. Either way the stop, its receipt and the kept items stay, and that receipt still removes them.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"DENIED", "TOKEN_REPLACED"})
+    void shouldKeepTheStopAndItsReceiptWhenTheAddIsNotConfirmedToTheCurrentToken(String answer) throws Exception {
+        boolean replaced = answer.equals("TOKEN_REPLACED");
+        var own = gitLabWorkspace();
+        var repository = repository(own.getAccountLogin() + "/unconfirmed");
+        long pullId = pull(repository);
+        long root = monitorAndIndex(own, repository);
+        long pullItem = member(own, pullId, root);
+        stop(own, repository);
+        UUID stopReceipt = receipt(own, root);
+        Connection before =
+                connections.findActive(own.getId(), IntegrationKind.GITLAB).orElseThrow();
+        String noProject = "{\"data\":{\"project\":null}}";
+        var asked = new CountDownLatch(1);
+        var answered = new CompletableFuture<String>();
+        // Only the client built from the token this connection stores, for its stored server, reaches the transport.
+        when(gitLabClients.forScope(own.getId(), tokenOf(own), GITLAB_URL)).thenReturn(client(request -> {
+            asked.countDown();
+            return Mono.fromFuture(answered).map(GitLabStoppedProjectServiceIntegrationTest::ok);
+        }));
+        if (!replaced) answered.complete(noProject);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var add = CompletableFuture.runAsync(
+                    () -> monitorService.addRepositoryToMonitor(
+                            own.getWorkspaceSlug(), repository.getNameWithOwner()),
+                    executor);
+            assertThat(asked.await(TIMEOUT.toSeconds(), TimeUnit.SECONDS))
+                    .as("the Add's lookup reached GitLab")
+                    .isTrue();
+            if (replaced) {
+                var replacement = new BearerToken(tokenOf(own) + "-replaced", null);
+                assertThat(connectionService.rotateBearerToken(own.getId(), IntegrationKind.GITLAB, replacement))
+                        .isPresent();
+                assertThat(connectionService.findActiveBearerToken(own.getId(), IntegrationKind.GITLAB))
+                        .contains(replacement);
+                answered.complete(project(repository));
+            }
+            await().atMost(TIMEOUT).until(add::isDone);
+            var failure = assertThrows(CompletionException.class, add::join);
+            assertThat(failure.getCause())
+                    .isInstanceOf(
+                            replaced ? RepositorySelectionChangedException.class : EntityNotFoundException.class);
+        } finally {
+            answered.complete(noProject);
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(TIMEOUT.toSeconds(), TimeUnit.SECONDS))
+                    .isTrue();
+        }
+        if (replaced) {
+            assertThat(connections
+                            .findById(Objects.requireNonNull(before.getId()))
+                            .orElseThrow()
+                            .getVersion())
+                    .as("the token was replaced on the same row")
+                    .isNotEqualTo(before.getVersion());
+        }
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), repository.getNameWithOwner()))
+                .isEmpty();
+        var exclusions = gitLabConfig(own).projectExclusions();
+        assertThat(exclusions.excludes(repository.getNativeId(), repository.getNameWithOwner()))
+                .isTrue();
+        assertThat(exclusions.stopReceipt(repository.getNativeId())).contains(stopReceipt);
+        assertThat(receipt(own, root)).isEqualTo(stopReceipt);
+        assertThat(active(own, root)).isTrue();
+        assertThat(member(own, pullId, root)).isEqualTo(pullItem);
+
+        stoppedProjects.removeStoppedProject(own.getId(), root, stopReceipt, actor());
+
+        assertThat(active(own, root)).isFalse();
+        assertThat(repositories.findById(repository.getId())).isEmpty();
     }
 
     @Test
@@ -204,6 +315,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
         stop(removing, repository);
         stoppedProjects.removeStoppedProject(removing.getId(), removed, receipt(removing, removed), actor());
         assertThat(active(removing, removed)).isFalse();
+        confirmTo(removing, repository);
         monitorService.addRepositoryToMonitor(removing.getWorkspaceSlug(), repository.getNameWithOwner());
         assertThat(active(removing, removed)).isTrue();
 
@@ -235,6 +347,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
         stop(removing, repository);
         UUID stopReceipt = receipt(removing, root);
         long actor = actor();
+        confirmTo(claiming, repository);
         var claimed = new CountDownLatch(1);
         var releaseClaim = new CountDownLatch(1);
         var claimedRoot = new AtomicLong();
@@ -288,6 +401,8 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
         long repositoryId = Objects.requireNonNull(repository.getId());
         long pullId = pull(repository);
         monitorAndIndex(owner, repository);
+        confirmTo(first, repository);
+        confirmTo(second, repository);
         var claimed = new CountDownLatch(1);
         var releaseClaim = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -330,6 +445,8 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
         stop(removing, repository);
         UUID stopReceipt = receipt(removing, root);
         long actor = actor();
+        // GitLab confirms the project to the claim, so the claim reaches the deletion's lock.
+        confirmTo(claiming, repository);
         var deletionStarted = new CountDownLatch(1);
         var releaseDeletion = new CountDownLatch(1);
         ApplicationListener<ApplicationEvent> deletionBarrier = event -> {
@@ -448,11 +565,58 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
 
     private Workspace gitLabWorkspace() {
         String slug = "stopped-" + UUID.randomUUID();
-        return WorkspaceTestFixtures.persistGitLabWorkspace(
+        Workspace workspace = WorkspaceTestFixtures.persistGitLabWorkspace(
                 workspaces,
                 connections,
                 WorkspaceTestFixtures.gitLabPatWorkspace(slug).withSlug(slug),
                 GITLAB_URL);
+        // The connection stores its own token, which a manual Add sends to GitLab to confirm the project.
+        Connection connection = connections
+                .findActive(workspace.getId(), IntegrationKind.GITLAB)
+                .orElseThrow();
+        connection.setCredentials(new BearerToken(tokenOf(workspace), null), credentialConverter);
+        connections.saveAndFlush(connection);
+        return workspace;
+    }
+
+    /** The synthetic token stored with the workspace's connection; no real credential is read anywhere here. */
+    private static String tokenOf(Workspace workspace) {
+        return "synthetic-token-" + workspace.getWorkspaceSlug();
+    }
+
+    /** GitLab confirms {@code repository}, at its stored id and path, to the workspace's own stored token. */
+    private void confirmTo(Workspace workspace, Repository repository) {
+        when(gitLabClients.forScope(workspace.getId(), tokenOf(workspace), GITLAB_URL))
+                .thenReturn(client(request -> Mono.just(ok(project(repository)))));
+    }
+
+    private static String project(Repository repository) {
+        String path = repository.getNameWithOwner();
+        return """
+                {"data":{"project":{"id":"gid://gitlab/Project/%s","fullPath":"%s","name":"%s",
+                  "webUrl":"%s/%s","visibility":"public","group":null}}}
+                """.formatted(
+                        repository.getNativeId(), path, path.substring(path.lastIndexOf('/') + 1), GITLAB_URL, path);
+    }
+
+    private static ClientResponse ok(String body) {
+        return ClientResponse.create(HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .body(body)
+                .build();
+    }
+
+    /** A GitLab client for {@link #GITLAB_URL} whose requests {@code exchange} answers; nothing leaves the test. */
+    private static HttpGraphQlClient client(ExchangeFunction exchange) {
+        return HttpGraphQlClient.builder(WebClient.builder().exchangeFunction(exchange))
+                .url(GITLAB_URL + "/api/graphql")
+                .documentSource(new FragmentMergingDocumentSource(
+                        List.of(
+                                new ClassPathResource("graphql/gitlab/operations/"),
+                                new ClassPathResource("graphql/gitlab/fragments/")),
+                        List.of(".graphql", ".gql"),
+                        List.of(new ClassPathResource("graphql/gitlab/fragments/GitLabUserFields.graphql"))))
+                .build();
     }
 
     private Repository repository(String nameWithOwner) {

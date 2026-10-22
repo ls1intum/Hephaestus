@@ -1,8 +1,14 @@
 import { useInView } from "motion/react";
-import { type ReactNode, useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { MorePages } from "@/runtime/tanstack-query/infinite-list";
+
+/**
+ * The placeholder rows a list draws for its next page while it loads: enough to read as the list
+ * going on, not a whole page.
+ */
+export const LOADING_MORE_ROWS = 3;
 
 export interface InfiniteListEndProps extends Omit<MorePages, "isLoadingMore"> {
 	/** Absent for a list that reveals rows it already holds, which never waits. */
@@ -11,8 +17,6 @@ export interface InfiniteListEndProps extends Omit<MorePages, "isLoadingMore"> {
 	moreLabel: string;
 	/** "We could not load earlier reviews."; absent where nothing is requested, so nothing fails. */
 	failedLabel?: string;
-	/** A skeleton in the shape of the list's own row, for a list that waits for its next page. */
-	loadingRow?: ReactNode;
 }
 
 /**
@@ -20,7 +24,8 @@ export interface InfiniteListEndProps extends Omit<MorePages, "isLoadingMore"> {
  * `useInfiniteQuery` (through `MorePages`), or the next rows of a list held whole. The button stays,
  * because a keyboard needs it, and it is the only retry after a failure, so a failed page never
  * loads again on its own. TanStack Query ships no sentinel, so this pairs it with motion's
- * `useInView`.
+ * `useInView`. While the next page loads, the list itself draws placeholders in the shape of its
+ * rows where those rows will appear; the end only says it is loading.
  */
 export function InfiniteListEnd({
 	hasMore,
@@ -30,7 +35,6 @@ export function InfiniteListEnd({
 	onLoadMore,
 	moreLabel,
 	failedLabel,
-	loadingRow,
 }: InfiniteListEndProps) {
 	const end = useRef<HTMLDivElement>(null);
 	// Start the next page before the reader reaches the end.
@@ -51,11 +55,6 @@ export function InfiniteListEnd({
 		<div tabIndex={-1} data-list-end className="outline-none">
 			{(hasMore || failed) && (
 				<div ref={end} className="flex flex-col gap-2.5">
-					{isLoadingMore && (
-						<div aria-hidden className="flex flex-col gap-2.5">
-							{loadingRow}
-						</div>
-					)}
 					<span className="flex flex-wrap items-center gap-2 text-sm">
 						{failed && (
 							<span role="alert" className="text-muted-foreground">

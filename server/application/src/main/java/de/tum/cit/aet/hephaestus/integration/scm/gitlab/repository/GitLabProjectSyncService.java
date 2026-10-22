@@ -21,11 +21,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectA
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 
 /**
@@ -108,7 +110,7 @@ public class GitLabProjectSyncService {
                     .orElse(null);
             if (read == null) return Optional.empty();
             ClientGraphQlResponse response = query(
-                    scopeId,
+                    () -> graphQlClientProvider.forScope(scopeId),
                     GET_PROJECT_DOCUMENT,
                     "fullPath",
                     projectFullPath,
@@ -136,8 +138,21 @@ public class GitLabProjectSyncService {
      * GitLab reports no such project, and a response GitLab could not give throws, so a caller can retry.
      */
     public Optional<GitLabProjectResponse> fetchProject(Long scopeId, String projectFullPath) {
+        return fetchProject(() -> graphQlClientProvider.forScope(scopeId), projectFullPath);
+    }
+
+    /**
+     * As {@link #fetchProject(Long, String)}, with a token and server URL the caller read together from one stored
+     * connection, so the token is only ever sent to the server it was stored with.
+     */
+    public Optional<GitLabProjectResponse> fetchProject(
+            Long scopeId, String token, String serverUrl, String projectFullPath) {
+        return fetchProject(() -> graphQlClientProvider.forScope(scopeId, token, serverUrl), projectFullPath);
+    }
+
+    private Optional<GitLabProjectResponse> fetchProject(Supplier<HttpGraphQlClient> client, String projectFullPath) {
         ClientGraphQlResponse response = query(
-                scopeId,
+                client,
                 GET_PROJECT_DOCUMENT,
                 "fullPath",
                 projectFullPath,
@@ -152,8 +167,13 @@ public class GitLabProjectSyncService {
      */
     public Optional<GitLabProjectResponse> fetchProjectById(Long scopeId, long nativeId) {
         String globalId = PROJECT_GLOBAL_ID_PREFIX + nativeId;
-        ClientGraphQlResponse response =
-                query(scopeId, GET_PROJECTS_BY_IDS_DOCUMENT, "ids", List.of(globalId), "project " + nativeId, true);
+        ClientGraphQlResponse response = query(
+                () -> graphQlClientProvider.forScope(scopeId),
+                GET_PROJECTS_BY_IDS_DOCUMENT,
+                "ids",
+                List.of(globalId),
+                "project " + nativeId,
+                true);
         if (response.field("projects.nodes").getValue() == null) {
             throw new GitLabSyncException("GitLab did not list project " + nativeId);
         }
@@ -195,12 +215,16 @@ public class GitLabProjectSyncService {
      * read as an absent project.
      */
     private ClientGraphQlResponse query(
-            Long scopeId, String document, String name, Object value, String context, boolean complete) {
+            Supplier<HttpGraphQlClient> client,
+            String document,
+            String name,
+            Object value,
+            String context,
+            boolean complete) {
         graphQlClientProvider.acquirePermission();
         ClientGraphQlResponse response;
         try {
-            response = graphQlClientProvider
-                    .forScope(scopeId)
+            response = client.get()
                     .documentName(document)
                     .variable(name, value)
                     .execute()

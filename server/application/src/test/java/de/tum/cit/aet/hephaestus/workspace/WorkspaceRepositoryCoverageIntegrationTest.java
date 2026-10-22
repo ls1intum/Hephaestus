@@ -7,15 +7,19 @@ import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -24,6 +28,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.GitHubGraphQlFragments;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.RepositoryManagementNotAllowedException;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.RepositoryProviderNotConnectedException;
@@ -52,10 +58,19 @@ import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Autowired
@@ -102,6 +117,15 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ReviewScopeRepositoryRepository reviewScopeRepositoryRepository;
 
+    @Autowired
+    private CredentialBundleConverter credentialConverter;
+
+    /** GitHub itself is not reachable here; a token workspace's Add asks it with the token its connection stores. */
+    @MockitoBean
+    private GitHubGraphQlClientProvider gitHubClients;
+
+    private static final String PAT = "synthetic-pat-token";
+
     private static final String SHARED_NAME = "shared-org/shared-repo";
     private static final String GITLAB_SERVER_URL = "https://gitlab.example.com";
 
@@ -119,6 +143,26 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         // Clear any suspended installation state from previous tests
         // This prevents test pollution when async syncs mark installations as suspended
         gitHubAppTokenService.markInstallationActive(INSTALLATION_ID);
+        // GitHub confirms the shared repository, at its mirror's id, to the token a token workspace stores.
+        when(gitHubClients.withToken(PAT))
+                .thenReturn(HttpGraphQlClient.builder(WebClient.builder()
+                                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                                        .body("""
+                                        {"data":{"repository":{"databaseId":9001,"nameWithOwner":"%s"}}}
+                                        """.formatted(SHARED_NAME))
+                                        .build())))
+                        .url("https://api.github.com/graphql")
+                        .documentSource(new FragmentMergingDocumentSource(
+                                List.of(
+                                        new ClassPathResource("graphql/github/operations/"),
+                                        new ClassPathResource("graphql/github/fragments/")),
+                                List.of(".graphql", ".gql"),
+                                List.of(
+                                        new ClassPathResource(GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE),
+                                        new ClassPathResource(
+                                                GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE))))
+                        .build());
     }
 
     @Test
@@ -563,6 +607,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
                 IntegrationKind.GITHUB,
                 null,
                 new ConnectionConfig.GitHubPatConfig(saved.getAccountLogin(), null, Set.of()));
+        connection.setCredentials(new BearerToken(PAT, null), credentialConverter);
         connection.setDisplayName(saved.getAccountLogin());
         ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
         connectionRepository.save(connection);

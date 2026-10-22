@@ -28,7 +28,7 @@ import {
 	hasReviewFilter,
 	ReviewFilters,
 } from "./ReviewFilters";
-import { ReviewListEnd } from "./ReviewListEnd";
+import { loadingMoreRows, ReviewListEnd } from "./ReviewListEnd";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { REVIEW_SUMMARY_COLUMNS, ReviewSummaryRow } from "./ReviewSummaryRow";
@@ -132,6 +132,7 @@ export function ReviewsPage({
 					reviews={rows}
 					dateOf={(review) => review.createdAt}
 					reviewKey={(review) => review.id}
+					loadingMore={loadingMoreRows(reviews)}
 					renderRow={(review) => (
 						<ReviewSummaryRow
 							review={review}

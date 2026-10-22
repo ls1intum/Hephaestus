@@ -5,6 +5,7 @@ import type { AuthEventView } from "@/api/types.gen";
 import { ElevationBadge } from "@/components/admin/audit/ElevationBadge";
 import { FilterLink } from "@/components/admin/audit/FilterLink";
 import { refLabel } from "@/components/admin/audit/ref-label";
+import { LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
@@ -66,8 +67,8 @@ export function AdminAuditTable({
 	}
 	if (state.status === "loading") {
 		return (
-			<AuthEventsTable>
-				<TableRowsSkeleton columns={["w-24", "w-28", "w-16", "w-24", null]} rows={8} />
+			<AuthEventsTable busy>
+				<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={8} />
 			</AuthEventsTable>
 		);
 	}
@@ -104,9 +105,12 @@ export function AdminAuditTable({
 	);
 }
 
-function AuthEventsTable({ children }: { children: ReactNode }) {
+/** Time, event, result, account, and the details press, which promises nothing. */
+const SKELETON_COLUMNS = ["w-24", "w-28", "w-16", "w-24", null];
+
+function AuthEventsTable({ busy = false, children }: { busy?: boolean; children: ReactNode }) {
 	return (
-		<Table bordered>
+		<Table bordered aria-busy={busy || undefined}>
 			<TableCaption className="sr-only">Sign-in and account events, newest first</TableCaption>
 			<TableHeader>
 				<TableRow>
@@ -141,7 +145,7 @@ function AuthEventRows({
 	const [detailOpen, setDetailOpen] = useState(false);
 	return (
 		<>
-			<AuthEventsTable>
+			<AuthEventsTable busy={list.isLoadingMore}>
 				<TableBody>
 					{list.rows.map((e) => {
 						const severity = eventSeverity(e.eventType, e.result);
@@ -220,6 +224,9 @@ function AuthEventRows({
 						);
 					})}
 				</TableBody>
+				{list.isLoadingMore && (
+					<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={LOADING_MORE_ROWS} continues />
+				)}
 			</AuthEventsTable>
 
 			<AuditListEnd list={list} noun="events" />

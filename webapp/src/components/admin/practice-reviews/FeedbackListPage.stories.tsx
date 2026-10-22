@@ -7,6 +7,7 @@ import type { ReviewFeedback } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
+import { expectPlaceholderRows } from "@/stories/loading-more";
 import { loadedList, narrowedList } from "@/stories/paged-list";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { StatefulPatch } from "@/stories/stateful";
@@ -349,6 +350,15 @@ export const LoadsMoreAtTheEnd: Story = {
 		const more = canvas.getByRole("button", { name: "Show more feedback" });
 		more.scrollIntoView();
 		await waitFor(async () => expect(loadMoreFeedback).toHaveBeenCalled());
+	},
+};
+
+/** The next page's placeholder rows continue the table in its own columns while it is busy. */
+export const LoadingMore: Story = {
+	args: { feedback: pool(reviewFeedback, { hasMore: true, isLoadingMore: true }) },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas, canvasElement }) => {
+		await expectPlaceholderRows(canvasElement, canvas.getByRole("table", { name: "Feedback" }));
 	},
 };
 

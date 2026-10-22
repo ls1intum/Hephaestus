@@ -6,14 +6,11 @@ import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.event.RepositoryMonitoringChangedEvent;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.connection.SourceProviderNamespaces;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
@@ -21,13 +18,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationSuspensionTrac
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryIdentityLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.events.RepositoryAboutToBeDeletedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -92,8 +87,7 @@ public class WorkspaceRepositoryMonitorService {
     private final ConnectionService connectionService;
     private final ConnectionRepository connectionRepository;
     private final TransactionTemplate transactionTemplate;
-    private final Map<IntegrationKind, RepositoryIdentityLookup> repositoryIdentityLookups;
-    private final GitLabRepositorySelectionService selection;
+    private final ManualRepositoryMonitorService manualAdds;
 
     public WorkspaceRepositoryMonitorService(
             NatsConnectionProperties natsProperties,
@@ -111,10 +105,9 @@ public class WorkspaceRepositoryMonitorService {
             List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
             ApplicationEventPublisher eventPublisher,
             TransactionTemplate transactionTemplate,
-            List<RepositoryIdentityLookup> repositoryIdentityLookupList,
-            GitLabRepositorySelectionService selection) {
+            ManualRepositoryMonitorService manualAdds) {
         this.natsProperties = natsProperties;
-        this.selection = selection;
+        this.manualAdds = manualAdds;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
@@ -126,11 +119,6 @@ public class WorkspaceRepositoryMonitorService {
         this.connectionRepository = connectionRepository;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
-        Map<IntegrationKind, RepositoryIdentityLookup> identityLookupMap = new EnumMap<>(IntegrationKind.class);
-        for (RepositoryIdentityLookup lookup : repositoryIdentityLookupList) {
-            identityLookupMap.put(lookup.kind(), lookup);
-        }
-        this.repositoryIdentityLookups = identityLookupMap;
 
         Map<IntegrationKind, InstallationSuspensionTracker> suspensionMap = new EnumMap<>(IntegrationKind.class);
         for (InstallationSuspensionTracker t : suspensionTrackerList) {
@@ -179,147 +167,15 @@ public class WorkspaceRepositoryMonitorService {
     public void addRepositoryToMonitor(String slug, String nameWithOwner)
             throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         Workspace workspace = requireWorkspace(slug);
-
         if (isGitHubAppWorkspace(workspace)) {
             throw new RepositoryManagementNotAllowedException(slug);
         }
-
-        IntegrationKind kind = connectionService
-                .findActiveProviderKind(workspace.getId())
-                .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
-        if (kind == IntegrationKind.GITLAB) {
-            addGitLabRepositoryToMonitor(workspace, nameWithOwner);
-            return;
-        }
-
-        Long workspaceId = workspace.getId();
-        RepositoryToMonitor monitor = transactionTemplate.execute(status -> {
-            // Disconnect and credential changes take this same lock; decide from the configuration they committed.
-            ConnectionConfig config = connectionRepository
-                    .lockActiveConfig(workspaceId, IntegrationKind.GITHUB)
-                    .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
-            if (!(config instanceof ConnectionConfig.GitHubPatConfig)) {
-                throw new RepositoryManagementNotAllowedException(slug);
-            }
-            if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspaceId, nameWithOwner)) {
-                throw new RepositoryAlreadyMonitoredException(nameWithOwner);
-            }
-            IdentityProvider provider = sourceProvider(IntegrationKind.GITHUB, config)
-                    .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
-            Repository repository = repositoryRepository
-                    .findByNameWithOwnerAndProviderId(nameWithOwner, Objects.requireNonNull(provider.getId()))
-                    .orElseThrow(() -> new EntityNotFoundException("Repository", nameWithOwner));
-            if (repositoryToMonitorRepository
-                    .findOneByWorkspaceIdAndNativeId(workspaceId, repository.getNativeId())
-                    .isPresent()) {
-                throw new RepositoryAlreadyMonitoredException(nameWithOwner);
-            }
-            Workspace owner = workspaceRepository
-                    .findById(workspaceId)
-                    .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
-            RepositoryToMonitor created = new RepositoryToMonitor();
-            created.setNameWithOwner(nameWithOwner);
-            created.setNativeId(repository.getNativeId());
-            created.setWorkspace(owner);
-            owner.getRepositoriesToMonitor().add(created);
-            RepositoryToMonitor saved = repositoryToMonitorRepository.saveAndFlush(created);
-            eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
-                    owner.getId(), repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(saved.getId())));
-            return saved;
-        });
+        RepositoryToMonitor monitor = manualAdds.add(workspace, nameWithOwner);
         log.info(
                 "Added repository to monitor: nameWithOwner={}, workspaceId={}",
                 LoggingUtils.sanitizeForLog(nameWithOwner),
-                workspaceId);
-        announceRepositoryMonitor(workspace, Objects.requireNonNull(monitor), false);
-    }
-
-    // Hold the connection lifecycle lock across lookup and write; a renamed project must not acquire a second monitor.
-    private void addGitLabRepositoryToMonitor(Workspace workspace, String nameWithOwner) {
-        Long workspaceId = workspace.getId();
-        var connection = connectionRepository
-                .findActive(workspaceId, IntegrationKind.GITLAB)
-                .orElseThrow(() -> new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug()));
-        if (!(connection.getConfig() instanceof ConnectionConfig.GitLabConfig initialConfig)) {
-            throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
-        }
-        // A workspace that selected its projects admits a project only by the id its monitor carries, so the id comes
-        // from GitLab, never from a shared mirror whose path another workspace may have recorded.
-        boolean selected = workspaceRepository
-                .findMonitorPolicy(workspaceId)
-                .filter(policy -> policy.getRepositorySelection() == RepositorySelection.SELECTED)
-                .isPresent();
-        Long storedNativeId = selected
-                ? null
-                : sourceProvider(IntegrationKind.GITLAB, initialConfig)
-                        .flatMap(provider -> repositoryRepository.findByNameWithOwnerAndProviderId(
-                                nameWithOwner, Objects.requireNonNull(provider.getId())))
-                        .map(Repository::getNativeId)
-                        .orElse(null);
-        // Stop can remove the last mirror. Resolve an explicit Add against GitLab before taking the write lock;
-        // a path alone cannot tell which excluded native project it is, or whether that path has been reused.
-        Long includedNativeId = storedNativeId;
-        if (includedNativeId == null
-                && (selected
-                        || !initialConfig.projectExclusions().nativeIds().isEmpty()
-                        || initialConfig.projectExclusions().excludes(null, nameWithOwner))) {
-            RepositoryIdentityLookup lookup = repositoryIdentityLookups.get(IntegrationKind.GITLAB);
-            if (lookup == null) throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
-            var reported = lookup.resolve(workspaceId, nameWithOwner)
-                    .orElseThrow(() -> new EntityNotFoundException("Repository", nameWithOwner));
-            if (!nameWithOwner.equalsIgnoreCase(reported.fullPath())) {
-                throw new EntityNotFoundException("Repository", nameWithOwner);
-            }
-            includedNativeId = reported.nativeId();
-        }
-        Long resolvedNativeId = includedNativeId;
-        RepositoryToMonitor monitor = transactionTemplate.execute(status -> {
-            ConnectionConfig config = connectionRepository
-                    .lockActiveConfig(workspaceId, IntegrationKind.GITLAB)
-                    .orElseThrow(() -> new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug()));
-            if (!(config instanceof ConnectionConfig.GitLabConfig currentConfig)
-                    || !Objects.equals(currentConfig.serverUrl(), initialConfig.serverUrl())
-                    || connectionRepository
-                            .findActive(workspaceId, IntegrationKind.GITLAB)
-                            .filter(current -> Objects.equals(current.getId(), connection.getId()))
-                            .isEmpty()) {
-                throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
-            }
-            if (!selected && selection.storedSelection(workspaceId) == RepositorySelection.SELECTED) {
-                throw new RepositorySelectionChangedException();
-            }
-            Long nativeId = resolvedNativeId;
-            if (connectionService
-                    .updateGitLabProjectExclusions(
-                            workspaceId, exclusions -> exclusions.include(nativeId, nameWithOwner))
-                    .isEmpty()) {
-                throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
-            }
-            if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspaceId, nameWithOwner)
-                    || (nativeId != null
-                            && !repositoryToMonitorRepository
-                                    .findByWorkspaceIdAndNativeId(workspaceId, nativeId)
-                                    .isEmpty())) {
-                throw new RepositoryAlreadyMonitoredException(nameWithOwner);
-            }
-            Workspace owner = workspaceRepository
-                    .findById(workspaceId)
-                    .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
-            RepositoryToMonitor created = new RepositoryToMonitor();
-            created.setNameWithOwner(nameWithOwner);
-            created.setNativeId(nativeId);
-            created.setWorkspace(owner);
-            owner.getRepositoriesToMonitor().add(created);
-            RepositoryToMonitor saved = repositoryToMonitorRepository.saveAndFlush(created);
-            eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
-                    owner.getId(), repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(saved.getId())));
-            return saved;
-        });
-        log.info(
-                "Added repository to monitor: nameWithOwner={}, workspaceId={}",
-                LoggingUtils.sanitizeForLog(nameWithOwner),
-                workspaceId);
-        announceRepositoryMonitor(workspace, Objects.requireNonNull(monitor), false);
+                workspace.getId());
+        announceRepositoryMonitor(workspace, monitor, false);
     }
 
     public void addRepositoryToMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
@@ -614,12 +470,6 @@ public class WorkspaceRepositoryMonitorService {
                 ensureRepositoryMonitorInternal(workspace, snapshot.id(), snapshot.nameWithOwner(), deferSync);
             }
         });
-    }
-
-    private Optional<IdentityProvider> sourceProvider(IntegrationKind kind, ConnectionConfig config) {
-        return PersonSourceNamespace.from(kind.name(), SourceProviderNamespaces.configuredUrl(config))
-                .flatMap(namespace -> gitProviderRepository.findByTypeAndServerUrl(
-                        IdentityProviderType.from(kind), namespace.serverUrl()));
     }
 
     private boolean shouldUseNats(Workspace workspace) {
