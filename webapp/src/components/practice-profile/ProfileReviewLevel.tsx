@@ -12,7 +12,6 @@ import {
 	PracticeTabsTrigger,
 } from "@/components/common/practice-tabs";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { useNow } from "@/components/common/use-now";
 import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
 import {
@@ -32,6 +31,7 @@ import {
 	isActiveReview,
 	OWN_REVIEW_STATUS_DEFS,
 } from "@/components/practice-vocabulary/review-status-defs";
+import { ReviewStatusBadge } from "@/components/practice-vocabulary/ReviewStatusBadge";
 import { OwnFeedbackList } from "@/components/profile/OwnFeedbackList";
 import type { FeedbackResponseControls } from "@/components/profile/reviews";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -271,7 +271,7 @@ function ReviewHead({
 						</time>
 					</span>
 				)}
-				{review && <StatusBadge def={OWN_REVIEW_STATUS_DEFS[review.status]} />}
+				{review && <ReviewStatusBadge def={OWN_REVIEW_STATUS_DEFS[review.status]} />}
 				{review?.origin === "REQUEST" && <RequestedReviewTag />}
 				<ReviewOrdinalTag position={positionOnWork} />
 			</div>

@@ -11,6 +11,7 @@ import {
 	REVIEW_STATUS_DEFS,
 	REVIEW_STOP_REASON_SENTENCES,
 } from "@/components/practice-vocabulary/review-status-defs";
+import { ReviewStatusBadge } from "@/components/practice-vocabulary/ReviewStatusBadge";
 import { TableCell } from "@/components/ui/table";
 import { formatDayTime } from "@/lib/dates";
 import { hasText } from "@/lib/text";
@@ -79,7 +80,7 @@ function ReviewMarkers({ review }: { review: ReviewSummary }) {
 	const reason =
 		review.stopReason === null ? undefined : REVIEW_STOP_REASON_SENTENCES[review.stopReason];
 	return reviewMarkers(review).map((def) => (
-		<StatusBadge key={def.label} def={def} title={reason} />
+		<ReviewStatusBadge key={def.label} def={def} reason={reason} />
 	));
 }
 

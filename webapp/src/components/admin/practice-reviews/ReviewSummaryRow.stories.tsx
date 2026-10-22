@@ -128,6 +128,10 @@ export const PartialScan: Story = {
 	args: { review: scan },
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText("Partial")).toHaveLength(2);
+		// The badge explains itself to a keyboard as well, its stop reason after its sentence.
+		await expect(canvas.getByRole("button", { name: "Partial" })).toHaveAccessibleDescription(
+			"Its results cover only the work it reached. The scan’s budget was used up.",
+		);
 	},
 };
 

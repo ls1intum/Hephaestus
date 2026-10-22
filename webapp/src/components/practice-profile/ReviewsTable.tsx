@@ -18,6 +18,7 @@ import { count } from "@/components/practice-vocabulary/feedback-text";
 import { PracticeTableRow } from "@/components/practice-vocabulary/PracticeTable";
 import { RecordTimeCell } from "@/components/practice-vocabulary/RecordTable";
 import { OWN_REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
+import { ReviewStatusBadge } from "@/components/practice-vocabulary/ReviewStatusBadge";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,
@@ -169,8 +170,11 @@ function ReviewRow({
 				onOpen: () => onOpenReview(review.id),
 			}}
 		>
-			<RecordTimeCell status={OWN_REVIEW_STATUS_DEFS[review.status]} at={at} />
-			<ReviewItemCell item={item} position={position} />
+			<RecordTimeCell at={at} />
+			{/* The status as the workspace admin's list of reviews labels it, with its sentence. */}
+			<ReviewItemCell item={item} position={position}>
+				<ReviewStatusBadge def={OWN_REVIEW_STATUS_DEFS[review.status]} />
+			</ReviewItemCell>
 			<ReviewSawCell saw={sawOf(entry)}>
 				<FeedbackOnTheWork entry={entry} />
 				{isLatest && <LatestReviewTag />}

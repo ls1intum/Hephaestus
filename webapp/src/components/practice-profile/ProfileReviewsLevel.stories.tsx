@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import type { ProfileReview } from "@/api/types.gen";
 import { detailStackKey } from "@/components/layout/detail-drawer/detail-stack";
@@ -271,10 +271,20 @@ export const PartialReview: Story = {
 		]),
 		positions: undefined,
 	},
-	play: async () => {
+	play: async ({ args }) => {
 		await settledDrawerPanel();
 		await expect(screen.getByText("Nothing to improve in what it reached")).toBeVisible();
-		await expect(screen.getByRole("button", { name: "Partial" })).toBeVisible();
+		// The status is the label the workspace admin's list of reviews shows, with its sentence.
+		const badge = screen.getByRole("button", { name: "Partial" });
+		await expect(badge).toHaveAccessibleDescription(
+			"The review’s results cover only the work it reached.",
+		);
+		// A tap on it opens the sentence, not the review.
+		await userEvent.pointer({ keys: "[TouchA]", target: badge });
+		await waitFor(async () => {
+			await expect(badge).toHaveAttribute("aria-expanded", "true");
+		});
+		await expect(args.onOpenReview).not.toHaveBeenCalled();
 		await expect(screen.queryByText("Stopped before it finished")).toBeNull();
 	},
 };
