@@ -6,7 +6,9 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -73,7 +75,7 @@ class CatalogCriteriaCasesTest extends BaseUnitTest {
         var mapper = JsonMapper.builder().build();
         try (var catalogueStream = getClass().getResourceAsStream("/practices/default-catalog.json");
                 var casesStream = getClass().getResourceAsStream("/practices/criteria-cases.json")) {
-            Set<String> automated = new HashSet<>();
+            Map<String, String> automated = new HashMap<>();
             for (var group :
                     mapper.readTree(Objects.requireNonNull(catalogueStream)).path("groups")) {
                 for (var practice : group.path("practices")) {
@@ -84,16 +86,22 @@ class CatalogCriteriaCasesTest extends BaseUnitTest {
                                     .path("by")
                                     .asString()
                                     .equals("HEPHAESTUS")) {
-                        automated.add(practice.path("slug").asString());
+                        automated.put(
+                                practice.path("slug").asString(),
+                                practice.path("kind").asString());
                     }
                 }
             }
             Set<String> covered = new HashSet<>();
             for (var scenario : mapper.readTree(Objects.requireNonNull(casesStream))) {
-                covered.addAll(scenario.path("expected").propertyNames());
+                for (var slug : scenario.path("expected").propertyNames()) {
+                    if (("scm." + scenario.path("workType").asString()).equals(automated.get(slug))) {
+                        covered.add(slug);
+                    }
+                }
             }
             assertThat(automated).isNotEmpty();
-            assertThat(covered).containsAll(automated);
+            assertThat(covered).containsAll(automated.keySet());
         }
     }
 }
