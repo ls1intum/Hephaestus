@@ -518,28 +518,12 @@ public class GitLabTeamSyncService {
             Long providerId) {
         // Phase C.1: Fetch all members via GraphQL OUTSIDE a transaction
         // to avoid holding a DB connection during network I/O and throttle delays.
-        List<GitLabGroupMemberResponse> allMembers = new ArrayList<>();
-        boolean memberSyncComplete = fetchAllGroupMembers(client, scopeId, groupFullPath, allMembers);
-
+        Optional<Map<Long, ListedMember>> listing = listTeamMembers(client, scopeId, groupFullPath);
         // An incomplete listing cannot change stored memberships or roles.
-        if (!memberSyncComplete) {
-            log.warn("Skipped team membership changes: reason=incompleteListing, groupPath={}", groupFullPath);
+        if (listing.isEmpty()) {
             return new MemberSync(0, false);
         }
-        Map<Long, ListedMember> listedByNativeId = new HashMap<>();
-        for (GitLabGroupMemberResponse member : allMembers) {
-            if (member != null && member.isPendingInvitation()) {
-                continue;
-            }
-            ListedMember listed = ListedMember.of(member);
-            if (listed == null) {
-                log.warn("Skipped team membership changes: reason=unreadableMember, groupPath={}", groupFullPath);
-                return new MemberSync(0, false);
-            }
-            if (listed.role() != null) {
-                listedByNativeId.merge(listed.nativeId(), listed, ListedMember::higher);
-            }
-        }
+        Map<Long, ListedMember> listedByNativeId = listing.get();
 
         // Phase C.3: Apply the membership diff in a short transaction, only while this scope still
         // owns the group on the instance it was read from.
@@ -560,16 +544,7 @@ public class GitLabTeamSyncService {
 
             Set<Long> syncedMemberIds = new HashSet<>();
             for (ListedMember listed : listedByNativeId.values()) {
-                var userRef = listed.user();
-                User user = gitLabUserService.findOrCreateUser(
-                        GitLabUserLookup.of(
-                                userRef.id(),
-                                userRef.username(),
-                                userRef.name(),
-                                userRef.avatarUrl(),
-                                userRef.webUrl(),
-                                userRef.bot()),
-                        providerId);
+                User user = gitLabUserService.findOrCreateUser(listed.lookup(), providerId);
                 if (user == null) {
                     status.setRollbackOnly();
                     log.warn("Skipped team membership changes: reason=userNotResolved, teamSlug={}", team.getSlug());
@@ -594,6 +569,46 @@ public class GitLabTeamSyncService {
         });
 
         return result != null ? result : new MemberSync(0, false);
+    }
+
+    /**
+     * The people the group at {@code groupFullPath} grants access itself
+     * ({@link GitLabGroupMemberResponse#TEAM_RELATIONS}), each once and only when the access level is a team role,
+     * read with the scope's own credential. Empty unless GitLab listed the group completely and every entry
+     * readably. Only reads.
+     */
+    public Optional<List<GitLabUserLookup>> listOwnGroupMembers(Long scopeId, String groupFullPath) {
+        return listTeamMembers(graphQlClientProvider.forScope(scopeId), scopeId, groupFullPath)
+                .map(listed ->
+                        listed.values().stream().map(ListedMember::lookup).toList());
+    }
+
+    /**
+     * A group's own members that hold a team role, by native user id; empty when the listing is incomplete or an
+     * entry is unreadable. A pending e-mail invitation names nobody and is skipped.
+     */
+    private Optional<Map<Long, ListedMember>> listTeamMembers(
+            HttpGraphQlClient client, Long scopeId, String groupFullPath) {
+        List<GitLabGroupMemberResponse> allMembers = new ArrayList<>();
+        if (!fetchAllGroupMembers(client, scopeId, groupFullPath, allMembers)) {
+            log.warn("Skipped team membership changes: reason=incompleteListing, groupPath={}", groupFullPath);
+            return Optional.empty();
+        }
+        Map<Long, ListedMember> listedByNativeId = new HashMap<>();
+        for (GitLabGroupMemberResponse member : allMembers) {
+            if (member != null && member.isPendingInvitation()) {
+                continue;
+            }
+            ListedMember listed = ListedMember.of(member);
+            if (listed == null) {
+                log.warn("Skipped team membership changes: reason=unreadableMember, groupPath={}", groupFullPath);
+                return Optional.empty();
+            }
+            if (listed.role() != null) {
+                listedByNativeId.merge(listed.nativeId(), listed, ListedMember::higher);
+            }
+        }
+        return Optional.of(listedByNativeId);
     }
 
     /**
@@ -719,6 +734,11 @@ public class GitLabTeamSyncService {
         /** A user listed twice holds the higher role. */
         ListedMember higher(ListedMember other) {
             return other.role == TeamMembership.Role.MAINTAINER ? other : this;
+        }
+
+        GitLabUserLookup lookup() {
+            return GitLabUserLookup.of(
+                    user.id(), user.username(), user.name(), user.avatarUrl(), user.webUrl(), user.bot());
         }
     }
 

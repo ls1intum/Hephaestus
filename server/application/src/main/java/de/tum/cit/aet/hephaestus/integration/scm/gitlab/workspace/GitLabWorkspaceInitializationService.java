@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSelectedMembershipProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -629,6 +630,28 @@ public class GitLabWorkspaceInitializationService {
                 reportIncomplete(handle, SyncResult.abortedError(0), SyncPhase.TEAMS, "Team sync", accountLogin);
                 result = SyncResult.merge(result, SyncResult.abortedError(0));
             }
+        }
+
+        // A workspace that selected its projects takes its members from what they grant
+        var membershipProjection = gitLabServices.getSelectedMembershipProjection();
+        if (membershipProjection != null && !cancelled.getAsBoolean()) {
+            SyncResult projectionResult;
+            try {
+                GitLabSelectedMembershipProjection.Outcome outcome = membershipProjection.project(workspace.getId());
+                // Nothing changed; the next sync reads again.
+                boolean incomplete = outcome == GitLabSelectedMembershipProjection.Outcome.UNKNOWN
+                        || outcome == GitLabSelectedMembershipProjection.Outcome.STALE;
+                projectionResult = incomplete ? SyncResult.abortedError(0) : SyncResult.completed(0);
+                log.info(
+                        "GitLab selected membership projection: workspaceId={}, outcome={}",
+                        workspace.getId(),
+                        outcome);
+            } catch (Exception e) {
+                log.warn("Failed selected membership projection: workspaceId={}", workspace.getId(), e);
+                projectionResult = SyncResult.abortedError(0);
+            }
+            reportIncomplete(handle, projectionResult, SyncPhase.ORGANIZATION, "Member projection", accountLogin);
+            result = SyncResult.merge(result, projectionResult);
         }
         return result;
     }

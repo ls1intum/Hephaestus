@@ -35,7 +35,7 @@ export const AllProjects: Story = {
 		await expect(
 			canvas.getByRole("radio", { name: "Only the projects listed below" }),
 		).not.toBeChecked();
-		canvas.getByText(/members and teams still come from the whole group/iu);
+		canvas.getByText(/members come from those projects and the subgroups that contain them/iu);
 		canvas.getByText(/Projects you stopped stay stopped/u);
 	},
 };
@@ -151,6 +151,9 @@ export const WideningConfirmation: Story = {
 		await expectSettledVisible(dialog);
 		within(dialog).getByText(/including projects created later/u);
 		within(dialog).getByText(/Projects you stopped stay stopped until you add them again/u);
+		within(dialog).getByText(
+			/Workspace members also come from the whole group after the next successful sync/u,
+		);
 		await expect(within(dialog).getByRole("button", { name: "Add new projects" })).toBeEnabled();
 		await expect(selected).toBeChecked();
 	},
@@ -197,7 +200,9 @@ export const Phone320: Story = {
 			await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
 			await expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(width);
 		}
-		const explanation = canvas.getByText(/members and teams still come from the whole group/iu);
+		const explanation = canvas.getByText(
+			/members come from those projects and the subgroups that contain them/iu,
+		);
 		await expect(explanation.getBoundingClientRect().right).toBeLessThanOrEqual(width);
 	},
 };

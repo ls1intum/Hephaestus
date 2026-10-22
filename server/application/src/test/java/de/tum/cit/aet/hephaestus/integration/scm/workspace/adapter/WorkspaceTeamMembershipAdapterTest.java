@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.Optional;
@@ -45,9 +44,6 @@ class WorkspaceTeamMembershipAdapterTest extends BaseUnitTest {
     private WorkspaceOrganizationMembershipAdapter organizationAdapter;
 
     @Mock
-    private WorkspaceActorSelector actorSelector;
-
-    @Mock
     private WorkspaceOrganizationLookup organizations;
 
     private WorkspaceTeamMembershipAdapter adapter;
@@ -56,12 +52,7 @@ class WorkspaceTeamMembershipAdapterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         adapter = new WorkspaceTeamMembershipAdapter(
-                workspaceRepository,
-                organizations,
-                membershipService,
-                teamMembershipRepository,
-                organizationAdapter,
-                actorSelector);
+                workspaceRepository, organizations, membershipService, teamMembershipRepository, organizationAdapter);
         Organization group = new Organization();
         group.setId(5L);
         group.setLogin(ROOT);
@@ -72,14 +63,15 @@ class WorkspaceTeamMembershipAdapterTest extends BaseUnitTest {
         lenient().when(organizations.find(workspace)).thenReturn(Optional.of(group));
         workspace.setMembersSyncedAt(Instant.now());
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
-        lenient().when(actorSelector.connectedProviderId(WORKSPACE_ID)).thenReturn(Optional.of(PROVIDER_ID));
         lenient()
                 .when(teamMembershipRepository.findDistinctUserIdsOfTeams(any(), anyLong()))
                 .thenReturn(Set.of(7L));
     }
 
     @Test
-    void shouldAddNobodyFromTeamsOfAnotherInstanceOrAnotherRoot() {
+    void shouldAddNobodyFromTeamsTheWorkspaceMayNotTakeMembersFrom() {
+        // The group grant authority withholds teams of another instance or root, and of a workspace that selected
+        // its projects (WorkspaceOrganizationMembershipAdapterTest).
         adapter.onTeamMembershipsSynced(new TeamsSyncedEvent(WORKSPACE_ID, ROOT, PROVIDER_ID + 1, true));
         adapter.onTeamMembershipsSynced(new TeamsSyncedEvent(WORKSPACE_ID, ROOT, PROVIDER_ID + 1, false));
         adapter.onTeamMembershipsSynced(new TeamsSyncedEvent(WORKSPACE_ID, "course/other", PROVIDER_ID, false));
@@ -89,17 +81,9 @@ class WorkspaceTeamMembershipAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldAddNobodyOnceTheWorkspaceIsConnectedToAnotherInstance() {
-        when(actorSelector.connectedProviderId(WORKSPACE_ID)).thenReturn(Optional.of(PROVIDER_ID + 1));
-
-        adapter.onTeamMembershipsSynced(new TeamsSyncedEvent(WORKSPACE_ID, ROOT, PROVIDER_ID, true));
-
-        verify(membershipService, never()).ensureMemberships(any(), any());
-        verify(organizationAdapter, never()).reconcileWorkspaceMembers(any(), anyLong(), anyBoolean());
-    }
-
-    @Test
     void shouldOnlyAddMembersFromAPartialPassOfItsOwnTeams() {
+        grantsOwnTeams();
+
         adapter.onTeamMembershipsSynced(new TeamsSyncedEvent(WORKSPACE_ID, ROOT, PROVIDER_ID, false));
 
         verify(membershipService).ensureMemberships(workspace, Set.of(7L));
@@ -108,9 +92,17 @@ class WorkspaceTeamMembershipAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldReconcileTheWorkspaceAfterACompletePassOfItsOwnTeams() {
+        grantsOwnTeams();
+
         adapter.onTeamMembershipsSynced(new TeamsSyncedEvent(WORKSPACE_ID, ROOT, PROVIDER_ID, true));
 
         verify(organizationAdapter).reconcileWorkspaceMembers(workspace, 5L, true);
         verify(membershipService, never()).ensureMemberships(any(), any());
+    }
+
+    /** The workspace may take members from the teams of its own root group on its connected instance. */
+    private void grantsOwnTeams() {
+        when(organizationAdapter.mayApplyGroupGrants(workspace, IdentityProviderType.GITLAB, PROVIDER_ID, ROOT, null))
+                .thenReturn(true);
     }
 }

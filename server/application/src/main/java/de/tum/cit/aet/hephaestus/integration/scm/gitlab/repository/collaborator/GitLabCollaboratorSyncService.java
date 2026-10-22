@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.collaborator
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.MAX_PAGINATION_PAGES;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.adaptPageSize;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.extractNumericId;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -18,11 +19,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPag
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -47,6 +50,9 @@ public class GitLabCollaboratorSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitLabCollaboratorSyncService.class);
     private static final String GET_PROJECT_MEMBERS_DOCUMENT = "GetProjectMembers";
     private static final int LARGE_PAGE_SIZE = 100;
+
+    /** Everyone with access to the project, its own members and those it inherits: GitLab's default relations. */
+    private static final List<String> EFFECTIVE_RELATIONS = List.of("DIRECT", "INHERITED");
 
     private final RepositoryCollaboratorRepository collaboratorRepository;
     private final GitLabGraphQlClientProvider graphQlClientProvider;
@@ -112,102 +118,28 @@ public class GitLabCollaboratorSyncService {
             return SyncResult.abortedError(0);
         }
 
-        Map<String, ListedCollaborator> listedByGlobalId = new LinkedHashMap<>();
-        String cursor = null;
-        String previousCursor = null;
-        int page = 0;
-        boolean complete = false;
-
+        Optional<ProjectMembers> listing;
         try {
-            while (page < MAX_PAGINATION_PAGES) {
-                graphQlClientProvider.acquirePermission();
-                graphQlClientProvider.waitIfRateLimitLow(scopeId);
-
-                int remaining = graphQlClientProvider.getRateLimitRemaining(scopeId);
-                int pageSize = adaptPageSize(LARGE_PAGE_SIZE, remaining);
-
-                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-                ClientGraphQlResponse response = client.documentName(GET_PROJECT_MEMBERS_DOCUMENT)
-                        .variable("fullPath", projectPath)
-                        .variable("first", pageSize)
-                        .variable("after", cursor)
-                        .execute()
-                        .block(gitLabProperties.graphqlTimeout());
-
-                var handleResult = responseHandler.handle(response, "collaborators for " + safeProjectPath, log);
-                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
-                    continue;
-                }
-                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
-                    graphQlClientProvider.recordFailure(
-                            new GitLabSyncException("Invalid response for project members"));
-                    break;
-                }
-                graphQlClientProvider.recordSuccess();
-                if (!Objects.requireNonNull(response).getErrors().isEmpty()) {
-                    log.warn("Stopped collaborator sync: reason=fieldErrors, projectPath={}", safeProjectPath);
-                    break;
-                }
-                if (!responseHandler.isWholePage(response, "project.projectMembers")) {
-                    log.warn("Stopped collaborator sync: reason=pageNotWhole, projectPath={}", safeProjectPath);
-                    break;
-                }
-
-                boolean everyEntryReadable = true;
-                for (Object node :
-                        response.field("project.projectMembers.nodes").toEntityList(Map.class)) {
-                    // A pending e-mail invitation is listed with no user and grants nobody access
-                    // (GitLabGroupMemberResponse#isPendingInvitation).
-                    if (node instanceof Map<?, ?> member && member.containsKey("user") && member.get("user") == null) {
-                        continue;
-                    }
-                    ListedCollaborator listed = ListedCollaborator.of(node);
-                    if (listed == null) {
-                        everyEntryReadable = false;
-                        break;
-                    }
-                    listedByGlobalId.merge(listed.globalId(), listed, ListedCollaborator::higher);
-                }
-                if (!everyEntryReadable) {
-                    log.warn("Stopped collaborator sync: reason=unreadableMember, projectPath={}", safeProjectPath);
-                    break;
-                }
-
-                GitLabPageInfo pageInfo = Objects.requireNonNull(
-                        response.field("project.projectMembers.pageInfo").toEntity(GitLabPageInfo.class));
-                if (!pageInfo.hasNextPage()) {
-                    complete = true;
-                    break;
-                }
-                cursor = pageInfo.endCursor();
-                if (cursor == null
-                        || responseHandler.isPaginationLoop(
-                                cursor, previousCursor, "collaborators for " + safeProjectPath, log)) {
-                    break;
-                }
-                previousCursor = cursor;
-                page++;
-            }
+            listing = listProjectMembers(scopeId, projectPath, EFFECTIVE_RELATIONS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.info("Collaborator sync interrupted: projectPath={}", safeProjectPath);
             return SyncResult.abortedRateLimit(0);
-        } catch (Exception e) {
-            log.warn("Collaborator sync failed: projectPath={}", safeProjectPath, e);
         }
 
-        if (!complete) {
+        if (listing.isEmpty()) {
             log.warn("Skipped collaborator changes: reason=incompleteListing, projectPath={}", safeProjectPath);
             return SyncResult.abortedError(0);
         }
+        Collection<ListedCollaborator> listed = listing.get().members();
         Integer synced = transactionTemplate.execute(status -> {
             // The monitor, the connection or the group link may have changed while GitLab was being read.
             if (!admission.hold(read) || !workspaceLinkService.mayWriteRepository(scopeId, repository)) {
                 return null;
             }
             Set<Long> syncedUserIds = new HashSet<>();
-            for (ListedCollaborator listed : listedByGlobalId.values()) {
-                User user = userService.findOrCreateUser(listed.lookup(), providerId);
+            for (ListedCollaborator member : listed) {
+                User user = userService.findOrCreateUser(member.lookup(), providerId);
                 if (user == null) {
                     status.setRollbackOnly();
                     return null;
@@ -217,9 +149,9 @@ public class GitLabCollaboratorSyncService {
                         .findByRepositoryIdAndUserId(repository.getId(), user.getId())
                         .orElse(null);
                 if (collaborator == null) {
-                    collaborator = new RepositoryCollaborator(repository, user, listed.permission());
+                    collaborator = new RepositoryCollaborator(repository, user, member.permission());
                 } else {
-                    collaborator.updatePermission(listed.permission());
+                    collaborator.updatePermission(member.permission());
                 }
                 collaboratorRepository.save(collaborator);
             }
@@ -236,10 +168,131 @@ public class GitLabCollaboratorSyncService {
     }
 
     /**
+     * The members GitLab lists for the project at {@code projectPath} through {@code relations}, read with the scope's
+     * own credential. Every page is read, outside a transaction; empty unless the listing is complete, its pages whole
+     * and error-free, every entry names a user and an access level, and every page names the same project. A pending
+     * e-mail invitation names nobody and is skipped. Only reads.
+     *
+     * @throws InterruptedException when the read was interrupted while waiting for the rate limit
+     */
+    public Optional<ProjectMembers> listProjectMembers(Long scopeId, String projectPath, List<String> relations)
+            throws InterruptedException {
+        String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
+        Map<String, ListedCollaborator> listedByGlobalId = new LinkedHashMap<>();
+        Long projectNativeId = null;
+        boolean firstPage = true;
+        String cursor = null;
+        String previousCursor = null;
+        int page = 0;
+
+        try {
+            while (page < MAX_PAGINATION_PAGES) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                int remaining = graphQlClientProvider.getRateLimitRemaining(scopeId);
+                int pageSize = adaptPageSize(LARGE_PAGE_SIZE, remaining);
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+                ClientGraphQlResponse response = client.documentName(GET_PROJECT_MEMBERS_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("relations", relations)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
+
+                var handleResult = responseHandler.handle(response, "collaborators for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
+                    graphQlClientProvider.recordFailure(
+                            new GitLabSyncException("Invalid response for project members"));
+                    return Optional.empty();
+                }
+                graphQlClientProvider.recordSuccess();
+                if (!Objects.requireNonNull(response).getErrors().isEmpty()) {
+                    log.warn("Stopped collaborator sync: reason=fieldErrors, projectPath={}", safeProjectPath);
+                    return Optional.empty();
+                }
+                if (!responseHandler.isWholePage(response, "project.projectMembers")) {
+                    log.warn("Stopped collaborator sync: reason=pageNotWhole, projectPath={}", safeProjectPath);
+                    return Optional.empty();
+                }
+                // A later page that names another project, or none after one that did, is no page of this listing.
+                Long pageProjectId =
+                        projectNativeId(response.field("project.id").getValue());
+                if (firstPage) {
+                    projectNativeId = pageProjectId;
+                    firstPage = false;
+                } else if (!Objects.equals(projectNativeId, pageProjectId)) {
+                    log.warn("Stopped collaborator sync: reason=projectChanged, projectPath={}", safeProjectPath);
+                    return Optional.empty();
+                }
+
+                for (Object node :
+                        response.field("project.projectMembers.nodes").toEntityList(Map.class)) {
+                    // A pending e-mail invitation is listed with no user and grants nobody access
+                    // (GitLabGroupMemberResponse#isPendingInvitation).
+                    if (node instanceof Map<?, ?> member && member.containsKey("user") && member.get("user") == null) {
+                        continue;
+                    }
+                    ListedCollaborator listed = ListedCollaborator.of(node);
+                    if (listed == null) {
+                        log.warn("Stopped collaborator sync: reason=unreadableMember, projectPath={}", safeProjectPath);
+                        return Optional.empty();
+                    }
+                    listedByGlobalId.merge(listed.globalId(), listed, ListedCollaborator::higher);
+                }
+
+                GitLabPageInfo pageInfo = Objects.requireNonNull(
+                        response.field("project.projectMembers.pageInfo").toEntity(GitLabPageInfo.class));
+                if (!pageInfo.hasNextPage()) {
+                    return Optional.of(new ProjectMembers(projectNativeId, List.copyOf(listedByGlobalId.values())));
+                }
+                cursor = pageInfo.endCursor();
+                if (cursor == null
+                        || responseHandler.isPaginationLoop(
+                                cursor, previousCursor, "collaborators for " + safeProjectPath, log)) {
+                    return Optional.empty();
+                }
+                previousCursor = cursor;
+                page++;
+            }
+        } catch (InterruptedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Collaborator sync failed: projectPath={}", safeProjectPath, e);
+        }
+        return Optional.empty();
+    }
+
+    /** The numeric project id of a GitLab project GID, or null when GitLab named none or not a readable one. */
+    private static @Nullable Long projectNativeId(@Nullable Object globalId) {
+        if (!(globalId instanceof String id)) {
+            return null;
+        }
+        try {
+            return extractNumericId(id);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * A complete listing of one project's members.
+     *
+     * @param projectNativeId the numeric id of the project GitLab answered for, or null when it named none
+     * @param members         each listed member once, at their highest access
+     */
+    public record ProjectMembers(@Nullable Long projectNativeId, Collection<ListedCollaborator> members) {}
+
+    /**
      * One project member GitLab listed with a readable user and access level; a user listed through a direct and an
      * inherited grant holds the higher one.
      */
-    private record ListedCollaborator(String globalId, GitLabUserLookup lookup, int accessLevel) {
+    public record ListedCollaborator(String globalId, GitLabUserLookup lookup, int accessLevel) {
 
         /** The entry, or null when it does not say who the member is or what access they hold. */
         static @Nullable ListedCollaborator of(@Nullable Object node) {

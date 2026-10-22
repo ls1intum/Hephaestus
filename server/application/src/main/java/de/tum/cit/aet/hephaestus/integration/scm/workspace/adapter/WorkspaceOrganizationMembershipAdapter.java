@@ -1,5 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.workspace.adapter;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
@@ -9,9 +13,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
+import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +42,11 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
     private final OrganizationRepository organizationRepository;
     private final TeamMembershipRepository teamMembershipRepository;
     private final WorkspaceActorSelector actorSelector;
+    private final ConnectionRepository connections;
     private final Clock clock;
+
+    @PersistenceContext
+    private @Nullable EntityManager entityManager;
 
     public WorkspaceOrganizationMembershipAdapter(
             WorkspaceRepository workspaceRepository,
@@ -44,6 +55,7 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
             OrganizationRepository organizationRepository,
             TeamMembershipRepository teamMembershipRepository,
             WorkspaceActorSelector actorSelector,
+            ConnectionRepository connections,
             Clock clock) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipService = workspaceMembershipService;
@@ -51,7 +63,82 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         this.organizationRepository = organizationRepository;
         this.teamMembershipRepository = teamMembershipRepository;
         this.actorSelector = actorSelector;
+        this.connections = connections;
         this.clock = clock;
+    }
+
+    /**
+     * Whether members may come into {@code workspace} from the roster or the teams of the group {@code root} on the
+     * provider {@code providerId}, and keeps that answer true until the caller's transaction ends. Call it before the
+     * first membership write.
+     *
+     * <p>A GitLab group grants nobody while the workspace follows only the projects it selected: its members then
+     * come from those projects (the GitLab selected-membership projection). The answer is read under the connection's
+     * lifecycle lock, which a selection change, Stop and a disconnect take first as well, so none of them can change
+     * it before the caller's writes commit. A workspace without an active GitLab connection, or whose connection,
+     * instance or group changed while this waited, takes nobody. Other providers are not affected.
+     *
+     * <p>When the connection names its group by id, a group known by another id grants nobody: the source is a group
+     * the connection no longer reads. {@code groupId} is the source group's id when the source names it; a linked
+     * workspace's organization must have that id too. Only a source that names no id is known by the linked
+     * organization. A connection that names no group id, or a source whose group id is not known, is not compared.
+     */
+    boolean mayApplyGroupGrants(
+            Workspace workspace,
+            IdentityProviderType sourceType,
+            long providerId,
+            String root,
+            @Nullable Long groupId) {
+        if (sourceType != IdentityProviderType.GITLAB) {
+            return true;
+        }
+        long workspaceId = workspace.getId();
+        Optional<ConnectionConfig> locked = connections.lockActiveConfig(workspaceId, IntegrationKind.GITLAB);
+        if (locked.isEmpty()) {
+            return false;
+        }
+        // Read what the lock now guards, not what this transaction loaded before it.
+        EntityManager em = Objects.requireNonNull(entityManager);
+        connections.findActive(workspaceId, IntegrationKind.GITLAB).ifPresent(em::refresh);
+        em.refresh(workspace);
+        Long linked = workspace.getOrganizationId();
+        Organization linkedGroup = linked == null
+                ? null
+                : organizationRepository
+                        .findById(linked)
+                        .filter(organization ->
+                                Objects.equals(organization.getProvider().getId(), providerId)
+                                        && organization.getLogin().equalsIgnoreCase(root))
+                        .orElse(null);
+        boolean ownsGroup = linked == null ? root.equalsIgnoreCase(workspace.getAccountLogin()) : linkedGroup != null;
+        Long linkedGroupId = linkedGroup != null ? linkedGroup.getNativeId() : null;
+        // The caller writes the grants of the group it names, not of the group the workspace is linked to now: a link
+        // that changed while this waited must agree with a named source, never stand in for it.
+        boolean sameSource = groupId == null || linkedGroupId == null || groupId.equals(linkedGroupId);
+        Long knownGroupId = groupId != null ? groupId : linkedGroupId;
+        Long connectedGroupId =
+                locked.get() instanceof ConnectionConfig.GitLabConfig config ? config.gitlabGroupId() : null;
+        boolean sameGroup = sameSource
+                && (connectedGroupId == null || knownGroupId == null || connectedGroupId.equals(knownGroupId));
+        return ownsGroup
+                && sameGroup
+                && actorSelector
+                        .connectedProviderId(workspaceId)
+                        .filter(connected -> connected == providerId)
+                        .isPresent()
+                && workspaceRepository
+                        .findMonitorPolicy(workspaceId)
+                        .filter(policy -> policy.getRepositorySelection() != RepositorySelection.SELECTED)
+                        .isPresent();
+    }
+
+    private boolean mayApplyGroupGrants(Workspace workspace, Organization organization) {
+        return mayApplyGroupGrants(
+                workspace,
+                organization.getProvider().getType(),
+                Objects.requireNonNull(organization.getProvider().getId()),
+                organization.getLogin(),
+                organization.getNativeId());
     }
 
     @Override
@@ -70,13 +157,18 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
     @Transactional
     public void onOrganizationMembershipsSynced(OrganizationSyncedEvent event) {
         Optional<Workspace> workspaceOpt = findWorkspace(event.organizationId(), event.organizationLogin());
+        Optional<Organization> organization = organizationRepository.findById(event.organizationId());
 
-        if (workspaceOpt.isEmpty()) {
+        if (workspaceOpt.isEmpty() || organization.isEmpty()) {
             log.debug("Skipped member sync: reason=noWorkspaceForOrg, orgLogin={}", event.organizationLogin());
             return;
         }
 
         Workspace workspace = workspaceOpt.get();
+        if (!mayApplyGroupGrants(workspace, organization.get())) {
+            log.debug("Skipped member sync: reason=noGroupGrantAuthority, workspaceId={}", workspace.getId());
+            return;
+        }
 
         try {
             int synced = reconcileWorkspaceMembers(workspace, event.organizationId(), event.rosterComplete());
@@ -109,6 +201,13 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         }
 
         Workspace workspace = workspaceOpt.get();
+        if (!mayApplyGroupGrants(workspace, organization.get())) {
+            log.debug(
+                    "Skipped member sync: reason=noGroupGrantAuthority, workspaceId={}, action={}",
+                    workspace.getId(),
+                    action);
+            return;
+        }
 
         try {
             Membership.@Nullable WorkspaceRole role = currentGrant(organization.get(), event.userId());
@@ -174,7 +273,7 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
      * Sets the workspace's members to what the provider currently grants: the organization roster's
      * roles, and MEMBER for anyone only a team of the organization lists, since a team grants no
      * administration. No role is carried over from the workspace itself except OWNER, which is kept
-     * for anyone who holds it.
+     * for anyone who holds it. The caller has taken {@link #mayApplyGroupGrants} in this transaction.
      *
      * @param workspace the workspace to sync
      * @param organizationId the organization ID to sync members from

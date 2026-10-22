@@ -1,6 +1,7 @@
-query GetProjectMembers($fullPath: ID!, $first: Int!, $after: String) {
+query GetProjectMembers($fullPath: ID!, $relations: [ProjectMemberRelation!], $first: Int!, $after: String) {
     project(fullPath: $fullPath) {
-        projectMembers(first: $first, after: $after) {
+        id
+        projectMembers(first: $first, after: $after, relations: $relations) {
             pageInfo {
                 hasNextPage
                 endCursor
