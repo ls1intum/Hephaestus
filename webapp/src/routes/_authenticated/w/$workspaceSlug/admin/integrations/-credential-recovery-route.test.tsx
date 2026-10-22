@@ -9,6 +9,7 @@ import {
 	getGitLabRepositorySelectionQueryKey,
 	getIntegrationCatalogQueryKey,
 	getRepositoriesToMonitorQueryKey,
+	getStoppedGitLabProjectsQueryKey,
 	listConnectionSyncJobsQueryKey,
 	listConnectionSyncResourcesQueryKey,
 	listSlackChannelsQueryKey,
@@ -18,6 +19,7 @@ import type {
 	ConnectionSyncStatus,
 	ConnectionDetail,
 	GitLabRepositorySelection,
+	GitLabStoppedProject,
 	IntegrationCatalogEntry,
 	SlackChannelCandidate,
 	SlackMonitoredChannel,
@@ -86,6 +88,9 @@ function mockConnection(kind: "GITHUB" | "GITLAB", installationId?: number) {
 		http.get("*/workspaces/:workspaceSlug/repositories", () => HttpResponse.json([])),
 		http.get("*/workspaces/:workspaceSlug/repositories/selection", () =>
 			HttpResponse.json({ repositorySelection: "ALL" } satisfies GitLabRepositorySelection),
+		),
+		http.get("*/workspaces/:workspaceSlug/repositories/stopped", () =>
+			HttpResponse.json([] satisfies GitLabStoppedProject[]),
 		),
 	);
 	return { entry, workspace, detail, status };
@@ -335,9 +340,14 @@ describe("monitored repositories", () => {
 			),
 		);
 		const dialog = await screen.findByRole("alertdialog");
-		const description = within(dialog).getByText(/repository on GitLab is not affected/u);
-		expect(description.textContent).toContain("It stays stopped until you add it again below.");
-		expect(description.textContent).toContain("If no other workspace on this instance");
+		const description = within(dialog).getByText(/project on GitLab is not affected/u);
+		expect(description.textContent).toContain(
+			"To sync it again, add it below with its current path.",
+		);
+		expect(description.textContent).toContain(
+			"This workspace keeps the work Hephaestus already synced",
+		);
+		expect(description.textContent).not.toContain("erases");
 		await user.click(within(dialog).getByRole("button", { name: "Stop monitoring" }));
 
 		await screen.findByText("No repositories monitored yet");
@@ -427,6 +437,261 @@ describe("monitored repositories", () => {
 		expect(description.textContent).not.toContain("stays stopped");
 		expect(description.textContent).not.toContain("permanently");
 	});
+});
+
+const stopReceipt = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+/**
+ * An active GitLab workspace whose server moves a project between its monitored and stopped lists as
+ * the backend does: Stop keeps the project's repository item under a new receipt, Add clears it, and a
+ * removal must name the listed item and its current receipt. Every write is recorded.
+ */
+function serveStoppedProjects(monitored: string[], stopped: GitLabStoppedProject[] = []) {
+	const { entry } = mockConnection("GITLAB");
+	entry.credentialsUnreadableSince = undefined;
+	const state = { monitored: [...monitored], stopped: [...stopped], receipts: 100 };
+	const roots = new Map(
+		stopped.map((project) => [project.nameWithOwner, project.repositoryItemId]),
+	);
+	const writes: string[] = [];
+	const stoppedReads = { count: 0 };
+	const stop = (nameWithOwner: string) => {
+		state.receipts += 1;
+		const repositoryItemId = roots.get(nameWithOwner) ?? String(9000 + roots.size + 1);
+		roots.set(nameWithOwner, repositoryItemId);
+		state.stopped = [
+			...state.stopped.filter((project) => project.nameWithOwner !== nameWithOwner),
+			{ repositoryItemId, nameWithOwner, stopReceipt: stopReceipt(state.receipts) },
+		];
+	};
+	server.use(
+		http.get("*/workspaces/acme/repositories", () => HttpResponse.json(state.monitored)),
+		http.get("*/workspaces/acme/repositories/stopped", () => {
+			stoppedReads.count += 1;
+			return HttpResponse.json(state.stopped);
+		}),
+		http.delete("*/workspaces/acme/repositories", ({ request }) => {
+			const name = new URL(request.url).searchParams.get("nameWithOwner") ?? "";
+			writes.push(`DELETE /workspaces/acme/repositories ${name}`);
+			state.monitored = state.monitored.filter((monitoredName) => monitoredName !== name);
+			stop(name);
+			return new HttpResponse(null, { status: 204 });
+		}),
+		http.post("*/workspaces/acme/repositories", ({ request }) => {
+			const name = new URL(request.url).searchParams.get("nameWithOwner") ?? "";
+			writes.push(`POST /workspaces/acme/repositories ${name}`);
+			state.monitored.push(name);
+			state.stopped = state.stopped.filter((project) => project.nameWithOwner !== name);
+			return new HttpResponse(null, { status: 201 });
+		}),
+		http.delete(
+			"*/workspaces/acme/repositories/stopped/:repositoryItemId",
+			({ params, request }) => {
+				const receipt = new URL(request.url).searchParams.get("stopReceipt") ?? "";
+				const repositoryItemId = String(params.repositoryItemId);
+				writes.push(`DELETE /workspaces/acme/repositories/stopped/${repositoryItemId} ${receipt}`);
+				const listed = state.stopped.find(
+					(project) => project.repositoryItemId === repositoryItemId,
+				);
+				if (listed?.stopReceipt !== receipt) {
+					const status = listed === undefined ? 404 : 409;
+					return HttpResponse.json(
+						{
+							status,
+							title: "Removal refused",
+							detail:
+								"This project was added or stopped again after the list was loaded. Reload and try again.",
+						},
+						{ status },
+					);
+				}
+				state.stopped = state.stopped.filter((project) => project !== listed);
+				return new HttpResponse(null, { status: 204 });
+			},
+		),
+	);
+	return { state, writes, stoppedReads, stop };
+}
+
+async function openStoppedRemoval(user: ReturnType<typeof userEvent.setup>, nameWithOwner: string) {
+	await user.click(
+		await screen.findByRole(
+			"button",
+			{ name: `Remove synced work from ${nameWithOwner}` },
+			ROUTE_RENDER_WAIT,
+		),
+	);
+	return screen.findByRole("alertdialog", { name: `Remove the synced work of ${nameWithOwner}?` });
+}
+
+describe("stopped GitLab projects", () => {
+	const stoppedKey = getStoppedGitLabProjectsQueryKey({ path: { workspaceSlug: "acme" } });
+
+	it("lists a stopped project, sends nothing on Cancel, and removes exactly the listed Stop on confirmation", async () => {
+		const { writes } = serveStoppedProjects(["acme/platform/api"]);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await user.click(
+			await screen.findByRole(
+				"button",
+				{ name: "Stop monitoring acme/platform/api" },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+		const stopDialog = await screen.findByRole("alertdialog");
+		await user.click(within(stopDialog).getByRole("button", { name: "Stop monitoring" }));
+		await screen.findByText("No repositories monitored yet");
+
+		const dialog = await openStoppedRemoval(user, "acme/platform/api");
+		expect(within(dialog).getByText(/project on GitLab is not affected/u).textContent).toContain(
+			"Practice reviews, feedback and conversations about that work keep their usual retention.",
+		);
+		await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(writes).toStrictEqual(["DELETE /workspaces/acme/repositories acme/platform/api"]);
+
+		const confirm = await openStoppedRemoval(user, "acme/platform/api");
+		await user.click(within(confirm).getByRole("button", { name: "Remove synced work" }));
+
+		await screen.findByText("No stopped projects");
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(writes).toStrictEqual([
+			"DELETE /workspaces/acme/repositories acme/platform/api",
+			`DELETE /workspaces/acme/repositories/stopped/9001 ${stopReceipt(101)}`,
+		]);
+	});
+
+	it("does not send a refused removal again, and removes the newer Stop only after a new confirmation", async () => {
+		const { writes, stoppedReads, stop } = serveStoppedProjects(
+			[],
+			[
+				{
+					repositoryItemId: "9001",
+					nameWithOwner: "acme/platform/api",
+					stopReceipt: stopReceipt(1),
+				},
+			],
+		);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		const dialog = await openStoppedRemoval(user, "acme/platform/api");
+		// Another admin adds the project and stops it again before this confirmation answers.
+		stop("acme/platform/api");
+		const reads = stoppedReads.count;
+
+		await user.click(within(dialog).getByRole("button", { name: "Remove synced work" }));
+
+		await screen.findByText("We could not remove the synced work");
+		await waitFor(() => expect(stoppedReads.count).toBeGreaterThan(reads));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		screen.getByRole("button", { name: "Remove synced work from acme/platform/api" });
+		expect(writes).toStrictEqual([
+			`DELETE /workspaces/acme/repositories/stopped/9001 ${stopReceipt(1)}`,
+		]);
+
+		const fresh = await openStoppedRemoval(user, "acme/platform/api");
+		await user.click(within(fresh).getByRole("button", { name: "Remove synced work" }));
+		await screen.findByText("No stopped projects");
+		expect(writes).toStrictEqual([
+			`DELETE /workspaces/acme/repositories/stopped/9001 ${stopReceipt(1)}`,
+			`DELETE /workspaces/acme/repositories/stopped/9001 ${stopReceipt(101)}`,
+		]);
+	});
+
+	it("closes an open confirmation when a newer Stop of the project is read, without sending anything", async () => {
+		const { writes, stop } = serveStoppedProjects(
+			[],
+			[
+				{
+					repositoryItemId: "9001",
+					nameWithOwner: "acme/platform/api",
+					stopReceipt: stopReceipt(1),
+				},
+			],
+		);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await openStoppedRemoval(user, "acme/platform/api");
+
+		stop("acme/platform/api");
+		await reread(queryClient, stoppedKey);
+
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		screen.getByRole("button", { name: "Remove synced work from acme/platform/api" });
+		expect(writes).toStrictEqual([]);
+	});
+
+	it("resumes a stopped project through Add with its current path, which leaves the stopped list", async () => {
+		const { writes } = serveStoppedProjects(
+			[],
+			[
+				{
+					repositoryItemId: "9001",
+					nameWithOwner: "acme/platform/api",
+					stopReceipt: stopReceipt(1),
+				},
+			],
+		);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await screen.findByRole(
+			"button",
+			{ name: "Remove synced work from acme/platform/api" },
+			ROUTE_RENDER_WAIT,
+		);
+
+		await user.type(screen.getByLabelText("Add a repository"), "acme/platform/api");
+		await user.click(screen.getByRole("button", { name: "Add repository" }));
+
+		await screen.findByText("No stopped projects");
+		screen.getByRole("button", { name: "Stop monitoring acme/platform/api" });
+		expect(writes).toStrictEqual(["POST /workspaces/acme/repositories acme/platform/api"]);
+	});
+
+	it("offers no stopped projects and no removal when their read is refused", async () => {
+		serveStoppedProjects([]);
+		serveScmRead("*/workspaces/acme/repositories/stopped", { status: 403 });
+		renderRouteAt("/w/acme/admin/integrations/scm");
+
+		await screen.findByText(
+			"You do not have access to the stopped projects",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		expect(screen.queryByRole("button", { name: /^Remove synced work/u })).toBeNull();
+		expect(screen.queryByText("No stopped projects")).toBeNull();
+	});
+
+	it.each([
+		["a GitHub connection", "GITHUB", "ACTIVE"],
+		["a paused GitLab connection", "GITLAB", "SUSPENDED"],
+	] as const)(
+		"does not read or offer stopped projects on %s",
+		async (_case, kind, connectionState) => {
+			const { entry } = mockConnection(kind);
+			server.use(
+				http.get("*/workspaces/:workspaceSlug/connections/catalog", () =>
+					HttpResponse.json([{ ...entry, connectionState, credentialsUnreadableSince: undefined }]),
+				),
+			);
+			const stoppedReads = serveScmRead("*/workspaces/:workspaceSlug/repositories/stopped", {
+				status: 200,
+				body: [
+					{
+						repositoryItemId: "9001",
+						nameWithOwner: "acme/platform/api",
+						stopReceipt: stopReceipt(1),
+					},
+				],
+			});
+			renderRouteAt("/w/acme/admin/integrations/scm");
+
+			await screen.findByText("Repository sync state", undefined, ROUTE_RENDER_WAIT);
+			expect(screen.queryByText("Stopped projects")).toBeNull();
+			expect(screen.queryByRole("button", { name: /^Remove synced work/u })).toBeNull();
+			expect(stoppedReads.reads.count).toBe(0);
+		},
+	);
 });
 
 type ProjectChoice = GitLabRepositorySelection["repositorySelection"];

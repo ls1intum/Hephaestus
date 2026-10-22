@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
@@ -278,11 +279,10 @@ public class GitHubExceptionClassifier {
             cause = e.getCause();
         }
 
-        // Database deadlocks are transient and should be retried with backoff
-        // These occur when multiple threads try to upsert the same user concurrently
-        if (isDeadlockException(cause)) {
+        // Inspect the original chain: unwrapping can discard Spring's translated concurrency type.
+        if (isConcurrentWrite(e)) {
             return ClassificationResult.of(
-                    Category.RETRYABLE, "Database deadlock detected - will retry: " + type(cause));
+                    Category.RETRYABLE, "Concurrent database write - will retry: " + type(cause));
         }
 
         // UnexpectedRollbackException is transient — typically caused by a nested
@@ -425,22 +425,11 @@ public class GitHubExceptionClassifier {
         return null;
     }
 
-    /**
-     * Checks if the exception indicates a database deadlock.
-     * <p>
-     * Database deadlocks are transient failures that occur when:
-     * <ul>
-     *   <li>Multiple threads try to INSERT/UPDATE the same rows in different order</li>
-     *   <li>PostgreSQL detects a lock cycle and aborts one transaction</li>
-     * </ul>
-     * <p>
-     * Common in sync operations when parallel threads process shared entities (e.g., users).
-     * These should always be retried since the deadlock is resolved by PostgreSQL.
-     */
-    private boolean isDeadlockException(Throwable e) {
-        // Walk the cause chain to find deadlock indicators
+    /** Translated concurrency failures and driver deadlocks both require a fresh write transaction. */
+    private boolean isConcurrentWrite(Throwable e) {
         Throwable current = e;
         while (current != null) {
+            if (current instanceof ConcurrencyFailureException) return true;
             String className = current.getClass().getName();
             String message = current.getMessage();
 

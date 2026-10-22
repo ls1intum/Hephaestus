@@ -20,6 +20,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -38,11 +39,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.http.client.MockClientHttpRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -266,6 +269,39 @@ class GitHubExceptionClassifierTest {
         @Test
         void nullException() {
             assertThat(classifier.classify(null)).isEqualTo(Category.UNKNOWN);
+        }
+    }
+
+    @Nested
+    class ConcurrentWriteClassification {
+        static Stream<Throwable> conflicts() {
+            return Stream.of(
+                    new ObjectOptimisticLockingFailureException("repository", 7L),
+                    new PessimisticLockingFailureException("private-sql-canary"),
+                    new PessimisticLockingFailureException(
+                            "private-sql-canary", new SQLException("private-row-canary", "55P03")),
+                    new RuntimeException(new PessimisticLockingFailureException(
+                            "private-sql-canary", new SQLException("private-row-canary", "55P03"))),
+                    new CompletionException(
+                            new RuntimeException(new ObjectOptimisticLockingFailureException("repository", 7L))));
+        }
+
+        @ParameterizedTest
+        @MethodSource("conflicts")
+        void shouldRetryATypedConcurrentWriteWithoutRepeatingItsPrivateText(Throwable conflict) {
+            ClassificationResult result = classifier.classifyWithDetails(conflict);
+
+            assertThat(result.category()).isEqualTo(Category.RETRYABLE);
+            assertThat(result.message()).startsWith("Concurrent database write - will retry: ");
+            assertThat(result.message()).doesNotContain("canary", "repository", "55P03");
+        }
+
+        @Test
+        void shouldKeepSuspendedInstallationRefusalAheadOfConcurrentWriteRetry() {
+            var conflict = new PessimisticLockingFailureException(
+                    "private-sql-canary", new InstallationSuspendedException(42L));
+
+            assertThat(classifier.classify(conflict)).isEqualTo(Category.AUTH_ERROR);
         }
     }
 
@@ -496,7 +532,7 @@ class GitHubExceptionClassifierTest {
                     Arguments.of(
                             new CannotAcquireLockException("private-sql-canary"),
                             Category.RETRYABLE,
-                            "Database deadlock detected - will retry: CannotAcquireLockException"),
+                            "Concurrent database write - will retry: CannotAcquireLockException"),
                     Arguments.of(
                             new WebClientRequestException(
                                     new ConnectException("Connection refused: private-host-canary"),

@@ -19,6 +19,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -95,6 +96,27 @@ class GlobalControllerAdviceLoggingTest {
                         "db.response.status_code",
                         "23505"));
         assertThat(event.getFormattedMessage()).isEqualTo("Request conflicts with database constraints");
+        assertThat(event.getArgumentArray()).isNullOrEmpty();
+        assertThat(event.getThrowableProxy()).isNull();
+    }
+
+    @Test
+    void shouldNotLogTheStatementOrRowWhenAnotherTransactionOwnsTheWrite() {
+        var response = advice.handleConcurrentChange(new PessimisticLockingFailureException(
+                "private-statement", new SQLException("private-email@example.test private-row-value", "55P03")));
+
+        assertThat(response.getStatus()).isEqualTo(409);
+        assertThat(response.getDetail()).isEqualTo("Another request is changing this data. Reload and try again.");
+        assertThat(appender.list).hasSize(1);
+        ILoggingEvent event = appender.list.getFirst();
+        assertThat(event.getLevel()).isEqualTo(Level.WARN);
+        assertThat(fields(event))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        "event.name",
+                        "database.concurrent.change",
+                        "error.type",
+                        PessimisticLockingFailureException.class.getName()));
+        assertThat(event.getFormattedMessage()).isEqualTo("Request conflicts with another write");
         assertThat(event.getArgumentArray()).isNullOrEmpty();
         assertThat(event.getThrowableProxy()).isNull();
     }

@@ -1,5 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,13 +8,19 @@ import {
 	getConnectionSyncStatusQueryKey,
 	getIntegrationCatalogQueryKey,
 	getOpenWorkQueryKey,
+	getRepositoriesToMonitorOptions,
+	getStoppedGitLabProjectsOptions,
 	getWorkspaceQueryKey,
 	listConnectionSyncJobsQueryKey,
 	listConnectionSyncResourcesQueryKey,
+	listOutlineCollectionsOptions,
 	listOutlineCollectionsQueryKey,
+	listSlackChannelsOptions,
 	listSlackChannelsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
+import type { GitLabStoppedProject } from "@/api/types.gen";
 
+import { server } from "@/mocks/server";
 import { FakeEventSource } from "@/test/fake-event-source";
 
 import { useSyncEvents } from "./use-sync-events";
@@ -418,4 +425,137 @@ describe("useSyncEvents", () => {
 		expect(source.closed).toBe(true);
 		expect(FakeEventSource.instances).toHaveLength(1);
 	});
+});
+
+describe("repository reads after a resources hint", () => {
+	it.each(["GITLAB", undefined] as const)(
+		"reads monitored projects and a new Stop receipt through HTTP with connection kind %s",
+		async (kind) => {
+			const queryClient = new QueryClient({
+				defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+			});
+			if (kind !== undefined) {
+				queryClient.setQueryData(
+					getIntegrationCatalogQueryKey({ path: { workspaceSlug: WORKSPACE } }),
+					[{ kind, connected: true, connectionId: CONNECTION_ID, displayName: "GitLab" }],
+				);
+			}
+			const firstStop = {
+				repositoryItemId: "9001",
+				nameWithOwner: "acme/platform/api",
+				stopReceipt: "00000000-0000-4000-8000-000000000001",
+			} satisfies GitLabStoppedProject;
+			const secondStop = {
+				...firstStop,
+				stopReceipt: "00000000-0000-4000-8000-000000000002",
+			};
+			let monitored = ["acme/platform/web"];
+			let stopped = [firstStop];
+			const reads = {
+				monitored: 0,
+				stopped: 0,
+				otherMonitored: 0,
+				otherStopped: 0,
+				slack: 0,
+				outline: 0,
+			};
+			server.use(
+				http.get(`*/workspaces/${WORKSPACE}/repositories`, () => {
+					reads.monitored += 1;
+					return HttpResponse.json(monitored);
+				}),
+				http.get(`*/workspaces/${WORKSPACE}/repositories/stopped`, () => {
+					reads.stopped += 1;
+					return HttpResponse.json(stopped);
+				}),
+				http.get("*/workspaces/another-workspace/repositories", () => {
+					reads.otherMonitored += 1;
+					return HttpResponse.json(["other/team/project"]);
+				}),
+				http.get("*/workspaces/another-workspace/repositories/stopped", () => {
+					reads.otherStopped += 1;
+					return HttpResponse.json([firstStop]);
+				}),
+				http.get(`*/workspaces/${WORKSPACE}/slack/channels`, () => {
+					reads.slack += 1;
+					return HttpResponse.json([]);
+				}),
+				http.get(`*/workspaces/${WORKSPACE}/outline/collections`, () => {
+					reads.outline += 1;
+					return HttpResponse.json([]);
+				}),
+			);
+			const { result, unmount } = renderHook(
+				() => {
+					useSyncEvents(WORKSPACE);
+					return {
+						monitored: useQuery(
+							getRepositoriesToMonitorOptions({ path: { workspaceSlug: WORKSPACE } }),
+						),
+						stopped: useQuery(
+							getStoppedGitLabProjectsOptions({ path: { workspaceSlug: WORKSPACE } }),
+						),
+						otherMonitored: useQuery(
+							getRepositoriesToMonitorOptions({ path: { workspaceSlug: "another-workspace" } }),
+						),
+						otherStopped: useQuery(
+							getStoppedGitLabProjectsOptions({ path: { workspaceSlug: "another-workspace" } }),
+						),
+						slack: useQuery(listSlackChannelsOptions({ path: { workspaceSlug: WORKSPACE } })),
+						outline: useQuery(
+							listOutlineCollectionsOptions({ path: { workspaceSlug: WORKSPACE } }),
+						),
+					};
+				},
+				{ wrapper: wrapper(queryClient) },
+			);
+			try {
+				await waitFor(() => {
+					expect(result.current.monitored.data).toStrictEqual(monitored);
+					expect(result.current.stopped.data).toStrictEqual([firstStop]);
+					expect(result.current.otherMonitored.data).toStrictEqual(["other/team/project"]);
+					expect(result.current.otherStopped.data).toStrictEqual([firstStop]);
+					expect(result.current.slack.data).toStrictEqual([]);
+					expect(result.current.outline.data).toStrictEqual([]);
+				});
+				expect(reads).toStrictEqual({
+					monitored: 1,
+					stopped: 1,
+					otherMonitored: 1,
+					otherStopped: 1,
+					slack: 1,
+					outline: 1,
+				});
+
+				// Another admin changed the monitored set and added then stopped the same project again.
+				monitored = ["acme/platform/worker"];
+				stopped = [secondStop];
+				act(() => emitHint("resources"));
+				// With no cached kind the existing fallback also refreshes both sibling catalogs.
+				const siblingReads = kind === undefined ? 2 : 1;
+
+				await waitFor(() => {
+					expect(result.current.monitored.data).toStrictEqual(["acme/platform/worker"]);
+					expect(result.current.stopped.data).toStrictEqual([secondStop]);
+					expect(result.current.monitored.isFetching).toBe(false);
+					expect(result.current.stopped.isFetching).toBe(false);
+					expect(result.current.slack.isFetching).toBe(false);
+					expect(result.current.outline.isFetching).toBe(false);
+					expect(reads).toStrictEqual({
+						monitored: 2,
+						stopped: 2,
+						otherMonitored: 1,
+						otherStopped: 1,
+						slack: siblingReads,
+						outline: siblingReads,
+					});
+				});
+				expect(result.current.otherMonitored.data).toStrictEqual(["other/team/project"]);
+				expect(result.current.otherStopped.data).toStrictEqual([firstStop]);
+			} finally {
+				unmount();
+				queryClient.clear();
+			}
+		},
+	);
 });

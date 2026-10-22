@@ -1,4 +1,4 @@
-import { FolderGitIcon, Trash2Icon } from "lucide-react";
+import { CircleStopIcon, FolderGitIcon, Trash2Icon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -51,14 +51,21 @@ function StopDescription({
 	provider: ScmProvider | undefined;
 	providerLabel: string;
 }) {
+	if (provider === "GITLAB") {
+		return (
+			<>
+				Hephaestus stops syncing this project and leaves it out when it finds new projects in the
+				group. The project on GitLab is not affected. This workspace keeps the work Hephaestus
+				already synced from it, under Stopped projects, until you remove it there. To sync it again,
+				add it below with its current path.
+			</>
+		);
+	}
 	return (
 		<>
 			Hephaestus stops syncing this repository. The repository on {providerLabel} is not affected.
 			If no other workspace on this instance still monitors it, Hephaestus also erases the work it
-			mirrored from it. Practice reviews and feedback can remain.{" "}
-			{provider === "GITLAB"
-				? "It stays stopped until you add it again below."
-				: "To sync it again, add it below."}
+			mirrored from it. Practice reviews and feedback can remain. To sync it again, add it below.
 		</>
 	);
 }
@@ -77,6 +84,9 @@ function RepositoryRow({
 	onRemove: (nameWithOwner: string) => void;
 }) {
 	const [open, setOpen] = useState(false);
+	// A GitLab Stop keeps the synced work, so it is not a destructive action there.
+	const keepsWork = provider === "GITLAB";
+	const StopIcon = keepsWork ? CircleStopIcon : Trash2Icon;
 
 	const handleRemove = () => {
 		onRemove(repo.nameWithOwner);
@@ -98,7 +108,7 @@ function RepositoryRow({
 								size="icon"
 								aria-label={`Stop monitoring ${repo.nameWithOwner}`}
 							>
-								<Trash2Icon className="size-4" />
+								<StopIcon className="size-4" />
 							</Button>
 						}
 					/>
@@ -111,7 +121,11 @@ function RepositoryRow({
 						</AlertDialogHeader>
 						<AlertDialogFooter>
 							<AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
-							<AlertDialogAction variant="destructive" disabled={isRemoving} onClick={handleRemove}>
+							<AlertDialogAction
+								variant={keepsWork ? "default" : "destructive"}
+								disabled={isRemoving}
+								onClick={handleRemove}
+							>
 								{isRemoving ? (
 									<>
 										<Spinner className="size-4" aria-hidden />

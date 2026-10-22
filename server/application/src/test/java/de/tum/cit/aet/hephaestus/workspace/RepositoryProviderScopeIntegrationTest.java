@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -49,6 +50,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabReposito
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.GitLabRepositorySelectionService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.GitLabStoppedProjectService;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -112,6 +114,12 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Autowired
     private ItemIndexService itemWriter;
+
+    @Autowired
+    private ItemRepository itemRows;
+
+    @Autowired
+    private GitLabStoppedProjectService stoppedProjects;
 
     @Autowired
     private ScmItemSourceAccess sourceAccess;
@@ -406,6 +414,58 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(repositories.findAllByWorkspaceMonitors(own.getId()))
                 .extracting(Repository::getId)
                 .containsExactly(recreated.getId());
+    }
+
+    @Test
+    void shouldResolveExplicitReincludeAfterRemoveDeletesTheLastKeptMirror() {
+        Workspace own = workspace("kept-reinclude", persistUser("kept-include-owner"));
+        String origin = gitLabProperties.defaultServerUrl();
+        IdentityProvider source = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
+                .orElseGet(() -> provider(origin));
+        Connection connection = connect(own, source);
+        Repository stopped = repository(source, NATIVE_ID, NAME);
+        syncTargets.reconcileSyncTargetIdentity(monitor(own, NATIVE_ID).getId(), NATIVE_ID, NAME);
+        long root = itemWriter
+                .findSource(own.getId(), "scm.repository", stopped.getId())
+                .orElseThrow()
+                .itemId();
+        monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+        assertThat(repositories.findById(stopped.getId())).isPresent();
+        var kept = stoppedProjects.getStoppedProjects(own.getId());
+        assertThat(kept)
+                .singleElement()
+                .satisfies(project -> assertThat(project.repositoryItemId()).isEqualTo(String.valueOf(root)));
+
+        stoppedProjects.removeStoppedProject(
+                own.getId(),
+                root,
+                kept.getFirst().stopReceipt(),
+                Objects.requireNonNull(persistAccount("kept-reinclude-admin-" + UUID.randomUUID())
+                        .getId()));
+        assertThat(repositories.findById(stopped.getId())).isEmpty();
+        var answers = new ArrayDeque<>(List.of(projectResponse(origin, NATIVE_ID), projectResponse(origin, NATIVE_ID)));
+        when(clients.forScope(own.getId())).thenReturn(projectClient(origin, answers));
+
+        monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME);
+
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME)
+                        .orElseThrow()
+                        .getNativeId())
+                .isEqualTo(NATIVE_ID);
+        var included = (ConnectionConfig.GitLabConfig)
+                connections.findById(connection.getId()).orElseThrow().getConfig();
+        assertThat(included.projectExclusions().nativeIds()).isEmpty();
+        assertThat(included.projectExclusions().stopReceipt(NATIVE_ID)).isEmpty();
+        Repository recreated = projects.syncProject(own.getId(), NAME).orElseThrow();
+        assertThat(recreated.getId()).isNotEqualTo(stopped.getId());
+        assertThat(recreated.getNativeId()).isEqualTo(NATIVE_ID);
+        // The removed item names the deleted source row, so the new row never reactivates it.
+        assertThat(itemRows.findByIdAndWorkspaceId(root, own.getId())
+                        .orElseThrow()
+                        .getRemovedAt())
+                .isNotNull();
+        assertThat(stoppedProjects.getStoppedProjects(own.getId())).isEmpty();
     }
 
     @Test

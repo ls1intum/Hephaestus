@@ -7,12 +7,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.event.RepositoryMonitoringChangedEvent;
 import de.tum.cit.aet.hephaestus.core.event.ScmMirrorErasedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -25,7 +27,6 @@ import java.util.Optional;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
@@ -40,6 +41,9 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
 
     @Mock
     private RepositoryToMonitorRepository repositoryToMonitorRepository;
+
+    @Mock
+    private RepositoryRepository repositoryRepository;
 
     @Mock
     private WorkspaceRepositoryMonitorService repositoryMonitorService;
@@ -67,6 +71,7 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
                 workspaceRepository,
                 organizations,
                 repositoryToMonitorRepository,
+                repositoryRepository,
                 repositoryMonitorService,
                 teamRepository,
                 organizationMembershipRepository,
@@ -124,11 +129,24 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
 
-        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         InOrder order = inOrder(eventPublisher, repositoryMonitorService);
-        order.verify(eventPublisher).publishEvent(captor.capture());
+        order.verify(eventPublisher).publishEvent(new ScmMirrorErasedEvent(WORKSPACE_ID));
+        order.verify(eventPublisher).publishEvent(new RepositoryMonitoringChangedEvent(WORKSPACE_ID, List.of(101L)));
         order.verify(repositoryMonitorService).deleteRepositoryIfOrphaned(101L);
-        assertThat(captor.getValue()).isEqualTo(new ScmMirrorErasedEvent(WORKSPACE_ID));
+    }
+
+    @Test
+    void erase_releasesTheRepositoryItemsItKeptForStoppedProjectsBeforeTheOrphanCheck() {
+        workspaceWithMonitors("acme/alpha");
+        when(repositoryRepository.findIndexedRepositoryIds(WORKSPACE_ID)).thenReturn(List.of(101L, 300L));
+
+        eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
+
+        InOrder order = inOrder(eventPublisher, repositoryMonitorService);
+        order.verify(eventPublisher)
+                .publishEvent(new RepositoryMonitoringChangedEvent(WORKSPACE_ID, List.of(101L, 300L)));
+        order.verify(repositoryMonitorService).deleteRepositoryIfOrphaned(101L);
+        order.verify(repositoryMonitorService).deleteRepositoryIfOrphaned(300L);
     }
 
     @Test

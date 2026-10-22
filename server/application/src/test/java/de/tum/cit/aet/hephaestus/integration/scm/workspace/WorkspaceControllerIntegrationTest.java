@@ -11,8 +11,12 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserTeamsDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -33,11 +37,16 @@ import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceStatusRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceTokenRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +55,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -74,6 +84,24 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Autowired
     private ConnectionAuditRepository connectionAuditRepository;
+
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private ItemRepository itemRepository;
+
+    @Autowired
+    private SyncTargetProvider syncTargetProvider;
+
+    @Autowired
+    private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
+
+    @Autowired
+    private GitLabStoppedProjectService gitLabStoppedProjectService;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     @Test
     @WithAdminUser
@@ -794,6 +822,290 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getRepositorySelection())
                 .isEqualTo(RepositorySelection.ALL);
         assertThat(selectionChanges(workspace)).isEmpty();
+    }
+
+    @Test
+    @WithMentorUser
+    void shouldLetOnlyThatWorkspacesAdminListOrRemoveTheWorkKeptFromAStoppedProject() {
+        User mentor = persistUser("mentor");
+        Workspace joined = seedActiveGitLabWorkspace("stopped-member", 7701L);
+        ensureMembership(joined, mentor, Membership.WorkspaceRole.MEMBER);
+        Workspace administered = seedActiveGitLabWorkspace("stopped-administered", 7702L);
+        ensureMembership(administered, mentor, Membership.WorkspaceRole.ADMIN);
+        long joinedRoot = stopKeptProject(joined, 7701L);
+        long administeredRoot = stopKeptProject(administered, 7702L);
+        UUID joinedReceipt = gitLabStoppedProjectService
+                .getStoppedProjects(joined.getId())
+                .getFirst()
+                .stopReceipt();
+
+        webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories/stopped", joined.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectBody(Void.class);
+        webTestClient
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}?stopReceipt={stopReceipt}",
+                        joined.getWorkspaceSlug(),
+                        joinedRoot,
+                        joinedReceipt)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectBody(Void.class);
+        // The administered workspace cannot reach the other workspace's kept project by its ID.
+        webTestClient
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}?stopReceipt={stopReceipt}",
+                        administered.getWorkspaceSlug(),
+                        joinedRoot,
+                        joinedReceipt)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+        assertThat(kept(joined, joinedRoot)).isTrue();
+
+        List<GitLabStoppedProjectDTO> listed = webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/repositories/stopped", administered.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(GitLabStoppedProjectDTO.class)
+                .returnResult()
+                .getResponseBody();
+        assertNotNull(listed);
+        assertThat(listed).singleElement().satisfies(project -> {
+            assertThat(project.repositoryItemId()).isEqualTo(String.valueOf(administeredRoot));
+            assertThat(project.nameWithOwner()).isEqualTo("stopped-administered/kept-project");
+        });
+        webTestClient
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}?stopReceipt={stopReceipt}",
+                        administered.getWorkspaceSlug(),
+                        administeredRoot,
+                        listed.getFirst().stopReceipt())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent()
+                .expectBody(Void.class);
+
+        assertThat(kept(administered, administeredRoot)).isFalse();
+        assertThat(kept(joined, joinedRoot)).isTrue();
+        assertThat(stoppedProjectRemovals(administered))
+                .extracting(ConnectionAudit::getDetail, ConnectionAudit::getActorAccountId)
+                .containsExactly(tuple("stopped-administered/kept-project", accountId(mentor)));
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRefuseToRemoveKeptProjectWorkUntilThePausedGitLabConnectionResumes() {
+        Workspace workspace = seedActiveGitLabWorkspace("stopped-paused", 7801L);
+        long root = stopKeptProject(workspace, 7801L);
+        long repositoryId = Objects.requireNonNull(itemRepository
+                .findByIdAndWorkspaceId(root, workspace.getId())
+                .orElseThrow()
+                .getSourceId());
+        Connection active = connectionRepository
+                .findActive(workspace.getId(), IntegrationKind.GITLAB)
+                .orElseThrow();
+        Connection paused = connectionService.transition(
+                active,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.SUSPENDED,
+                        "TEST_SUSPENDED",
+                        "SYSTEM",
+                        "stopped-project-test",
+                        UUID.randomUUID().toString(),
+                        "Paused"));
+        UUID receipt = listedReceipt(workspace, root);
+
+        ProblemDetail problem = webTestClient
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}?stopReceipt={stopReceipt}",
+                        workspace.getWorkspaceSlug(),
+                        root,
+                        receipt)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.CONFLICT)
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getDetail()).contains("Resume the GitLab connection");
+        assertThat(kept(workspace, root)).isTrue();
+        assertThat(repositoryRepository.findById(repositoryId)).isPresent();
+        assertThat(listedReceipt(workspace, root)).isEqualTo(receipt);
+        assertThat(stoppedProjectRemovals(workspace)).isEmpty();
+
+        connectionService.transition(
+                paused,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_RESUMED",
+                        "SYSTEM",
+                        "stopped-project-test",
+                        UUID.randomUUID().toString(),
+                        "Resumed"));
+        webTestClient
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}?stopReceipt={stopReceipt}",
+                        workspace.getWorkspaceSlug(),
+                        root,
+                        receipt)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent()
+                .expectBody(Void.class);
+
+        assertThat(kept(workspace, root)).isFalse();
+        assertThat(repositoryRepository.findById(repositoryId)).isEmpty();
+        assertThat(stoppedProjectRemovals(workspace)).hasSize(1);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldReturnAConflictAndKeepStoppedWorkWhenAnotherTransactionClaimsItsSource() throws Exception {
+        Workspace workspace = seedActiveGitLabWorkspace("stopped-conflict", 7901L);
+        long root = stopKeptProject(workspace, 7901L);
+        long repositoryId = Objects.requireNonNull(itemRepository
+                .findByIdAndWorkspaceId(root, workspace.getId())
+                .orElseThrow()
+                .getSourceId());
+        UUID receipt = listedReceipt(workspace, root);
+        var claimed = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var claim = executor.submit(() -> transactions.executeWithoutResult(status -> {
+                assertThat(repositoryRepository.acquireIndexClaim(repositoryId)).contains(repositoryId);
+                claimed.countDown();
+                try {
+                    assertThat(release.await(20, TimeUnit.SECONDS)).isTrue();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(interrupted);
+                }
+            }));
+            assertThat(claimed.await(20, TimeUnit.SECONDS)).isTrue();
+
+            ProblemDetail problem = webTestClient
+                    .delete()
+                    .uri(
+                            "/workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}?stopReceipt={stopReceipt}",
+                            workspace.getWorkspaceSlug(),
+                            root,
+                            receipt)
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isEqualTo(HttpStatus.CONFLICT)
+                    .expectBody(ProblemDetail.class)
+                    .returnResult()
+                    .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            assertThat(problem.getTitle()).isEqualTo("Concurrent change");
+            assertThat(problem.getDetail()).isEqualTo("Another request is changing this data. Reload and try again.");
+            assertThat(kept(workspace, root)).isTrue();
+            assertThat(listedReceipt(workspace, root)).isEqualTo(receipt);
+            assertThat(repositoryRepository.findById(repositoryId)).isPresent();
+            assertThat(stoppedProjectRemovals(workspace)).isEmpty();
+            release.countDown();
+            claim.get(20, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(20, TimeUnit.SECONDS)).isTrue();
+        }
+
+        webTestClient
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}?stopReceipt={stopReceipt}",
+                        workspace.getWorkspaceSlug(),
+                        root,
+                        receipt)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent()
+                .expectBody(Void.class);
+        assertThat(kept(workspace, root)).isFalse();
+        assertThat(stoppedProjectRemovals(workspace)).hasSize(1);
+    }
+
+    /** Indexes the seeded project through its monitor, then stops it, so the workspace keeps its repository item. */
+    private long stopKeptProject(Workspace workspace, long nativeId) {
+        String name = workspace.getWorkspaceSlug() + "/kept-project";
+        Repository repository = new Repository();
+        repository.setNativeId(nativeId);
+        repository.setProvider(ensureGitLabProvider());
+        repository.setName("kept-project");
+        repository.setNameWithOwner(name);
+        repository.setHtmlUrl("https://gitlab.com/" + name);
+        repository.setDefaultBranch("main");
+        repository.setVisibility(Repository.Visibility.PUBLIC);
+        repository.setCreatedAt(Instant.now());
+        repository.setUpdatedAt(Instant.now());
+        repository = repositoryRepository.saveAndFlush(repository);
+        RepositoryToMonitor monitor = repositoryToMonitorRepository
+                .findByWorkspaceIdAndNameWithOwner(workspace.getId(), name)
+                .orElseThrow();
+        syncTargetProvider.reconcileSyncTargetIdentity(monitor.getId(), nativeId, name);
+        long root = itemRepository
+                .findSource(workspace.getId(), "scm.repository", Objects.requireNonNull(repository.getId()))
+                .orElseThrow()
+                .getId();
+        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspace.getWorkspaceSlug(), name);
+        return root;
+    }
+
+    private boolean kept(Workspace workspace, long root) {
+        return itemRepository
+                        .findByIdAndWorkspaceId(root, workspace.getId())
+                        .orElseThrow()
+                        .getRemovedAt()
+                == null;
+    }
+
+    private UUID listedReceipt(Workspace workspace, long root) {
+        return gitLabStoppedProjectService.getStoppedProjects(workspace.getId()).stream()
+                .filter(project -> project.repositoryItemId().equals(String.valueOf(root)))
+                .findFirst()
+                .orElseThrow()
+                .stopReceipt();
+    }
+
+    private List<ConnectionAudit> stoppedProjectRemovals(Workspace workspace) {
+        return connectionRepository
+                .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        workspace.getId(), IntegrationKind.GITLAB, IntegrationState.ACTIVE)
+                .or(() -> connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        workspace.getId(), IntegrationKind.GITLAB, IntegrationState.SUSPENDED))
+                .map(connection ->
+                        connectionAuditRepository.findByConnectionIdOrderByOccurredAtDesc(connection.getId()).stream()
+                                .filter(audit -> audit.getEventType().equals("STOPPED_PROJECT_WORK_REMOVED"))
+                                .toList())
+                .orElseThrow();
     }
 
     private List<ConnectionAudit> selectionChanges(Workspace workspace) {

@@ -1888,6 +1888,21 @@ export type GitLabRepositorySelection = {
     repositorySelection: 'ALL' | 'SELECTED';
 };
 
+/**
+ * A stopped GitLab project whose synced work the workspace still keeps
+ */
+export type GitLabStoppedProject = {
+    nameWithOwner: string;
+    /**
+     * The workspace's repository item that holds the kept work
+     */
+    repositoryItemId: string;
+    /**
+     * Names the Stop that a removal of the kept work answers
+     */
+    stopReceipt: string;
+};
+
 export type GroupDefinition = {
     color: string | null;
     description: string | null;
@@ -15148,6 +15163,51 @@ export type UpdateGitLabRepositorySelectionResponses = {
 };
 
 export type UpdateGitLabRepositorySelectionResponse = UpdateGitLabRepositorySelectionResponses[keyof UpdateGitLabRepositorySelectionResponses];
+
+export type GetStoppedGitLabProjectsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/repositories/stopped';
+};
+
+export type GetStoppedGitLabProjectsResponses = {
+    /**
+     * OK
+     */
+    200: Array<GitLabStoppedProject>;
+};
+
+export type GetStoppedGitLabProjectsResponse = GetStoppedGitLabProjectsResponses[keyof GetStoppedGitLabProjectsResponses];
+
+export type RemoveStoppedGitLabProjectData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        repositoryItemId: string;
+    };
+    query: {
+        stopReceipt: string;
+    };
+    url: '/workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}';
+};
+
+export type RemoveStoppedGitLabProjectResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemoveStoppedGitLabProjectResponse = RemoveStoppedGitLabProjectResponses[keyof RemoveStoppedGitLabProjectResponses];
 
 export type ListSlackChannelsData = {
     body?: never;

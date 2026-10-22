@@ -9,18 +9,28 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.BackfillBatchResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.GraphQlResponses;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -28,14 +38,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.GraphQlClient;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -44,6 +58,8 @@ import reactor.core.publisher.Mono;
 class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
 
     private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
+    private final Logger logger = (Logger) LoggerFactory.getLogger(GitLabMergeRequestSyncService.class);
+    private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
 
     private static final Long SCOPE_ID = 100L;
     private static final String FULL_PATH = "hephaestustest/demo-repository";
@@ -74,6 +90,8 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
+        appender.start();
+        logger.addAppender(appender);
         service = new GitLabMergeRequestSyncService(
                 graphQlClientProvider,
                 new GitLabGraphQlResponseHandler(mock(GitLabExceptionClassifier.class)),
@@ -96,6 +114,54 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
                 .when(requestSpec.execute())
                 .thenAnswer(
                         invocation -> scriptedResponses.isEmpty() ? Mono.empty() : Mono.just(scriptedResponses.poll()));
+    }
+
+    @AfterEach
+    void releaseEvents() {
+        logger.detachAppender(appender);
+        appender.stop();
+    }
+
+    @Test
+    void shouldAbortAConcurrentWriteWithoutReadingTheNextPageAndAllowAFreshSync() {
+        Repository repository = repository();
+        List<Map<String, Object>> nodes = nullable(List.of(mergeRequest(3)));
+        assertVendorCouldReturn(GITLAB, LISTING, "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(nodes, List.of(), true));
+        scriptedResponses.add(response(nodes));
+        when(mergeRequestProcessor.processFromSync(any(), any()))
+                .thenThrow(new PessimisticLockingFailureException(
+                        "private-statement-canary", new SQLException("private-row-canary", "55P03")))
+                .thenReturn(new PullRequest());
+
+        assertThat(service.syncMergeRequests(SCOPE_ID, repository, null)).isEqualTo(SyncResult.abortedError(0));
+        assertThat(scriptedResponses).hasSize(1);
+        assertConcurrentWriteStayedLocal();
+
+        assertThat(service.syncMergeRequests(SCOPE_ID, repository, null)).isEqualTo(SyncResult.completed(1));
+        assertThat(scriptedResponses).isEmpty();
+    }
+
+    @Test
+    void shouldAbortAConcurrentHistoricalWriteWithoutAdvancingItsCheckpointAndAllowAFreshBatch() {
+        Repository repository = repository();
+        List<Map<String, Object>> nodes = nullable(List.of(mergeRequest(3)));
+        assertVendorCouldReturn(GITLAB, "GetProjectMergeRequestsHistorical", "project.mergeRequests.nodes", nodes);
+        scriptedResponses.add(response(nodes, List.of(), true));
+        scriptedResponses.add(response(nodes));
+        when(mergeRequestProcessor.processFromSync(any(), any()))
+                .thenThrow(new PessimisticLockingFailureException(
+                        "private-statement-canary", new SQLException("private-row-canary", "55P03")))
+                .thenReturn(new PullRequest());
+
+        assertThat(service.backfillMergeRequests(SCOPE_ID, repository, null, 1))
+                .isEqualTo(BackfillBatchResult.abortedWithError());
+        assertThat(scriptedResponses).hasSize(1);
+        assertConcurrentWriteStayedLocal();
+
+        assertThat(service.backfillMergeRequests(SCOPE_ID, repository, null, 1))
+                .isEqualTo(new BackfillBatchResult(1, 3, 3, null, true, false));
+        assertThat(scriptedResponses).isEmpty();
     }
 
     @Test
@@ -419,6 +485,32 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
         return node;
     }
 
+    private void assertConcurrentWriteStayedLocal() {
+        verify(graphQlClientProvider, never()).recordFailure(any());
+        assertThat(appender.list)
+                .filteredOn(
+                        event -> event.getFormattedMessage().equals("Mirror write conflicts with another transaction"))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                    assertThat(event.getKeyValuePairs()).isNotNull();
+                    assertThat(event.getKeyValuePairs().stream()
+                                    .collect(Collectors.toMap(pair -> pair.key, pair -> pair.value)))
+                            .containsExactlyInAnyOrderEntriesOf(Map.of(
+                                    "event.name",
+                                    "integration.mirror.write.conflict",
+                                    "error.type",
+                                    PessimisticLockingFailureException.class.getName(),
+                                    "integration.scope.id",
+                                    SCOPE_ID));
+                    assertThat(event.getArgumentArray()).isNullOrEmpty();
+                });
+        assertThat(appender.list).allSatisfy(event -> {
+            assertThat(event.getFormattedMessage()).doesNotContain("canary");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
     /** Merge request !{@code iid} as the listing names it, with fields a test adds. */
     private static Map<String, @Nullable Object> mergeRequest(int iid) {
         Map<String, @Nullable Object> node = new HashMap<>();
@@ -509,9 +601,14 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
 
     /** A page holding {@code nodes} and no further page, with {@code errors} beside the data. */
     private static ClientGraphQlResponse response(List<Map<String, Object>> nodes, List<Map<String, ?>> errors) {
+        return response(nodes, errors, false);
+    }
+
+    private static ClientGraphQlResponse response(
+            List<Map<String, Object>> nodes, List<Map<String, ?>> errors, boolean hasNextPage) {
         Map<String, @Nullable Object> pageInfo = new HashMap<>();
-        pageInfo.put("hasNextPage", false);
-        pageInfo.put("endCursor", null);
+        pageInfo.put("hasNextPage", hasNextPage);
+        pageInfo.put("endCursor", hasNextPage ? "next-page" : null);
         return GraphQlResponses.of(
                 Map.of("project", Map.of("mergeRequests", Map.of("nodes", nodes, "pageInfo", pageInfo))), errors);
     }

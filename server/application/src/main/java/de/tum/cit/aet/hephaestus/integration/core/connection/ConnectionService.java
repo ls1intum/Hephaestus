@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateChangedEvent;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -329,7 +330,10 @@ public class ConnectionService {
                 .map(connection -> {
                     var config = (ConnectionConfig.GitLabConfig) connection.getConfig();
                     connection.setConfig(config.withProjectExclusions(mutator.apply(config.projectExclusions())));
-                    return connectionRepository.save(connection);
+                    Connection saved = connectionRepository.save(connection);
+                    eventPublisher.publishEvent(new SyncStateChangedEvent(
+                            workspaceId, saved.getId(), IntegrationKind.GITLAB, SyncStateChangedEvent.Scope.RESOURCES));
+                    return saved;
                 });
     }
 

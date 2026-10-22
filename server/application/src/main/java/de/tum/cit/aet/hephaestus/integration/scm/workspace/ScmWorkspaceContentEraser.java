@@ -2,12 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.scm.workspace;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.event.RepositoryMonitoringChangedEvent;
 import de.tum.cit.aet.hephaestus.core.event.ScmMirrorErasedEvent;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -39,6 +41,7 @@ public class ScmWorkspaceContentEraser {
     private final WorkspaceOrganizationLookup organizations;
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final RepositoryRepository repositoryRepository;
     private final WorkspaceRepositoryMonitorService repositoryMonitorService;
     private final TeamRepository teamRepository;
     private final OrganizationMembershipRepository organizationMembershipRepository;
@@ -53,6 +56,7 @@ public class ScmWorkspaceContentEraser {
             WorkspaceRepository workspaceRepository,
             WorkspaceOrganizationLookup organizations,
             RepositoryToMonitorRepository repositoryToMonitorRepository,
+            RepositoryRepository repositoryRepository,
             WorkspaceRepositoryMonitorService repositoryMonitorService,
             TeamRepository teamRepository,
             OrganizationMembershipRepository organizationMembershipRepository,
@@ -62,6 +66,7 @@ public class ScmWorkspaceContentEraser {
         this.workspaceRepository = workspaceRepository;
         this.organizations = organizations;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.repositoryRepository = repositoryRepository;
         this.repositoryMonitorService = repositoryMonitorService;
         this.teamRepository = teamRepository;
         this.organizationMembershipRepository = organizationMembershipRepository;
@@ -87,18 +92,22 @@ public class ScmWorkspaceContentEraser {
         // Delete dependent rows before the work they reference.
         eventPublisher.publishEvent(new ScmMirrorErasedEvent(workspaceId));
 
-        List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIds(workspaceId);
+        // Stopped GitLab projects have no monitor but stay indexed, so their sources are found through the items.
+        Set<Long> sources = new LinkedHashSet<>(repositoryToMonitorRepository.findSourceRepositoryIds(workspaceId));
+        sources.addAll(repositoryRepository.findIndexedRepositoryIds(workspaceId));
+        List<Long> repositoryIds = List.copyOf(sources);
 
         // Flush monitor removals before checking whether their repositories became orphaned.
         workspace.getRepositoriesToMonitor().clear();
         workspaceRepository.saveAndFlush(workspace);
+        // Unindexes this workspace's repository items; an item it kept would otherwise keep its source.
+        eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(workspaceId, repositoryIds));
 
         int erased = 0;
         int shared = 0;
         for (Long repositoryId : repositoryIds) {
-            long remaining = repositoryToMonitorRepository.countForRepository(repositoryId);
             repositoryMonitorService.deleteRepositoryIfOrphaned(repositoryId);
-            if (remaining > 0) {
+            if (repositoryRepository.existsById(repositoryId)) {
                 shared++;
             } else {
                 erased++;
