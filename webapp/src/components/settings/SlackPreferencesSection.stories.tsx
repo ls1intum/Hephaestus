@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import { StandardPageSurface } from "@/components/layout/StandardPageSurface";
 import { expectNoPageOverflow } from "@/stories/reflow";
@@ -72,6 +72,36 @@ export const MessageUseOff: Story = {
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("switch", { name: /use your new channel messages/iu }));
 		await expect(args.onToggleChannelMessages).toHaveBeenCalledWith("hephaestustest", true);
+	},
+};
+
+/**
+ * Two workspaces save at once. Each switch stays held until its own save finishes, and a workspace
+ * with no save in progress stays available.
+ */
+export const SavingTwoWorkspaces: Story = {
+	args: {
+		workspaces: [
+			workspace,
+			{ ...workspace, workspaceSlug: "research", workspaceName: "Research", slackTeamId: "T2" },
+			{ ...workspace, workspaceSlug: "teaching", workspaceName: "Teaching", slackTeamId: "T3" },
+		],
+		isSlackLinked: true,
+		canConnectSlack: true,
+		updatingWorkspaceSlugs: new Set(["hephaestustest", "research"]),
+	},
+	play: async ({ canvas }) => {
+		const channelMessages = (workspaceName: string) =>
+			within(canvas.getByRole("group", { name: `${workspaceName} Slack preferences` })).getByRole(
+				"switch",
+				{ name: "Use your new channel messages" },
+			);
+		for (const saving of ["Hephaestus Test", "Research"]) {
+			await expect(channelMessages(saving)).toHaveAttribute("aria-disabled", "true");
+			await expect(channelMessages(saving)).toHaveAttribute("aria-busy", "true");
+		}
+		await expect(channelMessages("Teaching")).not.toHaveAttribute("aria-disabled", "true");
+		await expect(channelMessages("Teaching")).not.toHaveAttribute("aria-busy", "true");
 	},
 };
 

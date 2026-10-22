@@ -58,6 +58,7 @@ import { SettingsPage } from "@/components/settings/SettingsPage";
 import type { SlackPreferencesSectionProps } from "@/components/settings/SlackPreferencesSection";
 import type { WeeklyDigestSectionProps } from "@/components/settings/WeeklyDigestSection";
 import { memberOnboardingQueryScope } from "@/hooks/use-member-onboarding";
+import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { productSurveyQueryScope } from "@/hooks/use-product-feedback";
 import { browserTimeZone, TIME_ZONES } from "@/lib/dates";
 import { pageHead } from "@/lib/page-title";
@@ -67,6 +68,13 @@ import { hasText } from "@/lib/text";
 import { useAuth } from "@/runtime/auth/AuthContext";
 import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 import { refreshPublicActivity } from "@/runtime/tanstack-query/refresh-public-activity";
+
+/** Every Slack preference write, whichever workspace it changes. */
+const SLACK_PREFERENCE_WRITE_KEY = ["updateSlackUserPreferences"];
+
+function slackPreferenceWorkspaceOf(variables: unknown): string | undefined {
+	return pathString(variables, "workspaceSlug");
+}
 
 export const Route = createFileRoute("/_authenticated/settings")({
 	head: pageHead("User settings"),
@@ -331,7 +339,7 @@ function RouteComponent() {
 
 	const slackPreferencesQueryKey = getSlackUserPreferencesQueryKey({});
 	const updateSlackPreferencesMutation = useMutation({
-		...updateSlackUserPreferencesMutation(),
+		...filedUnder(SLACK_PREFERENCE_WRITE_KEY, updateSlackUserPreferencesMutation()),
 		onSuccess: (updatedWorkspace) => {
 			queryClient.setQueryData<SlackUserPreferences>(slackPreferencesQueryKey, (current) => {
 				const workspaces = current?.workspaces ?? [];
@@ -359,6 +367,10 @@ function RouteComponent() {
 			toast.error(problemDetailOf(error, "We could not update your Slack preferences. Try again."));
 		},
 	});
+	const updatingSlackWorkspaceSlugs = usePendingMutationIds(
+		SLACK_PREFERENCE_WRITE_KEY,
+		slackPreferenceWorkspaceOf,
+	);
 
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
 		identities: linkedIdentitiesQuery.data ?? [],
@@ -406,15 +418,20 @@ function RouteComponent() {
 				linkAccount(slackProvider.registrationId, "/settings");
 			}
 		},
+		// One write per workspace at a time; another workspace's write never holds this one up.
 		onToggleChannelMessages: (workspaceSlug, channelMessagesAllowed) => {
-			updateSlackPreferencesMutation.mutate({
-				path: { workspaceSlug },
-				body: { channelMessagesAllowed },
+			const writing = queryClient.isMutating({
+				mutationKey: SLACK_PREFERENCE_WRITE_KEY,
+				predicate: ({ state }) => slackPreferenceWorkspaceOf(state.variables) === workspaceSlug,
 			});
+			if (writing === 0) {
+				updateSlackPreferencesMutation.mutate({
+					path: { workspaceSlug },
+					body: { channelMessagesAllowed },
+				});
+			}
 		},
-		updatingWorkspaceSlug: updateSlackPreferencesMutation.isPending
-			? updateSlackPreferencesMutation.variables.path.workspaceSlug
-			: null,
+		updatingWorkspaceSlugs: updatingSlackWorkspaceSlugs,
 		isLoading:
 			linkedIdentitiesQuery.isLoading ||
 			identityProvidersQuery.isLoading ||

@@ -34,7 +34,8 @@ export interface SlackPreferencesSectionProps {
 	canConnectSlack: boolean;
 	onConnectSlack: () => void;
 	onToggleChannelMessages: (workspaceSlug: string, channelMessagesAllowed: boolean) => void;
-	updatingWorkspaceSlug?: string | null;
+	/** The workspaces whose own write is still out, each one's switch held until it finishes. */
+	updatingWorkspaceSlugs?: ReadonlySet<string>;
 	isLoading?: boolean;
 	isError?: boolean;
 	/** The thrown query error behind `isError`. */
@@ -42,13 +43,15 @@ export interface SlackPreferencesSectionProps {
 	onRetry?: () => void;
 }
 
+const NO_WORKSPACES: ReadonlySet<string> = new Set();
+
 export function SlackPreferencesSection({
 	workspaces,
 	isSlackLinked,
 	canConnectSlack,
 	onConnectSlack,
 	onToggleChannelMessages,
-	updatingWorkspaceSlug = null,
+	updatingWorkspaceSlugs = NO_WORKSPACES,
 	isLoading = false,
 	isError = false,
 	error,
@@ -117,7 +120,7 @@ export function SlackPreferencesSection({
 					<WorkspacePreferenceRow
 						key={workspace.workspaceSlug}
 						workspace={workspace}
-						isUpdating={updatingWorkspaceSlug === workspace.workspaceSlug}
+						isUpdating={updatingWorkspaceSlugs.has(workspace.workspaceSlug)}
 						onToggleChannelMessages={onToggleChannelMessages}
 					/>
 				))}
