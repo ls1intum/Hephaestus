@@ -2,6 +2,7 @@ import { PulseIcon } from "@primer/octicons-react";
 import { PlayIcon } from "lucide-react";
 
 import type { ProfileReview, ReviewResultCounts } from "@/api/types.gen";
+import { LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { InlineLink } from "@/components/common/InlineLink";
 import { useNow } from "@/components/common/use-now";
 import type { ReviewSaw } from "@/components/practice-trace/review-saw";
@@ -49,9 +50,6 @@ export interface ReviewsTableProps {
 	/** Whether the next page of reviews is on its way: placeholder rows then continue the table. */
 	isLoadingMore?: boolean;
 }
-
-/** Placeholder rows for the next page: enough to read as the list going on, not a whole page. */
-const LOADING_MORE_ROWS = 3;
 
 const COLUMNS: readonly ReviewColumn[] = [
 	{ label: "What it saw" },

@@ -107,7 +107,7 @@ export function ProfileReviewsLevel({
 						isLoadingMore={feed.isLoadingMore}
 					/>
 					{/* The table draws the next page's placeholder rows itself, in its own columns. */}
-					<EarlierReviews {...feed} loadingRow={null} />
+					<EarlierReviews {...feed} />
 				</>
 			);
 			break;

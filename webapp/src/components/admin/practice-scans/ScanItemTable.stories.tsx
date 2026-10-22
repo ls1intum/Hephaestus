@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
 
 import { withStandardPage } from "@/stories/decorators";
+import { expectTablePlaceholders } from "@/stories/loading-more";
 import { StatefulPatch } from "@/stories/stateful";
 
 import { ITEM_ENTRIES, LISTED_ENTRY, WITHHELD_ENTRY } from "./fixtures";
@@ -99,6 +100,15 @@ export const Waiting: Story = {
 			await expect(within(listed).getByText("Not reviewed yet.")).toBeVisible();
 		}
 		await expect(canvas.getByRole("button", { name: "Show more files" })).toBeVisible();
+	},
+};
+
+/** The next page's placeholder rows continue the table in its own columns while it is busy. */
+export const LoadingMore: Story = {
+	args: { state: { ...ready(ITEM_ENTRIES, true), loadingMore: true } },
+	play: async ({ canvas }) => {
+		await expectTablePlaceholders(canvas.getByRole("table", { name: "Files and practices" }));
+		await expect(canvas.getByRole("button", { name: "Loading…" })).toBeDisabled();
 	},
 };
 

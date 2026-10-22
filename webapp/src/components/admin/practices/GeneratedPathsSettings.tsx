@@ -1,6 +1,7 @@
 import { ChevronDownIcon } from "lucide-react";
 import { useId, useState } from "react";
 import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
+import { LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -116,7 +117,7 @@ export function GeneratedPathsSettings(props: GeneratedPathsSettingsProps) {
 						</p>
 					)}
 					{/* Rows that do not match are hidden, not unmounted, so their drafts and guards stay. */}
-					<ItemGroup>
+					<ItemGroup aria-busy={repositories.more?.isLoadingMore === true || undefined}>
 						{repositories.options.map((option) => (
 							<RepositoryGeneratedPaths
 								key={option.itemId}
@@ -125,11 +126,30 @@ export function GeneratedPathsSettings(props: GeneratedPathsSettingsProps) {
 								matched={matches(option, needle)}
 							/>
 						))}
+						{repositories.more?.isLoadingMore === true &&
+							Array.from({ length: LOADING_MORE_ROWS }, (_, index) => (
+								<RepositorySkeleton key={index} />
+							))}
 					</ItemGroup>
 					{repositories.more !== undefined && <MoreRepositories more={repositories.more} />}
 				</>
 			)}
 		</section>
+	);
+}
+
+/** A repository's row while the next page loads: its name, its summary and the press. */
+function RepositorySkeleton() {
+	return (
+		<Item variant="outline" size="sm" aria-hidden data-loading-row>
+			<ItemContent className="min-w-0 gap-1.5">
+				<Skeleton className="h-4 w-48 max-w-full" />
+				<Skeleton className="h-3.5 w-28" />
+			</ItemContent>
+			<ItemActions>
+				<Skeleton className="h-8 w-36" />
+			</ItemActions>
+		</Item>
 	);
 }
 

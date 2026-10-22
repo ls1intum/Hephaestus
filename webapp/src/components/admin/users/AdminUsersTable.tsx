@@ -1,5 +1,6 @@
 import { LogOut, MoreHorizontal, UserCog, Users } from "lucide-react";
 import type { AdminAccountView } from "@/api/types.gen";
+import { LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { QueryErrorAlert, type QueryErrorAlertProps } from "@/components/common/QueryErrorAlert";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
@@ -93,12 +94,18 @@ export function AdminUsersTable({
 	if (loadFailure !== undefined) {
 		return <QueryErrorAlert title="We could not load users" {...loadFailure} />;
 	}
+	// With no row shown, a search that reads on says so in the table's one row instead.
+	const loadingMore = !isLoading && isFetchingNextPage && users.length > 0;
 	return (
 		<div className="space-y-4">
 			{refreshFailure !== undefined && (
 				<QueryErrorAlert title="These users may be out of date" {...refreshFailure} />
 			)}
-			<Table bordered aria-label="Application users" aria-busy={isLoading || undefined}>
+			<Table
+				bordered
+				aria-label="Application users"
+				aria-busy={isLoading || isFetchingNextPage || undefined}
+			>
 				<TableHeader>
 					<TableRow>
 						<TableHead scope="col">ID</TableHead>
@@ -117,6 +124,9 @@ export function AdminUsersTable({
 					<TableBody>
 						<UserRows {...rows} />
 					</TableBody>
+				)}
+				{loadingMore && (
+					<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={LOADING_MORE_ROWS} continues />
 				)}
 			</Table>
 

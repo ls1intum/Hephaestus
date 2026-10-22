@@ -1,13 +1,10 @@
-import { InfiniteListEnd } from "@/components/common/InfiniteListEnd";
+import { InfiniteListEnd, LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import type { MorePages } from "@/runtime/tanstack-query/infinite-list";
 
 export interface ReviewListEndProps extends MorePages {
 	/** What the list holds, in the plural: "reviews", "feedback". */
 	noun: string;
 }
-
-/** Placeholder rows for the next page: enough to read as the list going on, not a whole page. */
-const LOADING_MORE_ROWS = 3;
 
 /**
  * The placeholder rows a list's table draws after its rows while the next page loads, as its
@@ -27,7 +24,6 @@ export function ReviewListEnd({ noun, ...more }: ReviewListEndProps) {
 			{...more}
 			moreLabel={`Show more ${noun}`}
 			failedLabel={`We could not load more ${noun}.`}
-			loadingRow={null}
 		/>
 	);
 }
