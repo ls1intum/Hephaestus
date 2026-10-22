@@ -157,12 +157,16 @@ This let them make things for themselves.
 
 <p align="center">
   <strong>Developed by</strong><br><br>
-  <a href="https://aet.cit.tum.de/">
+  <a href="https://aet.cit.tum.de/#gh-dark-mode-only">
     <img alt="Applied Education Technologies" align="middle" hspace="12" src="./docs/static/img/readme-brand/aet-mark-dark.svg#gh-dark-mode-only" height="72">
+  </a>
+  <a href="https://aet.cit.tum.de/#gh-light-mode-only">
     <img alt="Applied Education Technologies" align="middle" hspace="12" src="./webapp/public/brand/aet-mark.svg#gh-light-mode-only" height="72">
   </a>
-  <a href="https://www.tum.de/en/">
+  <a href="https://www.tum.de/en/#gh-dark-mode-only">
     <img alt="Technical University of Munich" align="middle" hspace="12" src="./docs/static/img/readme-brand/tum-logo-dark.svg#gh-dark-mode-only" height="56">
+  </a>
+  <a href="https://www.tum.de/en/#gh-light-mode-only">
     <img alt="Technical University of Munich" align="middle" hspace="12" src="./webapp/public/brand/tum-logo.svg#gh-light-mode-only" height="56">
   </a>
   <br>
