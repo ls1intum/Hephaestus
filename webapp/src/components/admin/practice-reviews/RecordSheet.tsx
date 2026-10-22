@@ -1,6 +1,7 @@
 import { ChevronRightIcon, CopyIcon } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { Section } from "@/components/layout/Section";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -51,11 +52,7 @@ export function SheetStatusLine({ status, flag, figure, at }: SheetStatusLinePro
 		<span data-sheet-status className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
 			{parts.map((part, index) => (
 				<Fragment key={part.key}>
-					{index > 0 && (
-						<span aria-hidden className="text-muted-foreground">
-							·
-						</span>
-					)}
+					{index > 0 && <DotSeparator className="text-muted-foreground" />}
 					<span className="inline-flex items-center gap-1.5">{part.node}</span>
 				</Fragment>
 			))}
