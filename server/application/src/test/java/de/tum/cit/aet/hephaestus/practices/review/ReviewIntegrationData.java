@@ -43,12 +43,14 @@ import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
@@ -264,19 +266,45 @@ public class ReviewIntegrationData {
                 .param("review", result.getReviewId())
                 .param("ws", result.getWorkspaceId())
                 .param("trace", id.toString().replace("-", ""))
-                .param(
-                        "input",
-                        json.writeValueAsString(Map.of(
-                                "itemId",
-                                reviews.findByIdAndWorkspaceId(result.getReviewId(), result.getWorkspaceId())
-                                        .orElseThrow()
-                                        .getItemId(),
-                                "assignments",
-                                List.of(new ReviewAssignmentId(
-                                        result.getReviewId(), result.getPracticeId(), result.getItemId())))))
+                .param("input", jobInput(result))
                 .param("at", Timestamp.from(result.getRecordedAt()))
                 .update();
         return id;
+    }
+
+    /** An unfinished job of the result's review: QUEUED (waiting, or held when holdReason is BUDGET) or RUNNING. */
+    @Transactional
+    public UUID activeJob(Result result, String status, @Nullable String holdReason) {
+        var id = UUID.randomUUID();
+        jdbc.sql("""
+            INSERT INTO review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,submitted_at,available_at,started_at,hold_reason)
+            VALUES(:id,:review,:ws,:status,0,'NONE',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,:started,:hold)
+            """)
+                .param("id", id)
+                .param("review", result.getReviewId())
+                .param("ws", result.getWorkspaceId())
+                .param("status", status)
+                .param("trace", id.toString().replace("-", ""))
+                .param("input", jobInput(result))
+                .param("at", Timestamp.from(result.getRecordedAt()))
+                .param(
+                        "started",
+                        "RUNNING".equals(status) ? Timestamp.from(result.getRecordedAt()) : null,
+                        Types.TIMESTAMP)
+                .param("hold", holdReason, Types.VARCHAR)
+                .update();
+        return id;
+    }
+
+    /** The job input the worker reads: the review's item and its one assignment. */
+    private String jobInput(Result result) {
+        return json.writeValueAsString(Map.of(
+                "itemId",
+                reviews.findByIdAndWorkspaceId(result.getReviewId(), result.getWorkspaceId())
+                        .orElseThrow()
+                        .getItemId(),
+                "assignments",
+                List.of(new ReviewAssignmentId(result.getReviewId(), result.getPracticeId(), result.getItemId()))));
     }
 
     @Transactional

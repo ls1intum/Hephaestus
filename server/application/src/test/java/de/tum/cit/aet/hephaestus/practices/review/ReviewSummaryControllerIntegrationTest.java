@@ -145,6 +145,46 @@ class ReviewSummaryControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldListOnlyReviewsWhoseJobIsInTheQueueStateAsTheQueueCountsIt() {
+        var at = Instant.parse("2026-10-20T00:00:00Z");
+        // One current result per practice, item and developer: each review's result ends before the next.
+        var waiting = data.result(scenario, ResultOutcome.MET, at);
+        data.activeJob(waiting, "QUEUED", null);
+        data.end(waiting, at.plusSeconds(30));
+        var held = data.result(scenario, ResultOutcome.MET, at.plusSeconds(60));
+        data.activeJob(held, "QUEUED", "BUDGET");
+        data.end(held, at.plusSeconds(90));
+        var running = data.result(scenario, ResultOutcome.MET, at.plusSeconds(120));
+        data.activeJob(running, "RUNNING", null);
+        data.end(running, at.plusSeconds(150));
+        var finished = data.result(scenario, ResultOutcome.MET, at.plusSeconds(180));
+        data.job(finished);
+        get("/practices/reviews/queue")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.waiting")
+                .isEqualTo(1)
+                .jsonPath("$.heldForBudget")
+                .isEqualTo(1)
+                .jsonPath("$.running")
+                .isEqualTo(1);
+        for (var expected : List.of(
+                List.of("WAITING", waiting.getReviewId().toString()),
+                List.of("HELD", held.getReviewId().toString()),
+                List.of("RUNNING", running.getReviewId().toString()))) {
+            get("/practices/reviews?queueState=" + expected.getFirst())
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.totalElements")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].id")
+                    .isEqualTo(expected.getLast());
+        }
+    }
+
+    @Test
     void shouldExcludeIncorrectProofFromPracticeFiltersAndRestoreItWhenTheMarkIsRemoved() {
         var result = data.result(scenario, ResultOutcome.MET, Instant.now());
         var mark = data.mark(result, ResultMarkKind.INCORRECT, scenarioAccountId);

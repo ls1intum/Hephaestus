@@ -8362,7 +8362,8 @@ paths:
   /workspaces/{workspaceSlug}/practices/reviews:
     get:
       description: "Reviews are ordered by when they were created, newest first unless\
-        \ sort is OLDEST."
+        \ sort is OLDEST. queueState keeps the reviews whose job waits for a worker,\
+        \ is on hold for budget or runs now, as the queue counts them."
       operationId: listReviews
       parameters:
       - description: Workspace slug
@@ -8462,6 +8463,15 @@ paths:
           enum:
           - NEWEST
           - OLDEST
+      - in: query
+        name: queueState
+        required: false
+        schema:
+          type: string
+          enum:
+          - WAITING
+          - HELD
+          - RUNNING
       responses:
         "200":
           content:

@@ -13704,6 +13704,7 @@ export type ListReviewsData = {
         from?: string;
         to?: string;
         sort?: 'NEWEST' | 'OLDEST';
+        queueState?: 'WAITING' | 'HELD' | 'RUNNING';
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews';
 };
