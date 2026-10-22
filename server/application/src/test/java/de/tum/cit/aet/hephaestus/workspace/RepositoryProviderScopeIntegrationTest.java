@@ -48,6 +48,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectA
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRepositoryMonitors;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.GitLabRepositorySelectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -123,6 +124,9 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Autowired
     private WorkspaceRepositoryMonitorService monitorService;
+
+    @Autowired
+    private GitLabRepositorySelectionService selectionService;
 
     @Autowired
     private GitLabRepositoryMonitors gitLabMonitors;
@@ -473,7 +477,7 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
             }));
             try {
                 assertThat(loaded.await(10, TimeUnit.SECONDS)).isTrue();
-                assertThat(monitorService.updateGitLabRepositorySelection(
+                assertThat(selectionService.updateGitLabRepositorySelection(
                                 WorkspaceContext.fromWorkspace(own, null, null),
                                 RepositorySelection.SELECTED,
                                 accountId(owner)))

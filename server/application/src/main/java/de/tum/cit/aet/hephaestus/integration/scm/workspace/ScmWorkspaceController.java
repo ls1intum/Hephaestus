@@ -37,6 +37,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class ScmWorkspaceController {
     private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final WorkspaceTeamLabelService workspaceTeamLabelService;
+    private final GitLabRepositorySelectionService gitLabRepositorySelectionService;
 
     @GetMapping("/repositories")
     @Operation(summary = "List repositories monitored by a workspace")
@@ -82,7 +83,7 @@ public class ScmWorkspaceController {
     public ResponseEntity<GitLabRepositorySelectionDTO> getGitLabRepositorySelection(
             WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(new GitLabRepositorySelectionDTO(
-                workspaceRepositoryMonitorService.getGitLabRepositorySelection(workspaceContext)));
+                gitLabRepositorySelectionService.getGitLabRepositorySelection(workspaceContext)));
     }
 
     @PatchMapping("/repositories/selection")
@@ -94,7 +95,7 @@ public class ScmWorkspaceController {
     public ResponseEntity<GitLabRepositorySelectionDTO> updateGitLabRepositorySelection(
             WorkspaceContext workspaceContext, @Valid @RequestBody GitLabRepositorySelectionDTO request) {
         return ResponseEntity.ok(
-                new GitLabRepositorySelectionDTO(workspaceRepositoryMonitorService.updateGitLabRepositorySelection(
+                new GitLabRepositorySelectionDTO(gitLabRepositorySelectionService.updateGitLabRepositorySelection(
                         workspaceContext, request.repositorySelection(), CurrentAccount.requireId())));
     }
 

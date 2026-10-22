@@ -96,6 +96,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabConnectionWebhookController;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabRouteCredential;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabSubjectKeyDeriver;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.GitLabRepositorySelectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.RepositoryProviderNotConnectedException;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
@@ -343,6 +344,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
+
+    @Autowired
+    private GitLabRepositorySelectionService gitLabRepositorySelectionService;
 
     @Autowired
     private PracticeReviewCoverageService practiceReviewCoverageService;
@@ -1369,7 +1373,7 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
 
     /** Changes the selection as the workspace admin's PATCH does. */
     private RepositorySelection selectProjects(Workspace target, RepositorySelection selection, long actorAccountId) {
-        return workspaceRepositoryMonitorService.updateGitLabRepositorySelection(
+        return gitLabRepositorySelectionService.updateGitLabRepositorySelection(
                 WorkspaceContext.fromWorkspace(target, Set.of(), null), selection, actorAccountId);
     }
 
