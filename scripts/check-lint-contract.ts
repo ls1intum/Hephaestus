@@ -25,7 +25,7 @@ import { parse } from "jsonc-parser";
 import { loadLintConfig } from "../webapp/tools/oxlint/load-config.ts";
 import { isSet } from "./lib/env.ts";
 import { asRecord, isRecord } from "./lib/json.ts";
-import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+import { CAPTURE_LIMIT_BYTES, repositoryCli } from "./lib/process.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const WEBAPP = path.join(REPO_ROOT, "webapp");
@@ -292,10 +292,11 @@ const fixtures: Fixture[] = [
 ];
 
 function effectiveLintConfig(scope: string) {
-	const result = spawnSync("vp", ["-C", path.join(REPO_ROOT, scope), "lint", "--print-config"], {
-		encoding: "utf8",
-		maxBuffer: CAPTURE_LIMIT_BYTES,
-	});
+	const result = spawnSync(
+		process.execPath,
+		[repositoryCli(), "-C", path.join(REPO_ROOT, scope), "lint", "--print-config"],
+		{ encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES },
+	);
 	assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
 	return asRecord(JSON.parse(result.stdout), `${scope} effective lint config`);
 }
@@ -372,8 +373,16 @@ void test("vp lint preserves house rules, design-system checks and type-aware di
 	try {
 		writeScratchProject(project);
 		const result = spawnSync(
-			"vp",
-			["-C", project, "lint", "--format", "json", ...fixtures.map((fixture) => fixture.path)],
+			process.execPath,
+			[
+				repositoryCli(),
+				"-C",
+				project,
+				"lint",
+				"--format",
+				"json",
+				...fixtures.map((fixture) => fixture.path),
+			],
 			{ encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES },
 		);
 		assert.equal(result.error, undefined, `vp could not be spawned: ${String(result.error)}`);
@@ -442,7 +451,11 @@ void test("formatting agrees at the repository, webapp and extension entry point
 		["-C", "extension", "fmt", "--stdin-filepath", "src/toolchain.tsx"],
 		["-C", "webapp", "fmt", "--stdin-filepath", "src/toolchain.tsx"],
 	].map((args) => {
-		const result = spawnSync("vp", args, { cwd: REPO_ROOT, input: source, encoding: "utf8" });
+		const result = spawnSync(process.execPath, [repositoryCli(), ...args], {
+			cwd: REPO_ROOT,
+			input: source,
+			encoding: "utf8",
+		});
 		assert.equal(result.status, 0, result.stderr);
 		return result.stdout;
 	});
@@ -456,7 +469,11 @@ void test("formatting agrees at the repository, webapp and extension entry point
 		["fmt", "--stdin-filepath", "webapp/src/routeTree.gen.ts"],
 		["-C", "webapp", "fmt", "--stdin-filepath", "src/routeTree.gen.ts"],
 	]) {
-		const result = spawnSync("vp", args, { cwd: REPO_ROOT, input: source, encoding: "utf8" });
+		const result = spawnSync(process.execPath, [repositoryCli(), ...args], {
+			cwd: REPO_ROOT,
+			input: source,
+			encoding: "utf8",
+		});
 		assert.equal(result.status, 0, result.stderr);
 		assert.equal(result.stdout, source, args.join(" "));
 	}

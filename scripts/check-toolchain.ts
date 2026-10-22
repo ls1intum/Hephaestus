@@ -247,7 +247,7 @@ for (const file of execFileSync("git", ["ls-files", ".github"], { encoding: "utf
 }
 
 // CI provisions Node and pnpm from the manifest pins and installs through the package manager
-// without lifecycle scripts; Vite+ is added at its pin and never manages the runtime.
+// without lifecycle scripts; jobs then run the Vite+ that the lockfile installed, proven at its pin.
 const setup = asRecord(
 	parse(readFileSync(".github/actions/setup-toolchain/action.yml", "utf8")),
 	"setup-toolchain",
@@ -417,20 +417,44 @@ if (
 if ("if" in nodeSetupStep) {
 	throw new Error("setup-toolchain must select the pinned Node version in either install mode");
 }
-const vpSetupStep = setupStep(usesAction("voidzero-dev/setup-vp"));
-const vpSetup = withOf(vpSetupStep);
-if (vpSetup["node-manager"] !== false || vpSetup["run-install"] !== false) {
-	throw new Error("setup-toolchain must let setup-vp neither manage Node nor install");
-}
-if (vpSetupStep.if !== frozenOnly) {
-	throw new Error("setup-toolchain must install Vite+ only for a job that runs it");
-}
 const frozenInstall = setupStep(
 	(step) => step.run === "pnpm install --frozen-lockfile --ignore-scripts",
 );
 if (frozenInstall.if !== frozenOnly) {
 	throw new Error(
 		"setup-toolchain must install from the lockfile without scripts, only when asked",
+	);
+}
+// Jobs run the Vite+ CLI that the lockfile installed. The global installer downloads a CLI package
+// that the lockfile does not pin, so only the clean-install job, a contributor's first command, uses it.
+if (steps.some(usesAction("voidzero-dev/setup-vp"))) {
+	throw new Error("setup-toolchain must run the lockfile's Vite+, not a globally installed one");
+}
+const pathEntry = `node -p 'require("node:path").resolve("node_modules/.bin")' >> "$GITHUB_PATH"`;
+const localVitePlus = setupStep((step) => String(step.run).includes(pathEntry));
+if (
+	localVitePlus.if !== frozenOnly ||
+	steps.indexOf(localVitePlus) < steps.indexOf(frozenInstall)
+) {
+	throw new Error(
+		"setup-toolchain must put the installed Vite+ on PATH only after a frozen install",
+	);
+}
+const localLines = String(localVitePlus.run)
+	.split("\n")
+	.map((line) => line.trim());
+const proofLines = [
+	`pinned="$(node -p 'require("./package.json").devDependencies["vite-plus"]')"`,
+	`installed="$(node -p 'JSON.parse(require("node:fs").readFileSync("node_modules/vite-plus/package.json", "utf8")).version')"`,
+	`if [ "$installed" != "$pinned" ]; then`,
+	"exit 1",
+	`node_modules/.bin/vp --version | grep -F "vp v$pinned"`,
+	pathEntry,
+];
+const proofOrder = proofLines.map((line) => localLines.indexOf(line));
+if (proofOrder.some((index, at) => index < 0 || (at > 0 && index <= (proofOrder[at - 1] ?? -1)))) {
+	throw new Error(
+		"setup-toolchain must prove the installed vite-plus is the package.json pin before it puts it on PATH",
 	);
 }
 // pnpm/setup installs a runtime of its own, and the frozen install must run under the pinned one.

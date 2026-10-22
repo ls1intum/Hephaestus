@@ -30,7 +30,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+import { CAPTURE_LIMIT_BYTES, repositoryCli } from "./lib/process.ts";
 import { unpassedTasks } from "./report-task-run.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -111,7 +111,7 @@ function run(
 	args: string[],
 	env: Record<string, string> = {},
 ): { readonly status: number | null; readonly output: string } {
-	const result = spawnSync("vp", ["run", ...args], {
+	const result = spawnSync(process.execPath, [repositoryCli(), "run", ...args], {
 		cwd: workspace,
 		encoding: "utf8",
 		maxBuffer: CAPTURE_LIMIT_BYTES,
@@ -240,7 +240,7 @@ void test(
 
 void test("the report of a failed run names the task that failed", () => {
 	run(["groupFails"]);
-	const details = spawnSync("vp", ["run", "--last-details"], {
+	const details = spawnSync(process.execPath, [repositoryCli(), "run", "--last-details"], {
 		cwd: workspace,
 		encoding: "utf8",
 		maxBuffer: CAPTURE_LIMIT_BYTES,

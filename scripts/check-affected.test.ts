@@ -276,11 +276,11 @@ await test("selects documentation changes", () => {
 
 await test("maps scopes to the documented commands", () => {
 	assert.deepEqual(commandsFor(["agents", "docs", "extension", "server", "webapp"]), [
-		["vp", "run", "affected:agents"],
-		["vp", "run", "affected:docs"],
-		["vp", "run", "affected:extension"],
-		["vp", "run", "affected:server"],
-		["vp", "run", "affected:webapp"],
+		["run", "affected:agents"],
+		["run", "affected:docs"],
+		["run", "affected:extension"],
+		["run", "affected:server"],
+		["run", "affected:webapp"],
 	]);
 });
 
@@ -310,7 +310,7 @@ await test("fails closed for shared, generated, contract, tooling, and unknown i
 await test("a full-gate input overrides scoped inputs", () => {
 	assert.deepEqual(scopesFor(["webapp/src/a.tsx", "package.json"]), ["full"]);
 	assert.deepEqual(scopesFor(["extension/src/a.tsx", "server/openapi.yaml"]), ["full"]);
-	assert.deepEqual(commandsFor(["full"]), [["vp", "run", "quality"]]);
+	assert.deepEqual(commandsFor(["full"]), [["run", "quality"]]);
 });
 
 await test("discovers committed, staged, unstaged, untracked, deleted, and renamed paths", async () => {

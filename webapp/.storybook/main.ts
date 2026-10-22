@@ -53,12 +53,20 @@ const config: StorybookConfig = {
 		if (Array.isArray(output)) {
 			throw new TypeError("Storybook builds one Rolldown output");
 		}
+		// The upstream UI's shared dependencies stay in separate chunks, so modules must still run in source order.
+		output.strictExecutionOrder = true;
 		const splitting = typeof output.codeSplitting === "object" ? output.codeSplitting : {};
 		output.codeSplitting = {
 			...splitting,
 			groups: [
 				...(splitting.groups ?? []),
 				{ name: "storybook-stories", test: /storybook-stories\.js$/u },
+				// Preserve the upstream UI module boundary without recursively merging its shared dependencies.
+				{
+					name: "storybook-components",
+					test: /\/node_modules\/storybook\/dist\/components\/index\.js$/u,
+					includeDependenciesRecursively: false,
+				},
 			],
 		};
 		viteConfig.plugins ??= [];

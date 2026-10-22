@@ -2,9 +2,10 @@ import { spawnSync } from "node:child_process";
 
 import { isSet } from "./lib/env.ts";
 import { environmentWithoutGitRepository } from "./lib/git-environment.ts";
-import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+import { CAPTURE_LIMIT_BYTES, repositoryCli } from "./lib/process.ts";
 
 export type Scope = "agents" | "docs" | "extension" | "full" | "server" | "webapp";
+/** The arguments of one repository CLI call. */
 export type Command = readonly [string, ...string[]];
 
 export function parseBase(args: string[]): string {
@@ -147,14 +148,14 @@ export function changedPaths(requestedBase: string, cwd = process.cwd()): string
 
 export function commandsFor(scopes: Scope[]): Command[] {
 	if (scopes.includes("full")) {
-		return [["vp", "run", "quality"]];
+		return [["run", "quality"]];
 	}
 	const commands: Record<Exclude<Scope, "full">, Command> = {
-		agents: ["vp", "run", "affected:agents"],
-		docs: ["vp", "run", "affected:docs"],
-		extension: ["vp", "run", "affected:extension"],
-		server: ["vp", "run", "affected:server"],
-		webapp: ["vp", "run", "affected:webapp"],
+		agents: ["run", "affected:agents"],
+		docs: ["run", "affected:docs"],
+		extension: ["run", "affected:extension"],
+		server: ["run", "affected:server"],
+		webapp: ["run", "affected:webapp"],
 	};
 	return scopes.map((scope) => {
 		if (scope === "full") {
@@ -165,8 +166,7 @@ export function commandsFor(scopes: Scope[]): Command[] {
 }
 
 function run(command: Command): void {
-	const [executable, ...arguments_] = command;
-	const result = spawnSync(executable, arguments_, { stdio: "inherit" });
+	const result = spawnSync(process.execPath, [repositoryCli(), ...command], { stdio: "inherit" });
 	if (result.status !== 0) {
 		process.exit(result.status ?? 1);
 	}

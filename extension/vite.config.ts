@@ -1,8 +1,8 @@
 import path from "node:path";
 
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
-import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vite-plus";
+import { playwright } from "vite-plus/test/browser-playwright";
 
 import { loadLintConfig } from "../webapp/tools/oxlint/load-config.ts";
 import { extensionAliases, extensionVitePlugins } from "./vite.shared.ts";
