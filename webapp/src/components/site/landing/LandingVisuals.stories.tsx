@@ -11,7 +11,6 @@ const meta = {
 		group: { color: "sky", icon: "Package" },
 		practice: "Scope the change to one concern",
 		lead: "The invoice rename does not belong in a CSV export.",
-		stance: "gap",
 	},
 } satisfies Meta<typeof LandingFeedbackCard>;
 
@@ -19,25 +18,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * A practice the work falls short of. The stance is the card's only non-decorative icon, so it
+ * A practice the work falls short of. The outcome is the card's only non-decorative icon, so it
  * carries the accessible name the rest of the scene leaves to `aria-hidden`.
  */
 export const Gap: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByLabelText(OUTCOME_DEFS.NOT_MET.label)).toBeVisible();
-	},
-};
-
-/** The same card for a practice the work does well; only the stance changes. */
-export const Strength: Story = {
-	args: {
-		group: { color: "teal", icon: "Eye" },
-		practice: "Leave specific, actionable review comments",
-		lead: "Names the doubt and what would settle it.",
-		stance: "strength",
-	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByLabelText(OUTCOME_DEFS.MET.label)).toBeVisible();
 	},
 };
 

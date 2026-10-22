@@ -9,7 +9,7 @@ const faqItems = [
 	{
 		key: "practice-feedback",
 		q: "What is practice feedback?",
-		a: "It is feedback on how the work was done, not on the code itself. A practice is a defined way of working. Examples are scoping a change, writing an issue someone can act on, answering a reviewer, testing, handling failure, and changing dependencies deliberately. A curated set of practices ships with Hephaestus. Each piece of feedback names the practice it came from and points back to what it saw.",
+		a: "It is feedback on how the work was done. A practice is a defined way of working. Examples are scoping a change, writing an issue someone can act on, answering a reviewer, testing, handling failure, and changing dependencies deliberately. Feedback can cite code when a practice concerns it, such as testing or handling failure. A curated set of practices ships with Hephaestus. Each piece of feedback names the practice it came from and points back to what it saw.",
 	},
 	{
 		key: "replaces-review",
@@ -19,7 +19,7 @@ const faqItems = [
 	{
 		key: "feedback-location",
 		q: "Where does feedback appear?",
-		a: "Wherever you are most likely to read it: on the work itself, on your private practice profile, or in your next conversation with Heph. Feedback on the work waits for a workspace admin’s approval by default. Admins choose which repositories are connected. You can carry on the conversation in the web app or, when Slack is connected, in a direct message.",
+		a: "It can appear on the work itself, on your private practice profile, or in your next conversation with Heph. Feedback on the work waits for a workspace admin’s approval by default. Admins choose which repositories are connected. You can carry on the conversation in the web app or, when Slack is connected, in a direct message.",
 	},
 	{
 		key: "heph-conversation",

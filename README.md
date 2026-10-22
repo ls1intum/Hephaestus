@@ -28,15 +28,15 @@ Every piece of feedback names its practice and points back to the reviewed work.
 Developers can ask why, disagree, or discuss the next step.
 
 <div align="center">
-  <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer asks a specific question. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-dark.png#gh-dark-mode-only" width="1280">
-  <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer asks a specific question. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png#gh-light-mode-only" width="1280">
+  <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer raises a vague concern about large exports. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-dark.png#gh-dark-mode-only" width="1280">
+  <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer raises a vague concern about large exports. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png#gh-light-mode-only" width="1280">
   <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://docs.hephaestus.build/user/ai-code-review">user guide</a> for the real interface.</sub></p>
 </div>
 
 A mentor gives feedback on how you work.
 Examples include a coach on a university capstone or an experienced maintainer on an open-source project.
 There is never enough of that attention for everyone.
-Hephaestus does the routine part so that everyone gets some.
+Hephaestus can give more developers feedback on routine practices.
 People keep responsibility for the harder judgment and the relationships.
 
 > [!IMPORTANT]
