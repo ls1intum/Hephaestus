@@ -52,7 +52,7 @@ function BundledPractices({ group, guides }: BundledPracticesArgs) {
 								{/* The introduction's lead and figure without its region, which a page may hold once. */}
 								<div className="flex max-w-2xl flex-col gap-4">
 									{hasText(practice.whyItMatters) && (
-										<p className="text-base text-pretty">{practice.whyItMatters}</p>
+										<p className="text-sm text-pretty">{practice.whyItMatters}</p>
 									)}
 									{guidance.visual && (
 										<PracticeFigure visual={guidance.visual} caption={practice.whatGoodLooksLike} />

@@ -7,7 +7,7 @@ import {
 } from "@/components/common/UntrustedMarkdown";
 
 import { guideFigure } from "./practice-svg";
-import { PracticeVisual } from "./PracticeVisual";
+import { PRACTICE_VISUAL_WIDTH, PracticeVisual } from "./PracticeVisual";
 
 export interface PracticeGuideMarkdownProps {
 	/** The guide: its Markdown and the SVG figures the Markdown shows by name. */
@@ -17,17 +17,16 @@ export interface PracticeGuideMarkdownProps {
 /**
  * A practice guide, in the same restricted Markdown as feedback. The one image form it draws is the
  * guide's own figure, `![alt](figures/<name>.svg)`, as a themed picture named by its alt text, bare
- * on the prose's ground and at its width. Any other image source, and a figure the guide does not
+ * on the prose's ground at the width the introduction gives its picture. Any other image source, and a figure the guide does not
  * carry, draws nothing, so the guide loads nothing from elsewhere.
  */
 export function PracticeGuideMarkdown({ guide }: PracticeGuideMarkdownProps) {
 	const renderFigure = ({ src, alt }: UntrustedMarkdownImage) => {
 		const svg = guideFigure(guide.figures, src);
 		return svg === undefined ? null : (
-			// 42em is the visual's 672px over its 16px lead, so a figure's text keeps the same size
-			// against the guide's smaller body text.
-			<figure className="max-w-[42em]">
-				<PracticeVisual svg={svg} alt={alt} />
+			// The guide's body is `text-sm`, so its figures draw at the introduction's width.
+			<figure>
+				<PracticeVisual svg={svg} alt={alt} className={PRACTICE_VISUAL_WIDTH} />
 			</figure>
 		);
 	};
