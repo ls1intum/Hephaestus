@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -247,16 +248,19 @@ public class WorkspaceRepositoryMonitorService {
                                         .map(Repository::getNativeId)
                                         .orElse(null)
                                 : null;
+                String stoppedPath = repositoryToMonitor.getNameWithOwner();
                 if (connectionService
                         .updateGitLabProjectExclusions(
                                 workspace.getId(),
-                                exclusions ->
-                                        exclusions.exclude(stoppedNativeId, repositoryToMonitor.getNameWithOwner()))
+                                exclusions -> stoppedNativeId == null
+                                        ? exclusions.exclude(null, stoppedPath)
+                                        : exclusions.stop(stoppedNativeId, stoppedPath, UUID.randomUUID()))
                         .isEmpty()) {
                     throw new RepositoryProviderNotConnectedException(slug);
                 }
             }
-            deleteRepositoryMonitor(workspace, repositoryToMonitor);
+            // A GitLab Stop keeps the work the workspace indexed; Remove on the stopped project releases it.
+            deleteRepositoryMonitor(workspace, repositoryToMonitor, gitLab);
             repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
         });
     }
@@ -312,7 +316,7 @@ public class WorkspaceRepositoryMonitorService {
 
     private void removeMonitorAndOrphanedRepositories(Workspace workspace, RepositoryToMonitor monitor) {
         List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId());
-        deleteRepositoryMonitor(workspace, monitor);
+        deleteRepositoryMonitor(workspace, monitor, false);
         repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
     }
 
@@ -329,7 +333,7 @@ public class WorkspaceRepositoryMonitorService {
                 List<Long> repositoryIds = deleteRepositories
                         ? repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId())
                         : List.of();
-                deleteRepositoryMonitor(workspace, monitor);
+                deleteRepositoryMonitor(workspace, monitor, false);
                 repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
             }
         });
@@ -473,10 +477,11 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     /**
-     * Deletes an exact source repository only after its last matching monitor is removed. Callers
-     * capture its internal id before removal and flush that removal before this check. A same-named
-     * row on another provider is neither a deletion target nor proof that this source remains
-     * monitored.
+     * Deletes an exact source repository only after its last matching monitor is removed and no
+     * workspace still keeps it indexed, as a stopped GitLab project is kept until its work is
+     * removed. Callers capture its internal id before removal and flush that removal before this
+     * check. A same-named row on another provider is neither a deletion target nor proof that this
+     * source remains monitored.
      */
     public void deleteRepositoryIfOrphaned(Long repositoryId) {
         long monitorCount = repositoryToMonitorRepository.countForRepository(repositoryId);
@@ -485,6 +490,13 @@ public class WorkspaceRepositoryMonitorService {
                     "Skipped repository deletion: reason=stillMonitored, repositoryId={}," + " monitorCount={}",
                     repositoryId,
                     monitorCount);
+            return;
+        }
+        if (repositoryRepository.acquireDeletionClaim(repositoryId).isEmpty()) return;
+        // A publisher can claim the source between the fast check and our deletion claim.
+        if (repositoryToMonitorRepository.countForRepository(repositoryId) > 0) return;
+        if (repositoryRepository.isIndexedByAnyWorkspace(repositoryId)) {
+            log.debug("Skipped repository deletion: reason=stillIndexed, repositoryId={}", repositoryId);
             return;
         }
         repositoryRepository.findById(repositoryId).ifPresent(repository -> {
@@ -537,12 +549,13 @@ public class WorkspaceRepositoryMonitorService {
         }
     }
 
-    private void deleteRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor) {
+    private void deleteRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean retainIndex) {
         List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId());
         // Remove from collection first - orphanRemoval=true will handle deletion
         workspace.getRepositoriesToMonitor().remove(monitor);
         workspaceRepository.saveAndFlush(workspace);
-        eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(workspace.getId(), repositoryIds));
+        eventPublisher.publishEvent(
+                new RepositoryMonitoringChangedEvent(workspace.getId(), repositoryIds, retainIndex));
         refreshScopeConsumerAfterCommit(workspace);
     }
 

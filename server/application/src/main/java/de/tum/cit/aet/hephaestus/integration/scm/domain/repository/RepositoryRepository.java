@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -28,6 +30,29 @@ import org.springframework.transaction.annotation.Transactional;
 @org.springframework.stereotype.Repository
 @WorkspaceAgnostic("Provider-domain lookups by native ID / full name; workspace resolved downstream")
 public interface RepositoryRepository extends JpaRepository<Repository, Long> {
+    /**
+     * A live workspace root keeps its canonical source until the transaction ends. Shared claims coexist with
+     * other workspaces and ordinary mirror updates. They never wait behind deletion: a provider transaction can
+     * already hold a work row that deletion needs.
+     */
+    @Query(value = "SELECT id FROM repository WHERE id=:repositoryId FOR KEY SHARE NOWAIT", nativeQuery = true)
+    @Transactional(propagation = Propagation.MANDATORY)
+    Optional<Long> acquireIndexClaim(@Param("repositoryId") long repositoryId);
+
+    default void claimForIndex(long repositoryId) {
+        if (acquireIndexClaim(repositoryId).isEmpty()) {
+            throw new ObjectOptimisticLockingFailureException(Repository.class, repositoryId);
+        }
+    }
+
+    /**
+     * Fences source deletion against new workspace roots. NOWAIT also avoids a cycle with a caller's removed item
+     * and an in-flight event that still sees the old monitor. A refused claim rolls the whole removal back.
+     */
+    @Query(value = "SELECT id FROM repository WHERE id=:repositoryId FOR UPDATE NOWAIT", nativeQuery = true)
+    @Transactional(propagation = Propagation.MANDATORY)
+    Optional<Long> acquireDeletionClaim(@Param("repositoryId") long repositoryId);
+
     /**
      * Finds a repository by its full name (owner/name).
      * Used during sync operations to check if repository exists.
@@ -110,6 +135,21 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         )
         """)
     boolean isMonitored(@Param("workspaceId") long workspaceId, @Param("repositoryId") long repositoryId);
+
+    /** Whether any workspace still holds this exact source as an active repository item, monitored or stopped. */
+    @WorkspaceAgnostic("Shared source rows outlive one workspace while another workspace still indexes them")
+    @Query(value = """
+        SELECT EXISTS (SELECT 1 FROM item i WHERE i.kind='scm.repository' AND i.parent_id IS NULL
+          AND i.source_id=:repositoryId AND i.removed_at IS NULL)
+        """, nativeQuery = true)
+    boolean isIndexedByAnyWorkspace(@Param("repositoryId") long repositoryId);
+
+    /** The sources this workspace holds as active repository items, including stopped GitLab projects. */
+    @Query(value = """
+        SELECT i.source_id FROM item i WHERE i.workspace_id=:workspaceId AND i.kind='scm.repository'
+          AND i.parent_id IS NULL AND i.source_id IS NOT NULL AND i.removed_at IS NULL ORDER BY i.source_id
+        """, nativeQuery = true)
+    List<Long> findIndexedRepositoryIds(@Param("workspaceId") long workspaceId);
 
     /**
      * The repositories on {@code providerId} at the workspace's monitored paths. A monitor names a path, and another

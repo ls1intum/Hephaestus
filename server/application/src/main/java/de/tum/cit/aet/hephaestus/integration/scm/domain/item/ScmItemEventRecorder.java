@@ -169,6 +169,7 @@ public class ScmItemEventRecorder {
             @Nullable Long parentSourceId,
             ItemEventName name,
             EventContext context) {
+        repositories.claimForIndex(repositoryId);
         var repository = repositories.findById(repositoryId).orElseThrow();
         List<Long> workspaces = queries.monitoredWorkspaces(repository.getNameWithOwner());
         for (long workspace : workspaces) {
@@ -240,6 +241,7 @@ public class ScmItemEventRecorder {
      * occasion, and the old one is never pinned to later work.
      */
     private void pinUnresolved(long repositoryId, long pullRequestId) {
+        repositories.claimForIndex(repositoryId);
         var repository = repositories.findById(repositoryId).orElseThrow();
         for (long workspace : queries.monitoredWorkspaces(repository.getNameWithOwner())) {
             var item = writer.findSource(workspace, ScmItemEvents.PULL_REQUEST.value(), pullRequestId)

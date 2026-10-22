@@ -8,17 +8,20 @@ import {
 	getGitLabRepositorySelectionQueryKey,
 	getIntegrationCatalogOptions,
 	getRepositoriesToMonitorOptions,
+	getStoppedGitLabProjectsOptions,
 	getWorkspaceOptions,
 	removeRepositoryToMonitorMutation,
+	removeStoppedGitLabProjectMutation,
 	readOptions,
 	updateGitLabRepositorySelectionMutation,
 	updateTokenMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { GitLabRepositorySelection, Workspace } from "@/api/types.gen";
+import type { GitLabRepositorySelection, GitLabStoppedProject, Workspace } from "@/api/types.gen";
 import { SCM_CLASS_KEYS } from "@/components/admin/integrations/SyncResourcesTable";
 import type { WorkspaceGitLabProjectSelection } from "@/components/admin/integrations/WorkspaceGitLabProjectSelection";
 import type { WorkspaceRepositoriesSettings } from "@/components/admin/integrations/WorkspaceRepositoriesSettings";
 import type { WorkspaceScmTokenSettings } from "@/components/admin/integrations/WorkspaceScmTokenSettings";
+import type { WorkspaceStoppedGitLabProjects } from "@/components/admin/integrations/WorkspaceStoppedGitLabProjects";
 import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { useConnectionSync } from "@/hooks/use-connection-sync";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -107,8 +110,20 @@ export function useScmIntegration(workspaceSlug: string) {
 		void repositoriesQuery.refetch();
 	};
 
+	// Only an active GitLab connection has a project choice or stopped projects; the server refuses
+	// both reads for any other, and removes stopped work only while the connection is active.
+	const followsGitLabGroup = kind === "GITLAB" && isConnectionActive;
+
+	const stoppedQueryOptions = getStoppedGitLabProjectsOptions({ path: { workspaceSlug } });
+	const stoppedQuery = useQuery({ ...stoppedQueryOptions, enabled: followsGitLabGroup });
+	useQueryReadRefusal(stoppedQueryOptions.queryKey, stoppedQuery.isError, stoppedQuery.error);
+	const stoppedRetained = refreshRetryable(stoppedQuery);
+	const stoppedFailed = stoppedQuery.isError && !stoppedRetained;
+
+	// A Stop, an Add and a removal each move a project between the two lists.
 	const invalidateRepositorySet = () => {
 		void queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: stoppedQueryOptions.queryKey });
 		sync.invalidateSyncActivity();
 	};
 
@@ -129,8 +144,16 @@ export function useScmIntegration(workspaceSlug: string) {
 		},
 	});
 
-	// Only an active GitLab connection has a project choice; the server refuses the read for any other.
-	const followsGitLabGroup = kind === "GITLAB" && isConnectionActive;
+	// A refused or stale removal is answered by a fresh read, never sent again on its own. A newer Stop
+	// read then replaces the row and its open confirmation, so the reason also stays in a toast.
+	const removeStoppedProject = useMutation({
+		...removeStoppedGitLabProjectMutation(),
+		onError: (e) => {
+			toast.error("We could not remove the synced work", { description: problemDetailOf(e) });
+		},
+		onSettled: invalidateRepositorySet,
+	});
+
 	const selectionQueryOptions = getGitLabRepositorySelectionOptions({ path: { workspaceSlug } });
 	const selectionQuery = useQuery({ ...selectionQueryOptions, enabled: followsGitLabGroup });
 	useQueryReadRefusal(selectionQueryOptions.queryKey, selectionQuery.isError, selectionQuery.error);
@@ -262,5 +285,29 @@ export function useScmIntegration(workspaceSlug: string) {
 			},
 			onRetry: refetchRepositories,
 		} satisfies ComponentProps<typeof WorkspaceRepositoriesSettings>,
+		stoppedProjectsProps: {
+			projects: stoppedFailed ? [] : (stoppedQuery.data ?? []),
+			isLoading: stoppedQuery.isLoading,
+			error: stoppedFailed ? stoppedQuery.error : null,
+			refreshFailure: stoppedRetained
+				? {
+						error: stoppedQuery.error,
+						pending: stoppedQuery.isFetching,
+						onRetry: () => {
+							void stoppedQuery.refetch();
+						},
+					}
+				: undefined,
+			onRetry: () => {
+				void stoppedQuery.refetch();
+			},
+			// The confirmation names one listed Stop; its root and receipt are sent as listed.
+			onRemove: async ({ repositoryItemId, stopReceipt }: GitLabStoppedProject) => {
+				await removeStoppedProject.mutateAsync({
+					path: { workspaceSlug, repositoryItemId },
+					query: { stopReceipt },
+				});
+			},
+		} satisfies ComponentProps<typeof WorkspaceStoppedGitLabProjects>,
 	};
 }

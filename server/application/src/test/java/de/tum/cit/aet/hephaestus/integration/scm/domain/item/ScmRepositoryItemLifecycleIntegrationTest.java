@@ -1,7 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -9,7 +12,10 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -22,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRepositoryMonitors;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.GitLabStoppedProjectService;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -51,6 +58,18 @@ class ScmRepositoryItemLifecycleIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitLabRepositoryMonitors gitLabMonitors;
+
+    @Autowired
+    private MonitoredRepositoryQuery scope;
+
+    @Autowired
+    private ScmRepositoryAccess access;
+
+    @Autowired
+    private GitLabStoppedProjectService stoppedProjects;
+
+    @Autowired
+    private AccountRepository accounts;
 
     @Autowired
     private WorkspaceRepository workspaces;
@@ -247,7 +266,8 @@ class ScmRepositoryItemLifecycleIntegrationTest extends BaseIntegrationTest {
     @EnumSource(
             value = IdentityProviderType.class,
             names = {"GITHUB", "GITLAB"})
-    void shouldRemoveTheItemThroughTheWorkspaceMonitorService(IdentityProviderType type) {
+    void shouldUnindexAnInstallationRemovalAndKeepAGitLabStopThroughTheWorkspaceMonitorService(
+            IdentityProviderType type) {
         var fixture = fixture(type);
         reconcile(monitor(fixture.workspace(), fixture.repository()), fixture.repository());
         long itemId = repositoryItemId(fixture);
@@ -264,7 +284,7 @@ class ScmRepositoryItemLifecycleIntegrationTest extends BaseIntegrationTest {
                     fixture.workspace().getWorkspaceSlug(), fixture.repository().getNameWithOwner());
         }
 
-        assertActive(fixture.workspace(), itemId, false);
+        assertActive(fixture.workspace(), itemId, type == IdentityProviderType.GITLAB);
         assertThat(repositories.findById(fixture.repository().getId())).isPresent();
     }
 
@@ -285,10 +305,76 @@ class ScmRepositoryItemLifecycleIntegrationTest extends BaseIntegrationTest {
         } else {
             monitorService.removeRepositoryFromMonitor(
                     fixture.workspace().getWorkspaceSlug(), fixture.repository().getNameWithOwner());
+            assertThat(repositories.findById(fixture.repository().getId())).isPresent();
+            var stopped = stoppedProjects.getStoppedProjects(fixture.workspace().getId());
+            assertThat(stopped)
+                    .singleElement()
+                    .satisfies(project -> assertThat(project.repositoryItemId()).isEqualTo(String.valueOf(itemId)));
+            stoppedProjects.removeStoppedProject(
+                    fixture.workspace().getId(), itemId, stopped.getFirst().stopReceipt(), actor());
         }
 
         assertActive(fixture.workspace(), itemId, false);
         assertThat(repositories.findById(fixture.repository().getId())).isEmpty();
+    }
+
+    @Test
+    void shouldRetainTheProjectAndItsIndexedWorkWhenGitLabStopsTheLastMonitor() {
+        var fixture = fixture(IdentityProviderType.GITLAB);
+        var monitor = monitor(fixture.workspace(), fixture.repository());
+        long pullId = mirroredPull(fixture.repository(), 1);
+        long issueId = mirroredIssue(fixture.repository(), 2, false);
+        reconcile(monitor, fixture.repository());
+        long holder = repositoryItemId(fixture);
+        long pullItem = memberId(fixture.workspace(), ScmItemEvents.PULL_REQUEST, pullId, holder);
+        long issueItem = memberId(fixture.workspace(), ScmItemEvents.ISSUE, issueId, holder);
+
+        monitorService.removeRepositoryFromMonitor(
+                fixture.workspace().getWorkspaceSlug(), fixture.repository().getNameWithOwner());
+
+        assertThat(monitors.findById(monitor.getId())).isEmpty();
+        assertThat(gitLabConfig(fixture.workspace()).projectExclusions().nativeIds())
+                .contains(fixture.repository().getNativeId());
+        assertThat(repositories.findById(fixture.repository().getId())).isPresent();
+        assertThat(pulls.findById(pullId)).isPresent();
+        assertThat(issues.findById(issueId)).isPresent();
+        assertThat(repositoryItemIds(fixture)).containsExactly(holder);
+        assertActive(fixture.workspace(), holder, true);
+        assertThat(memberId(fixture.workspace(), ScmItemEvents.PULL_REQUEST, pullId, holder))
+                .isEqualTo(pullItem);
+        assertThat(memberId(fixture.workspace(), ScmItemEvents.ISSUE, issueId, holder))
+                .isEqualTo(issueItem);
+    }
+
+    @Test
+    void shouldDenyLiveScopeAndSourceAccessWhenGitLabStopsAProjectWhoseWorkIsRetained() {
+        var fixture = fixture(IdentityProviderType.GITLAB);
+        var stopped = fixture.repository();
+        long pullId = mirroredPull(stopped, 1);
+        reconcile(monitor(fixture.workspace(), stopped), stopped);
+        long holder = repositoryItemId(fixture);
+        var sibling = repository(stopped.getProvider(), fixture.workspace().getAccountLogin() + "/sibling");
+        reconcile(monitor(fixture.workspace(), sibling), sibling);
+        long siblingItem = items.findSource(
+                        fixture.workspace().getId(), ScmItemEvents.REPOSITORY.value(), sibling.getId())
+                .orElseThrow()
+                .getId();
+        assertThat(scope.repositories(fixture.workspace().getId())).containsKeys(holder, siblingItem);
+        access.authorize(fixture.workspace().getId(), stopped);
+
+        monitorService.removeRepositoryFromMonitor(fixture.workspace().getWorkspaceSlug(), stopped.getNameWithOwner());
+
+        assertThat(scope.repositories(fixture.workspace().getId()))
+                .doesNotContainKey(holder)
+                .containsKey(siblingItem);
+        assertThatThrownBy(() -> access.authorize(fixture.workspace().getId(), stopped))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        denied -> assertThat(denied.code()).isEqualTo(ItemCaptureCode.ITEM_NOT_VISIBLE));
+        access.authorize(fixture.workspace().getId(), sibling);
+        assertThat(repositories.findById(stopped.getId())).isPresent();
+        assertActive(fixture.workspace(), holder, true);
+        memberId(fixture.workspace(), ScmItemEvents.PULL_REQUEST, pullId, holder);
     }
 
     @Test
@@ -491,6 +577,20 @@ class ScmRepositoryItemLifecycleIntegrationTest extends BaseIntegrationTest {
                 .getConfig();
         if (config instanceof ConnectionConfig.GitHubAppConfig app) return Objects.requireNonNull(app.installationId());
         throw new IllegalStateException("Test workspace has no GitHub App connection");
+    }
+
+    private long actor() {
+        return Objects.requireNonNull(accounts.save(new Account("stopped-project-admin-" + UUID.randomUUID()))
+                .getId());
+    }
+
+    private ConnectionConfig.GitLabConfig gitLabConfig(Workspace workspace) {
+        var config = connections
+                .findActive(workspace.getId(), IntegrationKind.GITLAB)
+                .orElseThrow()
+                .getConfig();
+        if (config instanceof ConnectionConfig.GitLabConfig gitLab) return gitLab;
+        throw new IllegalStateException("Test workspace has no GitLab connection");
     }
 
     private static long randomId() {

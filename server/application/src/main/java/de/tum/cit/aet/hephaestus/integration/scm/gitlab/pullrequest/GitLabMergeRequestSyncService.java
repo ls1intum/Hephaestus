@@ -26,6 +26,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -218,6 +219,8 @@ public class GitLabMergeRequestSyncService {
                         } else {
                             totalSkipped++;
                         }
+                    } catch (ConcurrencyFailureException conflict) {
+                        throw conflict;
                     } catch (Exception e) {
                         log.warn(
                                 "Error processing merge request: projectPath={}, mrIid={}",
@@ -257,6 +260,13 @@ public class GitLabMergeRequestSyncService {
                     break;
                 }
             } while (true);
+        } catch (ConcurrencyFailureException conflict) {
+            log.atWarn()
+                    .addKeyValue("event.name", "integration.mirror.write.conflict")
+                    .addKeyValue("error.type", conflict.getClass().getName())
+                    .addKeyValue("integration.scope.id", scopeId)
+                    .log("Mirror write conflicts with another transaction");
+            errorAborted = true;
         } catch (Exception e) {
             graphQlClientProvider.recordFailure(e);
             log.error("MR sync failed: scopeId={}, projectPath={}", scopeId, safeProjectPath, e);
@@ -426,6 +436,8 @@ public class GitLabMergeRequestSyncService {
                                 fetchedAt,
                                 read);
                         totalProcessed++;
+                    } catch (ConcurrencyFailureException conflict) {
+                        throw conflict;
                     } catch (Exception e) {
                         log.warn(
                                 "Error in historical MR backfill: project={}, iid={}",
@@ -473,6 +485,13 @@ public class GitLabMergeRequestSyncService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.info("Historical MR backfill interrupted: project={}", safeProjectPath);
+            return BackfillBatchResult.abortedWithError();
+        } catch (ConcurrencyFailureException conflict) {
+            log.atWarn()
+                    .addKeyValue("event.name", "integration.mirror.write.conflict")
+                    .addKeyValue("error.type", conflict.getClass().getName())
+                    .addKeyValue("integration.scope.id", scopeId)
+                    .log("Mirror write conflicts with another transaction");
             return BackfillBatchResult.abortedWithError();
         } catch (Exception e) {
             log.warn("Historical MR backfill failed: project={}", safeProjectPath, e);
@@ -595,6 +614,8 @@ public class GitLabMergeRequestSyncService {
                         fields.userNotesCount(), syncApprovers != null && !syncApprovers.isEmpty(), fields.state())) {
             try {
                 discussionSyncService.syncDiscussionsForMergeRequest(scopeId, repository, iid, pr, read);
+            } catch (ConcurrencyFailureException conflict) {
+                throw conflict;
             } catch (Exception e) {
                 log.error("Discussion sync failed for MR: context={}", mrContext, e);
             }

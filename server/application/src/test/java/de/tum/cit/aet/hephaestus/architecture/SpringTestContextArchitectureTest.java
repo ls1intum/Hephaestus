@@ -58,6 +58,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment(
                     "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
                     "gitlab-event-routing"),
+            assignment(
+                    "integration.scm.workspace.GitLabStoppedProjectServiceIntegrationTest", "gitlab-stopped-project"),
             assignment("integration.slack.SlackConsentLifecycleE2EIntegrationTest", "slack-lifecycle"),
             assignment("integration.slack.channel.SlackChannelAdminControllerIntegrationTest", "slack-signed"),
             assignment("integration.slack.item.SlackThreadProjectionIntegrationTest", "slack-ingest"),
@@ -145,6 +147,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "gitlab-event-routing",
                     "real JetStream scope consumer with GitLab discovery, webhook and sync"
                             + " held at the API boundary"),
+            Map.entry(
+                    "gitlab-stopped-project",
+                    "real stop receipts, kept items, encrypted credentials, connection locks and source deletion with only the GitLab transport that confirms a manual Add controlled"),
             Map.entry(
                     "gitlab-token-lifecycle",
                     "real credential storage, lifecycle locks and attention with only"
@@ -303,6 +308,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "practices.result.MigratedHistoryReadIntegrationTest",
             "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest",
             "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
+            "integration.scm.workspace.GitLabStoppedProjectServiceIntegrationTest",
             "integration.slack.SlackConsentLifecycleE2EIntegrationTest",
             "practices.acrossworkspace.PracticesAcrossWorkspaceIntegrationTest",
             "practices.feedback.AbstractFeedbackDeliveryIntegrationTest",

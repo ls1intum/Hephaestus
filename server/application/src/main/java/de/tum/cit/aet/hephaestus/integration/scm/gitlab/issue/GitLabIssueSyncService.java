@@ -24,6 +24,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -188,6 +189,8 @@ public class GitLabIssueSyncService {
                         } else {
                             totalSkipped++;
                         }
+                    } catch (ConcurrencyFailureException conflict) {
+                        throw conflict;
                     } catch (Exception e) {
                         log.warn(
                                 "Error processing issue: projectPath={}, issueId={}",
@@ -229,6 +232,13 @@ public class GitLabIssueSyncService {
                     break;
                 }
             } while (true);
+        } catch (ConcurrencyFailureException conflict) {
+            log.atWarn()
+                    .addKeyValue("event.name", "integration.mirror.write.conflict")
+                    .addKeyValue("error.type", conflict.getClass().getName())
+                    .addKeyValue("integration.scope.id", scopeId)
+                    .log("Mirror write conflicts with another transaction");
+            errorAborted = true;
         } catch (Exception e) {
             graphQlClientProvider.recordFailure(e);
             log.error("Issue sync failed: scopeId={}, projectPath={}", scopeId, safeProjectPath, e);
@@ -351,6 +361,8 @@ public class GitLabIssueSyncService {
                         }
                         processIssueNode(issueNode, repository, scopeId, read);
                         totalProcessed++;
+                    } catch (ConcurrencyFailureException conflict) {
+                        throw conflict;
                     } catch (Exception e) {
                         log.warn(
                                 "Error in historical issue backfill: project={}, iid={}",
@@ -400,6 +412,13 @@ public class GitLabIssueSyncService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.info("Historical issue backfill interrupted: project={}", safeProjectPath);
+            return BackfillBatchResult.abortedWithError();
+        } catch (ConcurrencyFailureException conflict) {
+            log.atWarn()
+                    .addKeyValue("event.name", "integration.mirror.write.conflict")
+                    .addKeyValue("error.type", conflict.getClass().getName())
+                    .addKeyValue("integration.scope.id", scopeId)
+                    .log("Mirror write conflicts with another transaction");
             return BackfillBatchResult.abortedWithError();
         } catch (Exception e) {
             log.warn("Historical issue backfill failed: project={}", safeProjectPath, e);
@@ -542,6 +561,8 @@ public class GitLabIssueSyncService {
         if (issue != null && userNotesCount > 0) {
             try {
                 noteSyncService.syncNotesForIssue(scopeId, repository, Integer.parseInt(iid), issue, read);
+            } catch (ConcurrencyFailureException conflict) {
+                throw conflict;
             } catch (Exception e) {
                 log.error("Note sync failed for issue: context={}", issueContext, e);
             }

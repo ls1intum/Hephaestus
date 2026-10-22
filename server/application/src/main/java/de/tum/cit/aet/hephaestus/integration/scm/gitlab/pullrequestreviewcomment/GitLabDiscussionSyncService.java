@@ -35,6 +35,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -144,6 +145,8 @@ public class GitLabDiscussionSyncService {
                     totals[0] += result[0];
                     totals[1] += result[1];
                     totals[2] += result[2];
+                } catch (ConcurrencyFailureException conflict) {
+                    throw conflict;
                 } catch (Exception e) {
                     log.warn(
                             "Error processing discussion: context={}, id={}", safeContext, discussionNode.get("id"), e);
@@ -157,6 +160,8 @@ public class GitLabDiscussionSyncService {
                         read,
                         () -> applyThreadResolutions(
                                 repository, mrIid, new DiscussionRead(requestedAt, resolutions), scopeId));
+            } catch (ConcurrencyFailureException conflict) {
+                throw conflict;
             } catch (Exception e) {
                 log.warn("Error recording discussion resolution: context={}", safeContext, e);
             }
@@ -408,6 +413,9 @@ public class GitLabDiscussionSyncService {
                     return false;
                 }
             } while (true);
+        } catch (ConcurrencyFailureException conflict) {
+            // A page's local write conflict is not a provider failure; the parent sync aborts on it.
+            throw conflict;
         } catch (Exception e) {
             graphQlClientProvider.recordFailure(e);
             log.error("Discussion sync failed: context={}", safeContext, e);
@@ -659,6 +667,9 @@ public class GitLabDiscussionSyncService {
                 if (issueCommentProcessor.processFromSync(syncData, pr, providerId, scopeId) != null) {
                     generalNotes++;
                 }
+            } catch (ConcurrencyFailureException conflict) {
+                // Swallowed, it leaves the enclosing write rollback-only and its commit fails untyped.
+                throw conflict;
             } catch (Exception e) {
                 log.warn("Error processing general note: gid={}", globalId, e);
             }

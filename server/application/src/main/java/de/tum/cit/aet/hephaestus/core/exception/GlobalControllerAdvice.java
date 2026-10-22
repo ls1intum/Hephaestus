@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
@@ -110,6 +111,18 @@ public class GlobalControllerAdvice extends ResponseEntityExceptionHandler {
         event.log("Request conflicts with database constraints");
         return problem(
                 HttpStatus.CONFLICT, "Conflict", "This request conflicts with the current data. Reload and try again.");
+    }
+
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    ProblemDetail handleConcurrentChange(ConcurrencyFailureException exception) {
+        log.atWarn()
+                .addKeyValue("event.name", "database.concurrent.change")
+                .addKeyValue("error.type", exception.getClass().getName())
+                .log("Request conflicts with another write");
+        return problem(
+                HttpStatus.CONFLICT,
+                "Concurrent change",
+                "Another request is changing this data. Reload and try again.");
     }
 
     @Override

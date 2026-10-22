@@ -99,9 +99,14 @@ export const RemoveConfirmGitLab: Story = {
 		);
 
 		const dialog = await screen.findByRole("alertdialog");
-		const description = within(dialog).getByText(/repository on GitLab is not affected/iu);
-		await expect(description).toHaveTextContent(/stays stopped until you add it again below/iu);
-		await expect(description).toHaveTextContent(/if no other workspace/iu);
+		const description = within(dialog).getByText(/project on GitLab is not affected/iu);
+		await expect(description).toHaveTextContent(
+			/keeps the work Hephaestus already synced from it, under Stopped projects/iu,
+		);
+		await expect(description).toHaveTextContent(/add it below with its current path/iu);
+		// A GitLab Stop keeps the work, so it neither promises nor threatens to erase it.
+		await expect(description).not.toHaveTextContent(/erases|if no other workspace/iu);
+		await expect(within(dialog).getByRole("button", { name: "Stop monitoring" })).toBeEnabled();
 	},
 };
 

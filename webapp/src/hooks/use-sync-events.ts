@@ -6,6 +6,7 @@ import {
 	getIntegrationCatalogQueryKey,
 	getOutlineTokenStatusQueryKey,
 	getRepositoriesToMonitorQueryKey,
+	getStoppedGitLabProjectsQueryKey,
 	getWorkspaceQueryKey,
 	listConnectionSyncJobsQueryKey,
 	listConnectionSyncResourcesQueryKey,
@@ -84,6 +85,7 @@ function integrationQueryFamilyIds(workspaceSlug: string): ReadonlySet<string> {
 			listSlackChannelsQueryKey({ path }),
 			listSlackChannelCandidatesQueryKey({ path }),
 			getRepositoriesToMonitorQueryKey({ path }),
+			getStoppedGitLabProjectsQueryKey({ path }),
 			getConnectionSyncStatusQueryKey({ path: connectionPath }),
 			listConnectionSyncJobsQueryKey({ path: connectionPath }),
 			listConnectionSyncResourcesQueryKey({ path: connectionPath }),
@@ -172,6 +174,10 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 					// Only the catalog for this connection's integration changed; a GitHub repo-sync
 					// hint says nothing about Slack channels or Outline collections.
 					const kind = connectionKindOf(queryClient, workspaceSlug, connectionId);
+					if (kind === "GITLAB" || kind === undefined) {
+						void invalidate(getRepositoriesToMonitorQueryKey({ path: { workspaceSlug } }));
+						void invalidate(getStoppedGitLabProjectsQueryKey({ path: { workspaceSlug } }));
+					}
 					if (kind === "OUTLINE" || kind === undefined) {
 						void invalidate(listOutlineCollectionsQueryKey({ path: { workspaceSlug } }));
 					}

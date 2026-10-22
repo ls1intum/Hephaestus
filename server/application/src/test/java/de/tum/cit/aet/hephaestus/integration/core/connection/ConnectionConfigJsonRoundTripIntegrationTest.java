@@ -15,6 +15,7 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -170,11 +171,44 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
                        AND CAST(:expected AS jsonb) @> (config -> 'projectExclusions')
                 FROM connection WHERE id = :id AND workspace_id = :workspaceId
                 """)
-                .setParameter("expected", "{\"nativeIds\":[7001,7002],\"unresolvedPaths\":[\"team/legacy\"]}")
+                .setParameter(
+                        "expected",
+                        "{\"nativeIds\":[7001,7002],\"unresolvedPaths\":[\"team/legacy\"],\"stopReceipts\":{}}")
                 .setParameter("id", id)
                 .setParameter("workspaceId", workspace.getId())
                 .getSingleResult();
         assertThat(stored).isEqualTo(true);
+    }
+
+    @Test
+    void shouldKeepGitLabStopReceiptsThroughReadAndConfigUpdates() {
+        UUID receipt = UUID.fromString("6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7");
+        var exclusions = ConnectionConfig.GitLabProjectExclusions.empty()
+                .stop(7001L, "team/stopped", receipt)
+                .exclude(null, "team/legacy");
+        Long id = persistAndClear(
+                IntegrationKind.GITLAB,
+                "https://gitlab.example.test",
+                new ConnectionConfig.GitLabConfig(
+                                "https://gitlab.example.test",
+                                null,
+                                null,
+                                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                                Set.of("issues"),
+                                null)
+                        .withProjectExclusions(exclusions));
+
+        Connection connection = connectionRepository.findById(id).orElseThrow();
+        var config = (ConnectionConfig.GitLabConfig) connection.getConfig();
+        assertThat(config.projectExclusions()).isEqualTo(exclusions);
+        assertThat(config.projectExclusions().stopReceipt(7001L)).contains(receipt);
+        connection.setConfig(config.withGitlabWebhookId(74L));
+        connectionRepository.saveAndFlush(connection);
+        entityManager.clear();
+
+        var reloaded = (ConnectionConfig.GitLabConfig)
+                connectionRepository.findById(id).orElseThrow().getConfig();
+        assertThat(reloaded.projectExclusions()).isEqualTo(exclusions);
     }
 
     @Test

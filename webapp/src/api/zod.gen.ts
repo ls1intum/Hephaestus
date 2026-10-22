@@ -1556,6 +1556,15 @@ export const zGitLabRepositorySelection = z.object({
     repositorySelection: z.enum(['ALL', 'SELECTED'])
 });
 
+/**
+ * A stopped GitLab project whose synced work the workspace still keeps
+ */
+export const zGitLabStoppedProject = z.object({
+    nameWithOwner: z.string(),
+    repositoryItemId: z.string(),
+    stopReceipt: z.uuid()
+});
+
 export const zGroupDefinition = z.object({
     color: z.string().nullable(),
     description: z.string().nullable(),

@@ -11076,6 +11076,64 @@ paths:
         or only the projects it monitors
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/repositories/stopped:
+    get:
+      operationId: getStoppedGitLabProjects
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GitLabStoppedProject"
+          description: OK
+      summary: List stopped GitLab projects whose synced work the workspace still
+        keeps
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/repositories/stopped/{repositoryItemId}:
+    delete:
+      operationId: removeStoppedGitLabProject
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - in: path
+        name: repositoryItemId
+        required: true
+        schema:
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
+      - in: query
+        name: stopReceipt
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+      summary: Remove the synced work a workspace keeps from a stopped GitLab project
+      tags:
+      - workspace
   /workspaces/{workspaceSlug}/slack/channels:
     get:
       operationId: listSlackChannels
@@ -16283,6 +16341,24 @@ components:
           - SELECTED
       required:
       - repositorySelection
+    GitLabStoppedProject:
+      type: object
+      description: A stopped GitLab project whose synced work the workspace still
+        keeps
+      properties:
+        nameWithOwner:
+          type: string
+        repositoryItemId:
+          type: string
+          description: The workspace's repository item that holds the kept work
+        stopReceipt:
+          type: string
+          format: uuid
+          description: Names the Stop that a removal of the kept work answers
+      required:
+      - nameWithOwner
+      - repositoryItemId
+      - stopReceipt
     GroupDefinition:
       type: object
       properties:

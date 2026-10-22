@@ -57,8 +57,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.subissue.GitHubSubIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.GitLabStoppedProjectService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackTargetResolver;
 import de.tum.cit.aet.hephaestus.practices.result.ResultCurrentness;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
@@ -66,6 +71,9 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -86,6 +94,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -183,6 +192,18 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private WorkspaceRepositoryMonitorService monitorService;
+
+    @Autowired
+    private GitLabStoppedProjectService stoppedProjects;
+
+    @Autowired
+    private FeedbackRepository feedbackRows;
+
+    @Autowired
+    private FeedbackTargetResolver targets;
 
     @ParameterizedTest
     @EnumSource(
@@ -1077,6 +1098,70 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                 .isNull();
         monitor.setNativeId(fixture.repository().getNativeId());
         monitors.saveAndFlush(monitor);
+    }
+
+    @Test
+    void shouldRefuseSourceAndDeliveryOfAStoppedGitLabProjectAndKeepItsHistoryThroughRemove() {
+        var fixture = fixture(IdentityProviderType.GITLAB);
+        long workspaceId = fixture.workspace().getId();
+        var issue = progressIssue(fixture, 72, null);
+        var holder = writer.upsert(new ItemRegistration(
+                workspaceId, ScmItemEvents.REPOSITORY, fixture.repository().getId(), null, null));
+        var item = writer.upsert(
+                new ItemRegistration(workspaceId, ScmItemEvents.ISSUE, issue.getId(), holder.itemId(), null));
+        var canonical = sources.pin(item, null).version();
+        var scenario = parentScenario(fixture, item);
+        var at = Instant.now();
+        var result = resultData.result(scenario, ResultOutcome.MET, at, at, canonical.value());
+        var pending = feedbackRows.saveAndFlush(Feedback.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .reviewId(result.getReviewId())
+                .itemId(item.itemId())
+                .developerId(Objects.requireNonNull(scenario.account().getId()))
+                .destination(FeedbackDestination.ON_WORK)
+                .state(FeedbackState.READY)
+                .body("Track the remaining child work.")
+                .createdAt(at)
+                .build());
+        targets.resolve(pending);
+
+        monitorService.removeRepositoryFromMonitor(
+                fixture.workspace().getWorkspaceSlug(), fixture.repository().getNameWithOwner());
+
+        assertThat(monitored.repositories(workspaceId)).doesNotContainKey(holder.itemId());
+        assertThatThrownBy(() -> sources.pin(item, null))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        refused -> assertThat(refused.code()).isEqualTo(ItemCaptureCode.ITEM_NOT_VISIBLE));
+        assertThatThrownBy(() -> targets.resolve(pending))
+                .isInstanceOfSatisfying(
+                        FeedbackTargetResolver.TargetUnavailable.class,
+                        refused ->
+                                assertThat(refused.reason()).isEqualTo(FeedbackStopReason.APPROVAL_NO_LONGER_ELIGIBLE));
+        assertThat(itemRows.findByIdAndWorkspaceId(holder.itemId(), workspaceId))
+                .hasValueSatisfying(kept -> assertThat(kept.getRemovedAt()).isNull());
+
+        var stopped = stoppedProjects.getStoppedProjects(workspaceId);
+        assertThat(stopped)
+                .singleElement()
+                .satisfies(
+                        project -> assertThat(project.repositoryItemId()).isEqualTo(String.valueOf(holder.itemId())));
+        stoppedProjects.removeStoppedProject(
+                workspaceId,
+                holder.itemId(),
+                stopped.getFirst().stopReceipt(),
+                Objects.requireNonNull(scenario.account().getId()));
+
+        assertThat(itemRows.findByIdAndWorkspaceId(holder.itemId(), workspaceId))
+                .hasValueSatisfying(
+                        removed -> assertThat(removed.getRemovedAt()).isNotNull());
+        assertThat(repositories.findById(fixture.repository().getId())).isEmpty();
+        assertThat(results.findById(result.getId()))
+                .hasValueSatisfying(kept -> assertThat(kept.getEndedAt()).isNull());
+        assertThat(feedbackRows.findById(pending.getId()))
+                .hasValueSatisfying(kept -> assertThat(kept.getState()).isEqualTo(FeedbackState.READY));
+        assertThat(itemRows.findByIdAndWorkspaceId(item.itemId(), workspaceId)).isPresent();
     }
 
     @ParameterizedTest

@@ -71,12 +71,19 @@ For a token-managed workspace, as a workspace admin:
 2. Enter the full repository path.
 
 For a GitLab project, **Stop monitoring** keeps it excluded from later discovery, webhooks, and syncs.
+The workspace keeps the work that Hephaestus already synced from the project, and the project appears under **Stopped projects**.
 To resume it, add its current full namespace path again.
 Stopping a project does not change anything in GitLab.
 With **Selected projects**, people who had access only through that project leave the workspace at the next sync.
 
-**CAUTION:** If no other workspace monitors the same source repository, removal deletes its mirrored repository data.
-Shared mirrored data remains while another workspace monitors it.
+To remove the kept work of a stopped GitLab project, select **Remove synced work** under **Stopped projects**.
+This is available while the GitLab connection is active.
+The project stays stopped.
+Practice reviews, feedback, and conversations about that work keep their usual retention.
+
+**CAUTION:** **Stop monitoring** on a GitHub repository and **Remove synced work** on a stopped GitLab project both remove the repository from this workspace.
+If no other workspace monitors or keeps the same source repository, removal deletes its mirrored repository data.
+Shared mirrored data remains while another workspace monitors or keeps it.
 The upstream repository does not change.
 
 The first sync takes longer for large repositories and long histories.

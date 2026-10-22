@@ -28,12 +28,15 @@ public class ScmRepositoryItemLifecycle {
     @EventListener
     @Transactional
     public void onMonitoringChanged(RepositoryMonitoringChangedEvent event) {
-        for (long repositoryId : event.repositoryIds()) {
+        for (long repositoryId :
+                event.repositoryIds().stream().distinct().sorted().toList()) {
             if (!repositories.isMonitored(event.workspaceId(), repositoryId)) {
+                if (event.retainIndex()) continue;
                 items.findSource(event.workspaceId(), ScmItemEvents.REPOSITORY.value(), repositoryId)
                         .ifPresent(item -> writer.remove(event.workspaceId(), item.getId(), clock.instant()));
                 continue;
             }
+            repositories.claimForIndex(repositoryId);
             var repository = repositories.findById(repositoryId).orElseThrow();
             try {
                 access.authorize(event.workspaceId(), repository);

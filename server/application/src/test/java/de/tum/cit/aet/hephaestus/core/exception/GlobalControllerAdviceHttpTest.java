@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,6 +23,21 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag("unit")
 class GlobalControllerAdviceHttpTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"optimistic", "pessimistic"})
+    void shouldReturnARetryableConflictWithoutDatabaseDetailsWhenAConcurrentWriteWins(String kind) throws Exception {
+        var mvc = MockMvcBuilders.standaloneSetup(new RefusingController())
+                .setControllerAdvice(new GlobalControllerAdvice())
+                .build();
+
+        mvc.perform(get("/concurrent/{kind}", kind))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.title").value("Concurrent change"))
+                .andExpect(jsonPath("$.detail").value("Another request is changing this data. Reload and try again."));
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {403, 404, 409, 429})
     void shouldPreserveProblemAndHeadersWhenFrameworkErrorIsThrown(int statusCode) throws Exception {
@@ -38,6 +55,14 @@ class GlobalControllerAdviceHttpTest {
 
     @RestController
     static class RefusingController {
+        @GetMapping("/concurrent/{kind}")
+        void concurrent(@PathVariable String kind) {
+            if (kind.equals("optimistic")) {
+                throw new OptimisticLockingFailureException("private-row private-statement");
+            }
+            throw new PessimisticLockingFailureException("private-row private-statement");
+        }
+
         @GetMapping("/refused/{status}")
         void refuse(@PathVariable int status) {
             var body = ProblemDetail.forStatusAndDetail(

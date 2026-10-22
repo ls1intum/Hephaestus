@@ -18,7 +18,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @WorkspaceScopedController
@@ -38,6 +41,7 @@ public class ScmWorkspaceController {
     private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final WorkspaceTeamLabelService workspaceTeamLabelService;
     private final GitLabRepositorySelectionService gitLabRepositorySelectionService;
+    private final GitLabStoppedProjectService gitLabStoppedProjectService;
 
     @GetMapping("/repositories")
     @Operation(summary = "List repositories monitored by a workspace")
@@ -75,6 +79,24 @@ public class ScmWorkspaceController {
             WorkspaceContext workspaceContext, @RequestParam String nameWithOwner) {
         workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, nameWithOwner);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/repositories/stopped")
+    @Operation(summary = "List stopped GitLab projects whose synced work the workspace still keeps")
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<List<GitLabStoppedProjectDTO>> getStoppedGitLabProjects(WorkspaceContext workspaceContext) {
+        return ResponseEntity.ok(gitLabStoppedProjectService.getStoppedProjects(workspaceContext.id()));
+    }
+
+    @DeleteMapping("/repositories/stopped/{repositoryItemId}")
+    @Operation(summary = "Remove the synced work a workspace keeps from a stopped GitLab project")
+    @RequireAtLeastWorkspaceAdmin
+    @Audited(ledger = AuditLedger.CONNECTION_AUDIT)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeStoppedGitLabProject(
+            WorkspaceContext workspaceContext, @PathVariable long repositoryItemId, @RequestParam UUID stopReceipt) {
+        gitLabStoppedProjectService.removeStoppedProject(
+                workspaceContext.id(), repositoryItemId, stopReceipt, CurrentAccount.requireId());
     }
 
     @GetMapping("/repositories/selection")
