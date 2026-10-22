@@ -114,7 +114,8 @@ export function PracticeReviewOverviewPage({
 				title="What the reviews did"
 				size="lg"
 				description={rangeDef.label}
-				foldKey={`${OVERVIEW_FOLD}what-the-reviews-did`}
+				// The overview's failure is said only here, so a fold never hides it or its retry.
+				foldKey={overview.status === "error" ? undefined : `${OVERVIEW_FOLD}what-the-reviews-did`}
 			>
 				{overview.status === "error" ? (
 					<QueryErrorAlert

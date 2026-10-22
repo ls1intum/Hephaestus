@@ -5,6 +5,7 @@ import type { ReviewOverview } from "@/api/types.gen";
 import type { ReviewRange } from "@/components/admin/practice-reviews/review-range";
 import { ReviewReadinessBanner } from "@/components/admin/practices/review/ReviewReadinessBanner";
 import { forgetSectionFold } from "@/components/layout/section-folds";
+import { Button } from "@/components/ui/button";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
@@ -23,8 +24,11 @@ import {
 	withheldByReasonCounts,
 	workspacePractices,
 } from "./fixtures";
-import { PracticeReviewOverviewPage } from "./PracticeReviewOverviewPage";
-import type { ReviewSectionState } from "./review-states";
+import {
+	PracticeReviewOverviewPage,
+	type PracticeReviewOverviewPageProps,
+} from "./PracticeReviewOverviewPage";
+import type { ReviewOverviewState, ReviewSectionState } from "./review-states";
 
 function ready<T>(items: T[], total = items.length): ReviewSectionState<T> {
 	return { status: "ready", items, total };
@@ -410,5 +414,66 @@ export const FoldsItsLongSections: Story = {
 			"aria-expanded",
 			"true",
 		);
+	},
+};
+
+const FAILED_OVERVIEW = {
+	status: "error",
+	error: { status: 500 },
+	onRetry: fn(),
+} satisfies ReviewOverviewState;
+
+/** The overview read failing and coming back while the page stays open, driven by story-only buttons. */
+function OverviewReadChanges(args: PracticeReviewOverviewPageProps) {
+	return (
+		<Stateful initial={args.overview}>
+			{(overview, setOverview) => (
+				<>
+					<PracticeReviewOverviewPage {...args} overview={overview} />
+					<div className="mt-10 flex flex-wrap gap-2">
+						<Button type="button" variant="outline" onClick={() => setOverview(FAILED_OVERVIEW)}>
+							Make the overview read fail
+						</Button>
+						<Button type="button" variant="outline" onClick={() => setOverview(args.overview)}>
+							Make the overview read succeed
+						</Button>
+					</div>
+				</>
+			)}
+		</Stateful>
+	);
+}
+
+/**
+ * The overview's failure is the only thing said for the stages, Delivery and the practices, so a
+ * fold the reader chose for What the reviews did never hides it or its retry. The fold stays the
+ * reader's: once the overview is back, the section is still folded until they open it.
+ */
+export const FoldedOverviewStillSaysItFailed: Story = {
+	beforeEach: () => {
+		forgetFoldable();
+		return forgetFoldable;
+	},
+	render: (args) => <OverviewReadChanges {...args} />,
+	play: async ({ canvas, userEvent }) => {
+		const whatTheReviewsDid = () => canvas.getByRole("button", { name: "What the reviews did" });
+		await userEvent.click(whatTheReviewsDid());
+		await expect(whatTheReviewsDid()).toHaveAttribute("aria-expanded", "false");
+		await expect(canvas.queryByRole("list", { name: "Stages" })).toBeNull();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Make the overview read fail" }));
+		await expect(canvas.queryByRole("heading", { name: "Delivery" })).toBeNull();
+		await expect(canvas.queryByRole("heading", { name: "Practices" })).toBeNull();
+		await expect(canvas.getByText("We could not load what the reviews did")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeVisible();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Make the overview read succeed" }));
+		await expect(whatTheReviewsDid()).toHaveAttribute("aria-expanded", "false");
+		await expect(canvas.queryByRole("list", { name: "Stages" })).toBeNull();
+		await expect(canvas.queryByText("We could not load what the reviews did")).toBeNull();
+
+		await userEvent.click(whatTheReviewsDid());
+		await expect(whatTheReviewsDid()).toHaveAttribute("aria-expanded", "true");
+		await expect(canvas.getByRole("list", { name: "Stages" })).toBeVisible();
 	},
 };
