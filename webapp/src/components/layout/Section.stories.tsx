@@ -4,6 +4,7 @@ import { expect } from "storybook/test";
 import { Button } from "@/components/ui/button";
 
 import { Section } from "./Section";
+import { forgetSectionFold } from "./section-folds";
 
 const meta = {
 	component: Section,
@@ -60,5 +61,36 @@ export const LongContent: Story = {
 		description:
 			"Practices cover how a team records the reasoning behind a change. They keep operational runbooks current. They make the resulting knowledge findable long after the original authors have moved on.",
 		actions: <Button size="sm">Review 12 practices</Button>,
+	},
+};
+
+/**
+ * An admin page's long section folds: its heading becomes a button that says whether it is open, and
+ * the choice stays in this browser. Open by default.
+ */
+export const Foldable: Story = {
+	args: { foldKey: "story:foldable" },
+	beforeEach: () => {
+		forgetSectionFold("story:foldable");
+		return () => forgetSectionFold("story:foldable");
+	},
+	play: async ({ canvas, userEvent }) => {
+		// Still a heading of the region, with the button inside it.
+		canvas.getByRole("region", { name: "Review guidance" });
+		const fold = canvas.getByRole("button", { name: "Review guidance" });
+		await expect(fold).toHaveAttribute("aria-expanded", "true");
+		await expect(canvas.getByText("Section body.")).toBeVisible();
+		await userEvent.click(fold);
+		await expect(fold).toHaveAttribute("aria-expanded", "false");
+		await expect(canvas.queryByText("Section body.")).not.toBeVisible();
+		// The description stays, so a folded section still says what it holds.
+		await expect(
+			canvas.getByText("What the reviewer looks for, and what the author should have written."),
+		).toBeVisible();
+		await expect(window.localStorage.getItem("hephaestus:section-folded:story:foldable")).toBe(
+			"true",
+		);
+		await userEvent.keyboard("{Enter}");
+		await expect(fold).toHaveAttribute("aria-expanded", "true");
 	},
 };

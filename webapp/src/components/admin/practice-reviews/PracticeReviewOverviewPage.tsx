@@ -26,6 +26,12 @@ import type { ReviewQueueState } from "./ReviewQueueNow";
 import { ReviewTabIntro } from "./ReviewTabIntro";
 import type { ReviewTimingState } from "./ReviewTimeCard";
 
+/**
+ * The overview's long sections fold, each remembered per viewer. "Needs you" never folds: it is what
+ * an admin must not miss.
+ */
+const OVERVIEW_FOLD = "practice-reviews-overview:";
+
 export interface PracticeReviewOverviewPageProps {
 	workspaceSlug: string;
 	range: ReviewRange;
@@ -92,6 +98,7 @@ export function PracticeReviewOverviewPage({
 			<Section
 				title="Queue"
 				size="lg"
+				foldKey={`${OVERVIEW_FOLD}queue`}
 				description={`What waits and runs now. What finished and how long reviews took ${rangeDef.during}.`}
 			>
 				<ReviewQueueCard
@@ -103,7 +110,13 @@ export function PracticeReviewOverviewPage({
 					during={rangeDef.during}
 				/>
 			</Section>
-			<Section title="What the reviews did" size="lg" description={rangeDef.label}>
+			<Section
+				title="What the reviews did"
+				size="lg"
+				description={rangeDef.label}
+				// The overview's failure is said only here, so a fold never hides it or its retry.
+				foldKey={overview.status === "error" ? undefined : `${OVERVIEW_FOLD}what-the-reviews-did`}
+			>
 				{overview.status === "error" ? (
 					<QueryErrorAlert
 						error={overview.error}
@@ -123,7 +136,12 @@ export function PracticeReviewOverviewPage({
 			</Section>
 			{/* The Delivery cards count from the overview too: its failure is said once, above. */}
 			{overview.status !== "error" && (
-				<Section title="Delivery" size="lg" description={rangeDef.label}>
+				<Section
+					title="Delivery"
+					size="lg"
+					description={rangeDef.label}
+					foldKey={`${OVERVIEW_FOLD}delivery`}
+				>
 					<ReviewPipeline
 						aria-label="Delivery"
 						workspaceSlug={workspaceSlug}
@@ -150,6 +168,7 @@ export function PracticeReviewOverviewPage({
 				<Section
 					title="Practices"
 					size="lg"
+					foldKey={`${OVERVIEW_FOLD}practices`}
 					description={`How the reviews judged each practice ${rangeDef.during}, the ones that need a look first.`}
 				>
 					<PracticeCountsTable state={overview} practices={practices} filter={practicesFilter} />
