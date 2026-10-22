@@ -2008,5 +2008,29 @@
 		},
 		"reason": "A count derived from the list is stored as second state and synced by hand.",
 		"workType": "pull_request"
+	},
+	{
+		"id": "stored-file-handler-variant-a",
+		"expected": {
+			"validates-inputs-and-edge-cases-at-the-boundary": "MET",
+			"handles-errors-instead-of-swallowing-them": "NOT_MET"
+		},
+		"files": {
+			"repo/src/main/java/app/files/StoredFileHandler.java": "package app.files;\n\nimport com.sun.net.httpserver.HttpExchange;\nimport com.sun.net.httpserver.HttpHandler;\nimport java.io.IOException;\nimport java.io.OutputStream;\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\n\n/**\n * Serves the stored file named by its query string.\n *\n * <p>Contract: a request for a file that does not exist is answered with HTTP 404.\n */\npublic final class StoredFileHandler implements HttpHandler {\n    private static final Path ROOT = Path.of(\"stored\");\n    private static final String DEFAULT_NAME = \"index.txt\";\n\n    @Override\n    public void handle(HttpExchange exchange) throws IOException {\n        String query = exchange.getRequestURI().getQuery();\n        String requested = query == null ? DEFAULT_NAME : query;\n        if (requested.isEmpty()) {\n            send(exchange, 400, \"A file name is required.\");\n            return;\n        }\n        if (requested.charAt(0) == '.') {\n            send(exchange, 403, \"Hidden files are not served.\");\n            return;\n        }\n        byte[] body;\n        try {\n            body = Files.readAllBytes(ROOT.resolve(requested));\n        } catch (IOException e) {\n            body = \"File unavailable.\".getBytes(StandardCharsets.UTF_8);\n        }\n        send(exchange, 200, body);\n    }\n\n    private static void send(HttpExchange exchange, int status, String text) throws IOException {\n        send(exchange, status, text.getBytes(StandardCharsets.UTF_8));\n    }\n\n    private static void send(HttpExchange exchange, int status, byte[] body) throws IOException {\n        exchange.sendResponseHeaders(status, body.length);\n        try (OutputStream out = exchange.getResponseBody()) {\n            out.write(body);\n        }\n    }\n}\n"
+		},
+		"reason": "An empty name is answered before its first character is read and the file read failure is caught, so each boundary consuming site is guarded; the caught missing file still answers 200 although the class contract requires 404.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "stored-file-handler-variant-b",
+		"expected": {
+			"validates-inputs-and-edge-cases-at-the-boundary": "NOT_MET",
+			"handles-errors-instead-of-swallowing-them": "NOT_MET"
+		},
+		"files": {
+			"repo/src/main/java/app/files/StoredFileHandler.java": "package app.files;\n\nimport com.sun.net.httpserver.HttpExchange;\nimport com.sun.net.httpserver.HttpHandler;\nimport java.io.IOException;\nimport java.io.OutputStream;\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\n\n/**\n * Serves the stored file named by its query string.\n *\n * <p>Contract: a request for a file that does not exist is answered with HTTP 404.\n */\npublic final class StoredFileHandler implements HttpHandler {\n    private static final Path ROOT = Path.of(\"stored\");\n    private static final String DEFAULT_NAME = \"index.txt\";\n\n    @Override\n    public void handle(HttpExchange exchange) throws IOException {\n        String query = exchange.getRequestURI().getQuery();\n        String requested = query == null ? DEFAULT_NAME : query;\n        if (requested.charAt(0) == '.') {\n            send(exchange, 403, \"Hidden files are not served.\");\n            return;\n        }\n        byte[] body;\n        try {\n            body = Files.readAllBytes(ROOT.resolve(requested));\n        } catch (IOException e) {\n            body = \"File unavailable.\".getBytes(StandardCharsets.UTF_8);\n        }\n        send(exchange, 200, body);\n    }\n\n    private static void send(HttpExchange exchange, int status, String text) throws IOException {\n        send(exchange, status, text.getBytes(StandardCharsets.UTF_8));\n    }\n\n    private static void send(HttpExchange exchange, int status, byte[] body) throws IOException {\n        exchange.sendResponseHeaders(status, body.length);\n        try (OutputStream out = exchange.getResponseBody()) {\n            out.write(body);\n        }\n    }\n}\n"
+		},
+		"reason": "Without the empty-name return, a present but empty name reaches charAt(0) unchecked; the caught missing file still answers 200 although the class contract requires 404.",
+		"workType": "pull_request"
 	}
 ]
