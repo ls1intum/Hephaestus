@@ -149,7 +149,10 @@ export const TypeCarriesTrigger: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("columnheader", { name: "Trigger" })).toBeNull();
 		await expect(canvas.getAllByText("Reconciliation", { exact: false }).length).toBeGreaterThan(0);
-		await expect(canvas.getAllByText(/· scheduled/iu).length).toBeGreaterThan(0);
+		const phrases = canvas
+			.getAllByRole("cell")
+			.filter((cell) => /\S · scheduled$/iu.test(cell.textContent));
+		await expect(phrases.length).toBeGreaterThan(0);
 	},
 };
 

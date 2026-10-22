@@ -2,6 +2,7 @@ import { ChevronDownIcon, DatabaseIcon, GaugeIcon, WebhookIcon, ZapOffIcon } fro
 import { Fragment, type ReactElement, type ReactNode } from "react";
 
 import type { ConnectionSyncStatus, RateLimitSnapshot } from "@/api/types.gen";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { useNow } from "@/components/common/use-now";
@@ -336,7 +337,7 @@ export function SyncStatusHeader({
 					)}
 					{hasText(nextRun) && (
 						<span className="text-muted-foreground">
-							{" · "}
+							<DotSeparator inline />
 							{nextRun}
 						</span>
 					)}

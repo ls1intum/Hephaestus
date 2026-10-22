@@ -19,10 +19,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvas }) => {
+	play: async ({ canvas, canvasElement }) => {
 		await expect(canvas.getByText("Pull or merge request")).toBeVisible();
 		// The separator is decoration: it must not reach a screen reader as a word.
-		await expect(canvas.getByText("·")).toHaveAttribute("aria-hidden", "true");
+		await expect(canvasElement.querySelector("[data-dot-separator]")).toHaveAttribute(
+			"aria-hidden",
+			"true",
+		);
 	},
 };
 

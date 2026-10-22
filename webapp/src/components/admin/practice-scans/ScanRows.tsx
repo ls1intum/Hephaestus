@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
 import type { ScanSummary } from "@/api/types.gen";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { TableSkeletonColumn } from "@/components/common/TableRowsSkeleton";
@@ -91,7 +92,8 @@ export function ScanRows({ workspaceSlug, scans, filters }: ScanRowsProps) {
 						<TableCell className="text-sm whitespace-nowrap">
 							{scan.ref}
 							<span className="font-mono text-xs text-muted-foreground">
-								{" · "}
+								{/* Monospace spaces are wider, so the gap around the dot is too. */}
+								<DotSeparator inline className="mx-[0.8em]" />
 								{shortVersion(scan.itemVersion)}
 							</span>
 						</TableCell>
