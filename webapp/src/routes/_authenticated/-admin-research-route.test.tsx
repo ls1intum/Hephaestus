@@ -1,9 +1,10 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
-import type { AdminWorkspaceView, ResearchRemovalDisclosure } from "@/api/types.gen";
+import { getPasskeyStatusOptions } from "@/api/@tanstack/react-query.gen";
+import type { AdminWorkspaceView, PasskeyStatus, ResearchRemovalDisclosure } from "@/api/types.gen";
 import { WORDING_VERSION } from "@/components/auth/consent-wording";
 import type { Wire } from "@/lib/dates";
 import { server } from "@/mocks/server";
@@ -84,6 +85,25 @@ function serveResearch(options: {
 		}),
 	);
 	return state;
+}
+
+/** The account's passkey status with no passkey, under the instance's confirmation policy. */
+function passkeyStatus(assuranceEnforced: boolean): Wire<PasskeyStatus> {
+	return {
+		assuranceEnforced,
+		protectionEnabled: false,
+		recoveryRequired: false,
+		instanceAdminRequired: true,
+		workspaceAdminRequired: false,
+		verified: false,
+		credentials: [],
+	};
+}
+
+function servePasskeys(assuranceEnforced: boolean) {
+	server.use(
+		http.get("*/user/passkeys", () => HttpResponse.json(passkeyStatus(assuranceEnforced))),
+	);
 }
 
 function captureDownloads() {
@@ -424,6 +444,7 @@ describe("research datasets route", () => {
 
 	it("does not offer a passkey confirmation without a usable passkey", async () => {
 		serveResearch({ organization: "TUM AET", open: [] });
+		servePasskeys(true);
 		renderRouteAt("/admin/research");
 
 		await screen.findByText(
@@ -431,6 +452,150 @@ describe("research datasets route", () => {
 			undefined,
 			ROUTE_RENDER_WAIT,
 		);
+		expect(screen.queryByRole("button", { name: "Confirm with passkey" })).toBeNull();
+	});
+
+	it("asks for no passkey where the instance turned additional confirmation off, and still checks", async () => {
+		const research = serveResearch({ organization: "TUM AET", open: [] });
+		servePasskeys(false);
+		const user = userEvent.setup();
+		renderRouteAt("/admin/research");
+
+		await screen.findByText(
+			/Extra authentication checks are disabled on this instance/u,
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		expect(screen.queryByRole("button", { name: "Confirm with passkey" })).toBeNull();
+		expect(screen.queryByText(/you cannot export, check or update datasets/u)).toBeNull();
+
+		await user.click(screen.getByRole("button", { name: "Check open datasets" }));
+		await screen.findByText("No open datasets");
+		expect(research.checks).toBe(1);
+	});
+
+	it("neither asks for a passkey nor waives one while the passkey status loads", async () => {
+		serveResearch({ organization: "TUM AET", open: [] });
+		const held = deferred();
+		server.use(
+			http.get("*/user/passkeys", async () => {
+				await held.promise;
+				return HttpResponse.json(passkeyStatus(true));
+			}),
+		);
+		renderRouteAt("/admin/research");
+		try {
+			await screen.findByText("Loading your passkey status", undefined, ROUTE_RENDER_WAIT);
+			expect(screen.queryByText(/checks are disabled/u)).toBeNull();
+			expect(screen.queryByText(/you cannot export, check or update datasets/u)).toBeNull();
+			expect(screen.queryByRole("button", { name: "Confirm with passkey" })).toBeNull();
+
+			held.resolve();
+			await screen.findByText(/Without one, you cannot export, check or update datasets here/u);
+		} finally {
+			held.resolve();
+		}
+	});
+
+	it("keeps the export when the passkey status cannot be read, and reads it again on retry", async () => {
+		serveResearch({ organization: "TUM AET", open: [] });
+		let reads = 0;
+		server.use(
+			http.get(
+				"*/user/passkeys",
+				() => {
+					reads += 1;
+					return HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 });
+				},
+				{ once: true },
+			),
+			http.get("*/user/passkeys", () => {
+				reads += 1;
+				return HttpResponse.json(passkeyStatus(false));
+			}),
+		);
+		const user = userEvent.setup();
+		renderRouteAt("/admin/research");
+
+		await screen.findByText("We could not load your passkey status", undefined, ROUTE_RENDER_WAIT);
+		// The server's answer is classified, not read as a lost connection.
+		screen.getByText(/Try again in a moment/u);
+		expect(screen.queryByText(/Check your connection/u)).toBeNull();
+		expect(screen.queryByText(/checks are disabled/u)).toBeNull();
+		expect(screen.queryByText(/you cannot export, check or update datasets/u)).toBeNull();
+		const exportButton = await screen.findByRole("button", { name: "Export and download" });
+		expect(exportButton.hasAttribute("disabled")).toBe(false);
+
+		const retry = screen.getByRole("button", { name: "Retry" });
+		expect(retry.hasAttribute("disabled")).toBe(false);
+		await user.click(retry);
+		await screen.findByText(/Extra authentication checks are disabled on this instance/u);
+		expect(reads).toBe(2);
+	});
+
+	it("does not present cached policy as current after a failed refresh, and recovers on retry", async () => {
+		serveResearch({ organization: "TUM AET", open: [] });
+		servePasskeys(false);
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin/research");
+		await screen.findByText(
+			/Extra authentication checks are disabled on this instance/u,
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+
+		server.use(
+			http.get("*/user/passkeys", () =>
+				HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 }),
+			),
+		);
+		await act(async () => {
+			await queryClient.refetchQueries({ queryKey: getPasskeyStatusOptions().queryKey });
+		});
+		await screen.findByText("We could not load your passkey status");
+		expect(screen.queryByText(/checks are disabled/u)).toBeNull();
+		expect(
+			screen.getByRole("button", { name: "Export and download" }).hasAttribute("disabled"),
+		).toBe(false);
+
+		servePasskeys(true);
+		const policyError = screen
+			.getAllByRole("alert")
+			.find((alert) => within(alert).queryByText("We could not load your passkey status"));
+		assert.isDefined(policyError, "The research policy error is shown");
+		await user.click(within(policyError).getByRole("button", { name: "Retry" }));
+		await screen.findByText(/Without one, you cannot export, check or update datasets here/u);
+		expect(screen.queryByText("We could not load your passkey status")).toBeNull();
+		expect(screen.queryByText(/checks are disabled/u)).toBeNull();
+	});
+
+	it("names a refused passkey status read as missing access, and offers no retry", async () => {
+		serveResearch({ organization: "TUM AET", open: [] });
+		server.use(
+			http.get("*/user/passkeys", () =>
+				HttpResponse.json(
+					{
+						status: 403,
+						title: "Forbidden",
+						detail: "This account cannot read its passkey status.",
+					},
+					{ status: 403 },
+				),
+			),
+		);
+		renderRouteAt("/admin/research");
+
+		await screen.findByText(
+			"You do not have access to your passkey status",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		screen.getByText(/Ask a workspace admin or instance admin for access/u);
+		expect(screen.queryByText(/Check your connection/u)).toBeNull();
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+		// An unknown policy is neither waived nor enforced on the page.
+		expect(screen.queryByText(/checks are disabled/u)).toBeNull();
+		expect(screen.queryByText(/you cannot export, check or update datasets/u)).toBeNull();
 		expect(screen.queryByRole("button", { name: "Confirm with passkey" })).toBeNull();
 	});
 });

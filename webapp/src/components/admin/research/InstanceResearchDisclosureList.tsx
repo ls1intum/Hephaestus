@@ -36,7 +36,7 @@ export interface ResearchOpenDataset {
 }
 
 export type InstanceResearchDisclosureListState =
-	/** Nothing read yet: a check asks the server and needs a recent passkey confirmation. */
+	/** Nothing read yet: a check asks the server, which enforces the deployment's assurance policy. */
 	| { status: "unchecked" }
 	| { status: "loading" }
 	/** A failed check shows no earlier answer: the server owns which datasets are open. */

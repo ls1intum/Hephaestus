@@ -148,12 +148,16 @@ The file excludes participant and model text, source code, credentials, and prov
 It retains historical records with their recorded limits.
 A legacy record does not prove a capture contract.
 
-Every operation below requires the instance-admin role and the administrator's own fresh passkey verification.
+Every operation below requires the instance-admin role and the administrator's own session.
+By default, every operation also requires the administrator's own fresh passkey verification.
 This requirement applies even when the instance does not require passkeys for ordinary admin access.
+An isolated test instance can turn off this additional confirmation.
+See [Test instances without additional confirmation](./passkeys.mdx#test-instances-without-additional-confirmation).
+
 A user view or installed-client session cannot perform these operations.
 Browser requests also need normal CSRF protection.
 
-1. Verify your passkey through **User settings → Passkeys**.
+1. When the instance requires the additional confirmation, verify your passkey through **User settings → Passkeys**.
 2. Submit `POST /admin/research-disclosures` with the workspace ID as a string, `firstDay`, `lastDay`, and `useUntil`.
    The window uses UTC days and includes the last day.
    Choose a window of 1 to 400 days that ends no later than today.
@@ -166,7 +170,8 @@ Browser requests also need normal CSRF protection.
 
 Before further analysis, check whether a participant's removal is owed:
 
-1. Verify your passkey again when required, then submit `POST /admin/research-disclosures/removal-checks`.
+1. When the instance requires the additional confirmation, verify your passkey again if it is no longer recent.
+   Then submit `POST /admin/research-disclosures/removal-checks`.
    This operation records newly detected obligations.
    It returns open disclosures with a removal owed or an expired use-until date.
    An empty list does not mean no datasets were released.

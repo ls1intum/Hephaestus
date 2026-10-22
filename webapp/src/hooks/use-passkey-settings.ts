@@ -150,6 +150,8 @@ export function usePasskeySettings({
 	return {
 		/** The action the server last accepted in this visit, such as a registration just finished. */
 		completed: mutation.isSuccess ? mutation.variables.kind : undefined,
+		/** The failed read of the passkey status as the server answered it, for a caller that classifies it. */
+		statusError: status.error,
 		section: {
 			status: status.data,
 			loading: status.isPending,

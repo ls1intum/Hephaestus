@@ -38,6 +38,24 @@ export type ResearchProgramState =
 	/** No organization means the instance runs no research program; nothing new can be released. */
 	| { status: "ready"; organization?: string; noticeVersion: string };
 
+/**
+ * Whether this instance asks for a recent passkey confirmation, as the server reports it. The server
+ * still checks every request; this only says what to do before one.
+ */
+export type ResearchPasskeyState =
+	| { status: "loading" }
+	| { status: "error"; error: unknown; onRetry: () => void }
+	/** The instance turned additional confirmation off. */
+	| { status: "notRequired" }
+	| {
+			status: "required";
+			/** A passkey is registered and this browser can use it. */
+			available: boolean;
+			pending: boolean;
+			error?: string;
+			onConfirm: () => void;
+	  };
+
 export type ResearchWorkspacesState =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
@@ -59,13 +77,7 @@ export type ResearchReleaseOutcome =
 export interface InstanceResearchPageProps {
 	program: ResearchProgramState;
 	workspaces: ResearchWorkspacesState;
-	passkey: {
-		/** A passkey is registered and this browser can use it. */
-		available: boolean;
-		pending: boolean;
-		error?: string;
-		onConfirm: () => void;
-	};
+	passkey: ResearchPasskeyState;
 	release: {
 		pending: boolean;
 		/** A failed release. The server may still have recorded it; the open datasets say so. */
@@ -87,16 +99,49 @@ export function InstanceResearchPage({
 }: InstanceResearchPageProps) {
 	return (
 		<div className="space-y-6">
-			<Card>
-				<CardHeader>
-					<CardTitle>
-						<h2>Passkey confirmation</h2>
-					</CardTitle>
-					<CardDescription>
-						Exports, checks and dataset updates need a recent passkey confirmation. Confirm before
-						you start, and again if an action is refused.
-					</CardDescription>
-				</CardHeader>
+			<PasskeyCard passkey={passkey} />
+			<ReleaseCard program={program} workspaces={workspaces} release={release} />
+			<InstanceResearchDisclosureList {...disclosures} />
+		</div>
+	);
+}
+
+function PasskeyCard({ passkey }: { passkey: ResearchPasskeyState }) {
+	let description: string;
+	if (passkey.status === "required") {
+		description =
+			"Exports, checks and dataset updates need a recent passkey confirmation. Confirm before you start, and again if an action is refused.";
+	} else if (passkey.status === "notRequired") {
+		description =
+			"Extra authentication checks are disabled on this instance, so exports, checks and dataset updates need no passkey confirmation. They still need your own instance admin access.";
+	} else {
+		description =
+			"This instance may ask for a recent passkey confirmation before exports, checks and dataset updates.";
+	}
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>
+					<h2>Passkey confirmation</h2>
+				</CardTitle>
+				<CardDescription>{description}</CardDescription>
+			</CardHeader>
+			{passkey.status === "loading" && (
+				<CardContent aria-busy="true">
+					<Skeleton className="h-9 w-48" />
+					<span className="sr-only">Loading your passkey status</span>
+				</CardContent>
+			)}
+			{passkey.status === "error" && (
+				<CardContent>
+					<QueryErrorAlert
+						error={passkey.error}
+						title="We could not load your passkey status"
+						onRetry={passkey.onRetry}
+					/>
+				</CardContent>
+			)}
+			{passkey.status === "required" && (
 				<CardContent className="space-y-3">
 					{passkey.available ? (
 						<Button
@@ -120,10 +165,8 @@ export function InstanceResearchPage({
 						</Alert>
 					)}
 				</CardContent>
-			</Card>
-			<ReleaseCard program={program} workspaces={workspaces} release={release} />
-			<InstanceResearchDisclosureList {...disclosures} />
-		</div>
+			)}
+		</Card>
 	);
 }
 
