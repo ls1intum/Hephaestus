@@ -1,8 +1,9 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
+import { getPasskeyStatusOptions } from "@/api/@tanstack/react-query.gen";
 import type { AdminWorkspaceView, PasskeyStatus, ResearchRemovalDisclosure } from "@/api/types.gen";
 import { WORDING_VERSION } from "@/components/auth/consent-wording";
 import type { Wire } from "@/lib/dates";
@@ -530,6 +531,42 @@ describe("research datasets route", () => {
 		await user.click(retry);
 		await screen.findByText(/Extra authentication checks are disabled on this instance/u);
 		expect(reads).toBe(2);
+	});
+
+	it("does not present cached policy as current after a failed refresh, and recovers on retry", async () => {
+		serveResearch({ organization: "TUM AET", open: [] });
+		servePasskeys(false);
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin/research");
+		await screen.findByText(
+			/Extra authentication checks are disabled on this instance/u,
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+
+		server.use(
+			http.get("*/user/passkeys", () =>
+				HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 }),
+			),
+		);
+		await act(async () => {
+			await queryClient.refetchQueries({ queryKey: getPasskeyStatusOptions().queryKey });
+		});
+		await screen.findByText("We could not load your passkey status");
+		expect(screen.queryByText(/checks are disabled/u)).toBeNull();
+		expect(
+			screen.getByRole("button", { name: "Export and download" }).hasAttribute("disabled"),
+		).toBe(false);
+
+		servePasskeys(true);
+		const policyError = screen
+			.getAllByRole("alert")
+			.find((alert) => within(alert).queryByText("We could not load your passkey status"));
+		assert.isDefined(policyError, "The research policy error is shown");
+		await user.click(within(policyError).getByRole("button", { name: "Retry" }));
+		await screen.findByText(/Without one, you cannot export, check or update datasets here/u);
+		expect(screen.queryByText("We could not load your passkey status")).toBeNull();
+		expect(screen.queryByText(/checks are disabled/u)).toBeNull();
 	});
 
 	it("names a refused passkey status read as missing access, and offers no retry", async () => {

@@ -132,7 +132,7 @@ function ResearchRoute() {
 
 	const { section } = passkeys;
 	let passkey: ResearchPasskeyState;
-	if (section.status) {
+	if (section.status && !passkeys.statusError) {
 		passkey = section.status.assuranceEnforced
 			? {
 					status: "required",
