@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -8,12 +9,21 @@ import { OVERVIEW, serveAttention } from "./-overview-attention-server";
 vi.setConfig({ testTimeout: 30_000 });
 
 describe("the overview's review time", () => {
-	it("says what the merge cost in comments on the review time card", async () => {
+	it("shows nothing the Reviews list cannot open, not even in the review time card's (i)", async () => {
 		serveAttention();
 		renderRouteAtWithRouter(OVERVIEW);
 
-		const lost = await screen.findByText(/lost to merge$/u, undefined, ROUTE_RENDER_WAIT);
-		expect(lost.textContent).toBe("21 lost to merge");
+		const about = await screen.findByRole(
+			"button",
+			{ name: "About review time" },
+			ROUTE_RENDER_WAIT,
+		);
+		// No list opens exactly the feedback the merge withheld, so it is no figure of the card.
+		expect(screen.queryByText(/lost to merge$/u)).toBeNull();
+		await userEvent.click(about);
+		const info = await screen.findByRole("dialog", { name: "About review time" });
+		expect(info.textContent).not.toContain("merge");
+		await userEvent.keyboard("{Escape}");
 		// The slowest tenth is gone; the median is split into the trace's five stages instead, with
 		// no unsplit run, since every review recorded when its execution started.
 		expect(screen.queryByText("Slowest 1 in 10")).toBeNull();

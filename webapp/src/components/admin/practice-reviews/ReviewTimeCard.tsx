@@ -49,9 +49,10 @@ export interface ReviewTimeCardProps {
  * comment was posted on the work, and under it the same time as one bar split into the stages a
  * review's trace names, Until asked, Queue, Preparation, Execution and To developer, with the
  * unsplit Run of older reviews where the range has some, each as wide as its share of the reviews'
- * total time, with a legend of that share of the median, so the parts add up to it. Then one line of
- * figures: how many reviews of the range finished, the feedback lost because the work merged first, and the
- * reviews that finished after the merge. Where no time to a comment on the work was measured, as in a
+ * total time, with a legend of that share of the median, so the parts add up to it. Then how many
+ * reviews of the range finished, opening them. How many of them finished after the merge, and the
+ * feedback lost because the work merged first, are said in the (i): the reviews list cannot filter by
+ * them, so as figures they would open nothing. Where no time to a comment on the work was measured, as in a
  * course whose feedback goes to the practice pages or waits for approval, the part says so and
  * measures to the end of the review instead. A missing time is not a missing event: comments may
  * still have been delivered, and reviews may still have finished. What each figure means is in the
@@ -105,17 +106,17 @@ export function ReviewTimeCard({
 				{label}
 			</FigureCaption>
 			{body}
-			<RangeFigures workspaceSlug={workspaceSlug} timing={timing} finished={finished} />
+			<RangeFigures workspaceSlug={workspaceSlug} finished={finished} />
 		</div>
 	);
 }
 
 /**
- * The card's (i), one short line a term: what the figure is, each stage, then each figure of the
- * range. The median names which comments it times; what a stage leaves out is in the docs, not here.
+ * The card's (i), one short line a term: what the figure is, each stage, then the finished reviews
+ * of the range. A count the Reviews list cannot open, such as reviews finished after the merge, is not
+ * shown at all. The median names which comments it times; what a stage leaves out is in the docs.
  */
 function timeInfo(timing: ReviewTiming | undefined) {
-	const byMerge = timing?.finishedAfterMergeStartedByMerge ?? 0;
 	const typical = timing === undefined ? undefined : typicalReview(timing);
 	// A stage only some ranges have, the unsplit run of older reviews, is explained where it shows.
 	const shown = new Set(typical?.stages.map((stage) => stage.def.key));
@@ -137,14 +138,6 @@ function timeInfo(timing: ReviewTiming | undefined) {
 		{
 			term: "Finished",
 			text: "counts the reviews created in the range that completed, failed or timed out.",
-		},
-		{
-			term: "Lost to merge",
-			text: "counts pieces of feedback withheld because the work was merged first.",
-		},
-		{
-			term: "Finished after merge",
-			text: `counts reviews that finished after their work was merged.${byMerge > 0 ? ` ${byMerge} of them ${byMerge === 1 ? "was" : "were"} started by the merge.` : ""}`,
 		},
 	];
 }
@@ -231,26 +224,14 @@ function TimeFigures({ timing, during }: { timing: ReviewTiming; during: string 
 
 function RangeFigures({
 	workspaceSlug,
-	timing,
 	finished,
 }: {
 	workspaceSlug: string;
-	timing: ReviewTiming | undefined;
 	finished: FinishedInRange | undefined;
 }) {
 	const figures: CardFigure[] = [];
 	if (finished) {
 		figures.push(finishedFigure(workspaceSlug, finished));
-	}
-	const lost = timing?.feedbackWithheldAsMerged ?? 0;
-	if (lost > 0) {
-		figures.push({ key: "lost", term: "lost to merge", value: lost });
-	}
-	// Every review that finished after the merge, the ones the merge started too; the (i) says how
-	// many the merge started. The reviews list cannot filter by it, so the count opens nothing.
-	const afterMerge = timing?.finishedAfterMerge ?? 0;
-	if (afterMerge > 0) {
-		figures.push({ key: "late", term: "finished after merge", value: afterMerge });
 	}
 	const stale = finished?.state.status === "ready" && finished.state.stale;
 	return (

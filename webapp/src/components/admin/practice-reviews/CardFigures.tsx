@@ -9,7 +9,7 @@ import { OVERVIEW_TYPE } from "./overview-type-scale";
 
 export interface CardFigure {
 	key: string;
-	/** A short label: "waiting", "lost to merge". */
+	/** A short label: "waiting", "finished". */
 	term: ReactNode;
 	/** The figure, a number or a duration; a link when it opens the rows it counts. */
 	value: ReactNode;
