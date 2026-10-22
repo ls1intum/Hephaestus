@@ -17,6 +17,14 @@ const PRACTICE_SVG_THEME = [
 	"[&_.pv-stroke-accent]:stroke-mentor",
 ];
 
+/**
+ * The widest a practice picture draws, on an element set in `text-sm` like the words around it: 40em
+ * is 560px there, so the 640-unit canvas scales by 0.875 and its 15 and 16 unit labels show at about
+ * 13 and 14px, the size of that text. A narrower column shrinks the picture further; a wider one
+ * never draws it larger. The introduction and the guide share it, so a label is one size in both.
+ */
+export const PRACTICE_VISUAL_WIDTH = "max-w-[40em]";
+
 export interface PracticeVisualProps {
 	/** The SVG markup, as the server stores it. It is sanitized again before it is drawn. */
 	svg: string;

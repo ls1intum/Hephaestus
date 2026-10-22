@@ -1,13 +1,15 @@
+import { cn } from "cn";
 import { useSpinDelay } from "spin-delay";
 
 import type { PracticeGuidanceDto, PracticeStanding } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
-import { LabelledBlock } from "@/components/practice-profile/practice-profile-blocks";
+import { LabelledBlock, LevelLead } from "@/components/practice-profile/practice-profile-blocks";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { hasText } from "@/lib/text";
 
 import { PracticeFigure } from "./PracticeFigure";
+import { PRACTICE_VISUAL_WIDTH } from "./PracticeVisual";
 
 export type PracticeGuidanceState = PanelState<PracticeGuidanceDto>;
 
@@ -24,7 +26,8 @@ export interface PracticeIntroProps {
 /**
  * The top of a practice's level: why it matters, then the visual with what good looks like as its
  * caption. The words come with the standing and show at once; only the picture's area waits or
- * fails. Everything shares one text column, so the picture lines up with the words around it.
+ * fails. Everything shares one text column and the body size, `text-sm`, as the guide does: the lead
+ * stands out by its place and its ink, not by a larger size.
  */
 export function PracticeIntro({ practice, guidance }: PracticeIntroProps) {
 	// `ssr: false`, or a level that mounts with the request in flight shows the skeleton at once.
@@ -50,12 +53,12 @@ export function PracticeIntro({ practice, guidance }: PracticeIntroProps) {
 
 	return (
 		<section aria-label="Introduction" className="flex max-w-2xl flex-col gap-4">
-			{hasText(lead) && <p className="text-base text-pretty">{lead}</p>}
+			{hasText(lead) && <LevelLead>{lead}</LevelLead>}
 			{showSkeleton && (
-				<div className="flex flex-col gap-2" aria-busy="true">
+				<div className="flex flex-col gap-2 text-sm" aria-busy="true">
 					<span className="sr-only">Loading the picture for this practice…</span>
-					<Skeleton className="aspect-2/1 w-full rounded-md" />
-					{hasText(caption) && <p className="text-sm text-muted-foreground">{caption}</p>}
+					<Skeleton className={cn("aspect-2/1 w-full rounded-md", PRACTICE_VISUAL_WIDTH)} />
+					{hasText(caption) && <p className="text-muted-foreground">{caption}</p>}
 				</div>
 			)}
 			{visual && <PracticeFigure visual={visual} caption={caption} />}

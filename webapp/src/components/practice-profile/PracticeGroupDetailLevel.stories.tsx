@@ -205,7 +205,10 @@ export const NoPractices: Story = {
 	},
 };
 
-/** The group's own description, as the workspace wrote it, under the header. */
+/**
+ * The group's own description, as the workspace wrote it, under the header. It is the level's lead,
+ * set as a practice's why it matters is: body size, in the ink of the heading.
+ */
 export const WithItsDescription: Story = {
 	args: {
 		standing: {
@@ -214,9 +217,15 @@ export const WithItsDescription: Story = {
 		},
 	},
 	play: async () => {
-		await expectSettledVisible(
-			await screen.findByText("Work a reviewer can start on without asking first."),
+		const description = await screen.findByText(
+			"Work a reviewer can start on without asking first.",
 		);
+		await expectSettledVisible(description);
+		const heading = screen.getByRole("heading", { name: packagingGroup.name });
+		await expect(getComputedStyle(description).color).toBe(getComputedStyle(heading).color);
+		// `text-sm`, the body size of the practice surfaces.
+		const rootSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+		await expect(Number.parseFloat(getComputedStyle(description).fontSize)).toBe(0.875 * rootSize);
 		await expect(screen.getByText("Practices in this group")).toBeVisible();
 	},
 };

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 
 import { bundledGuidance, bundledPractice } from "@/stories/practice-guidance-story-mock-data";
-import { precedes } from "@/test/dom";
+import { largestLabelSize, precedes } from "@/test/dom";
 
 import { type PracticeGuidanceState, PracticeIntro } from "./PracticeIntro";
 
@@ -35,7 +35,8 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Why the practice matters, then the picture with what good looks like directly under it as its
- * caption. The picture has no frame and spans the text column.
+ * caption. The picture has no frame and starts at the text column's edge; it stops at the width that
+ * draws its labels at the size of the words around it.
  */
 export const Default: Story = {
 	play: async ({ canvas }) => {
@@ -46,9 +47,16 @@ export const Default: Story = {
 		const picture = canvas.getByRole("img", { name: bundledGuidance.visual.alt });
 		await expect(picture).toBeVisible();
 		await expect(precedes(lead, figure)).toBe(true);
-		// The picture lines up with the words: same left edge, same column.
+		// The lead, the caption and the picture's largest labels are one size: the lead is body text,
+		// and the picture lines up with the words but stops at 40 of their ems.
+		const caption = canvas.getByText(bundledPractice.whatGoodLooksLike);
+		const textSize = Number.parseFloat(getComputedStyle(lead).fontSize);
+		await expect(getComputedStyle(caption).fontSize).toBe(getComputedStyle(lead).fontSize);
 		await expect(picture.getBoundingClientRect().left).toBe(lead.getBoundingClientRect().left);
-		await expect(picture.getBoundingClientRect().width).toBe(lead.getBoundingClientRect().width);
+		await expect(picture.getBoundingClientRect().width).toBeLessThanOrEqual(
+			Math.min(lead.getBoundingClientRect().width, 40 * textSize),
+		);
+		await expect(largestLabelSize(picture)).toBeLessThanOrEqual(textSize);
 		await expect(canvas.queryByText("What good looks like")).toBeNull();
 		await expect(canvas.queryByRole("button")).toBeNull();
 	},

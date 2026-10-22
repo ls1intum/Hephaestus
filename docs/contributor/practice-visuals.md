@@ -67,7 +67,7 @@ Each pattern sets its height:
 | Visual, sequence | 200 |
 | Figure | 76 to 248 |
 
-- Do not set `width` or `height` on the root. The panel scales the picture to its text column, about 672 px.
+- Do not set `width` or `height` on the root. The panel draws the picture at most 560 px wide (40em beside its 14 px text). It never draws larger than its canvas. A label at 16 then shows at 14 px. A label at 15 shows at about 13 px, the size of the words around it. In a narrower column the picture shrinks with it.
 - Set `H` to the bottom of the lowest mark. Do not add space below it. When the lowest mark is a label, `H` is its baseline plus 4. `H` does not have to be a multiple of 8.
 - Draw to the edges. Put the first title at the top and the outermost shapes at x 0 and x 640.
 - In the fork, the shapes end at x 448, and the outcome labels end the picture. Write the outcome labels long enough to reach toward x 640.
