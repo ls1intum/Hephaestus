@@ -15,6 +15,7 @@ import { releaseResearchDataset } from "@/api/sdk.gen";
 import type { InstanceResearchDisclosureListState } from "@/components/admin/research/InstanceResearchDisclosureList";
 import {
 	InstanceResearchPage,
+	type ResearchPasskeyState,
 	type ResearchProgramState,
 	type ResearchReleaseDraft,
 	type ResearchReleaseOutcome,
@@ -41,8 +42,9 @@ export const Route = createFileRoute("/_authenticated/admin/research")({
 
 /**
  * Releases consented research datasets and records what happened to their copies. The server checks
- * a fresh passkey on every request and owns every fact shown here: the open datasets are read again
- * after each change, and nothing is kept in browser storage.
+ * every request against the instance's assurance policy, a fresh passkey by default, and owns every
+ * fact shown here: the open datasets are read again after each change, and nothing is kept in browser
+ * storage.
  */
 function ResearchRoute() {
 	// The same verification ceremony as Settings; it proves nothing here, the server checks each request.
@@ -128,6 +130,25 @@ function ResearchRoute() {
 		program = { status: "loading" };
 	}
 
+	const { section } = passkeys;
+	let passkey: ResearchPasskeyState;
+	if (section.status) {
+		passkey = section.status.assuranceEnforced
+			? {
+					status: "required",
+					available: section.supported && section.status.credentials.length > 0,
+					pending: section.pending && section.pendingAction === "verify",
+					error: section.error,
+					onConfirm: section.onVerify,
+				}
+			: { status: "notRequired" };
+	} else if (section.loading) {
+		passkey = { status: "loading" };
+	} else {
+		// The status read failed. Export stays offered: the server still checks each request.
+		passkey = { status: "error", error: passkeys.statusError, onRetry: section.onRetry };
+	}
+
 	let workspaces: ResearchWorkspacesState;
 	if (workspacesQuery.data) {
 		workspaces = {
@@ -191,13 +212,7 @@ function ResearchRoute() {
 			<InstanceResearchPage
 				program={program}
 				workspaces={workspaces}
-				passkey={{
-					available:
-						passkeys.section.supported && (passkeys.section.status?.credentials.length ?? 0) > 0,
-					pending: passkeys.section.pending && passkeys.section.pendingAction === "verify",
-					error: passkeys.section.error,
-					onConfirm: passkeys.section.onVerify,
-				}}
+				passkey={passkey}
 				release={{
 					pending: release.isPending,
 					error: release.error ?? undefined,

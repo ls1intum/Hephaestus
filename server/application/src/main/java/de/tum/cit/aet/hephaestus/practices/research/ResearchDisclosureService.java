@@ -28,7 +28,8 @@ import tools.jackson.databind.json.JsonMapper;
  * transaction is open while the caller sends the bytes.
  *
  * <p>This service does not authenticate. Its only callers are the instance-admin controllers, which
- * check the role, refuse delegated contexts and demand a fresh passkey on every route before calling in.
+ * check the role, refuse delegated contexts and apply the deployment's assurance policy before calling in.
+ * Fresh passkey verification is required by default.
  */
 @Service
 @ConditionalOnServerRole

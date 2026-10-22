@@ -18,7 +18,7 @@ const meta = {
 				{ id: "3", label: "Design Lab (design-lab)" },
 			],
 		},
-		passkey: { available: true, pending: false, onConfirm: fn() },
+		passkey: { status: "required", available: true, pending: false, onConfirm: fn() },
 		release: { pending: false, completed: 0, onRelease: fn() },
 		disclosures: {
 			state: { status: "unchecked" },
@@ -40,8 +40,7 @@ export const ReadyToRelease: Story = {
 		// The days are required fields, so the browser stops an empty form before it is sent.
 		await userEvent.click(canvas.getByRole("button", { name: "Export and download" }));
 		await expect(args.release.onRelease).not.toHaveBeenCalled();
-		await userEvent.click(canvas.getByRole("button", { name: "Confirm with passkey" }));
-		await expect(args.passkey.onConfirm).toHaveBeenCalledOnce();
+		await expect(canvas.getByRole("button", { name: "Confirm with passkey" })).toBeEnabled();
 	},
 };
 
@@ -142,12 +141,50 @@ export const LoadingQuestion: Story = {
 };
 
 export const NoUsablePasskey: Story = {
-	args: { passkey: { available: false, pending: false, onConfirm: fn() } },
+	args: { passkey: { status: "required", available: false, pending: false, onConfirm: fn() } },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: "Confirm with passkey" })).toBeNull();
 		await expect(
 			canvas.getByText(/you cannot export, check or update datasets here/u),
 		).toBeVisible();
+	},
+};
+
+/** A test instance that turned additional confirmation off: nothing asks for a passkey. */
+export const ConfirmationNotRequired: Story = {
+	args: { passkey: { status: "notRequired" } },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText(/Extra authentication checks are disabled on this instance/u),
+		).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Confirm with passkey" })).toBeNull();
+		await expect(canvas.queryByText(/you cannot export, check or update datasets/u)).toBeNull();
+		await expect(canvas.getByRole("button", { name: "Export and download" })).toBeEnabled();
+	},
+};
+
+/** Until the server answers, the page neither asks for a passkey nor says that none is needed. */
+export const LoadingPasskeyStatus: Story = {
+	args: { passkey: { status: "loading" } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/may ask for a recent passkey confirmation/u)).toBeVisible();
+		await expect(canvas.queryByText(/checks are disabled/u)).toBeNull();
+		await expect(canvas.queryByText(/you cannot export, check or update datasets/u)).toBeNull();
+		await expect(canvas.queryByRole("button", { name: "Confirm with passkey" })).toBeNull();
+	},
+};
+
+/** A failed status read keeps the export: the server still checks the request itself. */
+export const PasskeyStatusFailed: Story = {
+	args: {
+		passkey: { status: "error", error: { status: 503, title: "Unavailable" }, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not load your passkey status")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.queryByText(/checks are disabled/u)).toBeNull();
+		await expect(canvas.queryByText(/you cannot export, check or update datasets/u)).toBeNull();
+		await expect(canvas.getByRole("button", { name: "Export and download" })).toBeEnabled();
 	},
 };
 
