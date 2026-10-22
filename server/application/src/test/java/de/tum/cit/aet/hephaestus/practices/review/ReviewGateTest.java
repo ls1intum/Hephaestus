@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCaptureFixtures;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -106,6 +107,39 @@ class ReviewGateTest {
         }
     }
 
+    @ParameterizedTest
+    @EnumSource(ReviewOrigin.class)
+    void shouldSelectNoBundledPracticeThatPeopleReview(ReviewOrigin origin) {
+        workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(true);
+        workspace.getFeatures().setPracticeReviewManualTriggerEnabled(true);
+        var peoplePractices = ScmCaptureFixtures.bundledPractices().entrySet().stream()
+                .filter(entry -> entry.getValue().definition().reviewedBy().by() == ReviewedByKind.PEOPLE)
+                .toList();
+
+        assertThat(peoplePractices)
+                .extracting(Map.Entry::getKey)
+                .containsExactlyInAnyOrder(
+                        "triages-the-issue-with-labels-and-ownership", "issue-closed-with-unmet-outcome");
+        long id = 0;
+        for (var entry : peoplePractices) {
+            var definition = entry.getValue().definition();
+            assertThat(definition.reviewedBy().humanReason()).as(entry.getKey()).isNotNull();
+            assertThat(definition.script()).as(entry.getKey()).isNull();
+            var kind = entry.getValue().kind();
+            var practice = ReviewTestData.practice(1, ++id, entry.getKey(), definition);
+            practice.setKind(kind);
+            when(practices.findByWorkspaceIdAndKind(1L, kind)).thenReturn(List.of(practice));
+            // The practice's own event and an unfiltered state: only who reviews it keeps it from running.
+            assertThat(definition.reviewOn().state()).as(entry.getKey()).isEmpty();
+            var event = definition.reviewOn().events().getFirst();
+            assertThat(gate.evaluate(workspace, snapshot(kind, Map.of()), origin, event, List.of()))
+                    .as(entry.getKey())
+                    .isInstanceOfSatisfying(
+                            GateDecision.Skip.class,
+                            skip -> assertThat(skip.eventReason()).isEqualTo(ReviewRequestReason.NO_ACTIVE_PRACTICE));
+        }
+    }
+
     @Test
     void automaticStateFiltersDoNotExcludeARequestedReview() {
         var original = DefinitionTestFixtures.definition();
@@ -185,7 +219,11 @@ class ReviewGateTest {
     }
 
     private static ItemSnapshot snapshot(Map<String, String> state) {
-        return ItemFixtures.snapshot(new ItemRef(1, 1, new ItemKind("scm.pull_request"), 1L, null, null), state)
+        return snapshot(new ItemKind("scm.pull_request"), state);
+    }
+
+    private static ItemSnapshot snapshot(ItemKind kind, Map<String, String> state) {
+        return ItemFixtures.snapshot(new ItemRef(1, 1, kind, 1L, null, null), state)
                 .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null))
                 .label(ItemFixtures.label()
                         .itemId(1)

@@ -13,7 +13,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndexBuilder;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -30,6 +33,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
@@ -196,6 +200,41 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
     private Map<String, byte[]> captureFiles(ScmCaptureContext request) {
         return provider.capture(request, provider.sourceKinds()).files();
+    }
+
+    /** Reads the exported manifest back and binds one source's file and quoted words to their staged bytes. */
+    private static void assertExported(
+            JsonMapper mapper,
+            PreparedEvidence prepared,
+            ItemKind item,
+            SourceKind source,
+            String file,
+            String citation,
+            String words) {
+        JsonNode manifest =
+                mapper.readTree(Objects.requireNonNull(prepared.files().get(SandboxLayout.MANIFEST_PATH)));
+        assertThat(manifest.path("itemKind").asString()).isEqualTo(item.value());
+        assertThat(manifest.path("sources")).singleElement().satisfies(captured -> {
+            assertThat(captured.path("kind").asString()).isEqualTo(source.value());
+            assertThat(captured.path("state").path("availability").asString()).isEqualTo("AVAILABLE");
+            assertThat(captured.path("state").path("completeness").asString()).isEqualTo("COMPLETE");
+            assertThat(captured.path("state").path("content").asString()).isEqualTo("NON_EMPTY");
+        });
+        byte[] exported = Objects.requireNonNull(prepared.files().get(file));
+        assertThat(manifest.path("files")).anySatisfy(entry -> {
+            assertThat(entry.path("kind").asString()).isEqualTo(source.value());
+            assertThat(entry.path("file").path("path").asString()).isEqualTo(file);
+            assertThat(entry.path("file").path("sha256").asString()).isEqualTo(ProvenanceDigest.sha256Hex(exported));
+        });
+        assertThat(manifest.path("citableTexts")).anySatisfy(text -> {
+            assertThat(text.path("source").asString()).isEqualTo(source.value());
+            assertThat(text.path("path").asString()).isEqualTo(citation);
+            String staged = text.path("stagedPath").asString();
+            assertThat(prepared.files()).containsKey(staged);
+            byte[] quoted = Objects.requireNonNull(prepared.files().get(staged));
+            assertThat(new String(quoted, StandardCharsets.UTF_8)).isEqualTo(words);
+            assertThat(text.path("sha256").asString()).isEqualTo(ProvenanceDigest.sha256Hex(quoted));
+        });
     }
 
     @Nested
@@ -492,11 +531,12 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void shouldGiveEachBundledReviewerPracticeTheReviewersInlineWordsInTheCommentsSource() {
+            String words = "Could this loop stop at the first match?";
             PullRequestReviewComment ownWords = new PullRequestReviewComment();
             ownWords.setNativeId(91L);
             ownWords.setPath("src/Main.java");
             ownWords.setLine(10);
-            ownWords.setBody("Could this loop stop at the first match?");
+            ownWords.setBody(words);
             ownWords.setCreatedAt(Instant.parse("2025-06-01T12:00:00Z"));
             var reviewer = user("reviewer");
             ReflectionTestUtils.setField(reviewer, "id", 32L);
@@ -520,6 +560,10 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                             "leaves-useful-specific-review-comments",
                             "reviews-respectfully-asks-rather-than-demands",
                             "reviews-substantively-with-understanding");
+            var mapper = JsonMapper.builder().build();
+            var exporter = new JobFolderIndexBuilder(
+                    new ClasspathSourceCatalogRegistry(mapper, Clock.systemUTC()), mapper, Clock.systemUTC());
+            assertThat(provider.sourceKinds()).contains(COMMENTS);
             for (var entry : reviewerPractices) {
                 var practice = entry.getValue();
                 assertThat(practice.kind())
@@ -546,6 +590,27 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                 assertThat(captured.completeness())
                         .as(entry.getKey())
                         .containsEntry(COMMENTS, SourceCompleteness.COMPLETE);
+
+                // Preparation captures one source at a time and exports each contribution under that source.
+                try (var prepared = exporter.build(
+                        reviewItem.pinned().item().kind(),
+                        Map.of(COMMENTS, provider.capture(reviewItem, Set.of(COMMENTS))))) {
+                    assertThat(prepared.files()).as(entry.getKey()).doesNotContainKey("context/metadata.json");
+                    JsonNode exported = mapper.readTree(
+                            Objects.requireNonNull(prepared.files().get("context/comments.json")));
+                    assertThat(exported).as(entry.getKey()).singleElement().satisfies(comment -> {
+                        assertThat(comment.path("author").asString()).isEqualTo("reviewer");
+                        assertThat(comment.path("author_id").asLong()).isEqualTo(33L);
+                    });
+                    assertExported(
+                            mapper,
+                            prepared,
+                            reviewItem.pinned().item().kind(),
+                            COMMENTS,
+                            "context/comments.json",
+                            "context/comments.json#/0/body",
+                            words);
+                }
             }
         }
 
