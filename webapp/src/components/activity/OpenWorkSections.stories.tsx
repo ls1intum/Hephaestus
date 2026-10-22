@@ -49,6 +49,8 @@ export const Default: Story = {
 		await expect(returned).toHaveAccessibleName("Returned to you 2");
 		await expect(approved).toHaveAccessibleName("Approved 1");
 		await expect(rest).toEqual([]);
+		// A subsection at the one weight every layer 1 subsection uses (`Section size="sm"`).
+		await expect(requested).toHaveStyle({ fontWeight: "500" });
 		// Approved and requested on one pull request of six reviewers: four faces, then the rest.
 		const reviewers = canvas.getAllByRole("list", { name: "Reviewers" });
 		await expect(reviewers.some((list) => list.textContent.includes("+2"))).toBe(true);

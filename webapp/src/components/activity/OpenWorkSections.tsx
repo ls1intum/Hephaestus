@@ -5,7 +5,7 @@ import type { OpenWork, WorkItem, WorkItemList } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { GitLabCheckCircleIcon } from "@/components/icons/gitlab-icons";
-import { Section } from "@/components/layout/Section";
+import { Section, sectionTitleVariants } from "@/components/layout/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -138,7 +138,7 @@ interface GroupListsProps {
 	reviewNow?: OpenWorkReviewNow;
 }
 
-/** Each group that holds anything, as a small header over its bordered list. */
+/** Each group that holds anything, as a subsection heading over its bordered list. */
 function GroupLists({ groups, items, providerType, login, reviewNow }: GroupListsProps) {
 	return groups
 		.filter((group) => items[group].length > 0)
@@ -148,7 +148,7 @@ function GroupLists({ groups, items, providerType, login, reviewNow }: GroupList
 			const count = items[group].length;
 			return (
 				<div key={group} className="space-y-2">
-					<h3 className="flex items-center gap-2 text-sm font-semibold">
+					<h3 className={cn(sectionTitleVariants({ size: "sm" }), "flex items-center gap-2")}>
 						<Icon size={16} className={cn("shrink-0", ACTIVITY_TONES[def.tone].text)} />
 						{def.label}
 						<Badge variant="secondary">{count}</Badge>

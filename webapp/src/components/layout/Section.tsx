@@ -8,7 +8,8 @@ import { rendersContent } from "@/lib/react-node";
 
 import { useSectionOpen } from "./section-folds";
 
-const sectionTitleVariants = cva("text-foreground", {
+/** The section title classes, for a heading that names a group without being a region of its own. */
+export const sectionTitleVariants = cva("text-foreground", {
 	variants: {
 		size: {
 			/** A subsection inside a panel or a page region. */
