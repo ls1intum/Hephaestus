@@ -41,6 +41,15 @@ function stateAt(step: 1 | 2 | 3, overrides: Partial<WizardState> = {}): WizardS
 	return { ...initialWizardState, ...base[step], ...overrides };
 }
 
+/** Step 3 with selected projects chosen: `ids`, in the order they were chosen. */
+function choosing(...ids: number[]): WizardState {
+	let state = wizardReducer(stateAt(3), { type: "SET_PROJECT_SCOPE", scope: "SELECTED" });
+	for (const projectId of ids) {
+		state = wizardReducer(state, { type: "SET_PROJECT_SELECTED", projectId, selected: true });
+	}
+	return state;
+}
+
 describe("wizardReducer", () => {
 	describe("SET_PAT", () => {
 		it("sets the PAT and clears preflight result", () => {
@@ -231,15 +240,6 @@ describe("wizardReducer", () => {
 	});
 
 	describe("project choice", () => {
-		/** Step 3 with selected projects chosen: `ids`, in the order they were chosen. */
-		function choosing(...ids: number[]): WizardState {
-			let state = wizardReducer(stateAt(3), { type: "SET_PROJECT_SCOPE", scope: "SELECTED" });
-			for (const projectId of ids) {
-				state = wizardReducer(state, { type: "SET_PROJECT_SELECTED", projectId, selected: true });
-			}
-			return state;
-		}
-
 		it("starts at all projects, which sends no project IDs", () => {
 			const state = stateAt(3);
 			expect(state.projectScope).toBe("ALL");
