@@ -830,6 +830,11 @@ The source of each document is in the module that owns its data:
 | `slack_conversations.json` | `integration/slack/capture/ConversationCaptureSource` |
 | `outline_docs.json` | `integration/outline/capture/DocumentCaptureSource` |
 
+An admitted entry in `delivered_feedback.json` can include `developerResponse.resolution` from the developer's recorded response.
+An omitted response is unknown.
+It does not prove that the developer never responded.
+This metadata does not change the recorded review result.
+
 Each document obeys these rules:
 
 - It covers the developer's own or assigned work and the developer's activity on it.

@@ -8,8 +8,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -19,11 +23,14 @@ import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResponseService;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewAdmissionData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewLookupData;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
@@ -37,6 +44,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -95,6 +103,18 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ResultMarkService marks;
+
+    @Autowired
+    FeedbackResponseService responses;
+
+    @Autowired
+    FeedbackHistoryQuery feedbackHistory;
+
+    @Autowired
+    IdentityRepository identities;
+
+    @Autowired
+    IdentityProviderRepository identityProviders;
 
     @Autowired
     PracticeVersionService versions;
@@ -180,6 +200,113 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         assertThat(rows.getLast().endReason()).isEqualTo(ResultEndReason.REPLACED);
         assertThat(rows.getFirst().endedAt()).isNull();
         assertThat(rows.getFirst().endReason()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ABSENT", "PREPARED", "QUEUED", "RUNNING", "FAILED"})
+    void shouldKeepAnAddressedResponseSeparateFromANewAssessmentUntilANewResultIsRecorded(String recheck) {
+        var provider = identityProviders
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviders.saveAndFlush(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
+        var identity = new Identity();
+        identity.setAccount(scenario.account());
+        identity.setProviderId(Objects.requireNonNull(provider.getId()));
+        identity.setProviderUserKey(Long.toString(scenarioAccountId));
+        identities.saveAndFlush(identity);
+        var at = Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.MICROS);
+        var negative = data.result(scenario, ResultOutcome.NOT_MET, at);
+        long workspace = scenario.workspace().getId();
+        var original = history.find(
+                        workspace, negative.getId(), scenarioAccountId, SourceUsePurpose.CONVERSATIONAL_MENTORING)
+                .orElseThrow();
+        var feedbackId = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body,created_at,delivered_at)"
+                        + " VALUES(?,?,?,?,?,'PRACTICE_PAGE','DELIVERED','Explain the purpose.',?,?)",
+                feedbackId,
+                workspace,
+                negative.getReviewId(),
+                negative.getItemId(),
+                scenarioAccountId,
+                Timestamp.from(at),
+                Timestamp.from(at));
+        jdbc.update(
+                "INSERT INTO feedback_basis(id,workspace_id,feedback_id,result_id,developer_id,ordinal) VALUES(?,?,?,?,?,0)",
+                UUID.randomUUID(),
+                workspace,
+                feedbackId,
+                negative.getId(),
+                scenarioAccountId);
+        var response = responses.respond(
+                workspace, feedbackId, scenarioAccountId, FeedbackResolution.ADDRESSED, null, "Added the purpose.");
+        assertThat(response.resolution()).isEqualTo(FeedbackResolution.ADDRESSED);
+        var responseAt = Objects.requireNonNull(response.createdAt()).truncatedTo(ChronoUnit.MICROS);
+        assertThat(responseAt).isAfter(original.recordedAt());
+        var recheckAt = responseAt.plusMillis(1);
+
+        if (!recheck.equals("ABSENT")) {
+            var pending = admissions.pending(scenario, recheckAt, scenarioAccountId);
+            assertThat(pending.review().getOrderedAt()).isAfter(responseAt);
+            if (recheck.equals("PREPARED")) {
+                admissions.removeRuntime(pending);
+                jdbc.update(
+                        "UPDATE review SET status='QUEUED' WHERE workspace_id=? AND id=?",
+                        workspace,
+                        pending.review().getId());
+            } else {
+                jdbc.update(
+                        "UPDATE review_job SET status=? WHERE workspace_id=? AND id=?",
+                        recheck,
+                        workspace,
+                        pending.jobId());
+            }
+            assertThat(read.findByWorkspaceIdAndReviewIdOrderByRecordedAtAscIdAsc(
+                            workspace, pending.review().getId()))
+                    .isEmpty();
+        }
+
+        var visibleResponse =
+                feedbackHistory.find(workspace, feedbackId, scenarioAccountId).orElseThrow();
+        assertThat(visibleResponse.resolution()).isEqualTo(FeedbackResolution.ADDRESSED);
+        assertThat(visibleResponse.resultIds()).containsExactly(negative.getId());
+        assertThat(history.forDeveloper(workspace, scenarioAccountId, Instant.EPOCH, 20))
+                .singleElement()
+                .satisfies(recorded -> {
+                    assertThat(recorded.resultId()).isEqualTo(original.resultId());
+                    assertThat(recorded.reviewId()).isEqualTo(original.reviewId());
+                    assertThat(recorded.outcome()).isEqualTo(ResultOutcome.NOT_MET);
+                    assertThat(recorded.summary()).isEqualTo(original.summary());
+                    assertThat(recorded.explanation()).isEqualTo(original.explanation());
+                    assertThat(recorded.itemVersion()).isEqualTo(original.itemVersion());
+                    assertThat(recorded.recordedAt()).isEqualTo(original.recordedAt());
+                    assertThat(recorded.endedAt()).isNull();
+                });
+        assertThat(read.findByWorkspaceIdAndItemIdOrderByRecordedAtDescIdDesc(workspace, negative.getItemId()))
+                .extracting(Result::getId)
+                .containsExactly(negative.getId());
+
+        var completedAt = recheckAt.plusMillis(1);
+        data.end(negative, completedAt);
+        var later = data.result(scenario, ResultOutcome.MET, completedAt);
+        assertThat(later.getRecordedAt()).isAfter(responseAt).isAfter(recheckAt);
+        assertThat(history.forDeveloper(workspace, scenarioAccountId, Instant.EPOCH, 20))
+                .extracting(ResultHistoryEntry::resultId)
+                .containsExactly(later.getId(), negative.getId());
+        var previous = history.find(
+                        workspace, negative.getId(), scenarioAccountId, SourceUsePurpose.CONVERSATIONAL_MENTORING)
+                .orElseThrow();
+        assertThat(previous.outcome()).isEqualTo(ResultOutcome.NOT_MET);
+        assertThat(previous.summary()).isEqualTo(original.summary());
+        assertThat(previous.explanation()).isEqualTo(original.explanation());
+        assertThat(previous.recordedAt()).isEqualTo(original.recordedAt());
+        assertThat(previous.endedAt()).isEqualTo(completedAt);
+        assertThat(previous.endReason()).isEqualTo(ResultEndReason.REPLACED);
+        assertThat(history.find(workspace, later.getId(), scenarioAccountId, SourceUsePurpose.CONVERSATIONAL_MENTORING)
+                        .orElseThrow()
+                        .reviewId())
+                .isEqualTo(later.getReviewId())
+                .isNotEqualTo(original.reviewId());
     }
 
     @Test

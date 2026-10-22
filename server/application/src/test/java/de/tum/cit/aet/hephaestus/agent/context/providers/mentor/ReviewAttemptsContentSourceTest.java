@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.json.JsonMapper;
 
 class ReviewAttemptsContentSourceTest extends BaseUnitTest {
@@ -55,10 +57,13 @@ class ReviewAttemptsContentSourceTest extends BaseUnitTest {
         return new ReviewAssignmentQuery.Retained(ASSIGNMENT, RuntimeReviewTestData.ITEM, developer);
     }
 
-    @Test
-    void shouldShowAFailedInvocationWithoutInventingAResult() {
+    @ParameterizedTest
+    @EnumSource(
+            value = ReviewJobStatus.class,
+            names = {"QUEUED", "RUNNING", "FAILED"})
+    void shouldShowAnUnfinishedOrFailedInvocationWithoutInventingAResult(ReviewJobStatus status) {
         var job = RuntimeReviewTestData.job();
-        job.setStatus(ReviewJobStatus.FAILED);
+        job.setStatus(status);
         listed(job);
         attributed(job, List.of(about(5L)));
         when(labels.labels(eq(1L), any()))
@@ -68,9 +73,11 @@ class ReviewAttemptsContentSourceTest extends BaseUnitTest {
         var attempts = attempts();
         var payload = attempts.overview(1, 5);
         var row = payload.path("attempts").get(0);
-        assertThat(row.path("status").asString()).isEqualTo("FAILED");
+        assertThat(row.path("status").asString()).isEqualTo(status.name());
         assertThat(row.path("jobId").asString()).isEqualTo(job.getId().toString());
         assertThat(row.has("resultId")).isFalse();
+        assertThat(row.has("outcome")).isFalse();
+        assertThat(row.has("evidence")).isFalse();
         assertThat(row.path("title").asString()).isEqualTo("Onboarding guide");
         assertThat(row.path("url").asString()).isEqualTo("https://docs/x");
         assertThat(row.has("reviewsResource"))
