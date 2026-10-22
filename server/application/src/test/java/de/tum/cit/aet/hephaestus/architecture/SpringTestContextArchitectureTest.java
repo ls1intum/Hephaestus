@@ -39,6 +39,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("core.auth.consent.ConsentSignInBootstrapIntegrationTest", "consent-sign-in"),
             assignment("core.auth.dev.DevLoginIntegrationTest", "dev-login"),
             assignment("core.auth.webauthn.PasskeyLifecycleIntegrationTest", "required-passkeys"),
+            assignment("core.auth.webauthn.TestInstanceAssuranceIntegrationTest", "test-instance-assurance"),
             assignment("core.database.PracticeV1ReviewJobsIntegrationTest", "practice-upgrade-history"),
             assignment("integration.core.oauth.SlackOAuthCallbackConflictIntegrationTest", "slack-signed"),
             assignment("integration.core.sync.api.SyncControllerIntegrationTest", "sync-controller-focused"),
@@ -164,6 +165,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "worker role with the real LLM proxy on a free sandbox gateway port," + " calling live models"),
             Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
             Map.entry(
+                    "test-instance-assurance",
+                    "explicit operator-disabled assurance with real signed stale browser sessions, native role and CSRF enforcement, and saved workspace policies"),
+            Map.entry(
                     "research-disclosure-http",
                     "real signed browser and installed-client tokens with configured research consent, unconditional fresh-passkey authorization, and persisted disclosure fixtures"),
             Map.entry(
@@ -265,6 +269,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "testconfig.RealAuthIntegrationTest");
 
     private static final Set<String> PROPERTY_SOURCE_TESTS = names(
+            "core.auth.webauthn.TestInstanceAssuranceIntegrationTest",
             "core.auth.webauthn.PasskeyLifecycleIntegrationTest",
             "core.database.PracticeV1ReviewJobsIntegrationTest",
             "core.auth.clientsession.ClientSessionConcurrencyIntegrationTest",

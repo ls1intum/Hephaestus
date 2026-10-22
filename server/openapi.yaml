@@ -19324,6 +19324,8 @@ components:
     PasskeyStatus:
       type: object
       properties:
+        assuranceEnforced:
+          type: boolean
         credentials:
           type: array
           items:
@@ -19339,6 +19341,7 @@ components:
         workspaceAdminRequired:
           type: boolean
       required:
+      - assuranceEnforced
       - credentials
       - instanceAdminRequired
       - protectionEnabled
@@ -28746,11 +28749,14 @@ components:
     WorkspacePasskeyPolicy:
       type: object
       properties:
+        assuranceEnforced:
+          type: boolean
         instanceRequired:
           type: boolean
         required:
           type: boolean
       required:
+      - assuranceEnforced
       - instanceRequired
       - required
     WorkspacePracticeSplit:

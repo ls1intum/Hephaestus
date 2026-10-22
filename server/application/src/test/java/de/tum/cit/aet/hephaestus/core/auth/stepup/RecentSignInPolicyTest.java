@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -143,5 +144,30 @@ class RecentSignInPolicyTest extends BaseUnitTest {
         assertThatThrownBy(() -> policyWith(AuthPropertiesFixture.withStepUpMaxAge(Duration.ZERO)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("step-up-max-age");
+    }
+
+    @Test
+    void shouldPermitOldAuthenticatedSessionOnlyWhenOperatorDisablesAssurance() {
+        var disabled = policyWith(AuthPropertiesFixture.withoutAssurance());
+        Authentication stale = signedInAt(NOW.minus(Duration.ofHours(1)));
+        disabled.require(stale, AuthEvent.EventType.APP_ROLE_CHANGED, ACTING_ACCOUNT_ID);
+        assertThat(disabled.isRecent(stale)).isFalse();
+        verifyNoInteractions(authEventWriter);
+        assertThatThrownBy(() -> policy.require(stale, AuthEvent.EventType.APP_ROLE_CHANGED, ACTING_ACCOUNT_ID))
+                .isInstanceOf(StepUpRequiredException.class);
+    }
+
+    @Test
+    void shouldStillRefuseUnauthenticatedAndAnonymousSessionsWhenAssuranceIsDisabled() {
+        var disabled = policyWith(AuthPropertiesFixture.withoutAssurance());
+        assertThatThrownBy(() -> disabled.require(null, AuthEvent.EventType.APP_ROLE_CHANGED, null))
+                .isInstanceOf(StepUpRequiredException.class);
+        Authentication anonymous = new AnonymousAuthenticationToken(
+                "test", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
+        assertThatThrownBy(() -> disabled.require(anonymous, AuthEvent.EventType.APP_ROLE_CHANGED, null))
+                .isInstanceOf(StepUpRequiredException.class);
+        Authentication unauthenticated = new TestingAuthenticationToken("42", "n/a");
+        assertThatThrownBy(() -> disabled.require(unauthenticated, AuthEvent.EventType.APP_ROLE_CHANGED, null))
+                .isInstanceOf(StepUpRequiredException.class);
     }
 }

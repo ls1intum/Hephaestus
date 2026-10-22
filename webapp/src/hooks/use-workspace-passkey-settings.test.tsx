@@ -27,7 +27,11 @@ describe("useWorkspacePasskeySettings", () => {
 		server.use(
 			http.get("*/workspaces/acme/passkey-policy", () => {
 				policyRequests += 1;
-				return HttpResponse.json({ required: false, instanceRequired: false });
+				return HttpResponse.json({
+					assuranceEnforced: true,
+					required: false,
+					instanceRequired: false,
+				});
 			}),
 			http.get(
 				"*/workspaces/acme/members/me",
@@ -59,13 +63,13 @@ describe("useWorkspacePasskeySettings", () => {
 		let required = false;
 		server.use(
 			http.get("*/workspaces/acme/passkey-policy", () =>
-				HttpResponse.json({ required, instanceRequired: false }),
+				HttpResponse.json({ assuranceEnforced: true, required, instanceRequired: false }),
 			),
 			http.get("*/workspaces/acme/members/me", () => HttpResponse.json(membership)),
 			http.patch("*/workspaces/acme/passkey-policy", async ({ request }) => {
 				await expect(request.json()).resolves.toStrictEqual({ required: true });
 				required = true;
-				return HttpResponse.json({ required, instanceRequired: false });
+				return HttpResponse.json({ assuranceEnforced: true, required, instanceRequired: false });
 			}),
 		);
 		const { result } = setup();

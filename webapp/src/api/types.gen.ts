@@ -3452,6 +3452,7 @@ export type PasskeyRecoveryCodes = {
 };
 
 export type PasskeyStatus = {
+    assuranceEnforced: boolean;
     credentials: Array<PasskeyCredential>;
     instanceAdminRequired: boolean;
     protectionEnabled: boolean;
@@ -7217,6 +7218,7 @@ export type WorkspaceOnboardingSettings = {
 };
 
 export type WorkspacePasskeyPolicy = {
+    assuranceEnforced: boolean;
     instanceRequired: boolean;
     required: boolean;
 };

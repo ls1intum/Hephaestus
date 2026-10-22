@@ -32,6 +32,20 @@ Instance-admin elevation and user views require the same protection.
 Installed clients cannot use browser passkey assurance.
 Use the web app for protected administration.
 
+## Test instances without additional confirmation
+
+`HEPHAESTUS_AUTH_ASSURANCE_ENFORCED` defaults to `true`.
+Set it to `false` only on an isolated test instance that needs unattended validation.
+It suspends passkey and recent-sign-in requirements, including personal and workspace policies.
+OAuth sign-in, session validity, role and workspace permissions, consent, and audit still apply.
+User views remain read-only.
+
+Settings show that confirmation checks are disabled.
+Saved policies, passkeys and recovery codes remain unchanged.
+The server does not report a session as verified without an actual passkey verification.
+Set the variable back to `true` to restore the saved requirements.
+Do not use this setting to recover a production account.
+
 ## Enroll an administrator
 
 1. Sign in through the account's existing OAuth provider.

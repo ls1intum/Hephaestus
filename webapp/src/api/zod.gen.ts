@@ -2466,6 +2466,7 @@ export const zPasskeyRecoveryCodes = z.object({
 });
 
 export const zPasskeyStatus = z.object({
+    assuranceEnforced: z.boolean(),
     credentials: z.array(zPasskeyCredential),
     instanceAdminRequired: z.boolean(),
     protectionEnabled: z.boolean(),
@@ -6866,6 +6867,7 @@ export const zWorkspaceOnboardingSettings = z.object({
 });
 
 export const zWorkspacePasskeyPolicy = z.object({
+    assuranceEnforced: z.boolean(),
     instanceRequired: z.boolean(),
     required: z.boolean()
 });

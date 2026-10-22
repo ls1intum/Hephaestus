@@ -60,26 +60,43 @@ const LAST_PASSKEY_REMOVAL = {
  * passkey stays while recovery or personal protection still depends on it.
  */
 function passkeyRemoval(
-	{ credentials, recoveryRequired, protectionEnabled }: PasskeyStatus,
+	{ credentials, recoveryRequired, protectionEnabled, assuranceEnforced }: PasskeyStatus,
 	id: string,
 ): { copy: typeof PASSKEY_REMOVAL; heldBy?: string } {
+	const removalCopy = assuranceEnforced
+		? PASSKEY_REMOVAL
+		: {
+				...PASSKEY_REMOVAL,
+				description: "This passkey will stop working. Your other sessions will end.",
+			};
+	const lastRemovalCopy = assuranceEnforced
+		? LAST_PASSKEY_REMOVAL
+		: {
+				...LAST_PASSKEY_REMOVAL,
+				description:
+					"This is your last passkey. Removing it also deletes your recovery codes and signs you out of your other sessions.",
+			};
 	if (credentials.length !== 1) {
-		return { copy: PASSKEY_REMOVAL };
+		return { copy: removalCopy };
 	}
 	if (recoveryRequired) {
-		return { copy: LAST_PASSKEY_REMOVAL, heldBy: `${id}-recovery-active` };
+		return { copy: lastRemovalCopy, heldBy: `${id}-recovery-active` };
 	}
 	if (protectionEnabled) {
-		return { copy: LAST_PASSKEY_REMOVAL, heldBy: `${id}-last` };
+		return { copy: lastRemovalCopy, heldBy: `${id}-last` };
 	}
-	return { copy: LAST_PASSKEY_REMOVAL };
+	return { copy: lastRemovalCopy };
 }
 
 /** The instance policy, scoped as it applies: instance administration and workspace administration differ. */
 function passkeyRequirement({
+	assuranceEnforced,
 	instanceAdminRequired,
 	workspaceAdminRequired,
 }: PasskeyStatus): string | undefined {
+	if (!assuranceEnforced) {
+		return "Extra authentication checks are disabled on this instance.";
+	}
 	if (instanceAdminRequired && workspaceAdminRequired) {
 		return "This instance requires one for instance and workspace administration.";
 	}
@@ -90,6 +107,26 @@ function passkeyRequirement({
 		return "This instance requires one for workspace administration.";
 	}
 	return undefined;
+}
+
+/** Keep each policy's visible consequences together, including its confirmation dialogs. */
+function passkeyPolicyCopy(assuranceEnforced: boolean) {
+	if (assuranceEnforced) {
+		return {
+			recovery:
+				"Recovery is active. Register and verify a new passkey before you use admin access.",
+			protection:
+				"Require passkey verification for your admin access. When this is off, any passkey that this instance or a workspace requires is still asked for.",
+			recoveryConfirmation:
+				"This removes all passkeys and ends your other sessions. Admin access stays blocked until you register and verify a new passkey.",
+		};
+	}
+	return {
+		recovery: "Recovery is active.",
+		protection:
+			"Your preference is saved, but extra authentication checks are disabled on this instance.",
+		recoveryConfirmation: "This removes all passkeys and ends your other sessions.",
+	};
 }
 
 export function PasskeySection({
@@ -141,9 +178,10 @@ export function PasskeySection({
 		);
 	} else {
 		const { credentials } = status;
+		const policyCopy = passkeyPolicyCopy(status.assuranceEnforced);
 		// The server asks for a recent confirmation before any change to an enrolled account: adding
 		// another passkey, removing one, protection and recovery codes. A first passkey needs none.
-		const locked = credentials.length > 0 && !status.verified;
+		const locked = status.assuranceEnforced && credentials.length > 0 && !status.verified;
 		const lockedReasonId = locked ? `${id}-locked` : undefined;
 		// Every change to the passkeys waits for the one in flight and for a recent confirmation.
 		const unavailable = pending || locked;
@@ -167,7 +205,7 @@ export function PasskeySection({
 				</p>
 				{status.recoveryRequired && (
 					<p id={`${id}-recovery-active`} role="alert">
-						Recovery is active. Register and verify a new passkey before you use admin access.
+						{policyCopy.recovery}
 					</p>
 				)}
 				{locked && (
@@ -263,70 +301,67 @@ export function PasskeySection({
 					</Button>
 				</div>
 				{credentials.length > 0 && (
-					<div className="space-y-2">
-						<Button
-							variant="outline"
-							disabled={unavailable}
-							focusableWhenDisabled
-							className="aria-disabled:opacity-50"
-							aria-describedby={lockedReasonId}
-							onClick={() =>
-								ask({
-									title: "Create new recovery codes?",
-									description:
-										"Any recovery codes you saved before stop working. Save the new codes before you leave this page.",
-									confirmLabel: "Create codes",
-									action: onCreateRecoveryCodes,
-								})
-							}
-						>
-							{pending && pendingAction === "codes"
-								? "Creating recovery codes…"
-								: "Create new recovery codes"}
-						</Button>
-						{recoveryCodes && (
-							<div className="space-y-2">
-								<p>
-									Save these recovery codes somewhere safe. Hephaestus shows them only now. Each
-									code works once.
-								</p>
-								<ul aria-label="Recovery codes">
-									{recoveryCodes.map((code) => (
-										<li key={code}>
-											<code className="break-all">{code}</code>
-										</li>
-									))}
-								</ul>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() =>
-										copyToClipboard(recoveryCodes.join("\n"), "Recovery codes copied.")
-									}
-								>
-									Copy codes
-								</Button>
-							</div>
-						)}
-					</div>
-				)}
-				{credentials.length > 0 && (
-					<Field orientation="horizontal">
-						<FieldContent>
-							<FieldLabel htmlFor={`${id}-protection`}>Personal admin protection</FieldLabel>
-							<FieldDescription>
-								Require passkey verification for your admin access. When this is off, any passkey
-								that this instance or a workspace requires is still asked for.
-							</FieldDescription>
-						</FieldContent>
-						<Switch
-							id={`${id}-protection`}
-							checked={status.protectionEnabled}
-							disabled={unavailable}
-							aria-describedby={lockedReasonId}
-							onCheckedChange={onProtection}
-						/>
-					</Field>
+					<>
+						<div className="space-y-2">
+							<Button
+								variant="outline"
+								disabled={unavailable}
+								focusableWhenDisabled
+								className="aria-disabled:opacity-50"
+								aria-describedby={lockedReasonId}
+								onClick={() =>
+									ask({
+										title: "Create new recovery codes?",
+										description:
+											"Any recovery codes you saved before stop working. Save the new codes before you leave this page.",
+										confirmLabel: "Create codes",
+										action: onCreateRecoveryCodes,
+									})
+								}
+							>
+								{pending && pendingAction === "codes"
+									? "Creating recovery codes…"
+									: "Create new recovery codes"}
+							</Button>
+							{recoveryCodes && (
+								<div className="space-y-2">
+									<p>
+										Save these recovery codes somewhere safe. Hephaestus shows them only now. Each
+										code works once.
+									</p>
+									<ul aria-label="Recovery codes">
+										{recoveryCodes.map((code) => (
+											<li key={code}>
+												<code className="break-all">{code}</code>
+											</li>
+										))}
+									</ul>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() =>
+											copyToClipboard(recoveryCodes.join("\n"), "Recovery codes copied.")
+										}
+									>
+										Copy codes
+									</Button>
+								</div>
+							)}
+						</div>
+						<Field orientation="horizontal">
+							<FieldContent>
+								<FieldLabel htmlFor={`${id}-protection`}>Personal admin protection</FieldLabel>
+								<FieldDescription>{policyCopy.protection}</FieldDescription>
+							</FieldContent>
+							<Switch
+								id={`${id}-protection`}
+								checked={status.protectionEnabled}
+								disabled={unavailable}
+								aria-describedby={lockedReasonId}
+								onCheckedChange={onProtection}
+							/>
+						</Field>
+					</>
 				)}
 				<p role="status" className="text-sm text-muted-foreground">
 					{verificationStatus}
@@ -352,8 +387,7 @@ export function PasskeySection({
 							onClick={() => {
 								ask({
 									title: "Start passkey recovery?",
-									description:
-										"This removes all passkeys and ends your other sessions. Admin access stays blocked until you register and verify a new passkey.",
+									description: policyCopy.recoveryConfirmation,
 									confirmLabel: "Start recovery",
 									action: () => {
 										onRecover(recoveryCode.trim());

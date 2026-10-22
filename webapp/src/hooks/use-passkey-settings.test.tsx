@@ -71,6 +71,7 @@ beforeEach(() => {
 	server.use(
 		http.get("*/user/passkeys", () =>
 			HttpResponse.json({
+				assuranceEnforced: true,
 				protectionEnabled: false,
 				recoveryRequired: false,
 				instanceAdminRequired: true,
@@ -176,6 +177,7 @@ describe("usePasskeySettings", () => {
 		server.use(
 			http.get("*/user/passkeys", () =>
 				HttpResponse.json({
+					assuranceEnforced: true,
 					protectionEnabled: true,
 					recoveryRequired: false,
 					instanceAdminRequired: true,
@@ -238,6 +240,7 @@ describe("usePasskeySettings", () => {
 	it("does not show invalid recovery codes after removing the last key and enrolling again", async () => {
 		const codes = ["synthetic-recovery-code"];
 		let status = {
+			assuranceEnforced: true,
 			protectionEnabled: false,
 			recoveryRequired: false,
 			instanceAdminRequired: true,
@@ -260,6 +263,7 @@ describe("usePasskeySettings", () => {
 			http.post("*/user/passkeys", () => {
 				status = {
 					...status,
+					assuranceEnforced: true,
 					protectionEnabled: true,
 					credentials: [{ id: "new", label: "Phone" }],
 				};
@@ -285,6 +289,7 @@ describe("usePasskeySettings", () => {
 	it("keeps the displayed recovery codes when the last-key removal is refused", async () => {
 		const codes = ["synthetic-recovery-code"];
 		const status = {
+			assuranceEnforced: true,
 			protectionEnabled: false,
 			recoveryRequired: false,
 			instanceAdminRequired: true,
