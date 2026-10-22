@@ -168,23 +168,22 @@ interface LandingFeedbackCardProps {
 	/** A practice from the shipped catalog, named exactly as it is there. */
 	practice: string;
 	lead: string;
-	/** `strength` is a practice the work does well; `gap` is one it falls short of. */
-	stance: "strength" | "gap";
 	children?: ReactNode;
 	rotate?: number;
 }
+
+/** Feedback is written only from a Not met result, so every card shows that outcome. */
+const assessment = OUTCOME_DEFS.NOT_MET;
 
 export function LandingFeedbackCard({
 	group,
 	practice,
 	lead,
-	stance,
 	children,
 	rotate = 0,
 }: LandingFeedbackCardProps) {
 	const { Icon: GroupIcon, pill } = getGroupVisual(group.icon, group.color);
-	const assessment = OUTCOME_DEFS[stance === "strength" ? "MET" : "NOT_MET"];
-	const StanceIcon = assessment.icon;
+	const AssessmentIcon = assessment.icon;
 	return (
 		<div
 			className={cn(styles.atom, styles.slip)}
@@ -201,11 +200,8 @@ export function LandingFeedbackCard({
 			</p>
 			<div className="flex flex-col gap-2 p-3">
 				<p className="flex items-start gap-1.5 text-sm leading-snug font-semibold text-foreground">
-					<StanceIcon
-						className={cn(
-							"mt-0.5 size-3.5 shrink-0",
-							stance === "strength" ? "text-success" : "text-destructive",
-						)}
+					<AssessmentIcon
+						className="mt-0.5 size-3.5 shrink-0 text-destructive"
 						aria-label={assessment.label}
 					/>
 					{lead}

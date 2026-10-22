@@ -114,7 +114,6 @@ export function HeroScene() {
 						group={groups.issues}
 						practice="Define a checkable outcome"
 						lead="No acceptance criteria."
-						stance="gap"
 						rotate={2.5}
 					>
 						<ul className="flex flex-col gap-1">
@@ -129,7 +128,7 @@ export function HeroScene() {
 				</LandingCluster>
 
 				<LandingCluster placement={{ column: 1, row: 2, offset: "1rem" }} delay={0.08}>
-					<LandingWorkCard state="ready" reference="#412" title="Add CSV export" rotate={3}>
+					<LandingWorkCard state="ready" reference="#418" title="Add CSV export" rotate={3}>
 						<ul className="flex flex-col gap-0.5 border-t border-border/70 px-3 py-2">
 							{["export/CsvWriter.ts", "billing/InvoiceService.ts", "config/application.yaml"].map(
 								(path) => (
@@ -148,7 +147,6 @@ export function HeroScene() {
 						group={groups.packaging}
 						practice="Scope the change to one concern"
 						lead="The invoice rename does not belong in a CSV export."
-						stance="gap"
 						rotate={-2.5}
 					/>
 				</LandingCluster>
@@ -156,14 +154,13 @@ export function HeroScene() {
 				<LandingCluster placement={{ column: 3, row: 1, offset: "1rem" }} delay={0.16}>
 					<LandingWorkCard title="Review on “Add CSV export”" rotate={3}>
 						<ReviewComment author="maria-k" initials="MK">
-							Does this hold up past 10k rows? A test would settle it.
+							This may fail on large exports.
 						</ReviewComment>
 					</LandingWorkCard>
 					<LandingFeedbackCard
 						group={groups.reviewing}
 						practice="Leave specific, actionable review comments"
-						lead="Names the doubt and what would settle it."
-						stance="strength"
+						lead="Name the case and what would settle the concern."
 						rotate={-2.5}
 					/>
 				</LandingCluster>
@@ -182,8 +179,7 @@ export function HeroScene() {
 					<LandingFeedbackCard
 						group={groups.responding}
 						practice="Resolve open threads before merging"
-						lead="The 10k-row question never got an answer."
-						stance="gap"
+						lead="The large-export concern is unresolved. Follow up in the thread."
 						rotate={2.5}
 					/>
 				</LandingCluster>
@@ -246,10 +242,10 @@ export function LandingHeroSection({ onSignIn }: LandingHeroSectionProps) {
 						className="relative z-10 mt-6 max-w-xl text-lg leading-relaxed text-pretty sm:text-xl"
 					>
 						<span className="font-semibold text-foreground">
-							The mentoring feedback a senior would give.
+							Feedback on the practices behind your work.
 						</span>{" "}
 						<span className="text-muted-foreground">
-							For every developer, not only the ones a senior has time for.
+							Read the evidence, ask why, and decide what to try next.
 						</span>
 					</motion.p>
 
@@ -305,10 +301,10 @@ export function LandingHeroSection({ onSignIn }: LandingHeroSectionProps) {
 				<figure className={cn(styles.heroFigure, "relative w-full")}>
 					<HeroScene />
 					<figcaption className="sr-only">
-						One change through a project. Issue #412 has no acceptance criteria, so the pull request
-						grew to 34 files and picked up an unrelated rename. A reviewer asks a good question that
-						never gets answered before the merge. Hephaestus points back to the issue as the place
-						to start.
+						One change through a project. Issue #412 has no acceptance criteria. The pull request
+						grows to 34 files. A reviewer raises a vague concern about large exports. The pull
+						request merges with that thread unresolved. Hephaestus points back to the issue as the
+						place to start.
 					</figcaption>
 				</figure>
 			</motion.div>

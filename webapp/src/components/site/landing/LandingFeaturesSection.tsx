@@ -117,7 +117,6 @@ export function LandingFeaturesSection() {
 								group={{ color: "amber", icon: "TestTube" }}
 								practice="Include tests with the change"
 								lead="A rounding bug is exactly what a test pins down."
-								stance="gap"
 								rotate={2.5}
 							/>
 						</LandingCluster>
@@ -125,19 +124,14 @@ export function LandingFeaturesSection() {
 						<LandingCluster placement={{ column: 2, row: 1, offset: "5rem" }} delay={0.08}>
 							<LandingWorkCard title="PaymentClient.java" rotate={3}>
 								<DiffLines
-									removed={["} catch (TimeoutException e) { }"]}
-									added={[
-										"} catch (TimeoutException e) {",
-										"  throw new PaymentUnavailable(e);",
-										"}",
-									]}
+									removed={["gateway.charge(order);"]}
+									added={["try {", "  gateway.charge(order);", "} catch (TimeoutException e) { }"]}
 								/>
 							</LandingWorkCard>
 							<LandingFeedbackCard
 								group={{ color: "rose", icon: "ShieldAlert" }}
 								practice="Handle errors instead of swallowing them"
-								lead="The caller now learns the payment did not go through."
-								stance="strength"
+								lead="Make the timeout visible to the caller instead of silently continuing."
 								rotate={-2.5}
 							/>
 						</LandingCluster>
@@ -157,7 +151,6 @@ export function LandingFeaturesSection() {
 								group={{ color: "violet", icon: "MessageCircle" }}
 								practice="Post clear status and blocker updates"
 								lead="Nobody can tell whether you are blocked."
-								stance="gap"
 								rotate={-3}
 							/>
 						</LandingCluster>
