@@ -37,7 +37,7 @@ import {
 } from "./FoldedPractices";
 import { groupNeverApplied, splitFoldedPractices } from "./practice-folds";
 import type { PracticePattern } from "./practice-pattern";
-import { GroupWithoutPractices, NoSuchGroup } from "./practice-profile-blocks";
+import { GroupWithoutPractices, LevelLead, NoSuchGroup } from "./practice-profile-blocks";
 import { PracticePatternLine } from "./PracticePatternLine";
 
 export interface PracticeGroupDetailLevelProps {
@@ -307,11 +307,7 @@ export function PracticeGroupDetailLevel({
 				{/* The line under the header, with the room on each side that the blocks below keep
 				    between them. */}
 				<Separator />
-				{hasText(standing?.groupDescription) && (
-					<p className="max-w-prose text-sm break-words text-muted-foreground">
-						{standing.groupDescription}
-					</p>
-				)}
+				{hasText(standing?.groupDescription) && <LevelLead>{standing.groupDescription}</LevelLead>}
 				{body}
 			</DrawerBody>
 		</>

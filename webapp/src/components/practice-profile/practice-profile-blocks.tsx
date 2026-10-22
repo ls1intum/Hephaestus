@@ -79,6 +79,14 @@ export function GroupWithoutPractices() {
 	);
 }
 
+/**
+ * The sentence that opens a level: a practice's why it matters, a group's description. Both levels
+ * set it alike, in the body size and ink across the text column, so a group reads like its practices.
+ */
+export function LevelLead({ children }: { children: ReactNode }) {
+	return <p className="max-w-2xl text-sm text-pretty break-words">{children}</p>;
+}
+
 export interface LabelledBlockProps {
 	label: string;
 	/** `h3` inside a section that has its own heading. */

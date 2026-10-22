@@ -3,7 +3,7 @@ import { useSpinDelay } from "spin-delay";
 
 import type { PracticeGuidanceDto, PracticeStanding } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
-import { LabelledBlock } from "@/components/practice-profile/practice-profile-blocks";
+import { LabelledBlock, LevelLead } from "@/components/practice-profile/practice-profile-blocks";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { hasText } from "@/lib/text";
@@ -53,7 +53,7 @@ export function PracticeIntro({ practice, guidance }: PracticeIntroProps) {
 
 	return (
 		<section aria-label="Introduction" className="flex max-w-2xl flex-col gap-4">
-			{hasText(lead) && <p className="text-sm text-pretty">{lead}</p>}
+			{hasText(lead) && <LevelLead>{lead}</LevelLead>}
 			{showSkeleton && (
 				<div className="flex flex-col gap-2 text-sm" aria-busy="true">
 					<span className="sr-only">Loading the picture for this practice…</span>

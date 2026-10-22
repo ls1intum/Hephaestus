@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Suspense, use } from "react";
 import { expect } from "storybook/test";
 
+import { LevelLead } from "@/components/practice-profile/practice-profile-blocks";
 import { hasText } from "@/lib/text";
 import {
 	bundledPracticeGroupNames,
@@ -51,9 +52,7 @@ function BundledPractices({ group, guides }: BundledPracticesArgs) {
 								<h3 className="text-lg font-semibold">{practiceName}</h3>
 								{/* The introduction's lead and figure without its region, which a page may hold once. */}
 								<div className="flex max-w-2xl flex-col gap-4">
-									{hasText(practice.whyItMatters) && (
-										<p className="text-sm text-pretty">{practice.whyItMatters}</p>
-									)}
+									{hasText(practice.whyItMatters) && <LevelLead>{practice.whyItMatters}</LevelLead>}
 									{guidance.visual && (
 										<PracticeFigure visual={guidance.visual} caption={practice.whatGoodLooksLike} />
 									)}
