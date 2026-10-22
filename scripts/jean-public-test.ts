@@ -7,7 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { Client } from "pg";
 
 import { isHostname, isSet, positivePort, readEnvFile, requiredEnv } from "./lib/env.ts";
-import { output, run, succeeds } from "./lib/process.ts";
+import { output, repositoryCli, run, succeeds } from "./lib/process.ts";
 
 const root = path.join(import.meta.dirname, "..");
 // No default: the host this runs against is an operator's own instance, and naming one here would
@@ -408,7 +408,7 @@ async function seedStatus(): Promise<void> {
 
 async function start(): Promise<void> {
 	if (process.env.HEPHAESTUS_PUBLIC_TEST_SKIP_WEBAPP_BUILD !== "true") {
-		await run("vp", ["run", "build:webapp"], { cwd: root });
+		await run(process.execPath, [repositoryCli(), "run", "build:webapp"], { cwd: root });
 	}
 	await writeConfigs();
 	await succeeds("docker", ["rm", "-f", container]);

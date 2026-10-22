@@ -27,7 +27,9 @@ incomplete state. The job summary reports timing and outcomes. PIT's HTML/XML re
 summary are written below the application module's `build/reports/pitest` directory and uploaded by
 the workflow even on failure.
 
-The command evaluates the full target set without incremental analysis. CI limits it to eight minutes within a ten-minute job.
+The command evaluates the full target set without incremental analysis.
+In CI, a separate step first compiles the application and its tests, with a limit of ten minutes.
+The command then has its own limit of eight minutes, and the job has a limit of twenty minutes.
 Local runs have no wrapper timeout.
 
 ## Triage

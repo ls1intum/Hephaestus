@@ -1,12 +1,16 @@
 import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 
+import { repositoryCli } from "./lib/process.ts";
+
 const routeTree = "webapp/src/routeTree.gen.ts";
 const before = await readFile(routeTree);
 let status = 1;
 let changed = false;
 try {
-	status = spawnSync("vp", ["run", "build:webapp"], { stdio: "inherit" }).status ?? 1;
+	status =
+		spawnSync(process.execPath, [repositoryCli(), "run", "build:webapp"], { stdio: "inherit" })
+			.status ?? 1;
 	if (status === 0) {
 		changed = !before.equals(await readFile(routeTree));
 	}
