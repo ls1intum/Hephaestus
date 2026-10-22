@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { ItemEvent, ItemFact, ItemRef, ReviewRef } from "@/api/types.gen";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -266,7 +267,7 @@ function itemEvent(
 			<>
 				<span className="block">
 					<span title={foundBy.description}>{foundBy.label}</span>
-					{" · "}
+					<DotSeparator inline />
 					{ITEM_EVENT_STATE_DEFS[event.state].label}
 				</span>
 				{event.reason !== null && (

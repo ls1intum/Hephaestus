@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, PlugZapIcon } from "lucide-react";
 import type { ConnectionSyncStatus, IntegrationCatalogEntry } from "@/api/types.gen";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { useNow } from "@/components/common/use-now";
@@ -49,7 +50,7 @@ function ResourceHealthLine({ counts }: { counts: ConnectionSyncStatus["resource
 	return (
 		<p className="flex flex-wrap items-center gap-x-1.5">
 			{counts.errored > 0 && <span className="text-destructive">{counts.errored} errored</span>}
-			{counts.errored > 0 && counts.stale > 0 && <span className="text-muted-foreground">·</span>}
+			{counts.errored > 0 && counts.stale > 0 && <DotSeparator className="text-muted-foreground" />}
 			{counts.stale > 0 && <span className="text-warning">{counts.stale} stale</span>}
 			<span className="text-muted-foreground">of {counts.total} resources</span>
 		</p>

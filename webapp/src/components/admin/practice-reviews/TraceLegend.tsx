@@ -2,6 +2,7 @@ import { BookOpenIcon } from "lucide-react";
 import { type ReactNode, useId, useRef } from "react";
 
 import { cn } from "cn";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { type BadgeVariant, type StatusDef, statusValues } from "@/components/common/status-def";
 import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-state-defs";
 import { DEVELOPER_ANSWER_DEFS } from "@/components/practice-vocabulary/developer-answer-defs";
@@ -233,7 +234,7 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 							<span className="font-medium text-foreground">Terms:</span>{" "}
 							{TERMS.map((term, index) => (
 								<span key={term}>
-									{index > 0 && " · "}
+									{index > 0 && <DotSeparator inline />}
 									<GlossaryTerm term={term}>{TRACE_TERMS[term].label.toLowerCase()}</GlossaryTerm>
 								</span>
 							))}

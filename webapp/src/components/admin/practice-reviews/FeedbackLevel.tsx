@@ -9,6 +9,7 @@ import type {
 	ReviewFeedbackDetail,
 } from "@/api/types.gen";
 import { accountName } from "@/components/admin/users/account-labels";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -362,7 +363,12 @@ function FeedbackBasisList({ basis }: { basis: readonly FeedbackBasis[] }) {
 						</p>
 						<p className="text-xs text-muted-foreground">
 							{result.practiceName}
-							{whole && " · The whole result"}
+							{whole && (
+								<>
+									<DotSeparator inline />
+									The whole result
+								</>
+							)}
 							{problemIds.map((problemId, index) => {
 								const label =
 									index === 0 ? "One problem of this result" : "Another problem of this result";
@@ -373,7 +379,7 @@ function FeedbackBasisList({ basis }: { basis: readonly FeedbackBasis[] }) {
 										: ` (reference ${String(index + 1)} of ${String(problemIds.length)})`;
 								return (
 									<Fragment key={problemId}>
-										{" · "}
+										<DotSeparator inline />
 										<DetailStackLink
 											entry={problemLevel(problemId)}
 											single

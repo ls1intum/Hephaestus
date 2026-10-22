@@ -4,6 +4,7 @@ import { AlertCircleIcon, ChevronDownIcon, HistoryIcon } from "lucide-react";
 
 import { cn } from "cn";
 import type { SyncJob } from "@/api/types.gen";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { FOCUS_RING } from "@/components/common/focus";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -209,7 +210,7 @@ function JobRow({ job }: { job: SyncJob }) {
 			<TableCell>
 				{JOB_TYPE_LABEL[job.type]}
 				<span className="text-muted-foreground">
-					{" · "}
+					<DotSeparator inline />
 					{JOB_TRIGGER_LABEL[job.trigger].toLowerCase()}
 				</span>
 			</TableCell>

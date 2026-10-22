@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "cn";
+import { DotSeparator } from "@/components/common/DotSeparator";
 
 export interface MetaRowProps {
 	captions?: readonly ReactNode[];
@@ -26,11 +27,7 @@ export function MetaRow({ captions = NO_CAPTIONS, badges, className }: MetaRowPr
 				<span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
 					{shown.map((caption, index) => (
 						<span key={index} className="flex items-center gap-x-2">
-							{index > 0 && (
-								<span aria-hidden className="text-muted-foreground/50">
-									·
-								</span>
-							)}
+							{index > 0 && <DotSeparator className="text-muted-foreground/50" />}
 							{caption}
 						</span>
 					))}

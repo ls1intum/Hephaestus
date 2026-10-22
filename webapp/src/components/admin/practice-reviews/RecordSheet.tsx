@@ -130,26 +130,38 @@ export function SheetHistory({ events, now }: { events: readonly SheetEvent[]; n
 	const ordered = [...timed, ...untimed];
 	return (
 		<div className="space-y-3">
-			<ol aria-label="History" className="relative space-y-3 border-l pl-4 text-sm">
+			{/* The line runs through the middle of the dot column; each dot sits in its own column, centered on
+			    the first text line (h-5 is the line height of text-sm), so icons and wrapped titles cannot move it. */}
+			<ol
+				aria-label="History"
+				className="relative space-y-3 text-sm before:absolute before:inset-y-0 before:left-1 before:w-px before:-translate-x-1/2 before:bg-border"
+			>
 				{ordered.map((event) => (
-					<li key={event.key} data-sheet-event className="relative min-w-0">
-						<span
-							aria-hidden
-							className="absolute top-1.5 -left-[1.3rem] size-2 rounded-full border-2 border-background bg-muted-foreground"
-						/>
-						<p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-							<span className="inline-flex items-center gap-1.5 font-medium">
-								{event.icon}
-								{event.title}
-							</span>
-							{event.at !== undefined && (
-								<ReviewDayTime at={event.at} className="text-muted-foreground tabular-nums" />
+					<li
+						key={event.key}
+						data-sheet-event
+						className="relative grid min-w-0 grid-cols-[0.5rem_minmax(0,1fr)] gap-x-3"
+					>
+						<span aria-hidden className="flex h-5 items-center justify-center">
+							<span className="size-2 shrink-0 rounded-full border-2 border-background bg-muted-foreground" />
+						</span>
+						<div className="min-w-0">
+							<p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+								<span className="inline-flex items-center gap-1.5 font-medium">
+									{event.icon}
+									{event.title}
+								</span>
+								{event.at !== undefined && (
+									<ReviewDayTime at={event.at} className="text-muted-foreground tabular-nums" />
+								)}
+								{hasText(event.by) && <span className="text-muted-foreground">by {event.by}</span>}
+							</p>
+							{event.detail !== undefined && event.detail !== null && event.detail !== false && (
+								<div className="mt-0.5 min-w-0 break-words text-muted-foreground">
+									{event.detail}
+								</div>
 							)}
-							{hasText(event.by) && <span className="text-muted-foreground">by {event.by}</span>}
-						</p>
-						{event.detail !== undefined && event.detail !== null && event.detail !== false && (
-							<div className="mt-0.5 min-w-0 break-words text-muted-foreground">{event.detail}</div>
-						)}
+						</div>
 					</li>
 				))}
 			</ol>

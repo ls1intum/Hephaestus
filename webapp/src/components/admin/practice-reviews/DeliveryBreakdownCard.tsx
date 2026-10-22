@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { cn } from "cn";
 import type { ReasonCount, ReviewFeedbackCounts } from "@/api/types.gen";
 import { STALE } from "@/components/activity/activity-tones";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { InfoLines, InfoTip } from "@/components/common/InfoTip";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
@@ -297,7 +298,7 @@ function RateLine({
 				{rate.term}
 				{state.total > 0 && (
 					<>
-						{" · "}
+						<DotSeparator inline />
 						<InlineLink
 							tone="count"
 							render={<ReviewListLink workspaceSlug={workspaceSlug} destination={list} />}

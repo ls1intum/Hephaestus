@@ -41,7 +41,9 @@ export const Default: Story = {
 		}
 		await expect(within(queued).getByText("Queued")).toBeVisible();
 		await expect(within(complete).getByText("main")).toBeVisible();
-		await expect(within(complete).getByText("· 4f2a9c1", { exact: false })).toBeVisible();
+		const version = within(complete).getByText("4f2a9c1");
+		await expect(version).toBeVisible();
+		await expect(version.closest("td")).toHaveTextContent("main · 4f2a9c1");
 		await expect(within(running).getByText("Ada Lovelace")).toBeVisible();
 		// A scan that stopped before it counted anything shows no zeros that would read as clean.
 		await expect(within(cancelled).getAllByText("Not counted")).toHaveLength(3);

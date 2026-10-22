@@ -3,6 +3,7 @@ import { Fragment, type ReactNode } from "react";
 
 import { cn } from "cn";
 import type { ItemRef, ReviewDetail, ReviewLineage } from "@/api/types.gen";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -119,7 +120,7 @@ function stageSummary(
 			<span className="text-2xs text-muted-foreground">
 				{spans.map((entry, index) => (
 					<Fragment key={entry.kind}>
-						{index > 0 && " · "}
+						{index > 0 && <DotSeparator inline />}
 						{entry.label}{" "}
 						<span
 							className={cn(

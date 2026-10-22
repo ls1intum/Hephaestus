@@ -13,6 +13,7 @@ import type {
 } from "@/api/types.gen";
 import { formatTokens } from "@/components/admin/usage/usage-utils";
 import { accountName } from "@/components/admin/users/account-labels";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -323,12 +324,12 @@ function ResultCountLinks({
 	const named = (text: string) =>
 		practiceName === undefined ? undefined : `${text}, ${practiceName}`;
 	return (
-		<span>
+		// One flex row, so the counts with their icons, the commas, the dot and the link share one middle line.
+		<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
 			{counted.map(([outcome, key], index) => {
 				const text = `${String(counts[key])} ${OUTCOME_DEFS[outcome].label.toLowerCase()}`;
 				return (
-					<Fragment key={outcome}>
-						{index > 0 && ", "}
+					<span key={outcome} className="inline-flex items-center">
 						<CountLink
 							workspaceSlug={workspaceSlug}
 							def={OUTCOME_DEFS[outcome]}
@@ -336,12 +337,14 @@ function ResultCountLinks({
 							name={named(text)}
 							destination={{ list: "results", search: { ...scope, outcome: [outcome] } }}
 						/>
-					</Fragment>
+						{index < counted.length - 1 && ", "}
+					</span>
 				);
 			})}
 			{counts.notMet > 0 && (
-				<>
-					{" · "}
+				// The dot and the link wrap together, so a dot never ends a line on its own.
+				<span className="inline-flex items-center gap-x-1.5">
+					<DotSeparator />
 					<InlineLink
 						aria-label={named("View problems")}
 						render={
@@ -353,7 +356,7 @@ function ResultCountLinks({
 					>
 						View problems
 					</InlineLink>
-				</>
+				</span>
 			)}
 		</span>
 	);
