@@ -6,7 +6,9 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -63,6 +65,43 @@ class CatalogCriteriaCasesTest extends BaseUnitTest {
                             .isTrue();
                 }
             }
+        }
+    }
+
+    // The cases stage only an issue or a pull request. A review, a chat thread or a document has its witness in the
+    // test of its capture source, and a practice that people review is never captured.
+    @Test
+    void shouldGiveEachAutomatedIssueAndPullRequestPracticeACase() throws IOException {
+        var mapper = JsonMapper.builder().build();
+        try (var catalogueStream = getClass().getResourceAsStream("/practices/default-catalog.json");
+                var casesStream = getClass().getResourceAsStream("/practices/criteria-cases.json")) {
+            Map<String, String> automated = new HashMap<>();
+            for (var group :
+                    mapper.readTree(Objects.requireNonNull(catalogueStream)).path("groups")) {
+                for (var practice : group.path("practices")) {
+                    if (Set.of("scm.issue", "scm.pull_request")
+                                    .contains(practice.path("kind").asString())
+                            && practice.path("definition")
+                                    .path("reviewedBy")
+                                    .path("by")
+                                    .asString()
+                                    .equals("HEPHAESTUS")) {
+                        automated.put(
+                                practice.path("slug").asString(),
+                                practice.path("kind").asString());
+                    }
+                }
+            }
+            Set<String> covered = new HashSet<>();
+            for (var scenario : mapper.readTree(Objects.requireNonNull(casesStream))) {
+                for (var slug : scenario.path("expected").propertyNames()) {
+                    if (("scm." + scenario.path("workType").asString()).equals(automated.get(slug))) {
+                        covered.add(slug);
+                    }
+                }
+            }
+            assertThat(automated).isNotEmpty();
+            assertThat(covered).containsAll(automated.keySet());
         }
     }
 }

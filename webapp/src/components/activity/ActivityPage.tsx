@@ -43,6 +43,8 @@ export interface ActivityPageProps {
 	timeline: ActivityWorkLogState;
 	/** Absent where the workspace reviews no practices, or the reader may not ask on your behalf. */
 	reviewNow?: OpenWorkReviewNow;
+	/** Above the open work, such as the way to a review just requested from it. */
+	notice?: ReactElement;
 }
 
 /**
@@ -58,6 +60,7 @@ export function ActivityPage({
 	overview,
 	timeline,
 	reviewNow,
+	notice,
 }: ActivityPageProps) {
 	const header = <PageHeader icon={<Activity />} title="Activity" />;
 	if (account.status === "error") {
@@ -96,8 +99,9 @@ export function ActivityPage({
 	}
 	const login = account.status === "ready" ? account.login : undefined;
 	return (
-		<PageLayout className="max-w-4xl space-y-8">
+		<PageLayout className="space-y-8">
 			{header}
+			{notice}
 			<OpenWorkSections state={openWork} providerType={providerType} reviewNow={reviewNow} />
 			<PersonActivitySections
 				level={2}

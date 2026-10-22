@@ -94,14 +94,28 @@ export function useRequestPracticeReview(
 		asked !== undefined && data?.status === "SUBMITTED" && data.reviewId !== null
 			? { itemId: asked, reviewId: data.reviewId }
 			: undefined;
+	const submission = (itemId: string) => {
+		// A new ask replaces the answer to the last one, so an alert never outlives its refusal.
+		setRefusal(undefined);
+		const body: CreateReviewRequest = { itemId };
+		const submitted = { path: { workspaceSlug }, body };
+		latestAsk.current = submitted;
+		return submitted;
+	};
 	return {
 		ask: (itemId: string) => {
-			// A new ask replaces the answer to the last one, so an alert never outlives its refusal.
-			setRefusal(undefined);
-			const body: CreateReviewRequest = { itemId };
-			const submitted = { path: { workspaceSlug }, body };
-			latestAsk.current = submitted;
-			mutation.mutate(submitted);
+			mutation.mutate(submission(itemId));
+		},
+		/**
+		 * The same ask, for a caller whose own work spans it. It settles once the answer is handled:
+		 * a failure was already reported above, so it resolves without an outcome instead of rejecting.
+		 */
+		askAndSettle: async (itemId: string): Promise<ReviewRequestOutcome | undefined> => {
+			try {
+				return await mutation.mutateAsync(submission(itemId));
+			} catch {
+				return undefined;
+			}
 		},
 		asking: mutation.isPending ? asked : undefined,
 		// An earlier ask can finish later; only the current mutation's answer belongs inline.

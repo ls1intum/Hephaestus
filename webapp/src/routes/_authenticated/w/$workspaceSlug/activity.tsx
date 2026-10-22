@@ -1,6 +1,8 @@
-import { type UseQueryResult, useQuery } from "@tanstack/react-query";
+import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 
+import { resolveReviewContextOptions } from "@/api/@tanstack/react-query.gen";
 import type { WorkspaceMembership } from "@/api/types.gen";
 import { ACTIVITY_CATEGORY_DEFS } from "@/components/activity/activity-kind-defs";
 import { periodFromSearch, periodSearch } from "@/components/activity/activity-period";
@@ -15,11 +17,17 @@ import {
 import { ActivityDetailDrawer } from "@/components/activity/ActivityDetailDrawer";
 import { type ActivityAccount, ActivityPage } from "@/components/activity/ActivityPage";
 import { workLogTitle } from "@/components/activity/work-log-markdown";
+import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
+import { reviewLevel } from "@/components/practice-profile/practice-profile-search";
+import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
 import { buttonVariants } from "@/components/ui/button";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useActivityPerson, useActivityWork, useOpenWork } from "@/hooks/use-activity";
+import { pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { pageHead } from "@/lib/page-title";
+import { problemDetailOf } from "@/lib/problem-detail";
 import { type ProviderType, toScmProviderType } from "@/lib/provider/provider-terms";
 import { useSearchState, carriedSearchParams } from "@/lib/search-params";
 import { hasText } from "@/lib/text";
@@ -34,6 +42,22 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/activity"
 		middlewares: carriedSearchParams<ActivitySearch>(PERIOD_SEARCH_KEYS, ACTIVITY_SEARCH_DEFAULTS),
 	},
 });
+
+const REQUEST_REVIEW_MUTATION_KEY = ["activityRequestReview"];
+
+const NOT_REQUESTABLE = "You cannot request a review of this work.";
+
+/** A row's ask: the provider work it was asked from, and that work's address on the provider. */
+interface WorkReviewAsk {
+	path: { workspaceSlug: string; id: number };
+	url: string | undefined;
+}
+
+/** Said the way a problem detail says it, so the failure toast reads it like any other. */
+function notRequestable(reason: string | null): Error {
+	const detail = reason ?? NOT_REQUESTABLE;
+	return Object.assign(new Error(detail), { detail });
+}
 
 function Activity() {
 	const { workspaceSlug } = Route.useParams();
@@ -78,9 +102,75 @@ function Activity() {
 		enabled: scope.enabled && category !== undefined,
 	});
 
+	// A user view reads the developer's page; it never spends their workspace's budget.
+	const mayRequestReview = userView === undefined && workspace?.practicesEnabled === true;
+	const queryClient = useQueryClient();
+	const reviewRequest = useRequestPracticeReview(workspaceSlug);
+	const requestKey = [...REQUEST_REVIEW_MUTATION_KEY, workspaceSlug];
+	// The row's work is the provider's; the review is asked for the practice item, which only the
+	// work's review context names. One mutation spans both, so the row stays busy until the answer.
+	const requestForWork = useMutation({
+		mutationKey: requestKey,
+		mutationFn: async ({ path, url }: WorkReviewAsk) => {
+			if (!hasText(url)) {
+				throw notRequestable(null);
+			}
+			const context = await queryClient.query({
+				...resolveReviewContextOptions({
+					path: { workspaceSlug: path.workspaceSlug },
+					query: { url },
+				}),
+				staleTime: 0,
+			});
+			if (!context.requestAllowed || context.item === null) {
+				throw notRequestable(context.reasonDescription);
+			}
+			// The ask reports its own answer and failure; only the lookup's failure is reported below.
+			return reviewRequest.askAndSettle(context.item.id);
+		},
+		onError: (error) =>
+			toast.error("We could not request the review", {
+				description: problemDetailOf(error, "Try again in a moment."),
+			}),
+	});
+	const requesting = usePendingMutationIds(requestKey, (variables) => pathNumber(variables, "id"));
+	// The receipt is the latest row ask's own answer, read off the mutation that spans its lookup and
+	// request. The inner ask follows whichever request was sent last, which can be another
+	// workspace's that finished its lookup later.
+	const answered =
+		requestForWork.variables?.path.workspaceSlug === workspaceSlug
+			? requestForWork.data
+			: undefined;
+	const acceptedReviewId = answered?.status === "SUBMITTED" ? answered.reviewId : null;
+
 	return (
 		<>
 			<ActivityPage
+				reviewNow={
+					mayRequestReview
+						? {
+								onReviewNow: (work) =>
+									requestForWork.mutate({
+										path: { workspaceSlug, id: work.id },
+										url: work.htmlUrl,
+									}),
+								requesting,
+							}
+						: undefined
+				}
+				notice={
+					mayRequestReview && acceptedReviewId !== null ? (
+						<ReviewRequestedNotice
+							review={
+								<Link
+									to="/w/$workspaceSlug/practice-profile"
+									params={{ workspaceSlug }}
+									search={detailSearch(reviewLevel(acceptedReviewId))}
+								/>
+							}
+						/>
+					) : undefined
+				}
 				providerType={providerType}
 				account={accountOf(membership, login, userView === undefined)}
 				period={period}

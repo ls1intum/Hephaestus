@@ -1766,5 +1766,247 @@
 		},
 		"reason": "The caller supplies a valid base style for optional customization. A missing override can throw, but the function always returns a complete Badge with its independent title unchanged and that supplied style; the captured contract makes the normal default safe without a failure-label cue or unfinished required state. This establishes the coded fallback, not runtime rendering.",
 		"workType": "pull_request"
+	},
+	{
+		"id": "small-cohesive-greeting-function",
+		"expected": {
+			"scope-one-reviewable-change": "MET"
+		},
+		"files": {
+			"context/metadata.json": "{\"title\":\"Greet the user by name on the welcome page\",\"additions\":3,\"deletions\":0,\"changed_files\":1}\n",
+			"context/description.md": "Adds `greet(name)` for the welcome page.\n",
+			"repo/src/greeting.py": "def greet(name):\n    \"\"\"Return the greeting shown on the welcome page.\"\"\"\n    return f\"Hello, {name}!\"\n"
+		},
+		"reason": "One three-line function in one file is a batch a reviewer can read end to end.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "cli-flag-verified-by-command-and-output",
+		"expected": {
+			"states-how-to-verify-the-change": "MET"
+		},
+		"baseFiles": {
+			"repo/cli/greet.py": "import sys\n\n\ndef main(argv):\n    name = argv[0]\n    print(f\"Hello, {name}!\")\n\n\nif __name__ == \"__main__\":\n    main(sys.argv[1:])\n"
+		},
+		"files": {
+			"context/description.md": "Adds a `--shout` flag to the greeting command.\n\n## How to verify\nRun `python cli/greet.py --shout Ada`. It prints `HELLO, ADA!`. Without the flag, `python cli/greet.py Ada` prints `Hello, Ada!`.\n",
+			"repo/cli/greet.py": "import sys\n\n\ndef main(argv):\n    shout = \"--shout\" in argv\n    name = next(arg for arg in argv if not arg.startswith(\"--\"))\n    text = f\"Hello, {name}!\"\n    print(text.upper() if shout else text)\n\n\nif __name__ == \"__main__\":\n    main(sys.argv[1:])\n"
+		},
+		"reason": "A command, its action and its exact output give the reviewer the whole check.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "closing-change-maps-done-and-deferred-criteria",
+		"expected": {
+			"honours-linked-issue-acceptance-criteria": "MET"
+		},
+		"files": {
+			"context/metadata.json": "{\"title\":\"Export saved trips as CSV\"}\n",
+			"context/description.md": "Closes #12\n\n- [x] Saved trips can be exported as a CSV file: done here.\n- [ ] Exported trips include archived trips: deferred to #13.\n",
+			"context/linked_work_items.json": "{\"workItems\":[{\"number\":12,\"title\":\"Export saved trips\",\"state\":\"OPEN\",\"how\":\"closesOnMerge\",\"body\":\"## Acceptance criteria\\n- [ ] Saved trips can be exported as a CSV file\\n- [ ] Exported trips include archived trips\\n\",\"url\":\"https://example.org/team/project/issues/12\",\"labels\":[],\"createdAt\":\"2026-09-20T09:00:00Z\"}],\"unresolvedReferences\":[],\"truncated\":false}\n",
+			"context/linked_work_items/12.md": "# Export saved trips\n\nOpened 2026-09-20T09:00:00Z, state OPEN.\nThe body below is the issue's text as mirrored when this was captured; these dates are the issue's, not when any line of it was written.\n\n## Acceptance criteria\n- [ ] Saved trips can be exported as a CSV file\n- [ ] Exported trips include archived trips\n",
+			"repo/src/export.py": "import csv\n\n\ndef export_trips(trips, out):\n    writer = csv.writer(out)\n    writer.writerow([\"name\", \"start\"])\n    for trip in trips:\n        writer.writerow([trip.name, trip.start.isoformat()])\n"
+		},
+		"reason": "The closing change names each criterion of the closed issue as done here or deferred.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "branching-discount-without-a-test",
+		"expected": {
+			"ships-tests-with-the-change": "NOT_MET"
+		},
+		"files": {
+			"repo/src/pricing.py": "def discounted_total(total):\n    \"\"\"Apply the 10% bulk discount to orders over 100.\"\"\"\n    if total > 100:\n        return round(total * 0.9, 2)\n    return total\n"
+		},
+		"reason": "A new discount branch arrives with no test in the change.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "existing-test-skipped-without-a-reason",
+		"expected": {
+			"keeps-the-test-suite-honest": "NOT_MET"
+		},
+		"baseFiles": {
+			"repo/src/pricing.py": "def discounted_total(total):\n    \"\"\"Apply the 10% bulk discount to orders over 100.\"\"\"\n    if total > 100:\n        return round(total * 0.9, 2)\n    return total\n",
+			"repo/tests/test_pricing.py": "from src.pricing import discounted_total\n\n\ndef test_orders_over_100_get_the_discount():\n    assert discounted_total(200) == 180\n"
+		},
+		"files": {
+			"repo/src/pricing.py": "def discounted_total(total):\n    \"\"\"Apply the 10% bulk discount to orders over 100.\"\"\"\n    if total > 100:\n        return round(total * 0.9, 2)\n    return total\n",
+			"repo/tests/test_pricing.py": "import pytest\n\nfrom src.pricing import discounted_total\n\n\n@pytest.mark.skip\ndef test_orders_over_100_get_the_discount():\n    assert discounted_total(200) == 180\n"
+		},
+		"reason": "An existing check is skipped and nothing in the change says why.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "two-single-purpose-slug-helpers",
+		"expected": {
+			"keeps-functions-small-and-single-purpose": "MET"
+		},
+		"files": {
+			"repo/src/slugs.py": "import re\n\n\ndef slugify(title):\n    \"\"\"Lowercase the title and join its words with hyphens.\"\"\"\n    words = re.findall(r\"[a-z0-9]+\", title.lower())\n    return \"-\".join(words)\n\n\ndef unique_slug(title, taken):\n    \"\"\"Append the first free number when the slug is already taken.\"\"\"\n    slug = slugify(title)\n    suffix = 2\n    candidate = slug\n    while candidate in taken:\n        candidate = f\"{slug}-{suffix}\"\n        suffix += 1\n    return candidate\n"
+		},
+		"reason": "Each added function does one nameable job that a reader follows at a glance.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "page-size-from-query-divides-unchecked",
+		"expected": {
+			"validates-inputs-and-edge-cases-at-the-boundary": "NOT_MET"
+		},
+		"files": {
+			"repo/app/routes.py": "from flask import Flask, jsonify, request\n\nfrom app.store import load_items\n\napp = Flask(__name__)\n\n\n@app.get(\"/items/pages\")\ndef page_count():\n    items = load_items()\n    per_page = int(request.args.get(\"per_page\", \"20\"))\n    return jsonify(pages=-(-len(items) // per_page))\n"
+		},
+		"reason": "A request value of zero or a non-number reaches the division with no guard.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "decoded-request-body-unwrapped",
+		"expected": {
+			"avoids-unsafe-panics-and-chosen-crashes": "NOT_MET"
+		},
+		"files": {
+			"repo/src/main.rs": "use std::io::{Read, Write};\nuse std::net::TcpListener;\n\nmod orders;\n\nfn main() -> std::io::Result<()> {\n    let listener = TcpListener::bind(\"0.0.0.0:8080\")?;\n    for stream in listener.incoming() {\n        let mut stream = stream?;\n        let mut request = String::new();\n        stream.read_to_string(&mut request)?;\n        if !request.starts_with(\"POST /orders \") {\n            continue;\n        }\n        let body = request.split_once(\"\\r\\n\\r\\n\").map_or(\"\", |(_, body)| body);\n        let order = orders::parse_order(body);\n        write!(stream, \"HTTP/1.1 201 Created\\r\\n\\r\\n{} x {}\", order.quantity, order.item)?;\n    }\n    Ok(())\n}\n",
+			"repo/src/orders.rs":"use serde::Deserialize;\n\n#[derive(Deserialize)]\npub struct Order {\n    pub item: String,\n    pub quantity: u32,\n}\n\n/// Reads the JSON body of a POST /orders request.\npub fn parse_order(body: &str) -> Order {\n    serde_json::from_str(body).unwrap()\n}\n"
+		},
+		"reason": "A malformed client body makes the added unwrap panic on an ordinary request path.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "query-parameter-concatenated-into-sql",
+		"expected": {
+			"validates-and-escapes-untrusted-input": "NOT_MET"
+		},
+		"expectedSeverity": {
+			"validates-and-escapes-untrusted-input": "MAJOR"
+		},
+		"files": {
+			"repo/app/users.py": "from flask import request\n\nfrom app.db import connection\n\n\ndef find_user():\n    name = request.args[\"name\"]\n    cursor = connection().cursor()\n    cursor.execute(\"SELECT id, email FROM users WHERE name = '\" + name + \"'\")\n    return cursor.fetchone()\n"
+		},
+		"reason": "A request parameter is concatenated raw into a SQL query.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "library-export-documented-in-comment-and-changelog",
+		"expected": {
+			"documents-public-api-and-behaviour-changes": "MET"
+		},
+		"baseFiles": {
+			"repo/package.json": "{\"name\":\"@acme/dates\",\"version\":\"1.2.0\",\"main\":\"index.js\"}\n",
+			"repo/index.js": "export { formatDay } from \"./format.js\";\n",
+			"repo/format.js": "/** Formats a date as an ISO day such as `2026-10-22`. */\nexport function formatDay(date) {\n\treturn date.toISOString().slice(0, 10);\n}\n",
+			"repo/CHANGELOG.md": "# Changelog\n\n## 1.2.0\n- Add `formatDay(date)`.\n"
+		},
+		"files": {
+			"context/description.md": "Adds `parseDay(text)` to the package API.\n",
+			"repo/package.json": "{\"name\":\"@acme/dates\",\"version\":\"1.3.0\",\"main\":\"index.js\"}\n",
+			"repo/index.js": "export { formatDay } from \"./format.js\";\nexport { parseDay } from \"./parse.js\";\n",
+			"repo/format.js": "/** Formats a date as an ISO day such as `2026-10-22`. */\nexport function formatDay(date) {\n\treturn date.toISOString().slice(0, 10);\n}\n",
+			"repo/parse.js": "/**\n * Parses an ISO day such as `2026-10-22` into a local `Date` at midnight.\n * Returns `null` when the text is not a valid ISO day.\n */\nexport function parseDay(text) {\n\tconst match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(text);\n\tif (match === null) return null;\n\treturn new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));\n}\n",
+			"repo/CHANGELOG.md": "# Changelog\n\n## 1.3.0\n- Add `parseDay(text)`: parses an ISO day into a local date, or returns `null`.\n\n## 1.2.0\n- Add `formatDay(date)`.\n"
+		},
+		"reason": "The new export of a published package ships with a doc comment and a changelog entry.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "retention-default-changed-while-wiki-keeps-old-value",
+		"expected": {
+			"change-keeps-linked-docs-consistent": "NOT_MET"
+		},
+		"baseFiles": {
+			"repo/config/retention.yml": "expired_after_days: 30\n"
+		},
+		"files": {
+			"context/description.md": "Shortens record retention to 14 days.\n\nRetention is described in [Retention policy](https://wiki.example.org/doc/retention-policy).\n",
+			"context/docs/operations/retention-policy.md": "# Retention policy\n\nRecords are deleted 30 days after they expire. `expired_after_days` in `config/retention.yml` sets this period.\n",
+			"repo/config/retention.yml": "expired_after_days: 14\n"
+		},
+		"reason": "The linked wiki document still states the period that the change replaces.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "one-commit-adds-export-and-reformats-modules",
+		"expected": {
+			"commits-are-atomic-and-cohesive": "NOT_MET"
+		},
+		"baseFiles": {
+			"repo/src/models.py": "class Trip:\n  def __init__(self,name,start):\n    self.name=name\n    self.start=start\n",
+			"repo/src/views.py": "def show(trip):\n  return trip.name\n"
+		},
+		"files": {
+			"repo/src/models.py": "class Trip:\n    def __init__(self, name, start):\n        self.name = name\n        self.start = start\n",
+			"repo/src/views.py": "def show(trip):\n    return trip.name\n",
+			"repo/src/export.py": "import csv\n\n\ndef export_trips(trips, out):\n    writer = csv.writer(out)\n    for trip in trips:\n        writer.writerow([trip.name, trip.start])\n",
+			"context/commits.json": "{\"commits\":[{\"sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"message\":\"Add the CSV export and reformat every module with black\\n\",\"author\":\"author\",\"authoredAt\":\"2026-10-02T09:00:00Z\",\"parents\":[\"0000000000000000000000000000000000000000\"],\"files\":[{\"path\":\"src/export.py\",\"status\":\"A\",\"additions\":7,\"deletions\":0},{\"path\":\"src/models.py\",\"status\":\"M\",\"additions\":4,\"deletions\":4},{\"path\":\"src/views.py\",\"status\":\"M\",\"additions\":2,\"deletions\":2}]}]}\n"
+		},
+		"reason": "A single commit carries a new feature and an unrelated formatting sweep.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "built-bundle-committed-against-contributing-rule",
+		"expected": {
+			"excludes-generated-and-build-artifacts": "NOT_MET"
+		},
+		"baseFiles": {
+			"repo/CONTRIBUTING.md": "# Contributing\n\nDo not commit `dist/`. CI builds it from `src/` with `npm run build`.\n",
+			"repo/package.json": "{\"name\":\"web\",\"private\":true,\"scripts\":{\"build\":\"esbuild src/app.js --bundle --minify --outfile=dist/app.min.js\"}}\n",
+			"repo/src/app.js": "export function start() {\n\tdocument.title = \"Trips\";\n}\n"
+		},
+		"files": {
+			"repo/CONTRIBUTING.md": "# Contributing\n\nDo not commit `dist/`. CI builds it from `src/` with `npm run build`.\n",
+			"repo/package.json": "{\"name\":\"web\",\"private\":true,\"scripts\":{\"build\":\"esbuild src/app.js --bundle --minify --outfile=dist/app.min.js\"}}\n",
+			"repo/src/app.js": "export function start() {\n\tdocument.title = \"Trips\";\n\tdocument.body.dataset.ready = \"true\";\n}\n",
+			"repo/dist/app.min.js": "/*! built by esbuild */(()=>{function t(){document.title=\"Trips\";document.body.dataset.ready=\"true\"}t();})();\n"
+		},
+		"reason": "The build output that the contributing guide says CI produces is committed by hand.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "test-ask-deferred-on-bare-promise-then-merged",
+		"expected": {
+			"defers-review-asks-into-tracked-work": "NOT_MET"
+		},
+		"expectedSeverity": {
+			"defers-review-asks-into-tracked-work": "MAJOR"
+		},
+		"files": {
+			"context/metadata.json": "{\"author\":\"author\",\"title\":\"Add the cart total\",\"state\":\"MERGED\",\"is_merged\":true,\"merged_at\":\"2026-10-05T12:00:00Z\",\"merged_by\":\"author\"}\n",
+			"context/description.md": "Adds the cart total.\n",
+			"context/comments.json": "[{\"author\":\"reviewer\",\"body\":\"Please add a test for the empty cart before this merges.\",\"path\":\"src/cart.py\",\"line\":2,\"thread\":1,\"created_at\":\"2026-10-05T10:00:00Z\"},{\"author\":\"author\",\"body\":\"Will do in the next PR.\",\"path\":\"src/cart.py\",\"line\":2,\"thread\":1,\"created_at\":\"2026-10-05T10:30:00Z\"}]\n",
+			"context/review_threads.json": "{\"threads\":[{\"id\":1,\"state\":\"RESOLVED\",\"path\":\"src/cart.py\",\"line\":2,\"resolvedBy\":\"author\",\"resolvedAt\":\"2026-10-05T11:00:00Z\",\"createdAt\":\"2026-10-05T10:00:00Z\"}],\"reviewDecisions\":[{\"state\":\"APPROVED\",\"author\":\"reviewer\",\"submittedAt\":\"2026-10-05T11:30:00Z\"}],\"decisionHistoryComplete\":false,\"truncated\":false}\n",
+			"context/general_comments.json": "[]\n",
+			"repo/src/cart.py": "def cart_total(items):\n    return sum(item.price * item.quantity for item in items)\n"
+		},
+		"reason": "A requested test was deferred with only a promise and the change merged without a tracked issue.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "issue-opened-before-the-first-commit",
+		"expected": {
+			"plans-the-work-in-an-issue-first": "MET"
+		},
+		"files": {
+			"context/metadata.json": "{\"title\":\"Search saved trips\",\"source_branch\":\"21-search-trips\"}\n",
+			"context/description.md": "Closes #21\n\nAdds the trip search.\n",
+			"context/linked_work_items.json": "{\"workItems\":[{\"number\":21,\"title\":\"Search saved trips\",\"state\":\"OPEN\",\"how\":\"closesOnMerge\",\"body\":\"Search saved trips by name.\\n\",\"url\":\"https://example.org/team/project/issues/21\",\"labels\":[],\"createdAt\":\"2026-10-01T08:00:00Z\"}],\"unresolvedReferences\":[],\"truncated\":false}\n",
+			"context/linked_work_items/21.md": "# Search saved trips\n\nOpened 2026-10-01T08:00:00Z, state OPEN.\nThe body below is the issue's text as mirrored when this was captured; these dates are the issue's, not when any line of it was written.\n\nSearch saved trips by name.\n",
+			"context/commits.json": "{\"commits\":[{\"sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"message\":\"Add the trip search\\n\",\"author\":\"author\",\"authoredAt\":\"2026-10-02T09:00:00Z\",\"parents\":[\"0000000000000000000000000000000000000000\"],\"files\":[{\"path\":\"src/search.py\",\"status\":\"A\",\"additions\":3,\"deletions\":0}]}]}\n",
+			"repo/src/search.py": "def search(trips, text):\n    needle = text.casefold()\n    return [trip for trip in trips if needle in trip.name.casefold()]\n"
+		},
+		"reason": "The implemented issue was opened a day before the earliest recorded author date.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "derived-count-stored-beside-its-list",
+		"expected": {
+			"owns-state-at-the-right-level": "NOT_MET"
+		},
+		"expectedSeverity": {
+			"owns-state-at-the-right-level": "MINOR"
+		},
+		"files": {
+			"repo/App/TripListView.swift": "import SwiftUI\n\nstruct TripListView: View {\n    @State private var trips: [Trip] = []\n    @State private var tripCount = 0\n\n    var body: some View {\n        List(trips) { trip in\n            Text(trip.name)\n        }\n        .navigationTitle(\"\\(tripCount) trips\")\n        .onChange(of: trips) {\n            tripCount = trips.count\n        }\n    }\n}\n"
+		},
+		"reason": "A count derived from the list is stored as second state and synced by hand.",
+		"workType": "pull_request"
 	}
 ]

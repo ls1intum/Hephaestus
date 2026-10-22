@@ -14,8 +14,12 @@ import type {
 	ActivityWork,
 	ActivityWorkPage,
 	OpenWork,
+	ReviewContext,
+	ReviewRequestOutcome,
+	WorkItem,
 	WorkspaceMembership,
 } from "@/api/types.gen";
+import { ITEM_EVENT_REASON_SENTENCES } from "@/components/practice-vocabulary/item-event-defs";
 import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
@@ -24,6 +28,7 @@ import { QUERY_STALE_TIME_MS } from "@/runtime/tanstack-query/query-defaults";
 import { deferred } from "@/test/async";
 import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/test/router-harness";
+import { storeUserView } from "@/test/user-view";
 
 // A case mounts the whole app chrome, whose route modules are imported lazily.
 vi.setConfig({ testTimeout: 40_000 });
@@ -179,6 +184,13 @@ function adaMembership(
 		reviewSelected: true,
 		eligibleForPracticeReview: true,
 	};
+}
+
+/** Your own pull requests waiting for review are folded away until you open them. */
+async function openWaitingWork(user: ReturnType<typeof userEvent.setup>) {
+	await user.click(
+		await screen.findByRole("button", { name: /^Waiting on others/u }, ROUTE_RENDER_WAIT),
+	);
 }
 
 /** Signed in as `ada`, while the workspace's connected instance knows the same account as `ada-lrz`. */
@@ -378,6 +390,500 @@ describe("Activity", () => {
 
 		await screen.findByRole("heading", { name: "Needs you" }, ROUTE_RENDER_WAIT);
 		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
+	describe("Request review", () => {
+		// The activity row's id is the provider work's; the review asks for the practice item, which
+		// only the review context knows. Different on purpose, so a row id sent as the item fails.
+		const ownPullRequest = {
+			id: 27_001,
+			type: "PULL_REQUEST",
+			number: 27,
+			title: "Pull request 27",
+			state: "OPEN",
+			isDraft: false,
+			htmlUrl: "https://github.com/acme/app/pull/27",
+			author: { id: 7, login: "ada-lrz", name: "Ada", avatarUrl: "", htmlUrl: "" },
+		} satisfies Wire<WorkItem>;
+		const assignedIssue = {
+			id: 31_001,
+			type: "ISSUE",
+			number: 31,
+			title: "Issue 31",
+			state: "OPEN",
+			isDraft: false,
+			htmlUrl: "https://github.com/acme/app/issues/31",
+			author: { id: 8, login: "bob", name: "Bob", avatarUrl: "", htmlUrl: "" },
+		} satisfies Wire<WorkItem>;
+		const someoneElsesPullRequest = {
+			id: 45_001,
+			type: "PULL_REQUEST",
+			number: 45,
+			title: "Pull request 45",
+			state: "OPEN",
+			isDraft: false,
+			htmlUrl: "https://github.com/acme/app/pull/45",
+			author: { id: 8, login: "bob", name: "Bob", avatarUrl: "", htmlUrl: "" },
+		} satisfies Wire<WorkItem>;
+		const ownOpenWork = {
+			reviewRequests: { content: [someoneElsesPullRequest], hasMore: false },
+			teamReviewRequests: nothing,
+			pullRequests: { content: [ownPullRequest], hasMore: false },
+			issues: { content: [assignedIssue], hasMore: false },
+		} satisfies Wire<OpenWork>;
+		const ITEM_OF_URL: Record<string, string> = {
+			[ownPullRequest.htmlUrl]: "item-pull-request-27",
+			[assignedIssue.htmlUrl]: "item-issue-31",
+		};
+
+		function reviewContext(url: string, requestAllowed = true): Wire<ReviewContext> {
+			return {
+				canInspectReviewDetails: true,
+				item: {
+					id: ITEM_OF_URL[url] ?? "item-unknown",
+					kind: "PULL_REQUEST",
+					label: "#27",
+					container: "acme/app",
+					parentId: null,
+					path: null,
+					provider: "GITHUB",
+					removedAt: null,
+					title: null,
+					url,
+				},
+				reasonDescription: requestAllowed ? null : "Reviews of this work are paused.",
+				requestAllowed,
+				workspaceId: "1",
+				workspaceSlug: "acme",
+			};
+		}
+
+		/**
+		 * The page's own work, every review-context read by the address it names, and every review asked
+		 * for by its body. A held step waits for its promise; the answers run in order.
+		 */
+		function serveReviewRequests({
+			context = (url: string) => HttpResponse.json(reviewContext(url)),
+			heldContext = Promise.resolve(),
+			heldAsk = Promise.resolve(),
+			answers = [{ status: "SUBMITTED", reason: null, reviewId: "review-77" }],
+		}: {
+			context?: (url: string) => Response;
+			heldContext?: Promise<void>;
+			heldAsk?: Promise<void>;
+			answers?: readonly (ReviewRequestOutcome | { problem: number })[];
+		} = {}) {
+			const contexts: (string | null)[] = [];
+			const asks: unknown[] = [];
+			/** Every lookup and ask as `METHOD path`, in the order they reached the server. */
+			const requests: string[] = [];
+			server.use(
+				http.get("*/workspaces/:workspaceSlug/activity/members/:login/open-work", () =>
+					HttpResponse.json(ownOpenWork),
+				),
+				http.get("*/workspaces/:workspaceSlug/practices/review-context", async ({ request }) => {
+					const url = new URL(request.url).searchParams.get("url");
+					requests.push(`GET ${new URL(request.url).pathname}`);
+					contexts.push(url);
+					await heldContext;
+					return context(String(url));
+				}),
+				http.post("*/workspaces/:workspaceSlug/practices/review-requests", async ({ request }) => {
+					const body: unknown = await request.json();
+					requests.push(`POST ${new URL(request.url).pathname}`);
+					asks.push(body);
+					await heldAsk;
+					const answer = answers[asks.length - 1];
+					assert(answer, "Review request exceeded the prepared answers");
+					return "problem" in answer
+						? HttpResponse.json(
+								{ status: answer.problem, title: "Unavailable", detail: "Reviews are paused." },
+								{ status: answer.problem },
+							)
+						: HttpResponse.json(answer);
+				}),
+			);
+			return { contexts, asks, requests };
+		}
+
+		it.each([
+			{
+				work: "your own pull request",
+				reference: "#27",
+				other: "#31",
+				url: ownPullRequest.htmlUrl,
+				itemId: "item-pull-request-27",
+			},
+			{
+				work: "an issue assigned to you",
+				reference: "#31",
+				other: "#27",
+				url: assignedIssue.htmlUrl,
+				itemId: "item-issue-31",
+			},
+		])(
+			"asks a review of $work for its practice item, keeping only that row busy until the review exists",
+			async ({ reference, other, url, itemId }) => {
+				const resolved = deferred();
+				const asked = deferred();
+				const { contexts, asks } = serveReviewRequests({
+					heldContext: resolved.promise,
+					heldAsk: asked.promise,
+				});
+				const user = userEvent.setup();
+				renderRouteAtWithRouter("/w/acme/activity");
+				await openWaitingWork(user);
+				try {
+					await user.click(
+						await screen.findByRole(
+							"button",
+							{ name: `Request review: ${reference}` },
+							ROUTE_RENDER_WAIT,
+						),
+					);
+
+					// Busy while the work is looked up, and still while the review is asked for.
+					await waitFor(() => expect(contexts).toStrictEqual([url]));
+					expect(
+						screen.getByRole<HTMLButtonElement>("button", {
+							name: `Requesting review…: ${reference}`,
+						}).disabled,
+					).toBe(true);
+					expect(
+						screen.getByRole<HTMLButtonElement>("button", { name: `Request review: ${other}` })
+							.disabled,
+					).toBe(false);
+					resolved.resolve();
+					await waitFor(() => expect(asks).toStrictEqual([{ itemId }]));
+					expect(
+						screen.getByRole<HTMLButtonElement>("button", {
+							name: `Requesting review…: ${reference}`,
+						}).disabled,
+					).toBe(true);
+				} finally {
+					resolved.resolve();
+					asked.resolve();
+				}
+
+				const note = await screen.findByRole("note");
+				const link = within(note).getByRole("link", { name: "View requested review" });
+				const target = new URL(String(link.getAttribute("href")), "http://localhost");
+				expect({
+					path: target.pathname,
+					detail: target.searchParams.getAll("detail"),
+				}).toStrictEqual({ path: "/w/acme/practice-profile", detail: ["review:review-77"] });
+				// Accepted is not started: the new review's own level says whether it is queued or running.
+				expect(note.textContent).not.toMatch(/started|running|queued/iu);
+				expect(asks).toStrictEqual([{ itemId }]);
+			},
+		);
+
+		it("follows the requested review to your practice profile, and Back returns without asking again", async () => {
+			const { asks } = serveReviewRequests();
+			const user = userEvent.setup();
+			const { router } = renderRouteAtWithRouter("/w/acme/activity");
+			await openWaitingWork(user);
+
+			await user.click(
+				await screen.findByRole("button", { name: "Request review: #27" }, ROUTE_RENDER_WAIT),
+			);
+			const note = await screen.findByRole("note");
+			await user.click(within(note).getByRole("link", { name: "View requested review" }));
+			await waitFor(() => expect(router.state.location.pathname).toBe("/w/acme/practice-profile"));
+			expect(new URLSearchParams(router.state.location.searchStr).getAll("detail")).toStrictEqual([
+				"review:review-77",
+			]);
+
+			await act(async () => {
+				router.history.back();
+			});
+			await waitFor(() => expect(router.state.location.pathname).toBe("/w/acme/activity"));
+			await screen.findByRole("heading", { name: "Needs you" }, ROUTE_RENDER_WAIT);
+			expect(asks).toStrictEqual([{ itemId: "item-pull-request-27" }]);
+		});
+
+		it("keeps a review asked in one workspace out of the next workspace's Activity", async () => {
+			// Beta's own work differs from acme's in row id, number, title, address and practice item.
+			const betaIssue = {
+				id: 52_001,
+				type: "ISSUE",
+				number: 52,
+				title: "Issue 52",
+				state: "OPEN",
+				isDraft: false,
+				htmlUrl: "https://github.com/beta/web/issues/52",
+				author: { id: 8, login: "bob", name: "Bob", avatarUrl: "", htmlUrl: "" },
+			} satisfies Wire<WorkItem>;
+			const betaContext = {
+				canInspectReviewDetails: true,
+				item: {
+					id: "item-issue-52",
+					kind: "ISSUE",
+					label: "#52",
+					container: "beta/web",
+					parentId: null,
+					path: null,
+					provider: "GITHUB",
+					removedAt: null,
+					title: null,
+					url: betaIssue.htmlUrl,
+				},
+				reasonDescription: null,
+				requestAllowed: true,
+				workspaceId: "2",
+				workspaceSlug: "beta",
+			} satisfies Wire<ReviewContext>;
+			const acmeLookup = deferred();
+			const betaAnswer = deferred();
+			const { asks, requests } = serveReviewRequests({ heldContext: acmeLookup.promise });
+			const betaAsks: unknown[] = [];
+			server.use(
+				http.get("*/workspaces", () =>
+					HttpResponse.json([
+						workspaceListItem("acme", { practicesEnabled: true }),
+						workspaceListItem("beta", { practicesEnabled: true }),
+					]),
+				),
+				http.get("*/workspaces/beta", () => HttpResponse.json(workspaceListItem("beta"))),
+				http.get("*/workspaces/beta/activity/members/:login/open-work", () =>
+					HttpResponse.json({
+						reviewRequests: nothing,
+						teamReviewRequests: nothing,
+						pullRequests: nothing,
+						issues: { content: [betaIssue], hasMore: false },
+					} satisfies Wire<OpenWork>),
+				),
+				http.get("*/workspaces/beta/practices/review-context", ({ request }) => {
+					requests.push(`GET ${new URL(request.url).pathname}`);
+					return HttpResponse.json(betaContext);
+				}),
+				http.post("*/workspaces/beta/practices/review-requests", async ({ request }) => {
+					const body: unknown = await request.json();
+					requests.push(`POST ${new URL(request.url).pathname}`);
+					betaAsks.push(body);
+					await betaAnswer.promise;
+					return HttpResponse.json({
+						status: "SUBMITTED",
+						reason: null,
+						reviewId: "review-88",
+					} satisfies ReviewRequestOutcome);
+				}),
+			);
+			const user = userEvent.setup();
+			const { router } = renderRouteAtWithRouter("/w/acme/activity");
+			await openWaitingWork(user);
+			try {
+				await user.click(
+					await screen.findByRole("button", { name: "Request review: #27" }, ROUTE_RENDER_WAIT),
+				);
+				await waitFor(() =>
+					expect(requests).toStrictEqual(["GET /workspaces/acme/practices/review-context"]),
+				);
+
+				// Acme's lookup is still out when the reader moves to beta's Activity.
+				await act(async () => {
+					await router.navigate({
+						to: "/w/$workspaceSlug/activity",
+						params: { workspaceSlug: "beta" },
+					});
+				});
+				const betaRow = await screen.findByRole<HTMLButtonElement>(
+					"button",
+					{ name: "Request review: #52" },
+					ROUTE_RENDER_WAIT,
+				);
+				expect({
+					usable: !betaRow.disabled,
+					busy: screen.queryAllByRole("button", { name: /^Requesting review…/u }).length,
+					acmeWork: screen.queryByRole("link", { name: /^Pull request 27/u }),
+				}).toStrictEqual({ usable: true, busy: 0, acmeWork: null });
+
+				// Beta's own ask is out too when acme's lookup answers.
+				await user.click(betaRow);
+				await waitFor(() => expect(betaAsks).toStrictEqual([{ itemId: "item-issue-52" }]));
+				await act(async () => {
+					acmeLookup.resolve();
+				});
+				await waitFor(() => expect(asks).toStrictEqual([{ itemId: "item-pull-request-27" }]));
+				// Acme's ask is answered; its acceptance is acme's, never a note on beta's page.
+				await waitFor(() =>
+					expect(screen.getAllByText("Review requested").length).toBeGreaterThan(0),
+				);
+				expect({
+					note: screen.queryByRole("note"),
+					betaBusy: screen.getByRole<HTMLButtonElement>("button", {
+						name: "Requesting review…: #52",
+					}).disabled,
+					requests,
+				}).toStrictEqual({
+					note: null,
+					betaBusy: true,
+					requests: [
+						"GET /workspaces/acme/practices/review-context",
+						"GET /workspaces/beta/practices/review-context",
+						"POST /workspaces/beta/practices/review-requests",
+						"POST /workspaces/acme/practices/review-requests",
+					],
+				});
+
+				await act(async () => {
+					betaAnswer.resolve();
+				});
+				const note = await screen.findByRole("note");
+				const link = within(note).getByRole("link", { name: "View requested review" });
+				const target = new URL(String(link.getAttribute("href")), "http://localhost");
+				expect({
+					path: target.pathname,
+					detail: target.searchParams.getAll("detail"),
+					asks,
+					betaAsks,
+				}).toStrictEqual({
+					path: "/w/beta/practice-profile",
+					detail: ["review:review-88"],
+					asks: [{ itemId: "item-pull-request-27" }],
+					betaAsks: [{ itemId: "item-issue-52" }],
+				});
+			} finally {
+				acmeLookup.resolve();
+				betaAnswer.resolve();
+			}
+		});
+
+		it("offers no review of someone else's pull request that asks for your review", async () => {
+			serveReviewRequests();
+			const user = userEvent.setup();
+			renderRouteAtWithRouter("/w/acme/activity");
+			await openWaitingWork(user);
+
+			await screen.findByRole("button", { name: "Request review: #27" }, ROUTE_RENDER_WAIT);
+			screen.getByRole("link", { name: /^Pull request 45/u });
+			expect(screen.queryByRole("button", { name: /^Request review: #45/u })).toBeNull();
+		});
+
+		it("says why a review was declined, and asks again on the next press", async () => {
+			const { asks } = serveReviewRequests({
+				answers: [
+					{ status: "REFUSED", reason: "COOLDOWN_ACTIVE", reviewId: null },
+					{ status: "SUBMITTED", reason: null, reviewId: "review-78" },
+				],
+			});
+			const user = userEvent.setup();
+			renderRouteAtWithRouter("/w/acme/activity");
+			await openWaitingWork(user);
+
+			await user.click(
+				await screen.findByRole("button", { name: "Request review: #27" }, ROUTE_RENDER_WAIT),
+			);
+			await screen.findByText(ITEM_EVENT_REASON_SENTENCES.COOLDOWN_ACTIVE);
+			expect(screen.queryByRole("note")).toBeNull();
+
+			await user.click(screen.getByRole("button", { name: "Request review: #27" }));
+			await screen.findByRole("note");
+			expect(asks).toStrictEqual([
+				{ itemId: "item-pull-request-27" },
+				{ itemId: "item-pull-request-27" },
+			]);
+		});
+
+		it("says a review request failed, and asks again on the next press", async () => {
+			const { asks } = serveReviewRequests({
+				answers: [{ problem: 503 }, { status: "SUBMITTED", reason: null, reviewId: "review-79" }],
+			});
+			const user = userEvent.setup();
+			renderRouteAtWithRouter("/w/acme/activity");
+			await openWaitingWork(user);
+
+			await user.click(
+				await screen.findByRole("button", { name: "Request review: #27" }, ROUTE_RENDER_WAIT),
+			);
+			await screen.findByText("Reviews are paused.");
+
+			await user.click(screen.getByRole("button", { name: "Request review: #27" }));
+			await screen.findByRole("note");
+			expect(asks).toStrictEqual([
+				{ itemId: "item-pull-request-27" },
+				{ itemId: "item-pull-request-27" },
+			]);
+		});
+
+		it.each([
+			{
+				answer: "does not allow a request",
+				context: (url: string) => HttpResponse.json(reviewContext(url, false)),
+				shown: "Reviews of this work are paused.",
+			},
+			{
+				answer: "finds no reviewed work at the address",
+				context: () =>
+					HttpResponse.json(
+						{
+							status: 404,
+							title: "Not Found",
+							detail: "This workspace has no reviewed work at this address.",
+						},
+						{ status: 404 },
+					),
+				shown: "This workspace has no reviewed work at this address.",
+			},
+			{
+				answer: "names no practice item",
+				context: (url: string) => HttpResponse.json({ ...reviewContext(url), item: null }),
+				shown: "You cannot request a review of this work.",
+			},
+		])(
+			"asks for no review when the work's review context $answer, and says why",
+			async ({ context, shown }) => {
+				const { contexts, asks } = serveReviewRequests({ context });
+				const user = userEvent.setup();
+				renderRouteAtWithRouter("/w/acme/activity");
+				await openWaitingWork(user);
+
+				await user.click(
+					await screen.findByRole("button", { name: "Request review: #27" }, ROUTE_RENDER_WAIT),
+				);
+				await screen.findByText(shown);
+				await waitFor(() =>
+					expect(
+						screen.getByRole<HTMLButtonElement>("button", { name: "Request review: #27" }).disabled,
+					).toBe(false),
+				);
+				expect({ contexts, asks, note: screen.queryByRole("note") }).toStrictEqual({
+					contexts: [ownPullRequest.htmlUrl],
+					asks: [],
+					note: null,
+				});
+			},
+		);
+
+		it.each([
+			{
+				when: "an administrator views the page as the developer",
+				arrange: () => storeUserView({ workspaceSlug: "acme" }),
+			},
+			{
+				when: "the workspace reviews no practices",
+				arrange: () =>
+					server.use(
+						http.get("*/workspaces", () =>
+							HttpResponse.json([workspaceListItem("acme", { practicesEnabled: false })]),
+						),
+					),
+			},
+		])("offers no review request when $when", async ({ arrange }) => {
+			const { contexts, asks } = serveReviewRequests();
+			arrange();
+			const user = userEvent.setup();
+			renderRouteAtWithRouter("/w/acme/activity");
+			await openWaitingWork(user);
+
+			await screen.findByRole("link", { name: /^Pull request 27/u }, ROUTE_RENDER_WAIT);
+			screen.getByRole("link", { name: /^Issue 31/u });
+			expect({
+				requests: screen.queryAllByRole("button", { name: /^Request review/u }).length,
+				contexts,
+				asks,
+			}).toStrictEqual({ requests: 0, contexts: [], asks: [] });
+		});
 	});
 });
 
@@ -1977,6 +2483,12 @@ describe("Workspace activity", () => {
 	});
 
 	it("sends an old practice group page to its level on the practice profile", async () => {
+		// The practice profile sends a workspace that reviews no practices away, so this one reviews them.
+		server.use(
+			http.get("*/workspaces", () =>
+				HttpResponse.json([workspaceListItem("acme", { practicesEnabled: true })]),
+			),
+		);
 		const { router } = renderRouteAtWithRouter(
 			"/w/acme/user/ada-lrz/practice-groups/review-ready-work",
 		);
@@ -1985,6 +2497,11 @@ describe("Workspace activity", () => {
 			() => expect(router.state.location.pathname).toBe("/w/acme/practice-profile"),
 			ROUTE_RENDER_WAIT,
 		);
+		expect(router.state.location.href).toBe(
+			"/w/acme/practice-profile?detail=practice-group:review-ready-work",
+		);
+		// The addressed group level has mounted over the profile before its final address is checked.
+		await screen.findByRole("dialog", { name: "Practice group" }, ROUTE_RENDER_WAIT);
 		expect(router.state.location.href).toBe(
 			"/w/acme/practice-profile?detail=practice-group:review-ready-work",
 		);

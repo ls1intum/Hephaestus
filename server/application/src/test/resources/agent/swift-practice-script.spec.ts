@@ -4,8 +4,10 @@ import test from "node:test";
 import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/kits/scm/types.ts";
 import {
 	leadKeys,
+	REVIEWED,
 	runBundled,
 	runBundledProgram,
+	runBundledReview,
 } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 const view = `import SwiftUI
@@ -416,6 +418,83 @@ void test("native platform logging is a logger and standard output a print, a pr
 			["print-call", "python", "print(", true],
 		],
 	);
+});
+
+void test("the logger practice tells a print from a logger in each other language it names", async () => {
+	const result = await runBundled("logs-through-the-platform-logger", {
+		change: new Map([
+			whole(
+				"app/src/main/java/com/example/Feed.kt",
+				'class Feed {\n    fun load() {\n        logger.info("loaded")\n        Timber.d("loaded")\n    }\n}',
+			),
+			whole(
+				"app/src/main/java/com/example/Store.java",
+				'class Store {\n    void load() {\n        LOGGER.info("loaded");\n        error.printStackTrace();\n    }\n}',
+			),
+			whole(
+				"src/store.ts",
+				'export function load() {\n\tconsole.log("loading");\n\tlogger.info("loaded");\n}',
+			),
+			whole(
+				"web/store.js",
+				'function load() {\n\tconsole.error("failed");\n\tlog.warn("slow");\n}',
+			),
+			whole("server/store.py", 'def load():\n    logging.info("loaded")'),
+		]),
+	});
+	const keyOf = await leadKeys("logs-through-the-platform-logger");
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => [
+			lead.at,
+			keyOf(lead.label),
+			lead.facts?.language,
+			lead.facts?.call,
+		]),
+		[
+			[
+				{ file: "app/src/main/java/com/example/Feed.kt", line: 3, endLine: 3 },
+				"logger-call",
+				"kotlin",
+				"logger",
+			],
+			[
+				{ file: "app/src/main/java/com/example/Feed.kt", line: 4, endLine: 4 },
+				"logger-call",
+				"kotlin",
+				"Timber",
+			],
+			[
+				{ file: "app/src/main/java/com/example/Store.java", line: 3, endLine: 3 },
+				"logger-call",
+				"java",
+				"logger",
+			],
+			[
+				{ file: "app/src/main/java/com/example/Store.java", line: 4, endLine: 4 },
+				"print-call",
+				"java",
+				"printStackTrace()",
+			],
+			[{ file: "src/store.ts", line: 2, endLine: 2 }, "print-call", "typescript", "console.*"],
+			[{ file: "src/store.ts", line: 3, endLine: 3 }, "logger-call", "typescript", "logger"],
+			[{ file: "web/store.js", line: 2, endLine: 2 }, "print-call", "javascript", "console.*"],
+			[{ file: "web/store.js", line: 3, endLine: 3 }, "logger-call", "javascript", "logger"],
+			[{ file: "server/store.py", line: 2, endLine: 2 }, "logger-call", "python", "logging"],
+		],
+	);
+});
+
+void test("the logger practice reads no language it does not name, and still asks for the review", async () => {
+	const { review, candidate } = await runBundledReview("logs-through-the-platform-logger", {
+		change: new Map([
+			whole("cmd/store.go", 'fmt.Println("loaded")\nlog.Printf("loaded")'),
+			whole("lib/store.rb", 'puts "loaded"\nRails.logger.info("loaded")'),
+		]),
+	});
+	assert.deepEqual(review.leads ?? [], []);
+	assert.equal(review.facts?.filesScanned, 0);
+	// The review decides: an unread file is no proof that the practice does not apply.
+	assert.deepEqual(candidate, REVIEWED);
 });
 
 void test("a print in another language beyond the shared row cap is counted but not reported as a listed row", async () => {

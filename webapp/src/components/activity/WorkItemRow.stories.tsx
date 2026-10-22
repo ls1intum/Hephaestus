@@ -128,9 +128,9 @@ export const ReviewNow: Story = {
 export const Asking: Story = {
 	args: { work: assignedIssue, reviewNow: { onReviewNow: fn(), asking: true } },
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("button", { name: "Requesting review…: Hephaestus #1374" }),
-		).toBeDisabled();
+		const button = canvas.getByRole("button", { name: "Requesting review…: Hephaestus #1374" });
+		await expect(button).toBeDisabled();
+		await expect(button).toHaveTextContent("Requesting review…");
 	},
 };
 

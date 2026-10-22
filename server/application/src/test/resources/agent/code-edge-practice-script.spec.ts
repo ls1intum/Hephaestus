@@ -70,6 +70,18 @@ function crash(file: string, line: number, operators: string, inPreview = false)
 	};
 }
 
+function edge(file: string) {
+	return { file, line: 1, endLine: 1 };
+}
+
+function declaration(file: string, line: number, language: string, exported: boolean) {
+	return [
+		{ change: file, line },
+		exported ? "public-declaration" : "internal-declaration",
+		{ language, exported },
+	];
+}
+
 void test("the crash practice lists the operators the author wrote, with where each runs, and no implicit trap", async () => {
 	const result = await runBundled("avoids-unsafe-panics-and-chosen-crashes", {
 		change: new Map([
@@ -131,6 +143,63 @@ void test("a preview opener outside the hunk is read from the pinned file", asyn
 		inPreview: true,
 		testFile: false,
 	});
+});
+
+void test("the crash practice finds a written operator in each other language it names", async () => {
+	const change = new Map([
+		added("App/AppDelegate.m", ['NSAssert(window != nil, @"no window");']),
+		added("app/src/main/kotlin/Profile.kt", ["val name = user!!.name"]),
+		added("cli/main.ts", ["process.exit(1);"]),
+		added("cmd/serve.go", ["\tpanic(err)"]),
+		added("lib/runner.rb", ['abort "missing config"']),
+		added("server/jobs.py", ["sys.exit(1)"]),
+		added("src/App/Program.cs", ["Environment.Exit(1);"]),
+		added("src/lib.rs", ["let port = text.parse::<u16>().unwrap();"]),
+		added("src/main.c", ["abort();"]),
+		added("src/main/java/app/Main.java", ["System.exit(1);"]),
+		added("web/run.js", ["process.exit(2);"]),
+	]);
+	const result = await runBundled("avoids-unsafe-panics-and-chosen-crashes", { change });
+	const keyOf = await leadKeys("avoids-unsafe-panics-and-chosen-crashes");
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => [
+			lead.at,
+			keyOf(lead.label),
+			lead.facts?.language,
+			lead.facts?.operators,
+		]),
+		[
+			[{ file: "App/AppDelegate.m", line: 1 }, "crash-operator", "objective-c", "NSAssert"],
+			[
+				{ file: "app/src/main/kotlin/Profile.kt", line: 1 },
+				"crash-operator",
+				"kotlin",
+				"!! force non-null",
+			],
+			[{ file: "cli/main.ts", line: 1 }, "crash-operator", "typescript", "process.exit"],
+			[{ file: "cmd/serve.go", line: 1 }, "crash-operator", "go", "panic("],
+			[{ file: "lib/runner.rb", line: 1 }, "crash-operator", "ruby", "abort"],
+			[{ file: "server/jobs.py", line: 1 }, "crash-operator", "python", "sys.exit"],
+			[{ file: "src/App/Program.cs", line: 1 }, "crash-operator", "csharp", "Environment.Exit"],
+			[{ file: "src/lib.rs", line: 1 }, "crash-operator", "rust", ".unwrap()"],
+			[{ file: "src/main.c", line: 1 }, "crash-operator", "c", "abort("],
+			[{ file: "src/main/java/app/Main.java", line: 1 }, "crash-operator", "java", "System.exit"],
+			[{ file: "web/run.js", line: 1 }, "crash-operator", "javascript", "process.exit"],
+		],
+	);
+});
+
+void test("the crash practice reads no language it does not name, and still asks for the review", async () => {
+	const { review, candidate } = await runBundledReview("avoids-unsafe-panics-and-chosen-crashes", {
+		change: new Map([
+			added("scripts/save.lua", ["os.exit(1)"]),
+			added("web/index.php", ["exit(1);"]),
+		]),
+	});
+	assert.deepEqual(review.leads ?? [], []);
+	assert.deepEqual(review.facts, { crashOperatorLines: 0, inPreview: 0, inTests: 0 });
+	// The review decides: an unread file is no proof that the practice does not apply.
+	assert.deepEqual(candidate, REVIEWED);
 });
 
 void test("the input practice lists edge constructs in code only, and none the language already makes optional", async () => {
@@ -199,6 +268,163 @@ void test("the input practice lists edge constructs in code only, and none the l
 	assert.doesNotMatch(directions, /investigate whether|is absent|exported-function/u);
 });
 
+void test("the input practice finds a written construct in each other language it names", async () => {
+	const change = new Map([
+		added("app/src/main/kotlin/Port.kt", ["val port = raw.toInt()"]),
+		added("cmd/port.go", ["port, err := strconv.Atoi(raw)"]),
+		added("lib/config.rb", ["port = settings.fetch(:port)"]),
+		added("server/jobs.py", ["count = int(raw)"]),
+		added("src/App/Port.cs", ["var port = int.Parse(raw);"]),
+		added("src/lib.rs", ["let share = total / count;"]),
+		added("src/main.c", ["int port = atoi(raw);"]),
+		added("src/main/java/app/Port.java", ["int port = Integer.parseInt(raw);"]),
+		added("web/form.js", ["const qty = parseInt(text, 10);"]),
+	]);
+	const result = await runBundled("validates-inputs-and-edge-cases-at-the-boundary", { change });
+	const keyOf = await leadKeys("validates-inputs-and-edge-cases-at-the-boundary");
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => [lead.at, lead.facts?.language, lead.facts?.constructs]),
+		[
+			[edge("app/src/main/kotlin/Port.kt"), "kotlin", "toInt/toDouble parse"],
+			[edge("cmd/port.go"), "go", "strconv parse"],
+			[edge("lib/config.rb"), "ruby", ".fetch"],
+			[edge("server/jobs.py"), "python", "int()/float() parse"],
+			[edge("src/App/Port.cs"), "csharp", "int.Parse/Convert"],
+			[edge("src/lib.rs"), "rust", "division or remainder by a name"],
+			[edge("src/main.c"), "c", "atoi/strtol parse"],
+			[edge("src/main/java/app/Port.java"), "java", "Integer/Long/Double.parse"],
+			[edge("web/form.js"), "javascript", "parseInt/parseFloat"],
+		],
+	);
+	assert.ok(
+		(result.leads ?? []).every((lead) => keyOf(lead.label) === "edge-construct"),
+		"every lead is an edge construct",
+	);
+});
+
+void test("the input practice reads no language it does not name, and still asks for the review", async () => {
+	const { review, candidate } = await runBundledReview(
+		"validates-inputs-and-edge-cases-at-the-boundary",
+		{
+			change: new Map([
+				added("scripts/load.lua", ["local port = tonumber(raw)"]),
+				added("web/index.php", ["$port = intval($raw);"]),
+			]),
+		},
+	);
+	assert.deepEqual(review.leads ?? [], []);
+	assert.equal(review.facts?.edgeConstructLines, 0);
+	// The review decides: an unread file is no proof that the practice does not apply.
+	assert.deepEqual(candidate, REVIEWED);
+});
+
+void test("the public API practice reads the export rule of each language it names", async () => {
+	const change = new Map([
+		added("Sources/Kit/Store.swift", ["public func load() {}", "func cache() {}"]),
+		added("app/src/main/kotlin/Store.kt", ["fun load() {}", "private fun cache() {}"]),
+		added("server/store.py", ["def load():", "    pass", "def _cache():", "    pass"]),
+		added("src/main/java/app/Store.java", [
+			"public class Store {",
+			"    void cache() {",
+			"    }",
+			"}",
+		]),
+		added("src/store.ts", ["export function load() {}", "function cache() {}"]),
+		added("store/store.go", ["func Load() {}", "func cache() {}"]),
+		added("web/store.js", ["export const load = () => {};", "const cache = new Map();"]),
+	]);
+	const result = await runBundled("documents-public-api-and-behaviour-changes", { change });
+	const keyOf = await leadKeys("documents-public-api-and-behaviour-changes");
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts]),
+		[
+			declaration("Sources/Kit/Store.swift", 1, "swift", true),
+			declaration("Sources/Kit/Store.swift", 2, "swift", false),
+			declaration("app/src/main/kotlin/Store.kt", 1, "kotlin", true),
+			declaration("app/src/main/kotlin/Store.kt", 2, "kotlin", false),
+			declaration("server/store.py", 1, "python", true),
+			declaration("server/store.py", 3, "python", false),
+			declaration("src/main/java/app/Store.java", 1, "java", true),
+			declaration("src/main/java/app/Store.java", 2, "java", false),
+			declaration("src/store.ts", 1, "typescript", true),
+			declaration("src/store.ts", 2, "typescript", false),
+			declaration("store/store.go", 1, "go", true),
+			declaration("store/store.go", 2, "go", false),
+			declaration("web/store.js", 1, "javascript", true),
+			declaration("web/store.js", 2, "javascript", false),
+		],
+	);
+});
+
+void test("the public API practice reads no language it does not name, and still asks for the review", async () => {
+	const { review, candidate } = await runBundledReview(
+		"documents-public-api-and-behaviour-changes",
+		{
+			change: new Map([
+				added("lib/store.rb", ["def load; end"]),
+				added("src/store.rs", ["pub fn load() {}"]),
+			]),
+		},
+	);
+	assert.deepEqual(review.leads ?? [], []);
+	assert.equal(review.facts?.filesScanned, 0);
+	// The review decides: an unread file is no proof that the practice does not apply.
+	assert.deepEqual(candidate, REVIEWED);
+});
+
+void test("the clean-code practice finds a debug call in each language it names", async () => {
+	const change = new Map([
+		added("App/Store.swift", ['debugPrint("loaded")']),
+		added("app/src/main/kotlin/Feed.kt", ['println("loaded")']),
+		added("cmd/serve.go", ['fmt.Println("loaded")']),
+		added("lib/store.rb", ['puts "loaded"']),
+		added("server/store.py", ["breakpoint()"]),
+		added("src/main.rs", ["dbg!(order);"]),
+		added("src/main/java/app/Store.java", ['System.out.println("loaded");']),
+		added("src/store.ts", ["debugger;"]),
+		added("web/store.js", ['console.log("loaded");']),
+	]);
+	const result = await runBundled("leaves-the-code-clean-with-intent-revealing-comments", {
+		change,
+	});
+	const keyOf = await leadKeys("leaves-the-code-clean-with-intent-revealing-comments");
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts?.language]),
+		[
+			[{ file: "App/Store.swift", line: 1, endLine: 1 }, "debug-output", "swift"],
+			[{ file: "app/src/main/kotlin/Feed.kt", line: 1, endLine: 1 }, "debug-output", "kotlin"],
+			[{ file: "cmd/serve.go", line: 1, endLine: 1 }, "debug-output", "go"],
+			[{ file: "lib/store.rb", line: 1, endLine: 1 }, "debug-output", "ruby"],
+			[{ file: "server/store.py", line: 1, endLine: 1 }, "debug-output", "python"],
+			[{ file: "src/main.rs", line: 1, endLine: 1 }, "debug-output", "rust"],
+			[{ file: "src/main/java/app/Store.java", line: 1, endLine: 1 }, "debug-output", "java"],
+			[{ file: "src/store.ts", line: 1, endLine: 1 }, "debug-output", "typescript"],
+			[{ file: "web/store.js", line: 1, endLine: 1 }, "debug-output", "javascript"],
+		],
+	);
+	assert.equal(result.facts?.debugCandidates, 9);
+});
+
+void test("the clean-code practice reads markers in a language with no debug row, no file of an unknown language, and still asks for the review", async () => {
+	const { review, candidate } = await runBundledReview(
+		"leaves-the-code-clean-with-intent-revealing-comments",
+		{
+			change: new Map([
+				added("scripts/save.lua", ['print("saved") -- TODO: remove']),
+				added("src/App/Store.cs", ['Console.WriteLine("loaded");', "// TODO: remove"]),
+			]),
+		},
+	);
+	const keyOf = await leadKeys("leaves-the-code-clean-with-intent-revealing-comments");
+	assert.deepEqual(
+		(review.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts?.language]),
+		[[{ file: "src/App/Store.cs", line: 2, endLine: 2 }, "todo-fixme-marker", "csharp"]],
+	);
+	assert.equal(review.facts?.debugCandidates, 0);
+	// The review decides: an unread file is no proof that the practice does not apply.
+	assert.deepEqual(candidate, REVIEWED);
+});
+
 void test("the untrusted-input practice pairs a source with a rendering call, never with a native image template mode or a template constructor", async () => {
 	const result = await runBundled("validates-and-escapes-untrusted-input", {
 		change: new Map([
@@ -258,6 +484,81 @@ void test("the untrusted-input practice pairs a source with a rendering call, ne
 			],
 		],
 	);
+});
+
+void test("the untrusted-input practice pairs a source and a sink in each other language it names, and the shared rows in any other", async () => {
+	const result = await runBundled("validates-and-escapes-untrusted-input", {
+		change: new Map([
+			added("src/main/java/app/Run.java", [
+				'String name = servletRequest.getParameter("name");',
+				"new ProcessBuilder(name).start();",
+			]),
+			added("web/page.js", ["const page = location.search;", "el.innerHTML = page;"]),
+			added("cmd/files.go", ['name := r.FormValue("name")', "path := filepath.Join(root, name)"]),
+			// The shared params row is read first, so a Rails params read is reported by that row.
+			added("lib/convert.rb", ["name = params[:name]", 'system("convert #{name}")']),
+			added("web/hello.php", ["$name = $_GET['name'];", "echo $name;"]),
+			added("src/App/Page.cs", ['var name = Request.Query["name"];', "var html = Html.Raw(name);"]),
+			added("scripts/open.lua", ["local path = ENV.HOME", "io.popen(path)"]),
+		]),
+	});
+	assert.deepEqual(
+		(result.leads ?? []).map((lead) => [lead.at, lead.facts?.sourceToken, lead.facts?.sinkToken]),
+		[
+			[
+				{ change: "src/main/java/app/Run.java", line: 2 },
+				"servlet getParameter/getHeader",
+				"Runtime.exec / ProcessBuilder",
+			],
+			[
+				{ change: "web/page.js", line: 2 },
+				"URL/searchParams",
+				"innerHTML / dangerouslySetInnerHTML",
+			],
+			[{ change: "cmd/files.go", line: 2 }, "FormValue/Query", "path join with input"],
+			[{ change: "lib/convert.rb", line: 2 }, "params/query/body/headers/cookies", "exec / shell"],
+			[{ change: "web/hello.php", line: 2 }, "superglobals", "echo/print to HTML"],
+			[{ change: "src/App/Page.cs", line: 2 }, "request/req param", "Html.Raw"],
+			[{ change: "scripts/open.lua", line: 2 }, "env var", "exec / shell"],
+		],
+	);
+});
+
+void test("the public API practice detects the product manifest of each ecosystem it names", async () => {
+	const manifests: [string, string, number][] = [
+		["Package.swift", '.library(name: "Kit", targets: ["Kit"])', 1],
+		["Package.swift", '.executable(name: "App", targets: ["App"])', 0],
+		["package.json", '{"name":"kit","main":"index.js"}', 1],
+		["package.json", '{"name":"app","private":true,"main":"index.js"}', 0],
+		["pom.xml", "<project><packaging>jar</packaging></project>", 1],
+		["pom.xml", "<project><packaging>pom</packaging></project>", 0],
+		["build.gradle.kts", "plugins { `java-library` }", 1],
+		["build.gradle.kts", "plugins { application }", 0],
+		["build.gradle", "apply plugin: 'maven-publish'", 1],
+		["build.gradle", "apply plugin: 'application'", 0],
+		["setup.py", "setup(name='kit', packages=find_packages())", 1],
+		["setup.py", "setup(name='app', scripts=['run'])", 0],
+		["setup.cfg", "[metadata]\nname = kit\n[options]\npackages = find:\n", 1],
+		["setup.cfg", "[metadata]\nname = app\n", 0],
+		["pyproject.toml", '[project]\nname = "kit"\n', 1],
+		["pyproject.toml", "[tool.black]\nline-length = 100\n", 0],
+		["go.mod", "module example.org/kit\n\ngo 1.22\n", 1],
+		// A manifest of an ecosystem the script does not name is not read as a product.
+		["Cargo.toml", '[package]\nname = "kit"\n', 0],
+	];
+	const detected = [];
+	for (const [file, text] of manifests) {
+		const result = await runBundled("documents-public-api-and-behaviour-changes", {
+			repo: { [file]: text },
+		});
+		detected.push([file, text, result.facts?.hasPublicProduct]);
+	}
+	assert.deepEqual(detected, manifests);
+	const unread = await runBundled("documents-public-api-and-behaviour-changes", {
+		repo: { "Cargo.toml": '[package]\nname = "kit"\n' },
+	});
+	// No detected product is no proof of no public API: the review is asked to look.
+	assert.match((unread.directions ?? []).join(" "), /Investigate whether this repo exposes/u);
 });
 
 void test("the error practice lists the fallbacks and bare returns its criteria ask to classify", async () => {
