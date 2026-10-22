@@ -48,7 +48,7 @@ People keep responsibility for the harder judgment and the relationships.
 >
 > Version 1.0 makes upgrades, configuration, Compose, and the REST API predictable:
 > [compatibility policy](https://docs.hephaestus.build/admin/compatibility-policy) ·
-> [1.0 milestone](https://github.com/hephaestus-build/Hephaestus/issues/1378).
+> [1.0 milestone](https://github.com/hephaestus-build/Hephaestus/milestone/5).
 
 ## What Hephaestus does
 
