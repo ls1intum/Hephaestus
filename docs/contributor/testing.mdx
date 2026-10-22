@@ -181,6 +181,23 @@ The property first runs the selected fixture-staging checks, then those cases of
 Each case is reported under its `id`, not its position in the file.
 A blank, repeated or unknown `id` fails the run instead of sending every case.
 Without the property, the live tier runs every case.
+
+To also limit the upstream model requests that each selected case sends, add the optional
+`criteriaRequestLimit` property:
+
+```bash
+./gradlew :application:liveTest -PcriteriaCases=dependency-label -PcriteriaRequestLimit=12
+```
+
+The limit applies to each case.
+Each forwarding attempt reserves one slot, including retries and compaction requests.
+Failed or cancelled attempts keep their slots.
+A request past the limit is refused, and that case fails, even if its result matches.
+
+The limit needs `criteriaCases` and a positive integer.
+Without the property, this harness adds no request-count limit.
+Record provider token usage separately.
+
 First check the same selection without credentials or a model:
 
 ```bash

@@ -47,6 +47,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -82,6 +83,8 @@ class PracticeRunnerLiveLlmTest {
 
     @BeforeAll
     static void installPiSdk() throws Exception {
+        // An invalid request limit fails here, before the SDK install, the credentials or any model request.
+        ProxyStandIn.requestLimit(System.getProperty(ProxyStandIn.REQUEST_LIMIT_PROPERTY));
         PiSdkInstallation.ensureInstalled();
     }
 
@@ -149,6 +152,9 @@ class PracticeRunnerLiveLlmTest {
         }
         stdoutPump.join(5_000);
         stderrPump.join(5_000);
+
+        // Before the exit code and the result: a refused model request fails the case even if the result matches.
+        proxy.assertRequestLimitNotSpent();
 
         int exitCode = runner.exitValue();
 
@@ -358,15 +364,34 @@ class PracticeRunnerLiveLlmTest {
          */
         private static final Duration CLOSE_TIMEOUT = Duration.ofSeconds(5);
 
+        /**
+         * The most upstream model requests one stand-in sends. Absent means no limit. A sent request keeps its slot
+         * whatever its outcome, so an error, a dropped connection, a retry or a cancelled call cannot buy another.
+         */
+        static final String REQUEST_LIMIT_PROPERTY = "hephaestus.live.criteriaRequestLimit";
+
+        /** What a request past the limit receives instead of a model answer: a client error a client does not retry. */
+        private static final byte[] REQUEST_LIMIT_SPENT = ("{\"error\":{\"type\":\"request_budget_exhausted\","
+                        + "\"message\":\"This live measurement has sent every model request its request limit allows.\"}}")
+                .getBytes(StandardCharsets.UTF_8);
+
+        private final OptionalInt requestLimit;
         private final HttpServer server;
         private final ExecutorService executor;
-        private final HttpClient client = HttpClient.newHttpClient();
+        private final HttpClient client;
         private final Object lifecycle = new Object();
         // Guarded by lifecycle, so close() cannot miss a forwarding that registers concurrently.
         private final Set<Forwarding> active = new HashSet<>();
         private boolean closed;
+        // Guarded by lifecycle. Never decremented: a slot stays spent once its request may be sent.
+        private int sentRequests;
+        // Guarded by lifecycle. Any refusal fails the measurement, whatever result the run then writes.
+        private int refusedRequests;
 
         ProxyStandIn(LiveLlmCredentials creds) throws IOException {
+            // Read before the client and the listener exist, so an invalid limit starts nothing.
+            requestLimit = requestLimit(System.getProperty(REQUEST_LIMIT_PROPERTY));
+            client = HttpClient.newHttpClient();
             server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
             server.createContext("/admit-results", exchange -> {
                 byte[] body = MAPPER.writeValueAsBytes(admit(MAPPER.readTree(exchange.getRequestBody())));
@@ -384,6 +409,43 @@ class PracticeRunnerLiveLlmTest {
 
         String baseUrl() {
             return "http://127.0.0.1:" + server.getAddress().getPort();
+        }
+
+        /** The request limit named by {@code value}, a positive {@code int}; absent when the value is. */
+        static OptionalInt requestLimit(@Nullable String value) {
+            if (value == null) {
+                return OptionalInt.empty();
+            }
+            int limit;
+            try {
+                limit = Integer.parseInt(value);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                        REQUEST_LIMIT_PROPERTY + " must be a positive integer, not '" + value + "'", e);
+            }
+            if (limit < 1) {
+                throw new IllegalArgumentException(
+                        REQUEST_LIMIT_PROPERTY + " must be a positive integer, not '" + value + "'");
+            }
+            return OptionalInt.of(limit);
+        }
+
+        /**
+         * Fails when the request limit refused any model request. A refused request means the run did not get the
+         * model calls it asked for, so a result it wrote anyway does not count as a measurement.
+         */
+        void assertRequestLimitNotSpent() {
+            int sent;
+            int refused;
+            synchronized (lifecycle) {
+                sent = sentRequests;
+                refused = refusedRequests;
+            }
+            assertThat(refused)
+                    .as(
+                            "model requests refused after the request limit of %s was spent (%d sent)",
+                            requestLimit.isPresent() ? String.valueOf(requestLimit.getAsInt()) : "none", sent)
+                    .isZero();
         }
 
         /**
@@ -489,14 +551,26 @@ class PracticeRunnerLiveLlmTest {
             long started = System.nanoTime();
             log.info("Live upstream request {} started", requestId);
             try (exchange) {
+                byte[] body = exchange.getRequestBody().readAllBytes();
+                // The slot is taken once the whole request is here and just before the one upstream send.
+                Admission admission = reserve();
+                if (admission == Admission.CLOSED) {
+                    return;
+                }
+                if (admission == Admission.REFUSED) {
+                    log.info("Live upstream request {} refused: the request limit is spent", requestId);
+                    exchange.getResponseHeaders().set("content-type", "application/json");
+                    exchange.sendResponseHeaders(400, REQUEST_LIMIT_SPENT.length);
+                    try (var out = exchange.getResponseBody()) {
+                        out.write(REQUEST_LIMIT_SPENT);
+                    }
+                    return;
+                }
                 HttpRequest request = HttpRequest.newBuilder(URI.create(
                                 creds.baseUrl() + exchange.getRequestURI().getPath()))
                         .header("authorization", "Bearer " + creds.apiKey())
                         .header("content-type", "application/json")
-                        .method(
-                                exchange.getRequestMethod(),
-                                HttpRequest.BodyPublishers.ofByteArray(
-                                        exchange.getRequestBody().readAllBytes()))
+                        .method(exchange.getRequestMethod(), HttpRequest.BodyPublishers.ofByteArray(body))
                         .build();
                 try {
                     HttpResponse<InputStream> response =
@@ -538,6 +612,21 @@ class PracticeRunnerLiveLlmTest {
         private boolean register(Forwarding forwarding) {
             synchronized (lifecycle) {
                 return !closed && active.add(forwarding);
+            }
+        }
+
+        /** Takes a slot for one upstream send. Nothing ever returns it. */
+        private Admission reserve() {
+            synchronized (lifecycle) {
+                if (closed) {
+                    return Admission.CLOSED;
+                }
+                if (requestLimit.isPresent() && sentRequests >= requestLimit.getAsInt()) {
+                    refusedRequests++;
+                    return Admission.REFUSED;
+                }
+                sentRequests++;
+                return Admission.SEND;
             }
         }
 
@@ -615,6 +704,12 @@ class PracticeRunnerLiveLlmTest {
 
         private static Duration remaining(long deadline) {
             return Duration.ofNanos(Math.max(0, deadline - System.nanoTime()));
+        }
+
+        private enum Admission {
+            SEND,
+            REFUSED,
+            CLOSED
         }
 
         /** Once the upstream answers, the response stream transferred by one forwarding handler. */

@@ -205,6 +205,8 @@ val integrationShard = providers.environmentVariable("HEPHAESTUS_INTEGRATION_SHA
 val packagedServer = providers.gradleProperty("packagedServer").map(String::toBoolean).orElse(false)
 // Stable catalogue case IDs for live checks and their credential-free staging proof.
 val criteriaCases = providers.gradleProperty("criteriaCases")
+// Optional ceiling on the upstream model requests that each selected live case sends.
+val criteriaRequestLimit = providers.gradleProperty("criteriaRequestLimit")
 val testTiers =
     mapOf(
         "test" to "unit",
@@ -336,6 +338,14 @@ for ((taskName, tag) in testTiers.filterKeys { it != "test" }) {
                     "de.tum.cit.aet.hephaestus.agent.practice.live.$criteriaMethod"
                 )
             }
+        }
+        if (tag == "live" && criteriaRequestLimit.isPresent) {
+            val limit = criteriaRequestLimit.get()
+            require(criteriaCases.isPresent) { "criteriaRequestLimit needs criteriaCases" }
+            require((limit.toIntOrNull() ?: 0) > 0) {
+                "criteriaRequestLimit must be a positive integer, not '$limit'"
+            }
+            systemProperty("hephaestus.live.criteriaRequestLimit", limit)
         }
     }
 }
