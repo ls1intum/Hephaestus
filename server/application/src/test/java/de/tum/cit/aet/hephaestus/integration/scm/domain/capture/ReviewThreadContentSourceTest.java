@@ -6,9 +6,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndexBuilder;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -19,6 +26,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +44,7 @@ import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 class ReviewThreadContentSourceTest extends BaseUnitTest {
@@ -169,9 +179,10 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
 
     @Test
     void shouldNameTheReviewerAndTheirDecisionForEachBundledReviewerPractice() {
+        String words = "Please cover the empty list before merging.";
         var target =
                 review(PullRequestReview.State.CHANGES_REQUESTED, "reviewer", Instant.parse("2025-06-01T12:00:00Z"));
-        target.setBody("Please cover the empty list before merging.");
+        target.setBody(words);
         ReflectionTestUtils.setField(target, "id", 31L);
         var author = Objects.requireNonNull(target.getAuthor());
         ReflectionTestUtils.setField(author, "id", 32L);
@@ -187,6 +198,10 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         var reviewerPractices = ScmCaptureFixtures.bundledPractices().values().stream()
                 .filter(practice -> practice.definition().about() == AboutRole.REVIEWER)
                 .toList();
+        var mapper = JsonMapper.builder().build();
+        var exporter = new JobFolderIndexBuilder(
+                new ClasspathSourceCatalogRegistry(mapper, Clock.systemUTC()), mapper, Clock.systemUTC());
+        assertThat(provider.sourceKinds()).containsExactly(ReviewThreadContentSource.KIND);
 
         assertThat(reviewerPractices).hasSize(3).allSatisfy(practice -> {
             assertThat(practice.kind()).isEqualTo(reviewItem.pinned().item().kind());
@@ -207,6 +222,66 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                 assertThat(decision.path("state").asString()).isEqualTo("CHANGES_REQUESTED");
                 assertThat(decision.path("body").asString()).isEqualTo(target.getBody());
             });
+
+            try (var prepared = exporter.build(
+                    reviewItem.pinned().item().kind(),
+                    Map.of(
+                            ReviewThreadContentSource.KIND,
+                            provider.capture(reviewItem, Set.of(ReviewThreadContentSource.KIND))))) {
+                JsonNode exported =
+                        mapper.readTree(Objects.requireNonNull(prepared.files().get(FILE_KEY)));
+                assertThat(exported.path("reviewRecipient").path("author").asString())
+                        .isEqualTo("reviewer");
+                assertThat(exported.path("reviewRecipient").path("authorId").asLong())
+                        .isEqualTo(33L);
+                assertThat(exported.path("reviewDecisions")).singleElement().satisfies(decision -> {
+                    assertThat(decision.path("author").asString()).isEqualTo("reviewer");
+                    assertThat(decision.path("state").asString()).isEqualTo("CHANGES_REQUESTED");
+                });
+                assertExported(
+                        mapper,
+                        prepared,
+                        reviewItem.pinned().item().kind(),
+                        ReviewThreadContentSource.KIND,
+                        FILE_KEY,
+                        FILE_KEY + "#/reviewDecisions/0/body",
+                        words);
+            }
+        });
+    }
+
+    /** Reads the exported manifest back and binds one source's file and quoted words to their staged bytes. */
+    private static void assertExported(
+            JsonMapper mapper,
+            PreparedEvidence prepared,
+            ItemKind item,
+            SourceKind source,
+            String file,
+            String citation,
+            String words) {
+        JsonNode manifest =
+                mapper.readTree(Objects.requireNonNull(prepared.files().get(SandboxLayout.MANIFEST_PATH)));
+        assertThat(manifest.path("itemKind").asString()).isEqualTo(item.value());
+        assertThat(manifest.path("sources")).singleElement().satisfies(captured -> {
+            assertThat(captured.path("kind").asString()).isEqualTo(source.value());
+            assertThat(captured.path("state").path("availability").asString()).isEqualTo("AVAILABLE");
+            assertThat(captured.path("state").path("completeness").asString()).isEqualTo("COMPLETE");
+            assertThat(captured.path("state").path("content").asString()).isEqualTo("NON_EMPTY");
+        });
+        byte[] exported = Objects.requireNonNull(prepared.files().get(file));
+        assertThat(manifest.path("files")).anySatisfy(entry -> {
+            assertThat(entry.path("kind").asString()).isEqualTo(source.value());
+            assertThat(entry.path("file").path("path").asString()).isEqualTo(file);
+            assertThat(entry.path("file").path("sha256").asString()).isEqualTo(ProvenanceDigest.sha256Hex(exported));
+        });
+        assertThat(manifest.path("citableTexts")).anySatisfy(text -> {
+            assertThat(text.path("source").asString()).isEqualTo(source.value());
+            assertThat(text.path("path").asString()).isEqualTo(citation);
+            String staged = text.path("stagedPath").asString();
+            assertThat(prepared.files()).containsKey(staged);
+            byte[] quoted = Objects.requireNonNull(prepared.files().get(staged));
+            assertThat(new String(quoted, StandardCharsets.UTF_8)).isEqualTo(words);
+            assertThat(text.path("sha256").asString()).isEqualTo(ProvenanceDigest.sha256Hex(quoted));
         });
     }
 
