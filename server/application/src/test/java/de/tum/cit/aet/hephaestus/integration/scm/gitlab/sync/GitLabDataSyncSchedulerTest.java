@@ -3,11 +3,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -48,9 +50,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPro
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.GitLabLabelSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSelectedMembershipProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.subissue.GitLabSubIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.team.GitLabTeamSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRepositoryMonitors;
@@ -64,11 +68,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
@@ -319,6 +325,67 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.RECONCILIATION);
 
         verify(deletionSweepService, never()).sweepScope(any(), any());
+    }
+
+    @Test
+    void shouldProjectSelectedMembersAfterTheTeamsAndWarnWhenNothingChanged() {
+        var holder = mockHolder();
+        var teamSync = mock(GitLabTeamSyncService.class);
+        var projection = mock(GitLabSelectedMembershipProjection.class);
+        when(holder.getTeamSyncService()).thenReturn(teamSync);
+        when(holder.getSelectedMembershipProjection()).thenReturn(projection);
+        when(syncServiceHolderProvider.getIfAvailable()).thenReturn(holder);
+        lenient()
+                .when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID))
+                .thenReturn(List.of());
+        when(teamSync.syncTeamsForGroup(eq(WORKSPACE_ID), any())).thenReturn(new GitLabTeamSyncService.Result(0, true));
+        when(projection.project(WORKSPACE_ID)).thenReturn(GitLabSelectedMembershipProjection.Outcome.STALE);
+
+        scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
+
+        InOrder order = inOrder(teamSync, projection);
+        order.verify(teamSync).syncTeamsForGroup(eq(WORKSPACE_ID), any());
+        order.verify(projection).project(WORKSPACE_ID);
+        verify(syncJobHandle).reportWarnings();
+    }
+
+    @Test
+    void shouldNotProjectSelectedMembersWhenCancelledDuringRepositoryPhase() {
+        var holder = mockHolder();
+        var projection = mock(GitLabSelectedMembershipProjection.class);
+        lenient().when(holder.getSelectedMembershipProjection()).thenReturn(projection);
+        when(syncServiceHolderProvider.getIfAvailable()).thenReturn(holder);
+        lenient()
+                .when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID))
+                .thenReturn(List.of());
+        when(syncJobHandle.isCancellationRequested()).thenReturn(true);
+
+        scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.RECONCILIATION);
+
+        verify(projection, never()).project(anyLong());
+    }
+
+    @Test
+    void shouldNotProjectSelectedMembersWhenCancelledDuringTeamPhase() {
+        var holder = mockHolder();
+        var teamSync = mock(GitLabTeamSyncService.class);
+        var projection = mock(GitLabSelectedMembershipProjection.class);
+        when(holder.getTeamSyncService()).thenReturn(teamSync);
+        lenient().when(holder.getSelectedMembershipProjection()).thenReturn(projection);
+        when(syncServiceHolderProvider.getIfAvailable()).thenReturn(holder);
+        lenient()
+                .when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID))
+                .thenReturn(List.of());
+        var cancelled = new AtomicBoolean();
+        when(syncJobHandle.isCancellationRequested()).thenAnswer(invocation -> cancelled.get());
+        when(teamSync.syncTeamsForGroup(eq(WORKSPACE_ID), any())).thenAnswer(invocation -> {
+            cancelled.set(true);
+            return new GitLabTeamSyncService.Result(0, true);
+        });
+
+        scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
+
+        verify(projection, never()).project(anyLong());
     }
 
     @Test

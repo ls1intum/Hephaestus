@@ -161,8 +161,9 @@ export function WorkspaceGitLabProjectSelection({
 			<CardHeader>
 				<IntegrationCardHeading>Projects to follow</IntegrationCardHeading>
 				<CardDescription>
-					Choose whether new projects in the GitLab group are added to this workspace. Either way,
-					members and teams still come from the whole group, and work that is already synced stays.
+					Choose whether new projects in the GitLab group are added to this workspace. With only the
+					listed projects, members come from those projects and the subgroups that contain them,
+					after the next successful sync. Teams and work that is already synced stay.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
@@ -184,7 +185,8 @@ export function WorkspaceGitLabProjectSelection({
 						<AlertDialogTitle>Add new projects from the group?</AlertDialogTitle>
 						<AlertDialogDescription>
 							From now on, Hephaestus adds the projects it finds in the group, including projects
-							created later. Projects you stopped stay stopped until you add them again.
+							created later. Projects you stopped stay stopped until you add them again. Workspace
+							members also come from the whole group after the next successful sync.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

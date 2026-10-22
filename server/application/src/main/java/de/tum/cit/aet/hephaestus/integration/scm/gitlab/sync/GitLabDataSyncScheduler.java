@@ -38,6 +38,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.GitLabLabelSyncSer
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.GitLabMilestoneSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupMemberSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSelectedMembershipProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectSyncService;
@@ -318,6 +319,9 @@ public class GitLabDataSyncScheduler {
             if (handle == null || !handle.isCancellationRequested()) {
                 // Phase 5: Sync teams (subgroups)
                 syncTeams(services, session, handle);
+
+                // Phase 5.5: A workspace that selected its projects takes its members from what they grant
+                projectSelectedMembers(services, session, handle);
 
                 // Phase 6: Deletion sweep — RECONCILIATION only, and the one thing that makes
                 // RECONCILIATION different from INITIAL. Every phase above only ever upserts, so an
@@ -1086,6 +1090,26 @@ public class GitLabDataSyncScheduler {
             }
         } catch (Exception e) {
             log.error("Failed GitLab team sync: scopeId={}", session.scopeId(), e);
+            reportWarning(handle);
+        }
+    }
+
+    private void projectSelectedMembers(
+            GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncExecutionHandle handle) {
+        GitLabSelectedMembershipProjection projection = services.getSelectedMembershipProjection();
+        // A cancel may arrive during the team phase, after the outer check.
+        if (projection == null || (handle != null && handle.isCancellationRequested())) return;
+
+        try {
+            GitLabSelectedMembershipProjection.Outcome outcome = projection.project(session.scopeId());
+            log.info("GitLab selected membership projection: scopeId={}, outcome={}", session.scopeId(), outcome);
+            // Nothing changed; the next sync reads again.
+            if (outcome == GitLabSelectedMembershipProjection.Outcome.UNKNOWN
+                    || outcome == GitLabSelectedMembershipProjection.Outcome.STALE) {
+                reportWarning(handle);
+            }
+        } catch (Exception e) {
+            log.error("Failed GitLab selected membership projection: scopeId={}", session.scopeId(), e);
             reportWarning(handle);
         }
     }

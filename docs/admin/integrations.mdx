@@ -26,7 +26,21 @@ for a different instance permits sign-in, but does not permit a workspace there.
 The user also chooses which projects the workspace monitors.
 **All projects** monitors every project of the group and its subgroups, including projects added later.
 **Selected projects** monitors only the chosen projects. Hephaestus checks each chosen project with the user's token.
-The choice limits project content only. Workspace members and teams still come from the whole group.
+With **All projects**, workspace members come from the whole group.
+With **Selected projects**, a person becomes a workspace member only when one of these grants them access:
+
+- A chosen project.
+- A subgroup between the connected group and a chosen project.
+
+Access through the connected group or one of its parent groups alone does not make a person a member.
+A member who is an admin of the connected group stays a workspace admin.
+A Maintainer of a project or subgroup becomes a member, not an admin.
+Guest access to a chosen project alone does not make a person a member.
+Workspace owners always stay.
+Teams still come from the whole group.
+
+Membership changes apply at the next successful sync, or when you select **Sync now**.
+If GitLab does not list a chosen project or subgroup completely, Hephaestus keeps the current members.
 
 To change the choice later, open **Administration → Integrations → GitLab → Projects to follow**.
 This setting is available only while the GitLab connection is active.
@@ -34,7 +48,8 @@ This setting is available only while the GitLab connection is active.
 - **Only the projects listed below** keeps the current monitored projects. Hephaestus adds no new projects from the group. The list can be empty.
 - **All projects in the group** lets Hephaestus add the projects that it finds in the group at its next check. Hephaestus asks you to confirm this change. Stopped projects stay stopped.
 
-Neither change removes synced work or changes group membership.
+Neither change removes synced work or changes membership in GitLab.
+Workspace members follow the new choice at the next successful sync.
 Use **Add a repository** and **Stop monitoring** to change the list.
 If the connection or its projects change during the save, Hephaestus keeps the earlier choice. Then choose again.
 

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.GitLabLabelSyncSer
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.GitLabMilestoneSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupMemberSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSelectedMembershipProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.collaborator.GitLabCollaboratorSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.subissue.GitLabSubIssueSyncService;
@@ -42,6 +43,7 @@ public class GitLabSyncServiceHolder {
     private final @Nullable GitLabCommitMergeRequestLinker commitMergeRequestLinker;
     private final @Nullable GitLabSubIssueSyncService subIssueSyncService;
     private final @Nullable GitLabIssueDependencySyncService issueDependencySyncService;
+    private final @Nullable GitLabSelectedMembershipProjection selectedMembershipProjection;
 
     public GitLabSyncServiceHolder(
             @Nullable GitLabGroupSyncService groupSyncService,
@@ -57,7 +59,8 @@ public class GitLabSyncServiceHolder {
             @Nullable GitLabCommitBackfillService commitBackfillService,
             @Nullable GitLabCommitMergeRequestLinker commitMergeRequestLinker,
             @Nullable GitLabSubIssueSyncService subIssueSyncService,
-            @Nullable GitLabIssueDependencySyncService issueDependencySyncService) {
+            @Nullable GitLabIssueDependencySyncService issueDependencySyncService,
+            @Nullable GitLabSelectedMembershipProjection selectedMembershipProjection) {
         this.groupSyncService = groupSyncService;
         this.groupMemberSyncService = groupMemberSyncService;
         this.labelSyncService = labelSyncService;
@@ -72,6 +75,7 @@ public class GitLabSyncServiceHolder {
         this.commitMergeRequestLinker = commitMergeRequestLinker;
         this.subIssueSyncService = subIssueSyncService;
         this.issueDependencySyncService = issueDependencySyncService;
+        this.selectedMembershipProjection = selectedMembershipProjection;
     }
 
     @Nullable
@@ -142,5 +146,10 @@ public class GitLabSyncServiceHolder {
     @Nullable
     public GitLabIssueDependencySyncService getIssueDependencySyncService() {
         return issueDependencySyncService;
+    }
+
+    @Nullable
+    public GitLabSelectedMembershipProjection getSelectedMembershipProjection() {
+        return selectedMembershipProjection;
     }
 }

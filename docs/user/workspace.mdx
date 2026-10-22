@@ -45,7 +45,13 @@ The workspace belongs to that GitLab account.
 With **All projects**, the workspace monitors every project of the group and its subgroups, including projects added later.
 With **Selected projects**, it monitors only the projects that you chose.
 The choice covers project content, such as merge requests and issues.
-Workspace members and teams still come from the whole group.
+
+It also decides who becomes a member.
+With **All projects**, members come from the whole group.
+With **Selected projects**, you become a member when you are added to a chosen project, or to a subgroup that contains it.
+Access through the whole group, or a group above it, is not enough.
+Workspace owners always stay members, and teams still come from the whole group.
+Membership changes appear after the next sync.
 
 1. If **Create workspace** is unavailable, ask an instance admin.
 
@@ -66,7 +72,8 @@ For a token-managed workspace, as a workspace admin:
 
 For a GitLab project, **Stop monitoring** keeps it excluded from later discovery, webhooks, and syncs.
 To resume it, add its current full namespace path again.
-Stopping a project does not change group membership.
+Stopping a project does not change anything in GitLab.
+With **Selected projects**, people who had access only through that project leave the workspace at the next sync.
 
 **CAUTION:** If no other workspace monitors the same source repository, removal deletes its mirrored repository data.
 Shared mirrored data remains while another workspace monitors it.
@@ -80,7 +87,7 @@ Webhooks and scheduled reconciliation collect later changes.
 Members and teams belong to one workspace:
 
 - GitHub App workspaces mirror organization members, teams, and repository access from GitHub.
-- GitLab workspaces mirror the connected group and its projects.
+- GitLab workspaces mirror the connected group and its projects. With **Selected projects**, members come from the chosen projects and the subgroups that contain them.
 - Workspace admins can review membership and role information under **Administration**.
 
 If source-managed membership is incorrect:

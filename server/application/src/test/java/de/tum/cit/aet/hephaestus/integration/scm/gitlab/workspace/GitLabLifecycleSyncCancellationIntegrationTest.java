@@ -164,7 +164,7 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
         when(groups.syncGroupProjects(workspace.getId(), workspace.getAccountLogin(), gitLabConfig.serverUrl()))
                 .thenReturn(GitLabSyncResult.completed(List.of(first, second), 1, 0, 0));
         GitLabSyncServiceHolder services = new GitLabSyncServiceHolder(
-                null, null, null, null, issues, mergeRequests, teams, null, null, null, null, null, null, null);
+                null, null, null, null, issues, mergeRequests, teams, null, null, null, null, null, null, null, null);
         StaticListableBeanFactory beans = new StaticListableBeanFactory();
         beans.addBean("services", services);
         trigger = triggerWith(beans.getBeanProvider(GitLabSyncServiceHolder.class));
@@ -275,6 +275,7 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
                         null,
                         null,
                         null,
+                        null,
                         null)),
                 activeDiscoveryConfig(),
                 0);
@@ -304,6 +305,7 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
                         issues,
                         mergeRequests,
                         teams,
+                        null,
                         null,
                         null,
                         null,
@@ -383,6 +385,7 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
                         null,
                         null,
                         null,
+                        null,
                         null)),
                 activeDiscoveryConfig(),
                 0);
@@ -441,6 +444,7 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
                         null,
                         null,
                         subIssues,
+                        null,
                         null)),
                 activeDiscoveryConfig(),
                 0);
@@ -472,6 +476,7 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
                         issues,
                         mergeRequests,
                         teams,
+                        null,
                         null,
                         null,
                         null,

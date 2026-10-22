@@ -1,14 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.scm.workspace.adapter;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceOrganizationLookup;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -27,21 +26,18 @@ public class WorkspaceTeamMembershipAdapter implements TeamMembershipListener {
     private final MembershipService workspaceMembershipService;
     private final TeamMembershipRepository teamMembershipRepository;
     private final WorkspaceOrganizationMembershipAdapter organizationMembershipAdapter;
-    private final WorkspaceActorSelector actorSelector;
 
     public WorkspaceTeamMembershipAdapter(
             WorkspaceRepository workspaceRepository,
             WorkspaceOrganizationLookup organizations,
             MembershipService workspaceMembershipService,
             TeamMembershipRepository teamMembershipRepository,
-            WorkspaceOrganizationMembershipAdapter organizationMembershipAdapter,
-            WorkspaceActorSelector actorSelector) {
+            WorkspaceOrganizationMembershipAdapter organizationMembershipAdapter) {
         this.workspaceRepository = workspaceRepository;
         this.organizations = organizations;
         this.workspaceMembershipService = workspaceMembershipService;
         this.teamMembershipRepository = teamMembershipRepository;
         this.organizationMembershipAdapter = organizationMembershipAdapter;
-        this.actorSelector = actorSelector;
     }
 
     @Override
@@ -63,25 +59,19 @@ public class WorkspaceTeamMembershipAdapter implements TeamMembershipListener {
         }
 
         Workspace workspace = workspaceOpt.get();
-        Organization organization = organizations.find(workspace).orElse(null);
 
-        // Teams of another instance or another root group grant nothing here, not even additions.
-        boolean ownRoot = organization != null
-                ? Objects.equals(organization.getProvider().getId(), event.providerId())
-                        && organization.getLogin().equalsIgnoreCase(event.rootGroupFullPath())
-                : event.rootGroupFullPath().equalsIgnoreCase(workspace.getAccountLogin());
-        if (!ownRoot
-                || !actorSelector
-                        .connectedProviderId(workspace.getId())
-                        .filter(event.providerId()::equals)
-                        .isPresent()) {
-            log.warn(
-                    "Skipped team membership reconciliation: reason=notThisWorkspacesGroup,"
+        // Teams of another instance or another root group, or of a workspace that selected its projects, grant
+        // nothing here, not even additions. Team events come only from GitLab and do not name the group's id.
+        if (!organizationMembershipAdapter.mayApplyGroupGrants(
+                workspace, IdentityProviderType.GITLAB, event.providerId(), event.rootGroupFullPath(), null)) {
+            log.info(
+                    "Skipped team membership reconciliation: reason=noGroupGrantAuthority,"
                             + " workspaceId={}, rootGroupFullPath={}",
                     workspace.getId(),
                     event.rootGroupFullPath());
             return;
         }
+        Organization organization = organizations.find(workspace).orElse(null);
 
         // Once the organization's roster has been reconciled and every team's members are current,
         // the workspace
