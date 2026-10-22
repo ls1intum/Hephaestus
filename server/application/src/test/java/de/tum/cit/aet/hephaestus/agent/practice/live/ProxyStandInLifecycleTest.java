@@ -28,16 +28,37 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("unit")
+// Every stand-in reads the request limit from the JVM's system properties when it is constructed.
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class ProxyStandInLifecycleTest {
     private static final byte[] SSE = "data: {\"text\":\"hello\"}\n\n".getBytes(StandardCharsets.UTF_8);
     private static final byte[] JSON = "{\"text\":\"hello\"}".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] ERROR =
+            "{\"error\":{\"message\":\"loopback failure\"}}".getBytes(StandardCharsets.UTF_8);
+    private static final String REQUEST_LIMIT = "hephaestus.live.criteriaRequestLimit";
+    private static final String SYNTHETIC_KEY = "loopback-only";
+    /** One admissible result, as the runner posts it after measuring. */
+    private static final String ADMISSION = """
+            {"contractVersion":3,"reviewId":"10000000-0000-4000-8000-000000000001",\
+            "jobId":"20000000-0000-4000-8000-000000000001","attempt":0,"nonResults":[],"results":[\
+            {"practiceSlug":"handles-errors","itemId":"1","itemVersion":"fixture:1","readReceipts":[],\
+            "candidate":{"outcome":"MET","summary":"Handles errors","explanation":"The handler records the failure.",\
+            "citations":[],"evidence":{"openQuestions":[]},"coverage":{"source":"host","complete":true,"reads":0,\
+            "truncatedReads":0,"failedReads":0,"receipts":[]}}}]}""";
 
     @Test
     void shouldTerminateForwardingWhenUpstreamWithholdsHeaders() throws Exception {
@@ -152,6 +173,154 @@ class ProxyStandInLifecycleTest {
         assertFiniteResponse(Reply.FINITE_SSE, "text/event-stream", SSE);
     }
 
+    @Test
+    void shouldForwardAtMostTheLimitAndRefuseTheRestLocallyWhenRequestLimitIsSet() throws Exception {
+        try (Harness harness = new Harness(Reply.STALLED_HEADERS, "2")) {
+            var first = harness.request();
+            var second = harness.request();
+            harness.awaitReceipts(2);
+
+            // Both admitted requests are still held upstream when the third arrives.
+            harness.assertLocallyDenied(harness.request().get(3, TimeUnit.SECONDS));
+            assertThat(harness.receipts()).isEqualTo(2);
+
+            harness.releaseUpstream();
+            for (var admitted : List.of(first, second)) {
+                var response = admitted.get(3, TimeUnit.SECONDS);
+                assertThat(response.statusCode()).isEqualTo(201);
+                assertThat(harness.readBody(response)).isEqualTo(SSE);
+            }
+            // A finished request does not return its slot.
+            harness.assertLocallyDenied(harness.request().get(3, TimeUnit.SECONDS));
+            assertThat(harness.receipts()).isEqualTo(2);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = Reply.class,
+            names = {"SERVER_ERROR", "DROPPED"})
+    void shouldKeepTheSlotSpentWhenTheUpstreamRequestFails(Reply failure) throws Exception {
+        try (Harness harness = new Harness(failure, "1")) {
+            var attempt = harness.request();
+            harness.awaitReceipts(1);
+            var settled = attempt.handle((response, error) -> response).get(3, TimeUnit.SECONDS);
+            if (failure == Reply.SERVER_ERROR) {
+                assertThat(settled).isNotNull();
+                assertThat(settled.statusCode()).isEqualTo(500);
+                assertThat(harness.readBody(settled)).isEqualTo(ERROR);
+            } else {
+                assertThat(settled)
+                        .as("a dropped upstream connection fails the request")
+                        .isNull();
+            }
+
+            // The retry a client makes after a failure is a new request for the same, already spent, slot.
+            harness.assertLocallyDenied(harness.request().get(3, TimeUnit.SECONDS));
+            assertThat(harness.receipts()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void shouldForwardEveryRequestWhenNoRequestLimitIsSet() throws Exception {
+        try (Harness harness = new Harness(Reply.FINITE_JSON)) {
+            for (int call = 0; call < 3; call++) {
+                var response = harness.request().get(3, TimeUnit.SECONDS);
+                assertThat(response.statusCode()).isEqualTo(201);
+                assertThat(harness.readBody(response)).isEqualTo(JSON);
+            }
+            assertThat(harness.receipts()).isEqualTo(3);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "twelve", "0", "-1", "2147483648"})
+    void shouldRefuseToStartWhenRequestLimitIsInvalid(String limit) {
+        String previous = System.getProperty(REQUEST_LIMIT);
+        System.setProperty(REQUEST_LIMIT, limit);
+        try {
+            // A stand-in that accepts the value is closed at once, so the failed assertion leaves nothing running.
+            assertThatThrownBy(() -> new PracticeRunnerLiveLlmTest.ProxyStandIn(
+                                    new LiveLlmCredentials("http://127.0.0.1:9", SYNTHETIC_KEY, "unused"))
+                            .close())
+                    .hasMessageContaining(REQUEST_LIMIT);
+        } finally {
+            restoreRequestLimit(previous);
+        }
+    }
+
+    @Test
+    void shouldSendExactlyTheLimitWhenMoreRequestsArriveTogether() throws Exception {
+        try (Harness harness = new Harness(Reply.STALLED_HEADERS, "2")) {
+            List<CompletableFuture<HttpResponse<InputStream>>> calls =
+                    List.of(harness.request(), harness.request(), harness.request());
+
+            // The two requests that take the slots stay held upstream, so the only answer that can arrive now is
+            // the refusal of the third, whichever of the three it is.
+            CompletableFuture.anyOf(calls.toArray(CompletableFuture<?>[]::new)).get(3, TimeUnit.SECONDS);
+            harness.awaitReceipts(2);
+            var answered = calls.stream().filter(CompletableFuture::isDone).toList();
+            assertThat(answered).hasSize(1);
+            harness.assertLocallyDenied(answered.getFirst().get());
+
+            var forwarded = calls.stream().filter(call -> !call.isDone()).toList();
+            assertThat(forwarded).hasSize(2);
+            harness.releaseUpstream();
+            for (var call : forwarded) {
+                var response = call.get(3, TimeUnit.SECONDS);
+                assertThat(response.statusCode()).isEqualTo(201);
+                assertThat(harness.readBody(response)).isEqualTo(SSE);
+            }
+            assertThat(harness.receipts()).isEqualTo(2);
+        }
+    }
+
+    @Test
+    void shouldKeepTheSlotSpentWhenTheCallerCancelsItsRequest() throws Exception {
+        try (Harness harness = new Harness(Reply.STALLED_HEADERS, "1")) {
+            var cancelled = harness.request();
+            harness.awaitReceipts(1);
+            assertThat(cancelled.cancel(true)).isTrue();
+
+            // The cancelled request was already sent upstream, so its slot stays spent while it is held there.
+            harness.assertLocallyDenied(harness.request().get(3, TimeUnit.SECONDS));
+
+            // It also stays spent once the upstream has answered the request that nobody now reads.
+            harness.releaseUpstream();
+            harness.awaitAnswered(1);
+            harness.assertLocallyDenied(harness.request().get(3, TimeUnit.SECONDS));
+            assertThat(harness.receipts()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void shouldFailTheMeasurementWhenARequestIsRefusedAfterValidAnswers() throws Exception {
+        try (Harness harness = new Harness(Reply.FINITE_JSON, "1")) {
+            // Result admission is answered here and spends no model request.
+            var admission = harness.admitResults().get(3, TimeUnit.SECONDS);
+            assertThat(admission.statusCode()).isEqualTo(200);
+            harness.readBody(admission);
+
+            var answer = harness.request().get(3, TimeUnit.SECONDS);
+            assertThat(answer.statusCode()).isEqualTo(201);
+            assertThat(harness.readBody(answer)).isEqualTo(JSON);
+            harness.proxy.assertRequestLimitNotSpent();
+
+            harness.assertLocallyDenied(harness.request().get(3, TimeUnit.SECONDS));
+            // The earlier valid answer does not hide the refusal.
+            assertThatThrownBy(harness.proxy::assertRequestLimitNotSpent).isInstanceOf(AssertionError.class);
+            assertThat(harness.receipts()).isEqualTo(1);
+        }
+    }
+
+    private static void restoreRequestLimit(@Nullable String previous) {
+        if (previous == null) {
+            System.clearProperty(REQUEST_LIMIT);
+        } else {
+            System.setProperty(REQUEST_LIMIT, previous);
+        }
+    }
+
     private static void assertFiniteResponse(Reply reply, String contentType, byte[] expected) throws Exception {
         try (Harness harness = new Harness(reply)) {
             var response = harness.request().get(3, TimeUnit.SECONDS);
@@ -170,7 +339,9 @@ class ProxyStandInLifecycleTest {
         STALLED_HEADERS,
         STALLED_SSE,
         FINITE_JSON,
-        FINITE_SSE
+        FINITE_SSE,
+        SERVER_ERROR,
+        DROPPED
     }
 
     private static final class Harness implements AutoCloseable {
@@ -181,15 +352,33 @@ class ProxyStandInLifecycleTest {
         private final PracticeRunnerLiveLlmTest.ProxyStandIn proxy;
         private final CountDownLatch accepted = new CountDownLatch(1);
         private final CountDownLatch release = new CountDownLatch(1);
+        private final AtomicInteger receipts = new AtomicInteger();
+        private final Semaphore received = new Semaphore(0);
+        private final Semaphore answered = new Semaphore(0);
         private @Nullable Future<?> closeTask;
 
         Harness(Reply reply) throws IOException {
+            this(reply, null);
+        }
+
+        /** {@code requestLimit} is the stand-in's request limit property, or null for none. */
+        Harness(Reply reply, @Nullable String requestLimit) throws IOException {
             upstream = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
             upstream.setExecutor(upstreamTasks);
             upstream.createContext("/", exchange -> reply(exchange, reply));
             upstream.start();
-            proxy = new PracticeRunnerLiveLlmTest.ProxyStandIn(new LiveLlmCredentials(
-                    "http://127.0.0.1:" + upstream.getAddress().getPort(), "loopback-only", "unused"));
+            String previous = System.getProperty(REQUEST_LIMIT);
+            try {
+                if (requestLimit == null) {
+                    System.clearProperty(REQUEST_LIMIT);
+                } else {
+                    System.setProperty(REQUEST_LIMIT, requestLimit);
+                }
+                proxy = new PracticeRunnerLiveLlmTest.ProxyStandIn(new LiveLlmCredentials(
+                        "http://127.0.0.1:" + upstream.getAddress().getPort(), SYNTHETIC_KEY, "unused"));
+            } finally {
+                restoreRequestLimit(previous);
+            }
         }
 
         CompletableFuture<HttpResponse<InputStream>> request() {
@@ -200,8 +389,50 @@ class ProxyStandInLifecycleTest {
                     HttpResponse.BodyHandlers.ofInputStream());
         }
 
+        CompletableFuture<HttpResponse<InputStream>> admitResults() {
+            return client.sendAsync(
+                    HttpRequest.newBuilder(URI.create(proxy.baseUrl() + "/admit-results"))
+                            .POST(HttpRequest.BodyPublishers.ofString(ADMISSION))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofInputStream());
+        }
+
         void awaitAccepted() throws InterruptedException {
             assertThat(accepted.await(3, TimeUnit.SECONDS)).isTrue();
+        }
+
+        /** Waits until the upstream has finished answering {@code count} more requests. */
+        void awaitAnswered(int count) throws InterruptedException {
+            assertThat(answered.tryAcquire(count, 3, TimeUnit.SECONDS)).isTrue();
+        }
+
+        /** Waits until the upstream has read {@code count} more complete requests. */
+        void awaitReceipts(int count) throws InterruptedException {
+            assertThat(received.tryAcquire(count, 3, TimeUnit.SECONDS)).isTrue();
+        }
+
+        int receipts() {
+            return receipts.get();
+        }
+
+        void releaseUpstream() {
+            release.countDown();
+        }
+
+        byte[] readBody(HttpResponse<InputStream> response) throws Exception {
+            try (InputStream body = response.body()) {
+                return tasks.submit(body::readAllBytes).get(3, TimeUnit.SECONDS);
+            }
+        }
+
+        void assertLocallyDenied(HttpResponse<InputStream> response) throws Exception {
+            assertThat(response.statusCode())
+                    .as("a request beyond the limit is refused with a status a client does not retry")
+                    .isBetween(400, 499)
+                    .isNotIn(408, 409, 429);
+            assertThat(new String(readBody(response), StandardCharsets.UTF_8))
+                    .as("the refusal carries no credential")
+                    .doesNotContain(SYNTHETIC_KEY);
         }
 
         void closeProxy() throws InterruptedException, ExecutionException, TimeoutException {
@@ -225,7 +456,19 @@ class ProxyStandInLifecycleTest {
         private void reply(HttpExchange exchange, Reply reply) throws IOException {
             try (exchange) {
                 exchange.getRequestBody().readAllBytes();
+                receipts.incrementAndGet();
                 accepted.countDown();
+                received.release();
+                if (reply == Reply.DROPPED) {
+                    // Closing an exchange that sent no response headers closes its connection.
+                    return;
+                }
+                if (reply == Reply.SERVER_ERROR) {
+                    exchange.getResponseHeaders().set("content-type", "application/json");
+                    exchange.sendResponseHeaders(500, ERROR.length);
+                    exchange.getResponseBody().write(ERROR);
+                    return;
+                }
                 if (reply == Reply.STALLED_HEADERS) {
                     awaitRelease();
                 }
@@ -237,6 +480,8 @@ class ProxyStandInLifecycleTest {
                 if (reply == Reply.STALLED_SSE) {
                     awaitRelease();
                 }
+            } finally {
+                answered.release();
             }
         }
 
