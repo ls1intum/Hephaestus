@@ -133,6 +133,17 @@ export const EditModel: Story = {
 	},
 };
 
+/** Every step of the save runs under its own button's label, and Cancel still closes the form. */
+export const Submitting: Story = {
+	args: { editing: mockModel, isSubmitting: true },
+	play: async () => {
+		const dialog = await screen.findByRole("dialog");
+		await expectSettledVisible(dialog);
+		await expect(within(dialog).getByRole("button", { name: "Saving…" })).toBeDisabled();
+		await expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeEnabled();
+	},
+};
+
 /**
  * A declared row holds only its exact tier, so re-declaring a model drops it out of every row that
  * held it. The form cannot see bindings, so the warning follows the tier change, not a binding.

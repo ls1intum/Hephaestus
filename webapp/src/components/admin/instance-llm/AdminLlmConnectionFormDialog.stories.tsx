@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { LlmConnection } from "@/api/types.gen";
 import { expectSettledVisible } from "@/stories/overlay";
@@ -48,6 +48,17 @@ export const AddConnection: Story = {};
 
 export const EditConnection: Story = {
 	args: { editing: mockConnection },
+};
+
+/** The save says so in its own button, and Cancel still closes the form while it runs. */
+export const Submitting: Story = {
+	args: { editing: mockConnection, isSubmitting: true },
+	play: async () => {
+		const dialog = await screen.findByRole("dialog");
+		await expectSettledVisible(dialog);
+		await expect(within(dialog).getByRole("button", { name: "Saving…" })).toBeDisabled();
+		await expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeEnabled();
+	},
 };
 
 export const AddRerankConnection: Story = {

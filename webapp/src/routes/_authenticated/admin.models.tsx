@@ -30,6 +30,7 @@ import type {
 	LlmModel,
 	UpdateInstanceLlmSettingsRequest,
 	UpdateLlmConnectionRequest,
+	UpdateLlmModelSharingRequest,
 } from "@/api/types.gen";
 import { AdminLlmConnectionFormDialog } from "@/components/admin/instance-llm/AdminLlmConnectionFormDialog";
 import { AdminLlmConnectionsTable } from "@/components/admin/instance-llm/AdminLlmConnectionsTable";
@@ -60,20 +61,84 @@ export const Route = createFileRoute("/_authenticated/admin/models")({
 const CONNECTION_WRITE_MUTATION_KEY = ["adminWriteLlmConnection"];
 const MODEL_WRITE_MUTATION_KEY = ["adminWriteLlmModel"];
 
+/**
+ * The one dialog the page shows; they are modal, so at most one is open. Every opening and every
+ * close is a new object, the closed page included, so a write that finishes after its dialog was
+ * dismissed, or after another one came and went, finds a different object and leaves what is open now
+ * alone. A request for a fresh sign-in takes the place of the dialog it came from rather than stacking
+ * a second focus trap on it.
+ */
+type RouteDialog =
+	| { kind: "idle" }
+	| { kind: "addConnection" }
+	| { kind: "editConnection"; connection: LlmConnection }
+	| { kind: "addModel"; connectionId: number }
+	| { kind: "editModel"; model: LlmModel }
+	| { kind: "access"; model: LlmModel }
+	| { kind: "challenge"; challenge: StepUpChallenge };
+type ConnectionDialog = Extract<RouteDialog, { kind: "addConnection" | "editConnection" }>;
+type ModelDialog = Extract<RouteDialog, { kind: "addModel" | "editModel" }>;
+type AccessDialog = Extract<RouteDialog, { kind: "access" }>;
+
+/** Closes the dialog only if it is still the one the result belongs to. */
+function closedIf(origin: RouteDialog | null) {
+	return function closeOrigin(current: RouteDialog): RouteDialog {
+		return current === origin ? { kind: "idle" } : current;
+	};
+}
+
+/** Asks for a fresh sign-in only if what sent the refused request is still what is open. */
+function challengedIf(origin: RouteDialog, challenge: StepUpChallenge) {
+	return function askOrigin(current: RouteDialog): RouteDialog {
+		return current === origin ? { kind: "challenge", challenge } : current;
+	};
+}
+
+const STEP_UP_NOTICE = "Changes were not saved. Confirm access and try again.";
+
+/**
+ * Every refusal is reported here, the one that asks for a fresh sign-in included: the ask itself
+ * appears only if what sent the request is still open, and the change was not saved either way.
+ */
+function reportConnectionError(error: unknown, title: string) {
+	if (stepUpChallengeOf(error) === undefined) {
+		toast.error(title, { description: problemDetailOf(error) });
+	} else {
+		toast.error(STEP_UP_NOTICE);
+	}
+}
+
+/**
+ * One model save, from first request to last. A new model has no id yet, so its save is filed under
+ * the connection it is added to.
+ */
+interface ModelSave {
+	path: { id: number } | { connectionId: number };
+	connectionId: number;
+	editing: LlmModel | null;
+	body: AdminLlmModelSaveBody;
+}
+
+const creatingOnConnection = (variables: unknown) =>
+	pathNumber(variables, "id") === undefined ? pathNumber(variables, "connectionId") : undefined;
+
 function AdminLlmPage() {
 	const queryClient = useQueryClient();
 
 	const [selectedConnectionId, setSelectedConnectionId] = useState<number | null>(null);
-	const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
-	const [editingConnection, setEditingConnection] = useState<LlmConnection | null>(null);
+	const [dialog, setDialog] = useState<RouteDialog>(() => ({ kind: "idle" }));
+	const connectionDialog: ConnectionDialog | null =
+		dialog.kind === "addConnection" || dialog.kind === "editConnection" ? dialog : null;
+	const editingConnection = dialog.kind === "editConnection" ? dialog.connection : null;
+	const modelDialog: ModelDialog | null =
+		dialog.kind === "addModel" || dialog.kind === "editModel" ? dialog : null;
+	const accessDialog = dialog.kind === "access" ? dialog : null;
+	const challengeDialog = dialog.kind === "challenge" ? dialog : null;
+	const challenge = challengeDialog?.challenge;
 	const [probedModels, setProbedModels] = useState<{
 		connectionId: number | null;
 		models: string[];
 	} | null>(null);
-
-	const [modelDialogOpen, setModelDialogOpen] = useState(false);
-	const [editingModel, setEditingModel] = useState<LlmModel | null>(null);
-	const [accessModel, setAccessModel] = useState<LlmModel | null>(null);
 
 	const connectionsQuery = useQuery(adminListLlmConnectionsOptions());
 	const connections = connectionsQuery.data ?? [];
@@ -86,9 +151,9 @@ function AdminLlmPage() {
 	for (const model of allModels) {
 		modelCounts[model.connectionId] = (modelCounts[model.connectionId] ?? 0) + 1;
 	}
-	const modelsForSelectedConnection = selectedConnection
-		? allModels.filter((m) => m.connectionId === selectedConnection.id)
-		: [];
+	const modelsForSelectedConnection = allModels.filter(
+		(m) => m.connectionId === selectedConnection?.id,
+	);
 
 	const workspacesQuery = useQuery(adminListWorkspacesOptions());
 	const workspaceOptions = (workspacesQuery.data ?? []).map((w) => ({
@@ -104,34 +169,25 @@ function AdminLlmPage() {
 	const invalidateModels = async () =>
 		queryClient.invalidateQueries({ queryKey: adminListLlmModelsQueryKey() });
 
-	const [challenge, setChallenge] = useState<StepUpChallenge | undefined>(undefined);
 	const confirmAccess = useConfirmAccess(challenge !== undefined);
 
-	/**
-	 * A refusal that asks for a fresh sign-in is not a failure the operator can read and act on, so
-	 * it opens the ask instead of a toast — and it replaces the connection form rather than stacking
-	 * a second focus trap on top of it.
-	 */
-	const reportConnectionError = (error: unknown, title: string) => {
+	const askAgainIf = (origin: RouteDialog, error: unknown) => {
 		const stepUp = stepUpChallengeOf(error);
 		if (stepUp) {
-			setConnectionDialogOpen(false);
-			setChallenge(stepUp);
-			return;
+			setDialog(challengedIf(origin, stepUp));
 		}
-		toast.error(title, { description: problemDetailOf(error) });
 	};
 
 	const createConnection = useMutation({
 		...adminCreateLlmConnectionMutation(),
 		onSuccess: (created) => {
 			void invalidateConnections();
-			setConnectionDialogOpen(false);
 			setSelectedConnectionId(created.id);
+			// Models fetched in the add form belong to the connection it created; another form's stay.
 			setProbedModels((current) =>
 				current?.connectionId === null
 					? { connectionId: created.id, models: current.models }
-					: null,
+					: current,
 			);
 			toast.success("Connection added");
 		},
@@ -142,11 +198,31 @@ function AdminLlmPage() {
 		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminUpdateLlmConnectionMutation()),
 		onSuccess: () => {
 			void invalidateConnections();
-			setConnectionDialogOpen(false);
 			toast.success("Connection updated");
 		},
 		onError: (error) => reportConnectionError(error, "We could not update the connection"),
 	});
+
+	// A write outlives the dialog it came from, which may be dismissed meanwhile, so its result is
+	// applied only to that dialog: a later one is neither closed nor sent through a fresh sign-in.
+	const saveConnectionForm = async (origin: RouteDialog, request: Promise<unknown>) => {
+		try {
+			await request;
+			setDialog(closedIf(origin));
+		} catch (error) {
+			askAgainIf(origin, error);
+		}
+	};
+	// A row action starts on the closed page. Any dialog opened before it settles, even one closed again
+	// since, leaves a different closed page behind, so a late refusal asks nothing over it.
+	const runConnectionAction = async (request: Promise<unknown>) => {
+		const origin = dialog;
+		try {
+			await request;
+		} catch (error) {
+			askAgainIf(origin, error);
+		}
+	};
 
 	const deleteConnection = useMutation({
 		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminDeleteLlmConnectionMutation()),
@@ -173,6 +249,25 @@ function AdminLlmPage() {
 	const updateSharing = useMutation({
 		...filedUnder(MODEL_WRITE_MUTATION_KEY, adminUpdateLlmModelSharingMutation()),
 	});
+	// The steps of one save run in order; as one mutation, its pending state covers the gaps between them.
+	const saveModel = useMutation({
+		mutationKey: MODEL_WRITE_MUTATION_KEY,
+		mutationFn: async ({ connectionId, editing, body }: ModelSave) =>
+			saveAdminLlmModelSafely({
+				connectionId,
+				editing,
+				body,
+				operations: {
+					create: async (parentId, metadata) =>
+						createModel.mutateAsync({ path: { connectionId: parentId }, body: metadata }),
+					updateMetadata: async (id, metadata) =>
+						updateModel.mutateAsync({ path: { id }, body: metadata }),
+					updatePrice: async (id, price) => updatePrice.mutateAsync({ path: { id }, body: price }),
+					updateSharing: async (id, sharing) =>
+						updateSharing.mutateAsync({ path: { id }, body: sharing }),
+				},
+			}),
+	});
 	const deleteModel = useMutation({
 		...filedUnder(MODEL_WRITE_MUTATION_KEY, adminDeleteLlmModelMutation()),
 		onSuccess: () => {
@@ -186,6 +281,10 @@ function AdminLlmPage() {
 	const mutatingModelIds = usePendingMutationIds(MODEL_WRITE_MUTATION_KEY, (variables) =>
 		pathNumber(variables, "id"),
 	);
+	const addingModelConnectionIds = usePendingMutationIds(
+		MODEL_WRITE_MUTATION_KEY,
+		creatingOnConnection,
+	);
 
 	const updateSettings = useMutation({
 		...adminUpdateLlmSettingsMutation(),
@@ -197,34 +296,42 @@ function AdminLlmPage() {
 			toast.error("We could not save settings", { description: problemDetailOf(error) }),
 	});
 
-	const isModelSaving =
-		createModel.isPending ||
-		updateModel.isPending ||
-		updatePrice.isPending ||
-		updateSharing.isPending;
+	// A form is busy only while its own subject saves: another row's write is not its business.
+	const connectionFormSubmitting =
+		editingConnection === null
+			? createConnection.isPending
+			: mutatingConnectionIds.has(editingConnection.id);
+	const modelFormSubmitting =
+		modelDialog?.kind === "editModel"
+			? mutatingModelIds.has(modelDialog.model.id)
+			: modelDialog !== null && addingModelConnectionIds.has(modelDialog.connectionId);
 
-	const handleSaveModel = async (body: AdminLlmModelSaveBody) => {
-		if (!selectedConnection) {
-			return;
-		}
+	// Awaited here rather than in call-level callbacks, which TanStack runs only for the latest call.
+	const saveAccess = async (origin: AccessDialog, body: UpdateLlmModelSharingRequest) => {
 		try {
-			await saveAdminLlmModelSafely({
-				connectionId: selectedConnection.id,
-				editing: editingModel,
+			await updateSharing.mutateAsync({ path: { id: origin.model.id }, body });
+			void invalidateModels();
+			setDialog(closedIf(origin));
+			toast.success("Workspace access updated");
+		} catch (error) {
+			toast.error("We could not update workspace access", { description: problemDetailOf(error) });
+		}
+	};
+
+	// The save outlives its form, which may be dismissed meanwhile; its result closes only that form.
+	const handleSaveModel = async (saved: ModelDialog, body: AdminLlmModelSaveBody) => {
+		const editing = saved.kind === "editModel" ? saved.model : null;
+		const connectionId = saved.kind === "editModel" ? saved.model.connectionId : saved.connectionId;
+		try {
+			await saveModel.mutateAsync({
+				path: editing ? { id: editing.id } : { connectionId },
+				connectionId,
+				editing,
 				body,
-				operations: {
-					create: async (connectionId, metadata) =>
-						createModel.mutateAsync({ path: { connectionId }, body: metadata }),
-					updateMetadata: async (id, metadata) =>
-						updateModel.mutateAsync({ path: { id }, body: metadata }),
-					updatePrice: async (id, price) => updatePrice.mutateAsync({ path: { id }, body: price }),
-					updateSharing: async (id, sharing) =>
-						updateSharing.mutateAsync({ path: { id }, body: sharing }),
-				},
 			});
 			void invalidateModels();
-			setModelDialogOpen(false);
-			toast.success(editingModel ? "Model updated" : "Model added");
+			setDialog(closedIf(saved));
+			toast.success(editing ? "Model updated" : "Model added");
 		} catch (error) {
 			void invalidateModels();
 			if (error instanceof AdminLlmModelSaveError && error.modelId != null) {
@@ -257,15 +364,10 @@ function AdminLlmPage() {
 					models={modelsForSelectedConnection}
 					isLoading={modelsQuery.isLoading}
 					mutatingIds={mutatingModelIds}
-					onAdd={() => {
-						setEditingModel(null);
-						setModelDialogOpen(true);
-					}}
-					onEdit={(model) => {
-						setEditingModel(model);
-						setModelDialogOpen(true);
-					}}
-					onManageAccess={setAccessModel}
+					addDisabled={addingModelConnectionIds.has(selectedConnection.id)}
+					onAdd={() => setDialog({ kind: "addModel", connectionId: selectedConnection.id })}
+					onEdit={(model) => setDialog({ kind: "editModel", model })}
+					onManageAccess={(model) => setDialog({ kind: "access", model })}
 					onDelete={(model) => {
 						deleteModel.mutate({ path: { id: model.id } });
 					}}
@@ -282,11 +384,10 @@ function AdminLlmPage() {
 				description="Connect OpenAI-compatible endpoints and share models with workspaces."
 				actions={
 					<Button
-						disabled={!connectionsQuery.isSuccess}
+						disabled={!connectionsQuery.isSuccess || createConnection.isPending}
 						onClick={() => {
-							setEditingConnection(null);
 							setProbedModels({ connectionId: null, models: [] });
-							setConnectionDialogOpen(true);
+							setDialog({ kind: "addConnection" });
 						}}
 					>
 						<Plus className="size-4" aria-hidden />
@@ -306,25 +407,26 @@ function AdminLlmPage() {
 					void connectionsQuery.refetch();
 				}}
 				mutatingIds={mutatingConnectionIds}
+				addDisabled={createConnection.isPending}
 				selectedId={selectedConnection?.id ?? null}
 				onSelect={(connection) => {
 					setSelectedConnectionId(connection.id);
 				}}
 				onEdit={(connection) => {
-					setEditingConnection(connection);
 					setProbedModels({ connectionId: connection.id, models: [] });
-					setConnectionDialogOpen(true);
+					setDialog({ kind: "editConnection", connection });
 				}}
 				onToggleEnabled={(connection, enabled) => {
-					updateConnection.mutate({ path: { id: connection.id }, body: { enabled } });
+					void runConnectionAction(
+						updateConnection.mutateAsync({ path: { id: connection.id }, body: { enabled } }),
+					);
 				}}
 				onDelete={(connection) => {
-					deleteConnection.mutate({ path: { id: connection.id } });
+					void runConnectionAction(deleteConnection.mutateAsync({ path: { id: connection.id } }));
 				}}
 				onAdd={() => {
-					setEditingConnection(null);
 					setProbedModels({ connectionId: null, models: [] });
-					setConnectionDialogOpen(true);
+					setDialog({ kind: "addConnection" });
 				}}
 			/>
 
@@ -348,18 +450,20 @@ function AdminLlmPage() {
 			)}
 
 			<AdminLlmConnectionFormDialog
-				open={connectionDialogOpen}
+				open={connectionDialog !== null}
 				onOpenChange={(open) => {
-					setConnectionDialogOpen(open);
 					if (!open) {
+						setDialog(closedIf(connectionDialog));
 						setProbedModels(null);
 					}
 				}}
 				editing={editingConnection}
-				isSubmitting={createConnection.isPending || updateConnection.isPending}
-				onCreate={(body: CreateLlmConnectionRequest) => createConnection.mutate({ body })}
+				isSubmitting={connectionFormSubmitting}
+				onCreate={(body: CreateLlmConnectionRequest) => {
+					void saveConnectionForm(dialog, createConnection.mutateAsync({ body }));
+				}}
 				onUpdate={(id, body: UpdateLlmConnectionRequest) => {
-					updateConnection.mutate({ path: { id }, body });
+					void saveConnectionForm(dialog, updateConnection.mutateAsync({ path: { id }, body }));
 				}}
 				isProbing={probeDraft.isPending || probeSaved.isPending}
 				onProbe={(request, callbacks) => {
@@ -388,55 +492,46 @@ function AdminLlmPage() {
 			/>
 
 			<AdminLlmModelFormDialog
-				open={modelDialogOpen}
-				onOpenChange={setModelDialogOpen}
-				editing={editingModel}
+				open={modelDialog !== null}
+				onOpenChange={(open) => {
+					if (!open) {
+						setDialog(closedIf(modelDialog));
+					}
+				}}
+				editing={modelDialog?.kind === "editModel" ? modelDialog.model : null}
 				workspaceOptions={workspaceOptions}
 				probedModelIds={
 					probedModels && selectedConnection && probedModels.connectionId === selectedConnection.id
 						? probedModels.models
 						: []
 				}
-				isSubmitting={isModelSaving}
+				isSubmitting={modelFormSubmitting}
 				onSave={(body) => {
-					void handleSaveModel(body);
+					if (modelDialog !== null) {
+						void handleSaveModel(modelDialog, body);
+					}
 				}}
 			/>
 
 			<AdminLlmModelAccessDialog
-				open={accessModel != null}
+				open={accessDialog !== null}
 				onOpenChange={(open) => {
 					if (!open) {
-						setAccessModel(null);
+						setDialog(closedIf(accessDialog));
 					}
 				}}
-				model={accessModel}
+				model={accessDialog?.model ?? null}
 				workspaceOptions={workspaceOptions}
 				isLoadingWorkspaces={workspacesQuery.isLoading}
 				workspacesError={workspacesQuery.error}
 				onRetryWorkspaces={() => {
 					void workspacesQuery.refetch();
 				}}
-				isSubmitting={updateSharing.isPending}
+				isSubmitting={accessDialog !== null && mutatingModelIds.has(accessDialog.model.id)}
 				onSave={(body) => {
-					if (!accessModel) {
-						return;
+					if (accessDialog !== null) {
+						void saveAccess(accessDialog, body);
 					}
-					updateSharing.mutate(
-						{ path: { id: accessModel.id }, body },
-						{
-							onSuccess: () => {
-								void invalidateModels();
-								setAccessModel(null);
-								toast.success("Workspace access updated");
-							},
-							onError: (error) => {
-								toast.error("We could not update workspace access", {
-									description: problemDetailOf(error),
-								});
-							},
-						},
-					);
 				}}
 			/>
 
@@ -444,7 +539,7 @@ function AdminLlmPage() {
 				open={challenge !== undefined}
 				onOpenChange={(open) => {
 					if (!open) {
-						setChallenge(undefined);
+						setDialog(closedIf(challengeDialog));
 					}
 				}}
 				maxAgeSeconds={challenge?.maxAgeSeconds}

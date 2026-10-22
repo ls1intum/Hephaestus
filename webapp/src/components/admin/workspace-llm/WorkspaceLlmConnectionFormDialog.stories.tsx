@@ -76,8 +76,15 @@ export const EditEmbeddings: Story = {
 	},
 };
 
+/** The save says so in its own button, and Cancel still closes the form while it runs. */
 export const Submitting: Story = {
-	args: { isSubmitting: true },
+	args: { editing: mockConnection, isSubmitting: true },
+	play: async () => {
+		const dialog = await screen.findByRole("dialog");
+		await expectSettledVisible(dialog);
+		await expect(within(dialog).getByRole("button", { name: "Saving…" })).toBeDisabled();
+		await expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeEnabled();
+	},
 };
 
 /** The providers failed to refresh while the form was open: the warning is in the form, and the draft stays editable. */

@@ -50,6 +50,10 @@ export interface WorkspaceLlmProviderPanelProps {
 	testingConnectionIds: ReadonlySet<number>;
 	writingConnectionIds: ReadonlySet<number>;
 	writingModelIds: ReadonlySet<number>;
+	/** A new provider is being saved; Add waits for it, so a dismissed form cannot add it twice. */
+	addingConnection?: boolean;
+	/** Providers with a new model being saved; their Add model waits for it. */
+	addingModelConnectionIds?: ReadonlySet<number>;
 	onAddConnection: () => void;
 	onEditConnection: (connection: WorkspaceLlmConnection) => void;
 	onTestConnection: (connection: WorkspaceLlmConnection) => void;
@@ -86,6 +90,8 @@ function testOutcome(test: ProviderTestResult, connection: WorkspaceLlmConnectio
 	return { tone: "failed", message: result.message ?? "We could not reach the provider." };
 }
 
+const NO_IDS: ReadonlySet<number> = new Set();
+
 const TITLE = "Your providers";
 const DESCRIPTION =
 	"Connect a provider account to run models on your own key. Its usage is billed to that account.";
@@ -109,6 +115,8 @@ export function WorkspaceLlmProviderPanel({
 	testingConnectionIds,
 	writingConnectionIds,
 	writingModelIds,
+	addingConnection = false,
+	addingModelConnectionIds = NO_IDS,
 	onAddConnection,
 	onEditConnection,
 	onTestConnection,
@@ -130,7 +138,12 @@ export function WorkspaceLlmProviderPanel({
 			className="space-y-6"
 			actions={
 				registrationAllowed && connections.length > 0 ? (
-					<Button size="sm" variant="outline" onClick={onAddConnection}>
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={addingConnection}
+						onClick={onAddConnection}
+					>
 						<Plus className="size-4" aria-hidden /> Add provider
 					</Button>
 				) : undefined
@@ -177,7 +190,7 @@ export function WorkspaceLlmProviderPanel({
 								</EmptyDescription>
 							</EmptyHeader>
 							{registrationAllowed && (
-								<Button onClick={onAddConnection}>
+								<Button disabled={addingConnection} onClick={onAddConnection}>
 									<Plus className="size-4" aria-hidden /> Add provider
 								</Button>
 							)}
@@ -193,6 +206,7 @@ export function WorkspaceLlmProviderPanel({
 								testing={testingConnectionIds.has(connection.id)}
 								writing={writingConnectionIds.has(connection.id)}
 								writingModelIds={writingModelIds}
+								addingModel={addingModelConnectionIds.has(connection.id)}
 								onEdit={() => onEditConnection(connection)}
 								onTest={() => onTestConnection(connection)}
 								onDisconnect={() => setDisconnecting(connection)}
@@ -225,6 +239,7 @@ interface ProviderSectionProps {
 	testing: boolean;
 	writing: boolean;
 	writingModelIds: ReadonlySet<number>;
+	addingModel: boolean;
 	onEdit: () => void;
 	onTest: () => void;
 	onDisconnect: () => void;
@@ -241,6 +256,7 @@ function ProviderSection({
 	testing,
 	writing,
 	writingModelIds,
+	addingModel,
 	onEdit,
 	onTest,
 	onDisconnect,
@@ -304,6 +320,7 @@ function ProviderSection({
 								variant="outline"
 								size="sm"
 								aria-label={`Add model to ${connection.displayName}`}
+								disabled={addingModel}
 								onClick={onAddModel}
 							>
 								<Plus className="size-4" aria-hidden /> Add model

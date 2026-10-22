@@ -35,6 +35,8 @@ export interface AdminLlmModelsSectionProps {
 	isLoading?: boolean;
 	mutatingIds: ReadonlySet<number>;
 	onAdd: () => void;
+	/** A new model on this connection is being saved; Add waits for it, so it cannot be added twice. */
+	addDisabled?: boolean;
 	onEdit: (model: LlmModel) => void;
 	onManageAccess: (model: LlmModel) => void;
 	onDelete: (model: LlmModel) => void;
@@ -89,6 +91,7 @@ export function AdminLlmModelsSection({
 	isLoading = false,
 	mutatingIds,
 	onAdd,
+	addDisabled = false,
 	onEdit,
 	onManageAccess,
 	onDelete,
@@ -108,7 +111,7 @@ export function AdminLlmModelsSection({
 						<LlmConnectionApi connection={connection} />
 					</p>
 				</div>
-				<Button size="sm" variant="outline" onClick={onAdd}>
+				<Button size="sm" variant="outline" disabled={addDisabled} onClick={onAdd}>
 					<Plus className="size-4" aria-hidden />
 					Add model
 				</Button>

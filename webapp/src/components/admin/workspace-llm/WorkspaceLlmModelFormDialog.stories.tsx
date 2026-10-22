@@ -114,6 +114,17 @@ export const EditModel: Story = {
 	},
 };
 
+/** The save says so in its own button, and Cancel still closes the form while it runs. */
+export const Submitting: Story = {
+	args: { editing: mockModel, isSubmitting: true },
+	play: async () => {
+		const dialog = await screen.findByRole("dialog");
+		await expectSettledVisible(dialog);
+		await expect(within(dialog).getByRole("button", { name: "Saving…" })).toBeDisabled();
+		await expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeEnabled();
+	},
+};
+
 export const EditLegacyUndeclared: Story = {
 	args: { editing: legacyModel },
 	play: async ({ args }) => {

@@ -329,9 +329,27 @@ function ModelsContainer() {
 // Key pending writes by row so concurrent requests cannot clear another row's busy state.
 const PROBE_MUTATION_KEY = ["workspaceProbeLlmConnection"];
 const MODEL_WRITE_MUTATION_KEY = ["workspaceWriteLlmModel"];
+const MODEL_CREATE_MUTATION_KEY = ["workspaceCreateLlmModel"];
 const CONNECTION_WRITE_MUTATION_KEY = ["workspaceWriteLlmConnection"];
 
 const idOf = (variables: unknown) => pathNumber(variables, "id");
+const connectionIdOf = (variables: unknown) => pathNumber(variables, "connectionId");
+
+/**
+ * What an open form edits. Each opening is a new object, so a save that finishes after its form was
+ * dismissed finds a different subject and leaves the form now open alone.
+ */
+type ConnectionForm = { kind: "create" } | { kind: "edit"; connection: WorkspaceLlmConnection };
+type ModelForm =
+	| { kind: "create"; connectionId: number }
+	| { kind: "edit"; model: WorkspaceLlmModel };
+
+/** Closes the form only if it still shows the subject that was saved. */
+function closedIf<T>(saved: T | null) {
+	return function closeSaved(current: T | null) {
+		return current === saved ? null : current;
+	};
+}
 
 interface WorkspaceProvidersProps {
 	workspaceSlug: string;
@@ -349,11 +367,9 @@ function WorkspaceProviders({
 	const modelWriteKey = [...MODEL_WRITE_MUTATION_KEY, workspaceSlug];
 	const connectionWriteKey = [...CONNECTION_WRITE_MUTATION_KEY, workspaceSlug];
 	const probeKey = [...PROBE_MUTATION_KEY, workspaceSlug];
-	const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
-	const [editingConnection, setEditingConnection] = useState<WorkspaceLlmConnection | null>(null);
-	const [modelDialogOpen, setModelDialogOpen] = useState(false);
-	const [modelConnectionId, setModelConnectionId] = useState<number | null>(null);
-	const [editingModel, setEditingModel] = useState<WorkspaceLlmModel | null>(null);
+	const modelCreateKey = [...MODEL_CREATE_MUTATION_KEY, workspaceSlug];
+	const [connectionForm, setConnectionForm] = useState<ConnectionForm | null>(null);
+	const [modelForm, setModelForm] = useState<ModelForm | null>(null);
 	// The instance can withdraw registration while the page is open; a refused create says so.
 	const [registrationRefused, setRegistrationRefused] = useState(false);
 	const [testResults, setTestResults] = useState(() => new Map<number, ProviderTestResult>());
@@ -387,17 +403,10 @@ function WorkspaceProviders({
 	if (
 		blockingFailure !== undefined &&
 		!queryErrorIsRetryable(blockingFailure.error) &&
-		(connectionDialogOpen ||
-			modelDialogOpen ||
-			editingConnection !== null ||
-			editingModel !== null ||
-			modelConnectionId !== null)
+		(connectionForm !== null || modelForm !== null)
 	) {
-		setConnectionDialogOpen(false);
-		setModelDialogOpen(false);
-		setEditingConnection(null);
-		setEditingModel(null);
-		setModelConnectionId(null);
+		setConnectionForm(null);
+		setModelForm(null);
 	}
 
 	const invalidateProviders = async () =>
@@ -415,7 +424,6 @@ function WorkspaceProviders({
 		...workspaceCreateLlmConnectionMutation(),
 		onSuccess: () => {
 			void invalidateProviders();
-			setConnectionDialogOpen(false);
 			toast.success("Provider connected");
 		},
 		onError: (error) => {
@@ -429,7 +437,6 @@ function WorkspaceProviders({
 		...filedUnder(connectionWriteKey, workspaceUpdateLlmConnectionMutation()),
 		onSuccess: () => {
 			void invalidateProviders();
-			setConnectionDialogOpen(false);
 			toast.success("Provider updated");
 		},
 		onError: (error) =>
@@ -466,10 +473,9 @@ function WorkspaceProviders({
 	});
 
 	const createModel = useMutation({
-		...workspaceCreateLlmModelMutation(),
+		...filedUnder(modelCreateKey, workspaceCreateLlmModelMutation()),
 		onSuccess: () => {
 			void invalidateProviders();
-			setModelDialogOpen(false);
 			toast.success("Model added");
 		},
 		onError: (error) => {
@@ -483,7 +489,6 @@ function WorkspaceProviders({
 		...filedUnder(modelWriteKey, workspaceUpdateLlmModelMutation()),
 		onSuccess: () => {
 			void invalidateProviders();
-			setModelDialogOpen(false);
 			toast.success("Model updated");
 		},
 		onError: (error) =>
@@ -502,12 +507,37 @@ function WorkspaceProviders({
 	const testingConnectionIds = usePendingMutationIds(probeKey, idOf);
 	const writingConnectionIds = usePendingMutationIds(connectionWriteKey, idOf);
 	const writingModelIds = usePendingMutationIds(modelWriteKey, idOf);
+	const addingModelConnectionIds = usePendingMutationIds(modelCreateKey, connectionIdOf);
+
+	// A form is busy only while its own subject saves: another row's write is not its business.
+	const connectionFormSubmitting =
+		connectionForm?.kind === "edit"
+			? writingConnectionIds.has(connectionForm.connection.id)
+			: createConnection.isPending;
+	const modelFormSubmitting =
+		modelForm?.kind === "edit"
+			? writingModelIds.has(modelForm.model.id)
+			: modelForm !== null && addingModelConnectionIds.has(modelForm.connectionId);
+	// The save outlives its form, which may be dismissed meanwhile; its result closes only that form.
+	// Each mutation's own onError reports a failure, so the form stays open on it.
+	const saveConnectionForm = (saved: ConnectionForm | null, request: Promise<unknown>) => {
+		void request.then(
+			() => setConnectionForm(closedIf(saved)),
+			() => undefined,
+		);
+	};
+	const saveModelForm = (saved: ModelForm | null, request: Promise<unknown>) => {
+		void request.then(
+			() => setModelForm(closedIf(saved)),
+			() => undefined,
+		);
+	};
 
 	const refreshFailure: RefreshFailure | undefined =
 		blockingFailure === undefined && failedReads.length > 0
 			? { error: failedReads[0]?.error, pending: retryPending, onRetry: retryFailedReads }
 			: undefined;
-	const formOpen = connectionDialogOpen || modelDialogOpen;
+	const formOpen = connectionForm !== null || modelForm !== null;
 	const refreshNotice =
 		refreshFailure === undefined ? undefined : (
 			<QueryErrorAlert
@@ -538,14 +568,10 @@ function WorkspaceProviders({
 				testingConnectionIds={testingConnectionIds}
 				writingConnectionIds={writingConnectionIds}
 				writingModelIds={writingModelIds}
-				onAddConnection={() => {
-					setEditingConnection(null);
-					setConnectionDialogOpen(true);
-				}}
-				onEditConnection={(connection) => {
-					setEditingConnection(connection);
-					setConnectionDialogOpen(true);
-				}}
+				addingConnection={createConnection.isPending}
+				addingModelConnectionIds={addingModelConnectionIds}
+				onAddConnection={() => setConnectionForm({ kind: "create" })}
+				onEditConnection={(connection) => setConnectionForm({ kind: "edit", connection })}
 				onTestConnection={(connection) => {
 					setTestResult(connection.id, undefined);
 					probeConnection.mutate({ path: { workspaceSlug, id: connection.id } });
@@ -553,40 +579,55 @@ function WorkspaceProviders({
 				onDisconnect={(connection) =>
 					deleteConnection.mutate({ path: { workspaceSlug, id: connection.id } })
 				}
-				onAddModel={(connection) => {
-					setEditingModel(null);
-					setModelConnectionId(connection.id);
-					setModelDialogOpen(true);
-				}}
-				onEditModel={(model) => {
-					setEditingModel(model);
-					setModelConnectionId(model.connectionId);
-					setModelDialogOpen(true);
-				}}
+				onAddModel={(connection) => setModelForm({ kind: "create", connectionId: connection.id })}
+				onEditModel={(model) => setModelForm({ kind: "edit", model })}
 				onDeleteModel={(model) => deleteModel.mutate({ path: { workspaceSlug, id: model.id } })}
 			/>
 			<WorkspaceLlmConnectionFormDialog
-				open={connectionDialogOpen}
+				open={connectionForm !== null}
 				notice={refreshNotice}
-				onOpenChange={setConnectionDialogOpen}
-				editing={editingConnection}
-				isSubmitting={createConnection.isPending || updateConnection.isPending}
-				onCreate={(body) => createConnection.mutate({ path, body })}
-				onUpdate={(id, body) => updateConnection.mutate({ path: { workspaceSlug, id }, body })}
+				onOpenChange={(open) => {
+					if (!open) {
+						setConnectionForm(null);
+					}
+				}}
+				editing={connectionForm?.kind === "edit" ? connectionForm.connection : null}
+				isSubmitting={connectionFormSubmitting}
+				onCreate={(body) =>
+					saveConnectionForm(connectionForm, createConnection.mutateAsync({ path, body }))
+				}
+				onUpdate={(id, body) =>
+					saveConnectionForm(
+						connectionForm,
+						updateConnection.mutateAsync({ path: { workspaceSlug, id }, body }),
+					)
+				}
 			/>
 			<WorkspaceLlmModelFormDialog
-				open={modelDialogOpen}
+				open={modelForm !== null}
 				notice={refreshNotice}
-				onOpenChange={setModelDialogOpen}
-				editing={editingModel}
-				isSubmitting={createModel.isPending || updateModel.isPending}
+				onOpenChange={(open) => {
+					if (!open) {
+						setModelForm(null);
+					}
+				}}
+				editing={modelForm?.kind === "edit" ? modelForm.model : null}
+				isSubmitting={modelFormSubmitting}
 				onCreate={(body) => {
-					if (modelConnectionId == null) {
+					if (modelForm?.kind !== "create") {
 						return;
 					}
-					createModel.mutate({ path: { workspaceSlug, connectionId: modelConnectionId }, body });
+					saveModelForm(
+						modelForm,
+						createModel.mutateAsync({
+							path: { workspaceSlug, connectionId: modelForm.connectionId },
+							body,
+						}),
+					);
 				}}
-				onUpdate={(id, body) => updateModel.mutate({ path: { workspaceSlug, id }, body })}
+				onUpdate={(id, body) =>
+					saveModelForm(modelForm, updateModel.mutateAsync({ path: { workspaceSlug, id }, body }))
+				}
 			/>
 		</>
 	);

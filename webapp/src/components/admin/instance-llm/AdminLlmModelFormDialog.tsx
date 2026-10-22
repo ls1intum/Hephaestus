@@ -9,6 +9,7 @@ import type {
 } from "@/api/types.gen";
 import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
 	Dialog,
 	DialogBody,
@@ -89,6 +90,7 @@ function AdminLlmModelFormDialogContent({
 	onSave,
 }: AdminLlmModelFormDialogContentProps) {
 	const isEdit = editing !== null;
+	const submitLabel = isEdit ? "Save changes" : "Add model";
 	const [fields, setFields] = useState<LlmModelFieldsValue>(() =>
 		modelFieldsValueOf(editing, priceValueOf(editing)),
 	);
@@ -211,7 +213,8 @@ function AdminLlmModelFormDialogContent({
 						Cancel
 					</Button>
 					<Button type="submit" disabled={isSubmitting}>
-						{isEdit ? "Save changes" : "Add model"}
+						{isSubmitting && <Spinner aria-hidden />}
+						{isSubmitting ? "Saving…" : submitLabel}
 					</Button>
 				</DialogFooter>
 			</DialogForm>
