@@ -1,7 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "cn";
+import { InlineLink } from "@/components/common/InlineLink";
 
 import { OVERVIEW_TYPE } from "./overview-type-scale";
 
@@ -13,6 +14,8 @@ export interface CardFigure {
 	value: ReactNode;
 	/** Nothing of it: the figure is drawn quiet. */
 	none?: boolean;
+	/** Opens the rows the figure counts: number and term are one link, with this accessible name. */
+	link?: { render: ReactElement; label: string };
 }
 
 /**
@@ -32,19 +35,37 @@ export function FigureRow({ label, figures }: { label: string; figures: readonly
 		>
 			{figures.map((figure) => (
 				<li key={figure.key} data-figure={figure.key} className="whitespace-nowrap">
-					{/* A count link is muted at rest; here the number keeps the figure's colour. */}
-					<span
-						className={cn(
-							"[&_a]:text-current",
-							figure.none === true ? OVERVIEW_TYPE.none : OVERVIEW_TYPE.value,
-						)}
-					>
-						{figure.value}
-					</span>{" "}
-					{figure.term}
+					<FigureText figure={figure} />
 				</li>
 			))}
 		</ul>
+	);
+}
+
+/** The number then its label; a figure that opens its rows is one link, underlined as a count is. */
+function FigureText({ figure }: { figure: CardFigure }) {
+	const text = (
+		<>
+			{/* A count link is muted at rest; here the number keeps the figure's colour. */}
+			<span
+				data-figure-value
+				className={cn(
+					"[&_a]:text-current",
+					figure.none === true ? OVERVIEW_TYPE.none : OVERVIEW_TYPE.value,
+				)}
+			>
+				{figure.value}
+			</span>{" "}
+			{figure.term}
+		</>
+	);
+	if (figure.link === undefined) {
+		return text;
+	}
+	return (
+		<InlineLink tone="count" aria-label={figure.link.label} render={figure.link.render}>
+			{text}
+		</InlineLink>
 	);
 }
 

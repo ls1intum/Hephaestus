@@ -120,6 +120,43 @@ export const ResettingKeepsTheScope: Story = {
 	},
 };
 
+/**
+ * A figure of the queue card opened the list at its queue state. It has no control in the row, so it
+ * shows as a pill, and it is one of the tab's own filters, so "Reset" is offered.
+ */
+export const QueueStateFromTheQueueCard: Story = {
+	args: { search: { status: undefined, queueState: "HELD" }, total: 1 },
+	play: async ({ canvas }) => {
+		canvas.getByText("1 review matches your filters.");
+		await expect(canvas.getByText("Queue now: On hold for budget")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: /Reset/u })).toBeVisible();
+	},
+};
+
+/** The pill's own remove clears the queue state alone. */
+export const RemovingTheQueueState: Story = {
+	args: { search: { status: ["RUNNING"], queueState: "HELD" }, total: 1 },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Clear queue now filter (On hold for budget)" }),
+		);
+		await expect(args.onPatch).toHaveBeenLastCalledWith({ queueState: undefined });
+		await expect(canvas.queryByText("Queue now: On hold for budget")).not.toBeInTheDocument();
+		canvas.getByTitle("Status: Running");
+	},
+};
+
+/** "Reset" clears the queue state too: it is one of the tab's own filters. */
+export const ResettingClearsTheQueueState: Story = {
+	args: { search: { status: undefined, queueState: "WAITING" }, total: 4 },
+	play: async ({ args, canvas, userEvent }) => {
+		canvas.getByText("Queue now: Waiting");
+		await userEvent.click(canvas.getByRole("button", { name: /Reset/u }));
+		await expect(args.onReset).toHaveBeenCalledTimes(1);
+		await expect(canvas.queryByText("Queue now: Waiting")).not.toBeInTheDocument();
+	},
+};
+
 export const SelectionApplies: Story = {
 	args: {
 		search: {

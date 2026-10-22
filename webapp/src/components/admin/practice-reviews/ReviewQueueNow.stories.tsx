@@ -18,7 +18,7 @@ import { ReviewQueueNow } from "./ReviewQueueNow";
 function figuresOf(canvas: StoryContext["canvas"]) {
 	const list = canvas.getByLabelText("Queue now");
 	return [...list.querySelectorAll("li")].map((figure) => {
-		const value = figure.firstElementChild?.textContent ?? "";
+		const value = figure.querySelector("[data-figure-value]")?.textContent ?? "";
 		return `${figure.textContent.slice(value.length).trim()}: ${value}`;
 	});
 }
@@ -31,7 +31,9 @@ function rowsOf(canvas: StoryContext["canvas"]) {
 
 /** One figure's number, by its key. */
 function figureValue(canvas: StoryContext["canvas"], key: string) {
-	return canvas.getByLabelText("Queue now").querySelector(`[data-figure="${key}"] > span`);
+	return canvas
+		.getByLabelText("Queue now")
+		.querySelector(`[data-figure="${key}"] [data-figure-value]`);
 }
 
 const meta = {
@@ -84,24 +86,22 @@ export const Busy: Story = {
 			"on hold for budget: 0",
 			"oldest wait: 4 min",
 		]);
-		// Waiting and running open the Reviews table filtered to them, whatever the range.
+		// Waiting and running open the Reviews table at their queue state, whatever the range.
 		const opens = (name: string) =>
 			new URL(canvas.getByRole<HTMLAnchorElement>("link", { name }).href).searchParams;
-		// Waiting is a count; running opens its matching reviews.
-		await expect(canvas.queryByRole("link", { name: "5 reviews waiting" })).toBeNull();
-		await expect(opens("2 reviews running").getAll("status")).toStrictEqual(["RUNNING"]);
+		await expect(opens("5 reviews waiting").get("queueState")).toBe("WAITING");
+		await expect(opens("2 reviews running").get("queueState")).toBe("RUNNING");
+		await expect(opens("2 reviews running").getAll("status")).toStrictEqual([]);
 		await expect(opens("2 reviews running").get("from")).toBeNull();
-		// A figure's number is black whether it is a link or not; its label is muted.
+		// The whole figure is the link; its number is black and bold, its label muted.
 		const running = canvas.getByRole("link", { name: "2 reviews running" });
-		await expect(getComputedStyle(running).color).toBe(getComputedStyle(now).color);
-		await expect(getComputedStyle(running).fontWeight).toBe("600");
-		const runningFigure = canvas
-			.getByLabelText("Queue now")
-			.querySelector('[data-figure="running"]');
-		await expect(getComputedStyle(runningFigure ?? now).color).not.toBe(
-			getComputedStyle(running).color,
-		);
-		await expect(canvas.queryByRole("link", { name: /on hold$/u })).toBeNull();
+		await expect(running).toHaveTextContent("2 running");
+		const number = running.querySelector("[data-figure-value]") ?? now;
+		await expect(getComputedStyle(number).color).toBe(getComputedStyle(now).color);
+		await expect(getComputedStyle(number).fontWeight).toBe("600");
+		await expect(getComputedStyle(running).color).not.toBe(getComputedStyle(number).color);
+		// Nothing on hold: a quiet zero opens nothing.
+		await expect(canvas.queryByRole("link", { name: /on hold/u })).toBeNull();
 		const rows = rowsOf(canvas);
 		await expect(rows).toHaveLength(3);
 		// A small table: work, developer, state and how long, each column lined up down the rows.
@@ -125,6 +125,33 @@ export const Busy: Story = {
 		const search = new URL(all.getAttribute("href") ?? "", "http://x").searchParams;
 		await expect(search.getAll("status")).toStrictEqual(["RUNNING", "QUEUED"]);
 		await expect(now.querySelector(".lucide-triangle-alert")).toBeNull();
+	},
+};
+
+/**
+ * Each counted figure opens the Reviews table at its own queue state and names its count, so the
+ * list it opens holds as many reviews as it says (`-overview-queue-route.test.tsx` follows the links).
+ * The oldest wait counts no rows and is not one of them.
+ */
+export const FiguresOpenTheirQueueState: Story = {
+	args: { state: { status: "ready", queue: { ...busyReviewQueue, waiting: 4, heldForBudget: 1 } } },
+	play: async ({ canvas }) => {
+		const figures = canvas.getByLabelText("Queue now");
+		const counted = ["waiting", "running", "held"].map((key) =>
+			within(
+				figures.querySelector<HTMLElement>(`[data-figure="${key}"]`) ?? figures,
+			).getByRole<HTMLAnchorElement>("link"),
+		);
+		await expect(
+			counted.map(
+				(link) =>
+					`${link.getAttribute("aria-label") ?? ""} -> ${new URL(link.href).searchParams.toString()}`,
+			),
+		).toStrictEqual([
+			"4 reviews waiting -> queueState=WAITING",
+			"2 reviews running -> queueState=RUNNING",
+			"1 review on hold for budget, needs a look -> queueState=HELD",
+		]);
 	},
 };
 
@@ -208,7 +235,11 @@ export const OnHold: Story = {
 		await expect(figureValue(canvas, "held")).toHaveTextContent("Needs a look: 1");
 		// Nothing runs until an admin acts: broken, so red.
 		await expect(figureValue(canvas, "held")?.querySelector(".text-destructive")).not.toBeNull();
-		await expect(canvas.queryByRole("link", { name: "1 review on hold" })).toBeNull();
+		// The hold opens the reviews it holds; its name keeps the mark's words.
+		const held = canvas.getByRole<HTMLAnchorElement>("link", {
+			name: "1 review on hold for budget, needs a look",
+		});
+		await expect(new URL(held.href).searchParams.get("queueState")).toBe("HELD");
 		await expect(rowsOf(canvas)).toHaveLength(1);
 		await expect(rowsOf(canvas)[0]).toHaveTextContent("#1431Alan TuringOn hold42 min");
 	},

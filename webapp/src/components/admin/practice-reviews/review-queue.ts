@@ -1,4 +1,4 @@
-import type { ReviewQueue, ReviewQueueItem } from "@/api/types.gen";
+import type { ListReviewsData, ReviewQueue, ReviewQueueItem } from "@/api/types.gen";
 
 import { QUEUE_WAIT_THRESHOLDS } from "./review-attention-thresholds";
 
@@ -49,6 +49,23 @@ export function waitsLong(queue: ReviewQueue): boolean {
 }
 
 export type QueueItemState = "running" | "waiting" | "held";
+
+/**
+ * The Reviews list's `queueState`: the reviews whose job stands so in the queue now, split as the
+ * queue counts its figures, so a figure opens exactly the reviews it counts.
+ */
+export const QUEUE_STATES = ["WAITING", "HELD", "RUNNING"] as const satisfies readonly NonNullable<
+	NonNullable<ListReviewsData["query"]>["queueState"]
+>[];
+
+export type QueueState = (typeof QUEUE_STATES)[number];
+
+/** Each queue state as the queue card says it, for the filter's pill. */
+export const QUEUE_STATE_LABELS: Record<QueueState, string> = {
+	WAITING: "Waiting",
+	HELD: "On hold for budget",
+	RUNNING: "Running",
+};
 
 export function queueItemState(item: ReviewQueueItem): QueueItemState {
 	if (item.status === "RUNNING") {
