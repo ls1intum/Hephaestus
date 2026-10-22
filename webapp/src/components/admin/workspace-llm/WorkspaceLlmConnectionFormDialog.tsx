@@ -26,6 +26,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import type { FieldErrors, LlmConnectionFormField } from "@/lib/llm-form-validation";
 
@@ -72,6 +73,7 @@ function WorkspaceLlmConnectionFormDialogContent({
 	onUpdate,
 }: WorkspaceLlmConnectionFormDialogContentProps) {
 	const isEdit = editing !== null;
+	const submitLabel = isEdit ? "Save changes" : "Add connection";
 	const [fields, setFields] = useState<LlmConnectionFieldsValue>(() =>
 		connectionFieldsValueOf(editing),
 	);
@@ -171,7 +173,8 @@ function WorkspaceLlmConnectionFormDialogContent({
 				<DialogFooter>
 					<DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
 					<Button type="submit" disabled={isSubmitting}>
-						{isEdit ? "Save changes" : "Add connection"}
+						{isSubmitting && <Spinner aria-hidden />}
+						{isSubmitting ? "Saving…" : submitLabel}
 					</Button>
 				</DialogFooter>
 			</DialogForm>

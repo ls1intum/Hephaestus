@@ -20,6 +20,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
 import type { AdminLlmModelSaveBody } from "@/lib/admin-llm-model-save";
 import type { FieldErrors, LlmModelFormField } from "@/lib/llm-form-validation";
 import { reasoningEffortOf, reasoningEffortUpdateOf } from "@/lib/reasoning-effort";
@@ -89,6 +90,7 @@ function AdminLlmModelFormDialogContent({
 	onSave,
 }: AdminLlmModelFormDialogContentProps) {
 	const isEdit = editing !== null;
+	const submitLabel = isEdit ? "Save changes" : "Add model";
 	const [fields, setFields] = useState<LlmModelFieldsValue>(() =>
 		modelFieldsValueOf(editing, priceValueOf(editing)),
 	);
@@ -211,7 +213,8 @@ function AdminLlmModelFormDialogContent({
 						Cancel
 					</Button>
 					<Button type="submit" disabled={isSubmitting}>
-						{isEdit ? "Save changes" : "Add model"}
+						{isSubmitting && <Spinner aria-hidden />}
+						{isSubmitting ? "Saving…" : submitLabel}
 					</Button>
 				</DialogFooter>
 			</DialogForm>

@@ -1225,3 +1225,198 @@ it("keeps each model's delete pending on its own row when two run at once", asyn
 	);
 	expect(slowDeleteCalls).toBe(1);
 });
+
+it("keeps another provider's edit open and savable while an earlier provider's update finishes", async () => {
+	const user = userEvent.setup();
+	const second = { ...OWN_CONNECTION, id: 8, displayName: "Second provider" };
+	const slowUpdate = deferred();
+	const updates: { id: number; displayName?: string }[] = [];
+	let connectionReads = 0;
+	mockOwnProviders(() => []);
+	server.use(
+		http.get("*/workspaces/:workspaceSlug/llm/connections", () => {
+			connectionReads += 1;
+			return HttpResponse.json([OWN_CONNECTION, second]);
+		}),
+		http.patch<PathParams, { displayName?: string }>(
+			"*/workspaces/acme/llm/connections/7",
+			async ({ request }) => {
+				const body = await request.json();
+				updates.push({ id: 7, displayName: body.displayName });
+				await slowUpdate.promise;
+				return HttpResponse.json(OWN_CONNECTION);
+			},
+		),
+		http.patch<PathParams, { displayName?: string }>(
+			"*/workspaces/acme/llm/connections/8",
+			async ({ request }) => {
+				const body = await request.json();
+				updates.push({ id: 8, displayName: body.displayName });
+				return HttpResponse.json({ ...second, displayName: "Second provider renamed" });
+			},
+		),
+	);
+	renderRouteAt("/w/acme/admin/models");
+	// A failed assertion must still answer the held update, or the test leaves it open.
+	try {
+		const editFirst = await screen.findByRole<HTMLButtonElement>(
+			"button",
+			{ name: "Edit Own OpenAI" },
+			ROUTE_RENDER_WAIT,
+		);
+		await user.click(editFirst);
+		const first = within(await screen.findByRole("dialog", { name: "Edit connection" }));
+		await user.click(first.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(updates).toStrictEqual([{ id: 7, displayName: "Own OpenAI" }]));
+		// The save has no timeout, so its dialog may still close; the provider it saves stays fenced.
+		expect(editFirst.disabled).toBe(true);
+		await user.click(first.getByRole("button", { name: "Cancel" }));
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+		await user.click(screen.getByRole("button", { name: "Edit Second provider" }));
+		const secondDialog = await screen.findByRole("dialog", { name: "Edit connection" });
+		const name = within(secondDialog).getByLabelText<HTMLInputElement>("Display name");
+		expect(name.value).toBe("Second provider");
+		await user.clear(name);
+		await user.type(name, "Second provider renamed");
+		const save = within(secondDialog).getByRole<HTMLButtonElement>("button", {
+			name: "Save changes",
+		});
+		const savableWhileFirstSaves = !save.disabled;
+
+		const readsBefore = connectionReads;
+		await act(async () => {
+			slowUpdate.resolve();
+		});
+		// The first update's success reads the providers again; by then it has done all it does.
+		await waitFor(() => expect(connectionReads).toBeGreaterThan(readsBefore));
+		expect({
+			savableWhileFirstSaves,
+			stillOpen: screen.queryByRole("dialog", { name: "Edit connection" }) === secondDialog,
+			draft: name.value,
+		}).toStrictEqual({
+			savableWhileFirstSaves: true,
+			stillOpen: true,
+			draft: "Second provider renamed",
+		});
+
+		await user.click(save);
+		await waitFor(() =>
+			expect(updates).toStrictEqual([
+				{ id: 7, displayName: "Own OpenAI" },
+				{ id: 8, displayName: "Second provider renamed" },
+			]),
+		);
+	} finally {
+		slowUpdate.resolve();
+	}
+});
+
+it.each([
+	{
+		start: "an update of another model",
+		openHeld: "Edit Slow model",
+		heldTitle: "Edit model",
+		// The stored model saves as it is.
+		heldFields: [],
+		submit: "Save changes",
+	},
+	{
+		start: "a new model",
+		openHeld: "Add model to Own OpenAI",
+		heldTitle: "Add model",
+		heldFields: [
+			["Display name", "Added model"],
+			["Upstream model ID", "added-model"],
+		],
+		submit: "Add inactive model",
+	},
+] as const)(
+	"keeps a model's edit open and savable while $start finishes",
+	async ({ openHeld, heldTitle, heldFields, submit }) => {
+		const user = userEvent.setup();
+		const slowWrite = deferred();
+		const writes: string[] = [];
+		const updates: { id: number; displayName?: string }[] = [];
+		let modelReads = 0;
+		// A model without metered cost must say why, or its form refuses to save it unchanged.
+		const priceNote = "Covered by our provider contract.";
+		const models = [
+			{ ...ownModel(10, "Slow model"), priceNote },
+			{ ...ownModel(20, "Draft model"), priceNote },
+		];
+		mockOwnProviders(() => models);
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/llm/models", () => {
+				modelReads += 1;
+				return HttpResponse.json(models);
+			}),
+			http.patch("*/workspaces/acme/llm/models/10", async () => {
+				writes.push("PATCH 10");
+				await slowWrite.promise;
+				return HttpResponse.json(models[0]);
+			}),
+			http.post("*/workspaces/acme/llm/connections/7/models", async () => {
+				writes.push("POST");
+				await slowWrite.promise;
+				return HttpResponse.json(ownModel(30, "Added model"));
+			}),
+			http.patch<PathParams, { displayName?: string }>(
+				"*/workspaces/acme/llm/models/20",
+				async ({ request }) => {
+					const body = await request.json();
+					updates.push({ id: 20, displayName: body.displayName });
+					return HttpResponse.json(ownModel(20, "Draft model renamed"));
+				},
+			),
+		);
+		renderRouteAt("/w/acme/admin/models");
+		// A failed assertion must still answer the held write, or the test leaves it open.
+		try {
+			await user.click(await screen.findByRole("button", { name: openHeld }, ROUTE_RENDER_WAIT));
+			const held = within(await screen.findByRole("dialog", { name: heldTitle }));
+			for (const [label, value] of heldFields) {
+				await user.type(held.getByLabelText(label), value);
+			}
+			await user.click(held.getByRole("button", { name: submit }));
+			await waitFor(() => expect(writes).toHaveLength(1));
+			await user.click(held.getByRole("button", { name: "Cancel" }));
+			await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+			await user.click(screen.getByRole("button", { name: "Edit Draft model" }));
+			const draftDialog = await screen.findByRole("dialog", { name: "Edit model" });
+			const name = within(draftDialog).getByLabelText<HTMLInputElement>("Display name");
+			expect(name.value).toBe("Draft model");
+			await user.clear(name);
+			await user.type(name, "Draft model renamed");
+			const save = within(draftDialog).getByRole<HTMLButtonElement>("button", {
+				name: "Save changes",
+			});
+			const savableWhileOtherSaves = !save.disabled;
+
+			const readsBefore = modelReads;
+			await act(async () => {
+				slowWrite.resolve();
+			});
+			// The held write's success reads the models again; by then it has done all it does.
+			await waitFor(() => expect(modelReads).toBeGreaterThan(readsBefore));
+			expect({
+				savableWhileOtherSaves,
+				stillOpen: screen.queryByRole("dialog", { name: "Edit model" }) === draftDialog,
+				draft: name.value,
+			}).toStrictEqual({
+				savableWhileOtherSaves: true,
+				stillOpen: true,
+				draft: "Draft model renamed",
+			});
+
+			await user.click(save);
+			await waitFor(() =>
+				expect(updates).toStrictEqual([{ id: 20, displayName: "Draft model renamed" }]),
+			);
+			expect(writes).toHaveLength(1);
+		} finally {
+			slowWrite.resolve();
+		}
+	},
+);

@@ -19,6 +19,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { listsNoModels, UNLISTED_MODELS } from "@/lib/llm-api-protocol-labels";
 import type { FieldErrors, LlmConnectionFormField } from "@/lib/llm-form-validation";
 import type { LlmApiProtocol, LlmAuthMode } from "@/lib/llm-provider-type";
@@ -101,6 +102,7 @@ function AdminLlmConnectionFormDialogContent({
 	onProbed,
 }: AdminLlmConnectionFormDialogContentProps) {
 	const isEdit = editing !== null;
+	const submitLabel = isEdit ? "Save changes" : "Add connection";
 	const [fields, setFields] = useState<LlmConnectionFieldsValue>(() =>
 		connectionFieldsValueOf(editing),
 	);
@@ -285,7 +287,8 @@ function AdminLlmConnectionFormDialogContent({
 						Cancel
 					</Button>
 					<Button type="submit" disabled={isSubmitting}>
-						{isEdit ? "Save changes" : "Add connection"}
+						{isSubmitting && <Spinner aria-hidden />}
+						{isSubmitting ? "Saving…" : submitLabel}
 					</Button>
 				</DialogFooter>
 			</DialogForm>

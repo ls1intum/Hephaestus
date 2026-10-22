@@ -25,6 +25,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 import type { FieldErrors, LlmModelFormField } from "@/lib/llm-form-validation";
 import { reasoningEffortOf, reasoningEffortUpdateOf } from "@/lib/reasoning-effort";
 
@@ -84,6 +85,7 @@ function WorkspaceLlmModelFormDialogContent({
 	onUpdate,
 }: WorkspaceLlmModelFormDialogContentProps) {
 	const isEdit = editing !== null;
+	const submitLabel = isEdit ? "Save changes" : "Add inactive model";
 	const [fields, setFields] = useState<LlmModelFieldsValue>(() =>
 		modelFieldsValueOf(editing, priceValueOf(editing)),
 	);
@@ -157,7 +159,8 @@ function WorkspaceLlmModelFormDialogContent({
 				<DialogFooter>
 					<DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
 					<Button type="submit" disabled={isSubmitting}>
-						{isEdit ? "Save changes" : "Add inactive model"}
+						{isSubmitting && <Spinner aria-hidden />}
+						{isSubmitting ? "Saving…" : submitLabel}
 					</Button>
 				</DialogFooter>
 			</DialogForm>

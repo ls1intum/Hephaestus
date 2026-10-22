@@ -45,6 +45,8 @@ export interface AdminLlmConnectionsTableProps {
 	onToggleEnabled: (connection: LlmConnection, enabled: boolean) => void;
 	onDelete: (connection: LlmConnection) => void;
 	onAdd?: () => void;
+	/** A new connection is being saved; Add waits for it, so a dismissed form cannot add it twice. */
+	addDisabled?: boolean;
 }
 
 function hostOf(baseUrl: string): string {
@@ -88,6 +90,7 @@ export function AdminLlmConnectionsTable({
 	onToggleEnabled,
 	onDelete,
 	onAdd,
+	addDisabled = false,
 }: AdminLlmConnectionsTableProps) {
 	const [deleting, setDeleting] = useState<LlmConnection | null>(null);
 	const [turningOff, setTurningOff] = useState<LlmConnection | null>(null);
@@ -125,7 +128,7 @@ export function AdminLlmConnectionsTable({
 				</EmptyHeader>
 				{onAdd && (
 					<EmptyContent>
-						<Button onClick={onAdd}>
+						<Button disabled={addDisabled} onClick={onAdd}>
 							<Plus className="size-4" aria-hidden />
 							Add connection
 						</Button>
