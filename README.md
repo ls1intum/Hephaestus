@@ -9,27 +9,26 @@
   <p><strong>Learn from the work you already do</strong></p>
 
   <p>
-    <a href="https://hephaestus.build"><img alt="Open the TUM-operated Hephaestus web app" src="https://img.shields.io/badge/web_app-try_it-493C83"></a>
-    <a href="https://docs.hephaestus.build/"><img alt="Read the Hephaestus documentation" src="https://img.shields.io/badge/docs-read_online-1F75CB?logo=docusaurus&logoColor=white"></a>
-    <a href="https://github.com/hephaestus-build/Hephaestus/releases/latest"><img alt="Latest Hephaestus release" src="https://img.shields.io/github/v/release/hephaestus-build/Hephaestus?display_name=tag&sort=semver"></a>
-    <a href="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml"><img alt="Hephaestus CI status" src="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml/badge.svg?branch=main"></a>
-    <a href="https://github.com/hephaestus-build/Hephaestus/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/hephaestus-build/Hephaestus"></a>
+    <a href="https://hephaestus.build"><strong>App</strong></a> ·
+    <a href="https://docs.hephaestus.build/"><strong>Docs</strong></a> ·
+    <a href="https://docs.hephaestus.build/admin/install"><strong>Self-host</strong></a> ·
+    <a href="https://github.com/hephaestus-build/Hephaestus/discussions"><strong>Discussions</strong></a>
+  </p>
+  <p>
+    <a href="https://github.com/hephaestus-build/Hephaestus/releases/latest"><img alt="Latest Hephaestus release" height="20" src="https://img.shields.io/github/v/release/hephaestus-build/Hephaestus?display_name=tag&amp;sort=semver"></a>
+    <a href="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml?query=branch%3Amain"><img alt="Hephaestus CI status on main" height="20" src="https://github.com/hephaestus-build/Hephaestus/actions/workflows/cicd.yml/badge.svg?branch=main"></a>
+    <a href="https://scorecard.dev/viewer/?uri=github.com/hephaestus-build/Hephaestus"><img alt="Hephaestus OpenSSF Scorecard report" height="20" src="https://img.shields.io/ossf-scorecard/github.com/hephaestus-build/Hephaestus?label=OpenSSF%20Scorecard&amp;style=flat"></a>
+    <a href="./LICENSE"><img alt="MIT license" height="20" src="https://img.shields.io/github/license/hephaestus-build/Hephaestus?style=flat"></a>
   </p>
 </div>
 
 Hephaestus is an open-source AI mentor for software teams.
 It checks developers' existing work against the engineering practices that their project values.
 This work includes issues, pull requests, reviews, and their related discussions.
-Hephaestus explains what went well, what could be better, and a way to improve it.
+Hephaestus explains where the work needs attention and suggests a next step.
 
 Every piece of feedback names its practice and points back to the reviewed work.
 Developers can ask why, disagree, or discuss the next step.
-
-A mentor gives feedback on how you work.
-Examples include a coach on a university capstone or an experienced maintainer on an open-source project.
-There is never enough of that attention for everyone.
-Hephaestus does the routine part so that everyone gets some.
-People keep responsibility for the harder judgment and the relationships.
 
 <div align="center">
   <picture>
@@ -39,6 +38,12 @@ People keep responsibility for the harder judgment and the relationships.
   </picture>
   <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://docs.hephaestus.build/user/ai-code-review">user guide</a> for the real interface.</sub></p>
 </div>
+
+A mentor gives feedback on how you work.
+Examples include a coach on a university capstone or an experienced maintainer on an open-source project.
+There is never enough of that attention for everyone.
+Hephaestus does the routine part so that everyone gets some.
+People keep responsibility for the harder judgment and the relationships.
 
 > [!IMPORTANT]
 > **Hephaestus is pre-1.0.** Releases are continuous.
@@ -130,13 +135,14 @@ The feedback is advisory: it does not approve a change for merge or grade anyone
 
 - **Contribute:** start with the
   [local development guide](https://docs.hephaestus.build/contributor/local-development).
-  The
-  web app's components are browsable in
-  [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.com/).
+  Explore the UI components with Storybook in the
+  [local development guide](https://docs.hephaestus.build/contributor/local-development#component-workflow-storybook--chromatic).
 
 ## Get help
 
-- Ask questions and share ideas in [GitHub Discussions](https://github.com/hephaestus-build/Hephaestus/discussions).
+- Ask usage and installation questions in [Support](https://github.com/hephaestus-build/Hephaestus/discussions/categories/support).
+- Propose a change in [Ideas](https://github.com/hephaestus-build/Hephaestus/discussions/categories/ideas).
+  A discussion can explore a proposal before it becomes selected work.
 - Report reproducible bugs in [GitHub Issues](https://github.com/hephaestus-build/Hephaestus/issues).
 - Report security vulnerabilities privately as described in [SECURITY.md](./SECURITY.md).
 
