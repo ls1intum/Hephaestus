@@ -23,6 +23,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -214,6 +215,36 @@ class ProductItemQueryIntegrationTest extends BaseIntegrationTest {
         monitors.delete(monitor);
         assertThat(sourceAccess.permits(target, purpose)).isFalse();
         assertStillMissing(source, OUTSIDE_THE_REVISION);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"GITHUB,true", "GITHUB,false", "GITLAB,true", "GITLAB,false"})
+    void shouldLeaveWorkWithoutAStoredRepositoryUnknownAndItsReadUsable(
+            IdentityProviderType provider, boolean pullRequest) {
+        var target = lookup.work(data.scenario().workspace(), provider, pullRequest);
+        long source = Objects.requireNonNull(target.sourceId());
+        var known = items.currentWorkVersion(target.workspaceId(), target.itemId());
+        assertThat(known).isInstanceOf(ProductItemQuery.CurrentWorkVersion.Known.class);
+        long repository = Objects.requireNonNull(
+                jdbc.queryForObject("SELECT repository_id FROM issue WHERE id=?", Long.class, source));
+
+        jdbc.update("UPDATE issue SET repository_id=NULL WHERE id=?", source);
+        var read = new TransactionTemplate(transactions);
+        read.setReadOnly(true);
+        var version = read.execute(status -> {
+            var unknown = items.currentWorkVersion(target.workspaceId(), target.itemId());
+            assertThat(items.find(target.workspaceId(), target.itemId())).contains(target);
+            assertThat(status.isRollbackOnly()).isFalse();
+            return unknown;
+        });
+        assertThat(version).isEqualTo(ProductItemQuery.CurrentWorkVersion.Unknown.INSTANCE);
+        assertThat(sourceAccess.permits(target, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
+        assertStillMissing(source, List.of("repository_id"));
+
+        jdbc.update("UPDATE issue SET repository_id=? WHERE id=?", repository, source);
+        assertThat(items.currentWorkVersion(target.workspaceId(), target.itemId()))
+                .isEqualTo(known);
     }
 
     /** No read fills a missing field: each stays NULL in the stored row. */

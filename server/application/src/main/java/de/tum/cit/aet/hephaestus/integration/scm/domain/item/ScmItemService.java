@@ -134,7 +134,8 @@ public class ScmItemService implements ItemSource {
         }
         var work = items.work(item.kind(), sourceId).orElseThrow(ScmItemService::gone);
         if (work.getDeleted()) throw gone();
-        long repositoryId = Objects.requireNonNull(work.getRepositoryId(), "Stored work has no repository");
+        Long repositoryId = work.getRepositoryId();
+        if (repositoryId == null) throw gone();
         authorize(item, repositoryRows.findById(repositoryId).orElseThrow(ScmItemService::gone));
         String base = objectId(work.getBaseRefOid());
         String head = objectId(work.getHeadRefOid());
@@ -526,7 +527,9 @@ public class ScmItemService implements ItemSource {
 
     private IntegrationRef authorize(ItemRef workItem, Issue work) {
         if (work.getDeletedAt() != null) throw gone();
-        return authorize(workItem, Objects.requireNonNull(work.getRepository()));
+        Repository repository = work.getRepository();
+        if (repository == null) throw gone();
+        return authorize(workItem, repository);
     }
 
     private IntegrationRef authorize(ItemRef workItem, Repository repository) {
