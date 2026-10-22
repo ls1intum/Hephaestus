@@ -14,6 +14,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 
 export interface WorkspacePasskeyPolicySectionProps {
+	assuranceEnforced?: boolean;
 	required?: boolean;
 	instanceRequired?: boolean;
 	owner: boolean;
@@ -25,6 +26,7 @@ export interface WorkspacePasskeyPolicySectionProps {
 }
 
 export function WorkspacePasskeyPolicySection({
+	assuranceEnforced = true,
 	required,
 	instanceRequired = false,
 	owner,
@@ -35,7 +37,17 @@ export function WorkspacePasskeyPolicySection({
 	onChange,
 }: WorkspacePasskeyPolicySectionProps) {
 	const id = useId();
+	const instanceEnforced = assuranceEnforced && instanceRequired;
 	const showSpinner = useSpinDelay(pending, { delay: 1000, minDuration: 500 });
+	let description =
+		"This policy is saved, but extra authentication checks are disabled on this instance.";
+	if (assuranceEnforced) {
+		description =
+			required === true || instanceRequired
+				? "Passkeys are required for workspace administration."
+				: "Passkeys are optional for workspace administration.";
+	}
+
 	return (
 		<section aria-labelledby={`${id}-heading`} aria-busy={loading} className="space-y-3">
 			<h2 id={`${id}-heading`} className="text-lg font-semibold">
@@ -64,30 +76,26 @@ export function WorkspacePasskeyPolicySection({
 							<Field orientation="horizontal">
 								<FieldContent>
 									<FieldLabel htmlFor={`${id}-required`}>Require admin passkeys</FieldLabel>
-									<FieldDescription id={`${id}-description`}>
-										{required || instanceRequired
-											? "Passkeys are required for workspace administration."
-											: "Passkeys are optional for workspace administration."}
-									</FieldDescription>
+									<FieldDescription id={`${id}-description`}>{description}</FieldDescription>
 								</FieldContent>
 								<Switch
 									id={`${id}-required`}
 									aria-describedby={`${id}-description`}
 									aria-busy={pending}
-									checked={required || instanceRequired}
-									disabled={pending || !owner || instanceRequired}
+									checked={required || instanceEnforced}
+									disabled={pending || !owner || instanceEnforced}
 									onCheckedChange={(checked) => onChange(checked)}
 								/>
 							</Field>
 						</FieldGroup>
 					)}
-					{instanceRequired && (
+					{instanceEnforced && (
 						<p>The instance requires passkeys. This workspace cannot weaken that requirement.</p>
 					)}
 					{!owner && required !== undefined && (
 						<p>Only a workspace owner can change this policy.</p>
 					)}
-					{owner && !instanceRequired && (
+					{assuranceEnforced && owner && !instanceEnforced && (
 						<p className="text-sm text-muted-foreground">
 							Verify your passkey in User settings before you change this policy.
 						</p>

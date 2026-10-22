@@ -33,12 +33,16 @@ class PasskeyAssurancePolicyTest {
     private final Account account = new Account("Ada");
 
     private PasskeyAssurancePolicy policy(boolean instance, boolean workspace) {
+        return policy(instance, workspace, true);
+    }
+
+    private PasskeyAssurancePolicy policy(boolean instance, boolean workspace, boolean enforced) {
         account.setId(42L);
         when(accounts.findById(42L)).thenReturn(Optional.of(account));
         return new PasskeyAssurancePolicy(
                 new PasskeyProperties(instance, workspace, "example.com", List.of()),
                 accounts,
-                AuthPropertiesFixture.defaults(),
+                enforced ? AuthPropertiesFixture.defaults() : AuthPropertiesFixture.withoutAssurance(),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 mock(PasskeySecurityEvents.class));
     }
@@ -191,5 +195,59 @@ class PasskeyAssurancePolicyTest {
                                         .build()),
                                 false))
                 .isInstanceOf(PasskeyRequiredException.class);
+    }
+
+    @Test
+    void shouldSuspendConfiguredAndPersonalRequirementsOnlyWhenOperatorDisablesAssurance() {
+        account.setPasskeyProtectionEnabled(true);
+        account.setPasskeyRecoveryRequired(true);
+        Authentication oauth = new JwtAuthenticationToken(
+                Jwt.withTokenValue("oauth").header("alg", "ES256").subject("42").build());
+        SecurityContextHolder.getContext().setAuthentication(oauth);
+        var disabled = policy(true, true, false);
+        disabled.requireInstanceAdmin(oauth, true);
+        disabled.requireWorkspaceAdmin(true, true, true);
+        disabled.requireFresh();
+        disabled.requireEnrollment(true, false);
+        disabled.requireEnrollment(false, false);
+        assertThat(disabled.isFresh(oauth)).isFalse();
+        assertThat(disabled.assuranceEnforced()).isFalse();
+        assertThatThrownBy(() -> policy(true, true).requireInstanceAdmin(oauth, true))
+                .isInstanceOf(PasskeyRequiredException.class);
+    }
+
+    @Test
+    void shouldKeepUserViewWriteProhibitionWhenAssuranceIsDisabled() {
+        SecurityContextHolder.getContext().setAuthentication(authentication(NOW, false));
+        UserViewContextHolder.set(new UserViewContextHolder.View(7L, 99L));
+        assertThatThrownBy(() -> policy(true, true, false).requireFresh())
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void shouldRejectMissingAccountAndInstalledClientWhenAssuranceIsDisabled() {
+        var disabled = policy(true, true, false);
+        assertThatThrownBy(disabled::requireFresh).isInstanceOf(PasskeyRequiredException.class);
+        assertThatThrownBy(() -> disabled.requireInstanceAdmin(null, true))
+                .isInstanceOf(PasskeyRequiredException.class);
+        SecurityContextHolder.getContext().setAuthentication(authentication(NOW, true));
+        assertThatThrownBy(disabled::requireFresh).isInstanceOf(PasskeyRequiredException.class);
+        SecurityContextHolder.getContext()
+                .setAuthentication(new JwtAuthenticationToken(Jwt.withTokenValue("oauth")
+                        .header("alg", "ES256")
+                        .subject("77")
+                        .build()));
+        assertThatThrownBy(disabled::requireFresh).isInstanceOf(PasskeyRequiredException.class);
+        SecurityContextHolder.getContext()
+                .setAuthentication(new JwtAuthenticationToken(Jwt.withTokenValue("oauth")
+                        .header("alg", "ES256")
+                        .subject("invalid")
+                        .build()));
+        assertThatThrownBy(disabled::requireFresh)
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
     }
 }

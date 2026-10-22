@@ -28,3 +28,17 @@ export const InstanceRequired: Story = {
 	},
 };
 export const Admin: Story = { args: { owner: false } };
+
+export const AssuranceDisabled: Story = {
+	args: { assuranceEnforced: false, required: false, instanceRequired: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("switch", { name: "Require admin passkeys" })).not.toBeChecked();
+		await expect(
+			canvas.getByRole("switch", { name: "Require admin passkeys" }),
+		).not.toHaveAttribute("aria-disabled", "true");
+		await expect(
+			canvas.getByText(/policy is saved, but extra authentication checks are disabled/u),
+		).toBeVisible();
+		await expect(canvas.queryByText(/Verify your passkey in User settings/u)).toBeNull();
+	},
+};

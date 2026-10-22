@@ -296,6 +296,7 @@ hephaestus:
         audience: ${HEPHAESTUS_AUTH_AUDIENCE:hephaestus-spa}
         access-ttl: ${HEPHAESTUS_AUTH_ACCESS_TTL:24h}
         step-up-max-age: ${HEPHAESTUS_AUTH_STEP_UP_MAX_AGE:5m}
+        assurance-enforced: ${HEPHAESTUS_AUTH_ASSURANCE_ENFORCED:true}
         passkeys:
             instance-admin-required: ${HEPHAESTUS_AUTH_PASSKEYS_INSTANCE_ADMIN_REQUIRED:false}
             workspace-admin-required: ${HEPHAESTUS_AUTH_PASSKEYS_WORKSPACE_ADMIN_REQUIRED:false}

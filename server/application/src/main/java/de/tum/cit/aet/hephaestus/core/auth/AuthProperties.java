@@ -31,6 +31,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  *                       admin; blank disables the endpoint
  * @param sessionMaxLifetime absolute session deadline set at login and preserved through refresh
  * @param stepUpMaxAge maximum sign-in age for sensitive actions; refresh does not reset sign-in time
+ * @param assuranceEnforced require additional passkey and recent-sign-in assurance; disable only on isolated test instances
  * @param devLoginEnabled passwordless local sign-in; rejected under the production profile and unsafe
  *                        on an internet-exposed deployment
  * @param cookieSecure whether auth and CSRF cookies use Secure and the {@code __Host-} prefix;
@@ -53,6 +54,7 @@ public record AuthProperties(
         @DefaultValue("") String bootstrapToken,
         @DefaultValue("7d") Duration sessionMaxLifetime,
         @DefaultValue("5m") Duration stepUpMaxAge,
+        @DefaultValue("true") boolean assuranceEnforced,
         @DefaultValue("false") boolean devLoginEnabled,
         @DefaultValue("true") boolean cookieSecure,
         @DefaultValue List<String> browserExtensionIds) {

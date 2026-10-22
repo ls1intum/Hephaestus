@@ -66,6 +66,9 @@ public class PasskeyService implements AccountErasureContributor {
 
     public record PasskeyStatusDTO(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean assuranceEnforced,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             boolean protectionEnabled,
 
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
@@ -88,6 +91,7 @@ public class PasskeyService implements AccountErasureContributor {
     public PasskeyStatusDTO status(Long accountId) {
         Account account = accounts.findById(accountId).orElseThrow();
         return new PasskeyStatusDTO(
+                assurance.assuranceEnforced(),
                 account.isPasskeyProtectionEnabled(),
                 account.isPasskeyRecoveryRequired(),
                 properties.instanceAdminRequired(),

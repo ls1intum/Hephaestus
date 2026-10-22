@@ -218,6 +218,7 @@ function servePasskeys(initial: "none" | "one", held?: Promise<unknown>) {
 	server.use(
 		http.get("*/user/passkeys", () =>
 			HttpResponse.json({
+				assuranceEnforced: true,
 				protectionEnabled: false,
 				recoveryRequired: false,
 				instanceAdminRequired: true,

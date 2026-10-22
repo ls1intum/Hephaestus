@@ -14,6 +14,7 @@ const props = {
 	onRecover: vi.fn(),
 };
 const status = {
+	assuranceEnforced: true,
 	protectionEnabled: false,
 	recoveryRequired: false,
 	instanceAdminRequired: true,
@@ -153,5 +154,43 @@ describe("PasskeySection", () => {
 		expect(screen.getByText(/This browser cannot use passkeys/u).getAttribute("role")).toBe(
 			"alert",
 		);
+	});
+	it("allows settings changes without claiming verification when deployment assurance is disabled", () => {
+		render(
+			<PasskeySection
+				{...props}
+				status={{ ...status, assuranceEnforced: false, protectionEnabled: true }}
+			/>,
+		);
+		expect(screen.queryByRole("button", { name: "Verify passkey" })).toBeNull();
+		expect(screen.queryByText("Recently confirmed.")).toBeNull();
+		expect(unavailable("Register passkey")).toBe(false);
+		expect(unavailable("Create new recovery codes")).toBe(false);
+		expect(
+			screen
+				.getByRole("switch", { name: "Personal admin protection" })
+				.getAttribute("aria-disabled"),
+		).not.toBe("true");
+		expect(screen.getByText(/Your preference is saved/u).textContent).toContain(
+			"checks are disabled",
+		);
+	});
+
+	it("describes actual removal and recovery effects without inventing a disabled admin lock", async () => {
+		const user = userEvent.setup();
+		render(<PasskeySection {...props} status={{ ...status, assuranceEnforced: false }} />);
+		await user.click(screen.getByRole("button", { name: "Remove Personal device" }));
+		let dialog = await screen.findByRole("alertdialog");
+		expect(dialog.textContent).toContain("deletes your recovery codes");
+		expect(dialog.textContent).toContain("other sessions");
+		expect(dialog.textContent).not.toContain("locked");
+		expect(dialog.textContent).not.toContain("verify");
+		await user.click(screen.getByRole("button", { name: "Cancel" }));
+		await user.click(screen.getByText("Recover passkeys"));
+		await user.type(screen.getByLabelText("Recovery code"), "test-recovery");
+		await user.click(screen.getByRole("button", { name: "Start recovery" }));
+		dialog = await screen.findByRole("alertdialog");
+		expect(dialog.textContent).toContain("removes all passkeys and ends your other sessions");
+		expect(dialog.textContent).not.toContain("blocked");
 	});
 });

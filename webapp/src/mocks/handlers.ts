@@ -46,6 +46,7 @@ function notFound() {
 export const handlers = [
 	http.get("*/user/passkeys", () =>
 		HttpResponse.json({
+			assuranceEnforced: true,
 			protectionEnabled: false,
 			recoveryRequired: false,
 			instanceAdminRequired: true,
@@ -57,6 +58,7 @@ export const handlers = [
 	http.get("*/workspaces/:workspaceSlug/passkey-policy", () =>
 		HttpResponse.json({
 			required: false,
+			assuranceEnforced: true,
 			instanceRequired: false,
 		} satisfies Wire<WorkspacePasskeyPolicy>),
 	),

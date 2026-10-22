@@ -39,12 +39,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Instance-wide research disclosure; every operation requires the operator's own fresh passkey. */
+/** Instance-wide research disclosure; every operation checks the operator's deployment assurance policy. */
 @RestController
 @ConditionalOnServerRole
 @RequestMapping("/admin/research-disclosures")
 @RequireInstanceAdmin
-@RecentSignInExempt(reason = "Every entry requires fresh verified WebAuthn through AdminPasskeyAccess.requireFresh")
+@RecentSignInExempt(reason = "Every entry enforces deployment assurance through AdminPasskeyAccess.requireFresh")
 @Tag(name = "Research", description = "Instance-admin research disclosures and downstream removal receipts")
 public class ResearchDisclosureController {
 

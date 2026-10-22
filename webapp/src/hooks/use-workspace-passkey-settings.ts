@@ -33,6 +33,7 @@ export function useWorkspacePasskeySettings({ workspaceSlug }: { workspaceSlug: 
 		error = problemDetailOf(policy.error);
 	}
 	return {
+		assuranceEnforced: policy.data?.assuranceEnforced,
 		required: membership.isError ? undefined : policy.data?.required,
 		instanceRequired: policy.data?.instanceRequired,
 		owner: membership.data?.role === "OWNER",
