@@ -185,6 +185,14 @@ code {
 }
 
 @layer base {
+	/* Browser-drawn controls, such as a date input's calendar icon, follow the selected theme. The
+	   dark variant matches only descendants of .dark, so the root states its own scheme. */
+	:root {
+		@apply scheme-light;
+	}
+	:root.dark {
+		@apply scheme-dark;
+	}
 	* {
 		@apply border-border outline-ring/50;
 	}
