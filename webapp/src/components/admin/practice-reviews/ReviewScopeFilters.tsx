@@ -14,13 +14,16 @@ import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
 import { GlobalScopeRow } from "./GlobalScopeRow";
 import type { PracticeFacetOption } from "./ResultFilters";
 import {
+	ORDERED_TABS,
 	type ReviewScope,
 	type ReviewTab,
 	SCOPE_APPLIES,
 	type ScopeFacet,
 	setScopeFacets,
+	type TimeOrder,
 } from "./review-scope";
 import { type ReviewPeople, ReviewPersonFacet } from "./ReviewPersonFacet";
+import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
 import { ShowTurnedOffSwitch } from "./ShowTurnedOffSwitch";
 
 export interface ScopeFiltersProps {
@@ -40,6 +43,19 @@ export interface ScopeFiltersProps {
 	 * so it is left out here.
 	 */
 	record?: ScopeRecordFilter;
+	/** An ordering this tab adds after the shared time order, as the results list adds "Most actionable first". */
+	ownOrder?: OwnOrder;
+}
+
+/**
+ * An ordering one tab offers after the shared time order. It is no time order, so it stays on its
+ * tab: a link to a sibling tab carries the time order alone.
+ */
+export interface OwnOrder {
+	item: ReviewSortItem<string>;
+	/** Whether the tab is ordered this way now, in place of the time order. */
+	active: boolean;
+	onSelect: () => void;
 }
 
 export interface ReviewScopeFiltersProps extends ScopeFiltersProps {
@@ -70,6 +86,11 @@ const RECORD_UNNAMED: Record<ScopeRecordFilter["facet"], string> = {
 
 const DEVELOPER_TITLE = "Developer";
 
+const TIME_ORDER_ITEMS: readonly [ReviewSortItem<TimeOrder>, ...ReviewSortItem<TimeOrder>[]] = [
+	{ value: "NEWEST", label: "Newest first" },
+	{ value: "OLDEST", label: "Oldest first" },
+];
+
 interface ScopePill {
 	key: string;
 	facet: ScopeFacet;
@@ -79,7 +100,35 @@ interface ScopePill {
 }
 
 /**
- * The scope's own controls, in the order every tab shows them: developer, group, practice, date.
+ * The shared time order, after the date it orders by, and the tab's own ordering after it. Choosing a
+ * time order leaves the tab's own ordering, as the URL key they share holds one or the other.
+ */
+function ScopeOrderSelect({
+	scope,
+	onChange,
+	ownOrder,
+}: Pick<ScopeFiltersProps, "scope" | "onChange" | "ownOrder">) {
+	const items: readonly [ReviewSortItem<string>, ...ReviewSortItem<string>[]] = ownOrder
+		? [...TIME_ORDER_ITEMS, ownOrder.item]
+		: TIME_ORDER_ITEMS;
+	return (
+		<ReviewSortSelect
+			items={items}
+			value={ownOrder?.active === true ? ownOrder.item.value : scope.order}
+			onChange={(next) => {
+				if (ownOrder !== undefined && next === ownOrder.item.value) {
+					ownOrder.onSelect();
+				} else {
+					onChange({ order: TIME_ORDER_ITEMS.find((item) => item.value === next)?.value });
+				}
+			}}
+		/>
+	);
+}
+
+/**
+ * The scope's own controls, in the order every tab shows them: developer, group, practice, date, and
+ * on a list the time order.
  * A part this tab cannot apply has no control; `ScopePills` keeps it visible as a muted pill. The
  * practice facet leaves out the practices turned off today, until the reader asks for them.
  */
@@ -92,6 +141,7 @@ function ScopeFacetControls({
 	practices,
 	people,
 	personName,
+	ownOrder,
 }: ScopeFiltersProps) {
 	const applies = SCOPE_APPLIES[tab];
 	const [showTurnedOff, setShowTurnedOff] = useState(false);
@@ -147,6 +197,9 @@ function ScopeFacetControls({
 					value={toDateRange(scope)}
 					onChange={(range) => onChange(fromDateRange(range))}
 				/>
+			)}
+			{ORDERED_TABS.includes(tab) && (
+				<ScopeOrderSelect scope={scope} onChange={onChange} ownOrder={ownOrder} />
 			)}
 		</>
 	);
@@ -230,9 +283,21 @@ function ScopePills({
 	);
 }
 
-/** "Clear scope", while any part of the scope holds a value, applied here or not. */
-function ClearScopeButton({ scope, onClear }: { scope: ReviewScope; onClear: () => void }) {
-	if (setScopeFacets(scope).length === 0) {
+/**
+ * "Clear scope", while any part of the scope holds a value, applied here or not, or a list is ordered
+ * oldest first.
+ */
+function ClearScopeButton({
+	tab,
+	scope,
+	onClear,
+}: {
+	tab: ReviewTab;
+	scope: ReviewScope;
+	onClear: () => void;
+}) {
+	const reordered = ORDERED_TABS.includes(tab) && scope.order === "OLDEST";
+	if (setScopeFacets(scope).length === 0 && !reordered) {
 		return null;
 	}
 	return (
@@ -256,7 +321,7 @@ export function ReviewScopeFilters(props: ReviewScopeFiltersProps) {
 			controls={
 				<>
 					<ScopeFacetControls {...props} />
-					<ClearScopeButton scope={scope} onClear={onClear} />
+					<ClearScopeButton tab={tab} scope={scope} onClear={onClear} />
 				</>
 			}
 			pills={

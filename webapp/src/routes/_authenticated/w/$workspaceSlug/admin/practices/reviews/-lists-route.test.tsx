@@ -207,6 +207,77 @@ describe("practice review list routes", () => {
 		expect(values(requested, "state")).toStrictEqual(["AWAITING_APPROVAL"]);
 	});
 
+	/**
+	 * The time order is part of the shared scope: chosen once in the bar above the tabs, it orders
+	 * every list, travels with the tab links, outlasts the tab's Reset and leaves with "Clear scope".
+	 */
+	it("keeps the time order chosen above the tabs on every list until the scope is cleared", async () => {
+		const { reviewUrls, resultUrls, problemUrls, feedbackUrls } = recordRequests();
+
+		const { router } = renderRouteAtWithRouter(
+			'/w/acme/admin/practices/reviews/feedback?state=["READY"]',
+		);
+		await screen.findByText("No feedback matches these filters", undefined, ROUTE_RENDER_WAIT);
+		const scope = screen.getByRole("group", { name: "Applies to every tab" });
+		await userEvent.click(within(scope).getByRole("combobox", { name: "Sort" }));
+		await userEvent.click(await screen.findByRole("option", { name: "Oldest first" }));
+		await waitFor(() => expect(router.state.location.search).toMatchObject({ order: "OLDEST" }));
+		await waitFor(() => expect(feedbackUrls.at(-1)?.searchParams.get("sort")).toBe("OLDEST"));
+
+		await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+		await waitFor(() => expect(values(feedbackUrls.at(-1), "state")).toStrictEqual([]));
+		expect(router.state.location.search).toMatchObject({ order: "OLDEST" });
+
+		const tabs = screen.getByRole("navigation", { name: "Practice review sections" });
+		for (const [tab, urls] of [
+			["Results", resultUrls],
+			["Problems", problemUrls],
+			["Reviews", reviewUrls],
+		] as const) {
+			await userEvent.click(within(tabs).getByRole("link", { name: new RegExp(`^${tab}`, "u") }));
+			await waitFor(() => expect(urls.at(-1)?.searchParams.get("sort")).toBe("OLDEST"));
+			expect(
+				within(screen.getByRole("group", { name: "Applies to every tab" })).getByRole("combobox", {
+					name: "Sort",
+				}).textContent,
+			).toContain("Oldest first");
+		}
+
+		await userEvent.click(screen.getByRole("button", { name: "Clear scope" }));
+		await waitFor(() => expect(reviewUrls.at(-1)?.searchParams.get("sort")).toBeNull());
+		expect(router.state.location.search.order).toBeUndefined();
+	});
+
+	/** "Most actionable first" is the results list's own: no other list has it, so no link carries it. */
+	it("keeps the results list's own ordering on that list alone", async () => {
+		const { resultUrls, feedbackUrls } = recordRequests();
+
+		renderRouteAtWithRouter(
+			"/w/acme/admin/practices/reviews/results?developerId=7&order=ACTIONABILITY",
+		);
+		await screen.findByText("No results match these filters", undefined, ROUTE_RENDER_WAIT);
+		const scope = screen.getByRole("group", { name: "Applies to every tab" });
+		expect(within(scope).getByRole("combobox", { name: "Sort" }).textContent).toContain(
+			"Most actionable first",
+		);
+
+		// "Clear scope" ends the shared scope; the list's own ordering is not part of it.
+		await userEvent.click(within(scope).getByRole("button", { name: "Clear scope" }));
+		await waitFor(() => expect(resultUrls.at(-1)?.searchParams.get("developerId")).toBeNull());
+		expect(resultUrls.at(-1)?.searchParams.get("sort")).toBe("ACTIONABILITY");
+
+		const tabs = screen.getByRole("navigation", { name: "Practice review sections" });
+		await userEvent.click(within(tabs).getByRole("link", { name: /^Feedback/u }));
+		await waitFor(() => expect(feedbackUrls.length).toBeGreaterThan(0));
+		expect(feedbackUrls.at(-1)?.searchParams.get("sort")).toBeNull();
+		await userEvent.click(
+			within(screen.getByRole("group", { name: "Applies to every tab" })).getByRole("combobox", {
+				name: "Sort",
+			}),
+		);
+		expect(screen.queryByRole("option", { name: "Most actionable first" })).toBeNull();
+	});
+
 	/** The default ordering is the server's, so nothing is sent rather than a guess at its name. */
 	it("sends no ordering when the reader has not chosen one", async () => {
 		const { resultUrls } = recordRequests();

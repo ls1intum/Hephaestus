@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { carriedScope, clearedScope, clearedScopeFilters } from "./review-scope";
 import {
 	feedbackQuery,
 	feedbackSearchSchema,
@@ -87,6 +88,33 @@ describe("practice review search", () => {
 		expect(resultsQuery(chosen, 25).sort).toBe("ACTIONABILITY");
 		expect(resultsQuery(untouched, 25).sort).toBeUndefined();
 		expect(resultsQuery(foreign, 25).sort).toBeUndefined();
+	});
+
+	it("sends the shared time order to every list's endpoint", () => {
+		const oldest = { order: "OLDEST" };
+
+		expect(reviewsQuery(reviewsSearchSchema.parse(oldest), 25).sort).toBe("OLDEST");
+		expect(resultsQuery(resultsSearchSchema.parse(oldest), 25).sort).toBe("OLDEST");
+		expect(problemsQuery(problemsSearchSchema.parse(oldest), 25).sort).toBe("OLDEST");
+		expect(feedbackQuery(feedbackSearchSchema.parse(oldest), 25).sort).toBe("OLDEST");
+		// Only the results list has an ordering of its own; every other list drops it.
+		expect(reviewsSearchSchema.parse({ order: "ACTIONABILITY" }).order).toBeUndefined();
+		expect(feedbackSearchSchema.parse({ order: "ACTIONABILITY" }).order).toBeUndefined();
+	});
+
+	it("carries the time order to the next tab, but not the results list's own ordering", () => {
+		expect(carriedScope({ developerId: "7", order: "OLDEST" })).toStrictEqual({
+			developerId: "7",
+			order: "OLDEST",
+		});
+		expect(carriedScope({ developerId: "7", order: "ACTIONABILITY" })).toStrictEqual({
+			developerId: "7",
+		});
+	});
+
+	it("clears the time order with the scope, but not with the filters", () => {
+		expect(clearedScope()).toHaveProperty("order", undefined);
+		expect(clearedScopeFilters()).not.toHaveProperty("order");
 	});
 
 	it("names the one practice a list narrows to, the tracked one first", () => {

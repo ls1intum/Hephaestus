@@ -24,7 +24,7 @@ import { ITEM_KIND_VALUES } from "@/lib/item-kinds";
 import { multiValue, narrowToEnum, nonEmpty } from "@/lib/search-params";
 import { hasText } from "@/lib/text";
 
-import { type ReviewScope, type ReviewScopeSearch, readScope } from "./review-scope";
+import { type ReviewScope, type ScopeSource, readScope, TIME_ORDERS } from "./review-scope";
 import { positiveIdParam, uuidParam } from "./review-selection";
 
 /**
@@ -61,14 +61,10 @@ export const PRACTICE_REVIEW_READS: ReadonlySet<string> = new Set([
 	"getItemTrace",
 ]);
 
-export const RESULT_SORTS = ["NEWEST", "ACTIONABILITY"] as const;
+/** The results list's orderings: the shared time order, then "Most actionable first", which is its own. */
+export const RESULT_SORTS = [...TIME_ORDERS, "ACTIONABILITY"] as const;
 
 export type ResultSort = (typeof RESULT_SORTS)[number];
-
-/** Ordering names the server understands for feedback: when it was composed, either way round. */
-export const FEEDBACK_SORTS = ["NEWEST", "OLDEST"] as const;
-
-export type FeedbackSort = (typeof FEEDBACK_SORTS)[number];
 
 const day = z.iso.date().optional().catch(undefined);
 const flag = z.boolean().optional().catch(undefined);
@@ -98,6 +94,8 @@ const scope = {
 	to: day,
 	groupSlug: multiValue,
 	practiceSlug: multiValue,
+	// The time order every list shares. The results list widens it with an ordering of its own.
+	order: z.enum(TIME_ORDERS).optional().catch(undefined),
 };
 
 export function parseScopeSearch(search: unknown): ReviewScope {
@@ -121,8 +119,6 @@ export const feedbackSearchSchema = z
 		location: z.enum(statusValues(FEEDBACK_LOCATION_DEFS)).optional().catch(undefined),
 		withdrawn: flag,
 		disagreed: flag,
-		// Sibling routes type sort differently; relative search links must specify from to retain their route's type.
-		order: z.enum(FEEDBACK_SORTS).optional().catch(undefined),
 	})
 	.transform(canonicalDateRange);
 
@@ -135,7 +131,8 @@ export const resultsSearchSchema = z
 		markedIncorrect: flag,
 		accepted: flag,
 		disagreed: flag,
-		// The endpoint's `sort`; the feedback list's `order` says what sharing the word costs.
+		// The endpoint's `sort`: the shared time order, or this list's own "Most actionable first". A
+		// link to a sibling tab carries only a time order (`carriedScope`).
 		order: z.enum(RESULT_SORTS).optional().catch(undefined),
 	})
 	.transform(canonicalDateRange);
@@ -168,6 +165,8 @@ export const overviewSearchSchema = z
 		showTurnedOff: z.literal(true).optional().catch(undefined),
 		// The default, "Needs a look first", is left out of the URL.
 		practicesSort: z.literal("BUSIEST").optional().catch(undefined),
+		// Kept as the list before had it; a link to a list carries only a time order (`carriedScope`).
+		order: z.enum(RESULT_SORTS).optional().catch(undefined),
 	})
 	.transform(canonicalDateRange);
 
@@ -209,7 +208,7 @@ export function onePracticeQuery(search: {
 	return hasText(search.selectedPractice) ? search.selectedPractice : oneValue(search.practiceSlug);
 }
 
-function scopeQuery(search: Partial<ReviewScopeSearch>) {
+function scopeQuery(search: Partial<ScopeSource>) {
 	return {
 		...dateWindowQuery(search),
 		reviewId: search.reviewId,
@@ -229,6 +228,7 @@ export function reviewsQuery(
 		kind: search.kind,
 		itemId: search.itemId,
 		developerId: numericId(search.developerId),
+		sort: search.order,
 	};
 }
 
@@ -292,5 +292,6 @@ export function problemsQuery(
 		markedIncorrect: search.markedIncorrect,
 		accepted: search.accepted,
 		disagreed: search.disagreed,
+		sort: search.order,
 	};
 }

@@ -5,7 +5,7 @@ import { nonEmpty } from "@/lib/search-params";
 
 import { listFacet } from "./AppliedFacetPills";
 import type { PracticeFacetOption } from "./ResultFilters";
-import { clearedScope, hasAppliedScope, readScope } from "./review-scope";
+import { clearedScopeFilters, hasAppliedScope, readScope } from "./review-scope";
 import type { ReviewsSearch } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
 import type { ReviewPeople } from "./ReviewPersonFacet";
@@ -26,7 +26,7 @@ export function clearedReviewFacets(): Partial<ReviewsSearch> {
 }
 
 export function clearedReviewFilters(): Partial<ReviewsSearch> {
-	return { ...clearedReviewFacets(), ...clearedScope() };
+	return { ...clearedReviewFacets(), ...clearedScopeFilters() };
 }
 
 export interface ReviewFiltersProps {

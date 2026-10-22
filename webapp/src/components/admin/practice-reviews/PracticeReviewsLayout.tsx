@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 
 import { GlobalScopeSlot } from "./GlobalScopeRow";
-import { carriedScope, type ReviewScopeSearch } from "./review-scope";
+import { carriedScope, type ScopeSource } from "./review-scope";
 
 const SECTIONS = [
 	{ to: "/w/$workspaceSlug/admin/practices/reviews/overview", label: "Overview", tab: "overview" },
@@ -81,7 +81,7 @@ export function PracticeReviewsLayout({
 												params={{ workspaceSlug }}
 												// Every tab keeps the shared scope: a person, practices, a date range and the
 												// selection. A tab's own facets stay behind.
-												search={(previous: ReviewScopeSearch) => carriedScope(previous)}
+												search={(previous: ScopeSource) => carriedScope(previous)}
 												activeOptions={{ exact: true, includeSearch: false }}
 											/>
 										}

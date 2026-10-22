@@ -165,7 +165,14 @@ export const SharedOrder: Story = {
 	play: async ({ canvas }) => {
 		const scope = canvas.getByRole("group", { name: "Applies to every tab" });
 		const filters = canvas.getByRole("group", { name: "Filters" });
-		await expect(controlsOf(scope)).toStrictEqual(["Developer", "Group", "Practice", "Created"]);
+		// The time order follows the date it orders by.
+		await expect(controlsOf(scope)).toStrictEqual([
+			"Developer",
+			"Group",
+			"Practice",
+			"Created",
+			expect.stringMatching(/^Newest first/u),
+		]);
 		await expect(controlsOf(filters)).toStrictEqual(["Status"]);
 		await expect(precedes(scope, filters)).toBe(true);
 	},

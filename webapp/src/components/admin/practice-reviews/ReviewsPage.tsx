@@ -82,7 +82,9 @@ export interface ReviewsPageProps {
 	openReviewId?: string;
 }
 
-const LIST_LABEL = "Practice reviews, newest first";
+function listLabel(order: ReviewsSearch["order"]): string {
+	return order === "OLDEST" ? "Practice reviews, oldest first" : "Practice reviews, newest first";
+}
 
 // Created dates include queue time; Requested would mislabel reviews started by other origins.
 const TIME_LABEL = "Created";
@@ -103,6 +105,7 @@ export function ReviewsPage({
 	const activeItems = activeItemsOf(rows);
 	const hasFilter = hasReviewFilter(search);
 	const reset = () => onSearchChange(clearedReviewFilters());
+	const label = listLabel(search.order);
 	let results: ReactNode;
 	if (reviews.status === "error") {
 		results = (
@@ -115,7 +118,7 @@ export function ReviewsPage({
 	} else if (reviews.status === "loading") {
 		results = (
 			<ReviewDayTableSkeleton
-				aria-label={LIST_LABEL}
+				aria-label={label}
 				timeLabel={TIME_LABEL}
 				columns={REVIEW_SUMMARY_COLUMNS}
 				rows={REVIEW_PAGE_SIZE}
@@ -126,7 +129,7 @@ export function ReviewsPage({
 			<>
 				<ReviewListRefresh failure={reviews.refreshFailure} noun="reviews" />
 				<ReviewDayTable
-					aria-label={LIST_LABEL}
+					aria-label={label}
 					timeLabel={TIME_LABEL}
 					columns={REVIEW_SUMMARY_COLUMNS}
 					reviews={rows}

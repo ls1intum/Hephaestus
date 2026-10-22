@@ -86,6 +86,22 @@ export const ReportsAChosenSeverity: Story = {
 	},
 };
 
+// "Most actionable first" follows the shared time order in the scope bar's select, as this list's own.
+export const OwnOrderAfterTheTimeOrder: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		const scope = canvas.getByRole("group", { name: "Applies to every tab" });
+		await userEvent.click(within(scope).getByRole("combobox", { name: /Sort/u }));
+		const options = await screen.findAllByRole("option");
+		await expect(options.map((option) => option.textContent)).toStrictEqual([
+			"Newest first",
+			"Oldest first",
+			"Most actionable first",
+		]);
+		await userEvent.click(await screen.findByRole("option", { name: "Oldest first" }));
+		await expect(args.onPatch).toHaveBeenCalledWith({ order: "OLDEST" });
+	},
+};
+
 // Sorting does not narrow the list, so Reset must preserve it.
 export const SortIsNotAFilter: Story = {
 	args: {
