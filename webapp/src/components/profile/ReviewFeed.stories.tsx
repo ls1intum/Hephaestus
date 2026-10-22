@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, waitFor } from "storybook/test";
 
+import { expectListPlaceholders } from "@/stories/loading-more";
 import { detailReviews } from "@/stories/practice-detail-story-mock-data";
 
 import { ReviewFeed } from "./ReviewFeed";
@@ -50,9 +51,14 @@ export const LoadMore: Story = {
 	},
 };
 
+/** The next page's placeholder cards continue the timeline, in its own shape, while it is busy. */
 export const LoadingMore: Story = {
 	args: { feed: { ...readyFeed, hasMore: true, isLoadingMore: true } },
 	play: async ({ canvas }) => {
+		const list = canvas.getByRole("list", { name: "Reviews" });
+		// The day and time, then the card's work (title and place) and a result (mark and name).
+		await expectListPlaceholders(list, { bars: 6 });
+		await expect(list.lastElementChild).toHaveAttribute("data-loading-row");
 		await expect(canvas.getByRole("button", { name: "Loading…" })).toHaveAttribute(
 			"aria-disabled",
 			"true",
@@ -113,6 +119,22 @@ export const NarrowedToNothingSoFar: Story = {
 		).toBeVisible();
 		await waitFor(async () => expect(onLoadMore).toHaveBeenCalledOnce());
 		await expect(canvas.getByRole("button", { name: "View earlier reviews" })).toBeVisible();
+	},
+};
+
+/** With no result loaded yet, the placeholders of the earlier reviews stand at full width. */
+export const NarrowedToNothingLoadingMore: Story = {
+	args: {
+		feed: { ...readyFeed, hasMore: true, isLoadingMore: true },
+		reviews: [],
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("The latest reviews have no results here.")).toBeVisible();
+		const list = canvas.getByRole("list", { name: "Reviews" });
+		await expectListPlaceholders(list, { bars: 6 });
+		const frame = list.parentElement;
+		await expect(frame).not.toBeNull();
+		await expect(list.getBoundingClientRect().width).toBe(frame?.getBoundingClientRect().width);
 	},
 };
 

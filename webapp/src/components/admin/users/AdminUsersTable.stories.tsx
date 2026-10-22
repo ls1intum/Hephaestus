@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { AdminAccountView } from "@/api/types.gen";
+import { expectTablePlaceholders } from "@/stories/loading-more";
 
 import { AdminUsersTable } from "./AdminUsersTable";
 
@@ -170,12 +171,25 @@ export const HasMore: Story = {
 	},
 };
 
+/** The next page's placeholder rows continue the table in its own columns while it is busy. */
+export const LoadingMore: Story = {
+	args: { hasNextPage: true, isFetchingNextPage: true },
+	play: async ({ canvas }) => {
+		await expectTablePlaceholders(canvas.getByRole("table", { name: "Application users" }));
+		await expect(canvas.getByRole("button", { name: "Load more" })).toBeDisabled();
+	},
+};
+
 /** A search reads every page before it says nothing matched. */
 export const Searching: Story = {
 	args: { users: [], hasSearch: true, hasNextPage: true, isFetchingNextPage: true },
 	play: async ({ canvas }) => {
 		canvas.getByText("Searching all users…");
 		await expect(canvas.queryByText("No users found")).not.toBeInTheDocument();
+		// The one row says the search reads on; no placeholder rows stand under it.
+		const table = canvas.getByRole("table", { name: "Application users" });
+		await expect(table).toHaveAttribute("aria-busy", "true");
+		await expect(table.querySelector("[data-loading-row]")).toBeNull();
 	},
 };
 

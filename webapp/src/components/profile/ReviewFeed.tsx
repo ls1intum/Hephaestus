@@ -2,7 +2,7 @@ import { PulseIcon } from "@primer/octicons-react";
 import type { ReactNode } from "react";
 
 import type { ProfileReview } from "@/api/types.gen";
-import { InfiniteListEnd } from "@/components/common/InfiniteListEnd";
+import { InfiniteListEnd, LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
 	Empty,
@@ -60,6 +60,7 @@ export function ReviewFeed({
 		return <ReviewFeedSkeleton rows={skeletonRows} />;
 	}
 	const shown = reviews ?? feed.reviews;
+	const loadingMore = feed.isLoadingMore ? LOADING_MORE_ROWS : undefined;
 	// Refresh failures must preserve loaded reviews and pending responses, with a stale-data warning.
 	const refreshAlert =
 		feed.refreshFailure === undefined ? undefined : (
@@ -79,7 +80,9 @@ export function ReviewFeed({
 				{refreshAlert}
 				<p className="text-sm text-muted-foreground">The latest reviews have no results here.</p>
 				{emptyAction}
-				<EarlierReviews {...feed} loadingRow={REVIEW_CARD_SKELETON} />
+				{/* The earlier reviews will appear here, so their placeholders do. */}
+				{loadingMore !== undefined && <ReviewTimeline reviews={[]} loadingMore={loadingMore} />}
+				<EarlierReviews {...feed} />
 			</div>
 		);
 	}
@@ -109,21 +112,20 @@ export function ReviewFeed({
 				showPracticeName={showPracticeName}
 				initiallyOpen={initiallyOpen}
 				continues={feed.hasMore}
+				loadingMore={loadingMore}
 			/>
-			<EarlierReviews {...feed} loadingRow={REVIEW_CARD_SKELETON} />
+			<EarlierReviews {...feed} />
 		</>
 	);
 }
 
-const REVIEW_CARD_SKELETON = <Skeleton className="h-24 w-full" />;
-
-export function EarlierReviews({ loadingRow, ...more }: MorePages & { loadingRow: ReactNode }) {
+/** The end of a review list; the list above draws the next page's placeholders itself. */
+export function EarlierReviews(more: MorePages) {
 	return (
 		<InfiniteListEnd
 			{...more}
 			moreLabel="View earlier reviews"
 			failedLabel="We could not load earlier reviews."
-			loadingRow={loadingRow}
 		/>
 	);
 }

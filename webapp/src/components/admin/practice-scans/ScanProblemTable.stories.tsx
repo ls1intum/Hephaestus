@@ -3,6 +3,7 @@ import { expect, fn, within } from "storybook/test";
 
 import type { ScanReportProblem } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
+import { expectTablePlaceholders } from "@/stories/loading-more";
 import { StatefulPatch } from "@/stories/stateful";
 
 import { PROBLEM_ENTRIES } from "./fixtures";
@@ -197,6 +198,15 @@ export const NotCompared: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText("Not compared")).toHaveLength(2);
 		await expect(canvas.queryByText("Now met")).not.toBeInTheDocument();
+	},
+};
+
+/** The next page's placeholder rows continue the table in its own columns while it is busy. */
+export const LoadingMore: Story = {
+	args: { state: { ...ready(), hasNext: true, loadingMore: true } },
+	play: async ({ canvas }) => {
+		await expectTablePlaceholders(canvas.getByRole("table", { name: "Problems in this scan" }));
+		await expect(canvas.getByRole("button", { name: "Loading…" })).toBeDisabled();
 	},
 };
 

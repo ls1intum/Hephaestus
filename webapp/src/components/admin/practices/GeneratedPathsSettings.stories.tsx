@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent } from "storybook/test";
 import { Button } from "@/components/ui/button";
+import { expectListPlaceholders } from "@/stories/loading-more";
 import { Stateful } from "@/stories/stateful";
 import { pending } from "@/test/async";
 import { GeneratedPathsSettings } from "./GeneratedPathsSettings";
@@ -51,6 +52,27 @@ export const Configured: Story = {
 };
 export const NoRepositories: Story = { args: { repositories: { status: "ready", options: [] } } };
 export const LoadingRepositories: Story = { args: { repositories: { status: "loading" } } };
+/** The next page's placeholder rows continue the list of repositories, in their shape, while it is busy. */
+export const LoadingMoreRepositories: Story = {
+	args: {
+		repositories: {
+			status: "ready",
+			options: [
+				{ itemId: "101", name: "owner/repo" },
+				{ itemId: "102", name: "group/nested/project" },
+			],
+			total: 40,
+			more: { hasMore: true, isLoadingMore: true, onLoadMore: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		const list = canvas.getByRole("list");
+		// The name, the summary and the press of a repository row.
+		await expectListPlaceholders(list, { bars: 3 });
+		await expect(list.lastElementChild).toHaveAttribute("data-loading-row");
+		await expect(canvas.getByRole("button", { name: "Loading repositories…" })).toBeDisabled();
+	},
+};
 export const FailedRepositories: Story = {
 	args: { repositories: { status: "error", error: new Error("Unavailable"), onRetry: fn() } },
 };

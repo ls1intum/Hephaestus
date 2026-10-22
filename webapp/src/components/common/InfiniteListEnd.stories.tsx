@@ -16,9 +16,7 @@ const meta = {
 		onLoadMore: fn(),
 		moreLabel: "View earlier reviews",
 		failedLabel: "We could not load earlier reviews.",
-		loadingRow: <Skeleton className="h-24 w-full" />,
 	},
-	argTypes: { loadingRow: { control: false } },
 	decorators: [
 		(Story) => (
 			<div className="flex max-w-xl flex-col gap-2.5">
@@ -40,7 +38,7 @@ export const LoadsMoreInView: Story = {
 	},
 };
 
-/** The next page on its way: a row in the list's shape stands in for it, and the press waits. */
+/** The next page on its way: the press waits; the list above draws the placeholder rows. */
 export const LoadingMore: Story = {
 	args: { isLoadingMore: true },
 	play: async ({ args, canvas }) => {

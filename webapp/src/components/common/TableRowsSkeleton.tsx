@@ -20,6 +20,12 @@ export interface TableRowsSkeletonProps {
 	 */
 	columns: readonly (string | null | TableSkeletonColumn)[];
 	rows?: number;
+	/**
+	 * The rows stand after rows already drawn, for the next page: a line then keeps the last row
+	 * apart, since a body's last row drops its border, and the placeholders stay out of the
+	 * accessibility tree while the table is busy.
+	 */
+	continues?: boolean;
 }
 
 /**
@@ -28,19 +34,34 @@ export interface TableRowsSkeletonProps {
  * layout when the real columns arrive; pairing this with the real header means only the text changes
  * on resolve.
  */
-export function TableRowsSkeleton({ columns, rows = 5 }: TableRowsSkeletonProps) {
+export function TableRowsSkeleton({
+	columns,
+	rows = 5,
+	continues = false,
+}: TableRowsSkeletonProps) {
 	return (
 		<TableBody>
+			{continues && (
+				<tr aria-hidden data-separator>
+					<td colSpan={columns.length} className="border-t p-0" />
+				</tr>
+			)}
 			{Array.from({ length: rows }, (_, rowIndex) => (
-				<TableRow key={rowIndex} variant="static">
+				<TableRow
+					key={rowIndex}
+					variant="static"
+					aria-hidden={continues || undefined}
+					data-loading-row={continues || undefined}
+				>
 					{columns.map((column, cellIndex) => {
 						const plain = column === null || typeof column === "string";
 						const width = plain ? column : column.width;
 						return (
 							<TableCell key={cellIndex} className={plain ? undefined : column.className}>
 								{hasText(width) && (
-									<Skeleton
+									<SkeletonBar
 										className={cn("h-5", width, !plain && column.numeric === true && "ml-auto")}
+										capped={continues}
 									/>
 								)}
 							</TableCell>
@@ -49,5 +70,20 @@ export function TableRowsSkeleton({ columns, rows = 5 }: TableRowsSkeletonProps)
 				</TableRow>
 			))}
 		</TableBody>
+	);
+}
+
+/**
+ * A bar among rows already drawn takes no width of its own, so it never widens a column that the
+ * real rows have set; it is cut at the cell's edge instead.
+ */
+function SkeletonBar({ className, capped }: { className: string; capped: boolean }) {
+	if (!capped) {
+		return <Skeleton className={className} />;
+	}
+	return (
+		<div className="w-0 min-w-full overflow-hidden">
+			<Skeleton className={cn(className, "max-w-full")} />
+		</div>
 	);
 }

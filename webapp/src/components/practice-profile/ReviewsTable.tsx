@@ -2,6 +2,7 @@ import { PulseIcon } from "@primer/octicons-react";
 import { PlayIcon } from "lucide-react";
 
 import type { ProfileReview, ReviewResultCounts } from "@/api/types.gen";
+import { LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { InlineLink } from "@/components/common/InlineLink";
 import { useNow } from "@/components/common/use-now";
 import type { ReviewSaw } from "@/components/practice-trace/review-saw";
@@ -46,6 +47,8 @@ export interface ReviewsTableProps {
 	requesting?: string;
 	/** Each review's position among the reviews of its item, when every review is loaded. */
 	positions?: Map<string, number>;
+	/** Whether the next page of reviews is on its way: placeholder rows then continue the table. */
+	isLoadingMore?: boolean;
 }
 
 const COLUMNS: readonly ReviewColumn[] = [
@@ -87,6 +90,7 @@ export function ReviewsTable({
 	onReviewNow,
 	requesting,
 	positions,
+	isLoadingMore = false,
 }: ReviewsTableProps) {
 	// The newest row of a narrowed list is only the newest of what the filter kept.
 	const latestId = filtered ? undefined : reviews[0]?.review.id;
@@ -98,6 +102,7 @@ export function ReviewsTable({
 			reviews={reviews}
 			dateOf={reviewedAt}
 			reviewKey={(entry) => entry.review.id}
+			loadingMore={isLoadingMore ? LOADING_MORE_ROWS : undefined}
 			renderRow={(entry) => (
 				<ReviewRow
 					entry={entry}

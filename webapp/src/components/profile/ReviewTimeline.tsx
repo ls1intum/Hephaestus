@@ -2,6 +2,7 @@ import type { ProfileReview } from "@/api/types.gen";
 
 import { ReviewCard } from "./ReviewCard";
 import type { FeedbackResponseControls } from "./reviews";
+import { TimelineItemSkeleton } from "./TimelineItem";
 
 export interface ReviewTimelineProps {
 	reviews: ProfileReview[];
@@ -18,6 +19,8 @@ export interface ReviewTimelineProps {
 	initiallyOpen?: "all" | "newest";
 	/** True while earlier reviews exist below the fold: the rail then ends in a dashed tail. */
 	continues?: boolean;
+	/** Placeholder cards after the last review while the next page loads; the list is then busy. */
+	loadingMore?: number;
 }
 
 export function ReviewTimeline({
@@ -26,9 +29,14 @@ export function ReviewTimeline({
 	showPracticeName = true,
 	initiallyOpen = "all",
 	continues = false,
+	loadingMore = 0,
 }: ReviewTimelineProps) {
 	return (
-		<ol className="flex min-w-0 flex-col" aria-label="Reviews">
+		<ol
+			className="flex w-full min-w-0 flex-col"
+			aria-label="Reviews"
+			aria-busy={loadingMore > 0 || undefined}
+		>
 			{reviews.map((review, index) => (
 				<ReviewCard
 					key={review.review.id}
@@ -38,6 +46,9 @@ export function ReviewTimeline({
 					initiallyOpen={cardInitiallyOpen(initiallyOpen, index)}
 					tailContinues={continues && index === reviews.length - 1}
 				/>
+			))}
+			{Array.from({ length: loadingMore }, (_, index) => (
+				<TimelineItemSkeleton key={index} />
 			))}
 		</ol>
 	);

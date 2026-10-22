@@ -3,7 +3,7 @@ import { type ReactNode, useId } from "react";
 
 import { cn } from "cn";
 import type { ActivityWork, RepositoryInfo, UserInfo, WorkItem } from "@/api/types.gen";
-import { InfiniteListEnd } from "@/components/common/InfiniteListEnd";
+import { InfiniteListEnd, LOADING_MORE_ROWS } from "@/components/common/InfiniteListEnd";
 import { InlineLink } from "@/components/common/InlineLink";
 import { MetaRow } from "@/components/common/MetaRow";
 import type { PanelState } from "@/components/common/panel-state";
@@ -112,7 +112,10 @@ export function ActivityWorkLog({ state, providerType, subject }: ActivityWorkLo
 	}
 	const today = new Date(nowMs);
 	return (
-		<div aria-busy={state.stale || undefined} className={cn("space-y-6", state.stale && STALE)}>
+		<div
+			aria-busy={state.stale || state.isLoadingMore || undefined}
+			className={cn("space-y-6", state.stale && STALE)}
+		>
 			{refreshAlert}
 			{groupByDay(state.items).map(({ day, items }) => (
 				<DayGroup key={day.getTime()} label={dayLabel(day, today)}>
@@ -121,6 +124,8 @@ export function ActivityWorkLog({ state, providerType, subject }: ActivityWorkLo
 					))}
 				</DayGroup>
 			))}
+			{/* An earlier page starts at an earlier day, so its placeholder is a day of rows. */}
+			{state.isLoadingMore && <DayGroupSkeleton rows={LOADING_MORE_ROWS} />}
 			<InfiniteListEnd
 				hasMore={state.hasMore}
 				isLoadingMore={state.isLoadingMore}
@@ -129,8 +134,17 @@ export function ActivityWorkLog({ state, providerType, subject }: ActivityWorkLo
 				onLoadMore={state.onLoadMore}
 				moreLabel="Show earlier activity"
 				failedLabel="We could not load earlier activity."
-				loadingRow={<RowsSkeleton rows={2} />}
 			/>
+		</div>
+	);
+}
+
+/** A day's label over its rows, in the shape of the log's own, while an earlier page loads. */
+function DayGroupSkeleton({ rows }: { rows: number }) {
+	return (
+		<div aria-hidden data-loading-row className="flex flex-col gap-2">
+			<Skeleton className="h-4 w-24" />
+			<RowsSkeleton rows={rows} />
 		</div>
 	);
 }

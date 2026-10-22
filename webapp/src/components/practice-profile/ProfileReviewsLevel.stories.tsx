@@ -19,7 +19,12 @@ import { expectNoPanelOverflow } from "@/stories/reflow";
 import { daysBefore } from "@/stories/story-clock";
 import { levelsOpenedBy } from "@/test/detail-stack";
 
-import { REVIEW_SELECTION_CLEARED, reviewLevel, REVIEWS_LEVEL } from "./practice-profile-search";
+import {
+	REVIEW_SELECTION_CLEARED,
+	reviewLevel,
+	REVIEWS_LEVEL,
+	REVIEWS_OF_YOUR_WORK,
+} from "./practice-profile-search";
 import { ProfileReviewsLevel } from "./ProfileReviewsLevel";
 
 const feedOf = (
@@ -165,6 +170,7 @@ export const ManyReviews: Story = {
 	},
 };
 
+/** The next page's placeholder rows continue the table in its own columns while the table is busy. */
 export const LoadingEarlierReviews: Story = {
 	args: { feed: feedOf(profileReviews, { hasMore: true, isLoadingMore: true }) },
 	play: async () => {
@@ -173,6 +179,15 @@ export const LoadingEarlierReviews: Story = {
 			"aria-disabled",
 			"true",
 		);
+		const table = screen.getByRole("table", { name: REVIEWS_OF_YOUR_WORK });
+		await expect(table).toHaveAttribute("aria-busy", "true");
+		const placeholders = table.querySelectorAll("tbody [data-loading-row]");
+		await expect(placeholders).toHaveLength(3);
+		// Every placeholder row has a cell per column, so the rows that replace it do not move the table.
+		const columns = table.querySelectorAll("thead th").length;
+		for (const row of placeholders) {
+			await expect(row.querySelectorAll("td")).toHaveLength(columns);
+		}
 	},
 };
 

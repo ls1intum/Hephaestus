@@ -43,6 +43,8 @@ export type FeedbackResultsState =
 
 export interface FeedbackResultsProps {
 	state: FeedbackResultsState;
+	/** Placeholder rows after the feedback while the next page loads. */
+	loadingMore?: number;
 }
 
 const LIST_LABEL = "Feedback";
@@ -67,7 +69,7 @@ const FEEDBACK_WORDS: RecordResultsWords = {
 };
 
 /** Feedback by day, drawn as the Reviews table draws reviews. */
-export function FeedbackResults({ state }: FeedbackResultsProps) {
+export function FeedbackResults({ state, loadingMore }: FeedbackResultsProps) {
 	return (
 		<RecordResults
 			state={state}
@@ -84,6 +86,7 @@ export function FeedbackResults({ state }: FeedbackResultsProps) {
 					rowKey={(item) => item.id}
 					renderRow={(item) => <FeedbackRow feedback={item} />}
 					empty={empty}
+					loadingMore={loadingMore}
 				/>
 			)}
 		</RecordResults>

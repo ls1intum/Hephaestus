@@ -29,7 +29,6 @@ function end(props: Partial<InfiniteListEndProps>) {
 			onLoadMore={vi.fn()}
 			moreLabel="View earlier reviews"
 			failedLabel="We could not load earlier reviews."
-			loadingRow={null}
 			{...props}
 		/>
 	);
@@ -49,6 +48,14 @@ describe("InfiniteListEnd", () => {
 
 		rerender(end({ isRefreshing: false, onLoadMore }));
 		expect(onLoadMore).toHaveBeenCalledOnce();
+	});
+
+	it("adds no placeholder while loading, since the list draws its own", () => {
+		vi.stubGlobal("IntersectionObserver", InViewObserver);
+		const { container } = render(end({ isLoadingMore: true }));
+		// Only the press stays: a placeholder here would stand outside the list, under its rows.
+		expect(container.querySelector("[aria-hidden]")).toBeNull();
+		screen.getByRole("button", { name: "Loading…" });
 	});
 
 	it("keeps focus at the end of the list when the last page removes the press", () => {

@@ -54,9 +54,11 @@ const HIDDEN_SUMMARY = "Details hidden";
 
 export interface ProblemRowsProps {
 	state: ProblemRowsState;
+	/** Placeholder rows after the problems while the next page loads. */
+	loadingMore?: number;
 }
 
-export function ProblemRows({ state }: ProblemRowsProps) {
+export function ProblemRows({ state, loadingMore }: ProblemRowsProps) {
 	const rows = state.status === "ready" ? state.problems : [];
 	return (
 		<RecordResults
@@ -74,6 +76,7 @@ export function ProblemRows({ state }: ProblemRowsProps) {
 					rowKey={(problem) => problem.id}
 					renderRow={(problem) => <ProblemRow problem={problem} />}
 					empty={empty}
+					loadingMore={loadingMore}
 				/>
 			)}
 		</RecordResults>

@@ -33,6 +33,8 @@ export interface ReviewDayTableProps<TReview> {
 	reviewKey: (review: TReview) => string;
 	renderRow: (review: TReview) => ReactNode;
 	empty: ReactNode;
+	/** Placeholder rows after the reviews while the next page loads. */
+	loadingMore?: number;
 }
 
 export function ReviewDayTable<TReview>({

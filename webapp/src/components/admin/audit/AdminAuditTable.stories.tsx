@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { AuthEventView } from "@/api/types.gen";
+import { expectTablePlaceholders } from "@/stories/loading-more";
 import { expectSettledVisible } from "@/stories/overlay";
 
 import { AdminAuditTable, type AdminAuditTableProps } from "./AdminAuditTable";
@@ -203,6 +204,15 @@ export const RefreshFailed: Story = {
 		await expect(canvas.getAllByRole("button", { name: /^View details for/iu })).toHaveLength(
 			events.length,
 		);
+	},
+};
+
+/** The next page's placeholder rows continue the table in its own columns while it is busy. */
+export const LoadingMore: Story = {
+	args: { state: { ...loaded(events), hasMore: true, isLoadingMore: true } },
+	play: async ({ canvas }) => {
+		await expectTablePlaceholders(canvas.getByRole("table"));
+		await expect(canvas.getByRole("button", { name: "Load more" })).toBeDisabled();
 	},
 };
 
