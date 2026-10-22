@@ -58,8 +58,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
                     "gitlab-event-routing"),
             assignment(
-                    "integration.scm.workspace.GitLabStoppedProjectServiceIntegrationTest",
-                    "gitlab-stopped-project"),
+                    "integration.scm.workspace.GitLabStoppedProjectServiceIntegrationTest", "gitlab-stopped-project"),
             assignment("integration.slack.SlackConsentLifecycleE2EIntegrationTest", "slack-lifecycle"),
             assignment("integration.slack.channel.SlackChannelAdminControllerIntegrationTest", "slack-signed"),
             assignment("integration.slack.item.SlackThreadProjectionIntegrationTest", "slack-ingest"),

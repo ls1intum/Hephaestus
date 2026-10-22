@@ -225,8 +225,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             var add = CompletableFuture.runAsync(
-                    () -> monitorService.addRepositoryToMonitor(
-                            own.getWorkspaceSlug(), repository.getNameWithOwner()),
+                    () -> monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), repository.getNameWithOwner()),
                     executor);
             assertThat(asked.await(TIMEOUT.toSeconds(), TimeUnit.SECONDS))
                     .as("the Add's lookup reached GitLab")
@@ -242,8 +241,7 @@ class GitLabStoppedProjectServiceIntegrationTest extends BaseIntegrationTest {
             await().atMost(TIMEOUT).until(add::isDone);
             var failure = assertThrows(CompletionException.class, add::join);
             assertThat(failure.getCause())
-                    .isInstanceOf(
-                            replaced ? RepositorySelectionChangedException.class : EntityNotFoundException.class);
+                    .isInstanceOf(replaced ? RepositorySelectionChangedException.class : EntityNotFoundException.class);
         } finally {
             answered.complete(noProject);
             executor.shutdownNow();
