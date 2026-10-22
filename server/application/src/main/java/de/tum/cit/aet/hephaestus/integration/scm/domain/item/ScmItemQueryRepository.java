@@ -2,8 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.item.Item;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -153,6 +155,24 @@ public interface ScmItemQueryRepository extends Repository<Item, Long> {
         """, nativeQuery = true)
     List<WorkRow> owners(@Param("sourceIds") List<Long> sourceIds, @Param("reviews") boolean reviews);
 
+    /**
+     * The stored facts of one issue or pull request that its version and its source relation read, without loading
+     * the work: a stored pull request can leave fields outside them, such as its line counts, empty.
+     */
+    @WorkspaceAgnostic("Reads the native SCM mirror row of an indexed item; its repository is authorized before use")
+    @Query(value = """
+        SELECT work.repository_id AS repository_id, work.deleted_at IS NOT NULL AS deleted,
+          work.base_ref_oid AS base_ref_oid, work.head_ref_oid AS head_ref_oid, work.title, work.body
+        FROM issue work WHERE work.id=:sourceId
+          AND work.issue_type=CASE :kind WHEN 'scm.pull_request' THEN 'PULL_REQUEST' WHEN 'scm.issue' THEN 'ISSUE' END
+        """, nativeQuery = true)
+    Optional<WorkFacts> work(@Param("kind") String kind, @Param("sourceId") long sourceId);
+
+    /** Every issue the stored pull request closes, as its entity's closing issues hold them. */
+    @WorkspaceAgnostic("Reads the native SCM mirror rows linked to an indexed pull request after its authorization")
+    @Query("SELECT DISTINCT i FROM PullRequest p JOIN p.closingIssues i WHERE p.id = :pullRequestId")
+    List<Issue> closingIssues(@Param("pullRequestId") long pullRequestId);
+
     @Query(value = """
         SELECT parent.id FROM item parent JOIN pull_request_review review ON review.pull_request_id=parent.source_id
         WHERE parent.workspace_id=:workspaceId AND parent.kind=:pullKind AND review.id=:reviewId
@@ -209,6 +229,25 @@ public interface ScmItemQueryRepository extends Repository<Item, Long> {
         String getNameWithOwner();
 
         String getServerUrl();
+    }
+
+    interface WorkFacts {
+        @Nullable
+        Long getRepositoryId();
+
+        boolean getDeleted();
+
+        @Nullable
+        String getBaseRefOid();
+
+        @Nullable
+        String getHeadRefOid();
+
+        @Nullable
+        String getTitle();
+
+        @Nullable
+        String getBody();
     }
 
     interface WorkRow {

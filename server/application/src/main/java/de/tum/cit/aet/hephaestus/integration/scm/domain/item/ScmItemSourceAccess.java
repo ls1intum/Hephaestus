@@ -30,7 +30,6 @@ import org.springframework.web.server.ResponseStatusException;
 public class ScmItemSourceAccess implements ItemSourceAccess {
     private final ScmItemAccess items;
     private final RepositoryRepository repositories;
-    private final ScmWorkLookup workLookup;
     private final PullRequestReviewRepository reviews;
     private final ScmRepositoryAccess access;
     private final ScmPersonSourceIdentityContributor contributors;
@@ -93,10 +92,10 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
             } else {
                 var parent = items.parent(item, ScmItemEvents.REPOSITORY);
                 if (!permitsItem(parent, audience)) return false;
-                var work = workLookup.find(item.kind(), source);
-                if (!work.map(row -> row.getDeletedAt() == null
-                                && row.getRepository() != null
-                                && Objects.equals(row.getRepository().getId(), parent.sourceId()))
+                var work = items.work(item.kind(), source);
+                if (!work.map(row -> !row.getDeleted()
+                                && row.getRepositoryId() != null
+                                && Objects.equals(row.getRepositoryId(), parent.sourceId()))
                         .orElse(false)) return false;
             }
             for (var identity : contributors.identitiesForSource(

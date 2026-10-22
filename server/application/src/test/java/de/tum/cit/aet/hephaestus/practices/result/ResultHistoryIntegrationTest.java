@@ -2,16 +2,28 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewAdmissionData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewLookupData;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
@@ -26,9 +38,13 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,12 +53,33 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@Import({ReviewIntegrationData.class, ReviewAdmissionData.class})
+@Import({ReviewIntegrationData.class, ReviewAdmissionData.class, ReviewLookupData.class})
 class ResultHistoryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     ReviewIntegrationData data;
+
+    @Autowired
+    ReviewLookupData lookup;
+
+    @Autowired
+    ItemRepository itemRows;
+
+    @Autowired
+    IssueRepository issues;
+
+    @MockitoSpyBean
+    ProductItemQuery productItems;
+
+    @Autowired
+    ItemIndexService index;
+
+    @Autowired
+    JsonMapper json;
 
     @Autowired
     ResultHistoryQuery history;
@@ -323,5 +360,184 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         assertThat(historicalVersions.findAt(workspace, ids, Instant.now()))
                 .extracting(v -> v.getId())
                 .containsExactly(appended.getId());
+    }
+
+    @Test
+    void shouldReportTheSameStoredWorkVersionWhenTheStoredWorkStillHasTheRecordedVersion() {
+        var work = monitoredPullRequest();
+        var recorded = data.result(work, ResultOutcome.NOT_MET, Instant.now(), Instant.now(), storedVersion(work));
+        assertStoredWorkVersion(recorded, "SAME");
+        assertStillAsRecorded(recorded);
+    }
+
+    @Test
+    void shouldReportADifferentStoredWorkVersionWithoutEndingTheResultWhenOnlyTheDescriptionChanged() {
+        var work = monitoredPullRequest();
+        var recorded = data.result(work, ResultOutcome.NOT_MET, Instant.now(), Instant.now(), storedVersion(work));
+        var pull = issues.findById(Objects.requireNonNull(work.item().getSourceId()))
+                .orElseThrow();
+        pull.setBody("Description that now explains why");
+        issues.saveAndFlush(pull);
+        assertThat(storedVersion(work)).isNotEqualTo(recorded.getItemVersion());
+        // No event reconciled the edit, so only the history read could end the result.
+        assertStillAsRecorded(recorded);
+        assertStoredWorkVersion(recorded, "DIFFERENT");
+        assertStillAsRecorded(recorded);
+    }
+
+    @Test
+    void shouldReportAnUnknownStoredWorkVersionWhenTheKindHasNoComparableVersion() {
+        var ref = index.upsert(new ItemRegistration(
+                scenario.workspace().getId(),
+                new ItemKind("slack.thread"),
+                ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE),
+                null,
+                null));
+        var thread = new ReviewIntegrationData.Scenario(
+                scenario.workspace(),
+                scenario.account(),
+                scenario.practice(),
+                itemRows.findById(ref.itemId()).orElseThrow());
+        var recorded = data.result(thread, ResultOutcome.NOT_MET, Instant.now(), Instant.now(), "opaque-thread");
+        assertStoredWorkVersion(recorded, "UNKNOWN");
+        assertStillAsRecorded(recorded);
+    }
+
+    @Test
+    void shouldReportAnUnknownStoredWorkVersionWhenNoStoredWorkCanBeRead() {
+        var recorded = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
+        var ref = productItems.require(recorded.getWorkspaceId(), recorded.getItemId());
+        assertThat(productItems.current(ref)).isEmpty();
+        assertStoredWorkVersion(recorded, "UNKNOWN");
+        assertStillAsRecorded(recorded);
+    }
+
+    @Test
+    void shouldNeitherCompareNorDateAResultWhoseWordsAreDenied() {
+        var work = monitoredPullRequest();
+        var recorded = data.result(work, ResultOutcome.NOT_MET, Instant.now(), Instant.now(), storedVersion(work));
+        when(authorization.authorized(any(), any(), any())).thenReturn(false);
+
+        var row = history.forDeveloper(recorded.getWorkspaceId(), scenarioAccountId, Instant.EPOCH, 20)
+                .getFirst();
+        assertThat(row.copyAuthorityComplete()).isFalse();
+        assertThat(row.storedWorkVersion()).isEqualTo(ResultHistoryEntry.StoredWorkVersion.UNKNOWN);
+        assertThat(row.capturedAt()).isNull();
+        verify(productItems, never()).currentWorkVersion(anyLong(), anyLong());
+        verify(authorization, never()).producingJobs(anyLong(), any());
+        verify(custody, never()).capturedAt(anyLong(), any(), any());
+        assertStillAsRecorded(recorded);
+    }
+
+    @Test
+    void shouldCompareAnEndedResultWithoutChangingItsRecordedEnd() {
+        var work = monitoredPullRequest();
+        var recorded = data.result(
+                work,
+                ResultOutcome.NOT_MET,
+                Instant.now().minusSeconds(120),
+                Instant.now().minusSeconds(120),
+                storedVersion(work));
+        data.end(recorded, Instant.now().minusSeconds(60));
+        var ended = read.findByIdAndWorkspaceId(recorded.getId(), recorded.getWorkspaceId())
+                .orElseThrow();
+
+        assertStoredWorkVersion(recorded, "SAME");
+        var row = read.findByIdAndWorkspaceId(recorded.getId(), recorded.getWorkspaceId())
+                .orElseThrow();
+        assertThat(row.getEndedAt()).isEqualTo(ended.getEndedAt());
+        assertThat(row.getEndReason()).isEqualTo(ResultEndReason.REPLACED);
+        assertThat(row.getOutcome()).isEqualTo(ResultOutcome.NOT_MET);
+        assertThat(row.getItemVersion()).isEqualTo(recorded.getItemVersion());
+    }
+
+    /**
+     * The producer lookup and the capture receipt are controlled here; {@code ResultSourceAuthorizationTest} and
+     * {@code HistoryCustodyQueryAdapterTest} prove what they answer.
+     */
+    @Test
+    void shouldDateEachResultByItsOwnReviewsProducingJobRatherThanByItsRecordedTime() {
+        var work = monitoredPullRequest();
+        var recordedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        var other = data.result(
+                work, ResultOutcome.MET, recordedAt.minusSeconds(60), recordedAt.minusSeconds(60), storedVersion(work));
+        var endedAt = recordedAt.minusSeconds(30);
+        data.end(other, endedAt);
+        var own = data.result(work, ResultOutcome.NOT_MET, recordedAt, recordedAt, storedVersion(work));
+        var job = UUID.randomUUID();
+        var capturedAt = recordedAt.minusSeconds(3600);
+        long workspace = own.getWorkspaceId();
+        when(authorization.producingJobs(eq(workspace), any()))
+                .thenReturn(Map.of(own.getId(), job, other.getId(), job));
+        // The job belongs to the first result's review, so the second review's receipt names no time.
+        when(custody.capturedAt(workspace, own.getReviewId(), job)).thenReturn(Optional.of(capturedAt));
+
+        var rows = history.forDeveloper(workspace, scenarioAccountId, Instant.EPOCH, 20);
+        assertThat(rows).extracting(ResultHistoryEntry::resultId).containsExactly(own.getId(), other.getId());
+        assertThat(rows.getFirst().capturedAt())
+                .isEqualTo(capturedAt)
+                .isNotEqualTo(rows.getFirst().recordedAt());
+        assertThat(rows.getLast().capturedAt()).isNull();
+        assertThat(rows)
+                .extracting(ResultHistoryEntry::storedWorkVersion)
+                .containsOnly(ResultHistoryEntry.StoredWorkVersion.SAME);
+        // One read compares the shared work once and finds the producers of all its rows at once.
+        verify(productItems).currentWorkVersion(workspace, work.item().getId());
+        verify(authorization).producingJobs(eq(workspace), any());
+        verify(custody).capturedAt(workspace, own.getReviewId(), job);
+        verify(custody).capturedAt(workspace, other.getReviewId(), job);
+        var detail = history.find(workspace, own.getId(), scenarioAccountId, SourceUsePurpose.CONVERSATIONAL_MENTORING)
+                .orElseThrow();
+        assertThat(detail.capturedAt()).isEqualTo(capturedAt);
+        assertThat(detail.storedWorkVersion()).isEqualTo(ResultHistoryEntry.StoredWorkVersion.SAME);
+        assertStillAsRecorded(own);
+        var storedOther = read.findByIdAndWorkspaceId(other.getId(), workspace).orElseThrow();
+        assertThat(storedOther.getEndedAt()).isEqualTo(endedAt);
+        assertThat(storedOther.getEndReason()).isEqualTo(ResultEndReason.REPLACED);
+        assertThat(storedOther.getItemVersion()).isEqualTo(other.getItemVersion());
+        assertThat(storedOther.getOutcome()).isEqualTo(other.getOutcome());
+    }
+
+    /** Monitored, mirrored pull request work of the scenario's developer and practice. */
+    private ReviewIntegrationData.Scenario monitoredPullRequest() {
+        var ref = lookup.work(scenario.workspace(), IdentityProviderType.GITHUB, true);
+        return new ReviewIntegrationData.Scenario(
+                scenario.workspace(),
+                scenario.account(),
+                scenario.practice(),
+                itemRows.findById(ref.itemId()).orElseThrow());
+    }
+
+    private String storedVersion(ReviewIntegrationData.Scenario work) {
+        var ref = productItems.require(work.workspace().getId(), work.item().getId());
+        return productItems.current(ref).orElseThrow().version().value();
+    }
+
+    /** The mentor's overview and its detail read state the same comparison. */
+    private void assertStoredWorkVersion(Result recorded, String expected) {
+        JsonNode fact = json.valueToTree(expected);
+        var overview = history.forDeveloper(recorded.getWorkspaceId(), scenarioAccountId, Instant.EPOCH, 20).stream()
+                .filter(entry -> entry.resultId().equals(recorded.getId()))
+                .findFirst()
+                .orElseThrow();
+        var detail = history.find(
+                        recorded.getWorkspaceId(),
+                        recorded.getId(),
+                        scenarioAccountId,
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING)
+                .orElseThrow();
+        for (var entry : List.of(overview, detail)) {
+            JsonNode row = json.valueToTree(entry);
+            assertThat(row.get("storedWorkVersion")).isEqualTo(fact);
+        }
+    }
+
+    private void assertStillAsRecorded(Result recorded) {
+        var row = read.findByIdAndWorkspaceId(recorded.getId(), recorded.getWorkspaceId())
+                .orElseThrow();
+        assertThat(row.getItemVersion()).isEqualTo(recorded.getItemVersion());
+        assertThat(row.getOutcome()).isEqualTo(recorded.getOutcome());
+        assertThat(row.getEndedAt()).isNull();
+        assertThat(row.getEndReason()).isNull();
     }
 }

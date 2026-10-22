@@ -63,7 +63,7 @@ public class ResultSourceAuthorization implements ResultProofAccess {
 
     private HistoryCustody custody(Result result, Lookups lookups) {
         var producer = lookups.producer(result)
-                .filter(m -> result.getId().equals(m.getResultId())
+                .filter(m -> produced(result, m)
                         || (result.getEvidenceVersion() == 0
                                 && m.getState() == ReviewItemState.WITHHELD
                                 && ReviewItem.LEGACY_AMBIGUOUS_RESULTS.equals(m.getReason())));
@@ -80,6 +80,43 @@ public class ResultSourceAuthorization implements ResultProofAccess {
         var job = producer.map(m -> m.getJobId()).orElse(null);
         if (job == null) return new HistoryCustody(false, false, List.of(), List.of(), List.of());
         return lookups.receipts.computeIfAbsent(job, ignored -> custody.find(result.getWorkspaceId(), List.of(job)));
+    }
+
+    private static boolean produced(Result result, ReviewItem assignment) {
+        return result.getId().equals(assignment.getResultId());
+    }
+
+    /**
+     * The job that produced each of {@code rows}: the job of the assignment that the row's own review made for its
+     * practice and item, when that assignment records exactly this result. A legacy assignment that records none, or
+     * an assignment without a job, names no job. The custody's {@code sourceJobIds} also list copied dependencies, so
+     * they cannot name it. The rows' assignments load in a bounded number of queries.
+     */
+    Map<UUID, UUID> producingJobs(long workspaceId, Collection<Result> rows) {
+        var owned = rows.stream()
+                .filter(result -> result.getWorkspaceId() == workspaceId)
+                .toList();
+        var byAssignment = assignmentsOf(workspaceId, owned);
+        Map<UUID, UUID> jobs = new HashMap<>();
+        for (var result : owned) {
+            var producer = byAssignment.get(
+                    new ReviewItem.Id(result.getReviewId(), result.getPracticeId(), result.getItemId()));
+            if (producer == null || !produced(result, producer)) continue;
+            var job = producer.getJobId();
+            if (job != null) jobs.put(result.getId(), job);
+        }
+        return jobs;
+    }
+
+    private Map<ReviewItem.Id, ReviewItem> assignmentsOf(long workspaceId, List<Result> owned) {
+        Map<ReviewItem.Id, ReviewItem> byAssignment = new HashMap<>();
+        for (var chunk :
+                chunks(owned.stream().map(Result::getReviewId).distinct().toList()))
+            assignments
+                    .findByWorkspaceIdAndReviewIdIn(workspaceId, chunk)
+                    .forEach(m ->
+                            byAssignment.put(new ReviewItem.Id(m.getReviewId(), m.getPracticeId(), m.getItemId()), m));
+        return byAssignment;
     }
 
     public boolean authorized(Result result, HistoryCustody facts, SourceUsePurpose purpose) {
@@ -162,13 +199,7 @@ public class ResultSourceAuthorization implements ResultProofAccess {
          * assignments of other reviews that reused a row.
          */
         void prefetch(long workspaceId, List<Result> owned) {
-            Map<ReviewItem.Id, ReviewItem> byAssignment = new HashMap<>();
-            for (var chunk :
-                    chunks(owned.stream().map(Result::getReviewId).distinct().toList()))
-                assignments
-                        .findByWorkspaceIdAndReviewIdIn(workspaceId, chunk)
-                        .forEach(m -> byAssignment.put(
-                                new ReviewItem.Id(m.getReviewId(), m.getPracticeId(), m.getItemId()), m));
+            var byAssignment = assignmentsOf(workspaceId, owned);
             Map<UUID, List<ReviewItem>> byRetained = new HashMap<>();
             for (var chunk : chunks(owned.stream().map(Result::getId).distinct().toList()))
                 for (var m : assignments.findByWorkspaceIdAndResultIdInOrderByReviewIdAscPracticeIdAscItemIdAsc(

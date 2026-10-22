@@ -592,7 +592,7 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
                             return canonical;
                         })
                         .when(productItems)
-                        .current(item);
+                        .currentWorkVersion(item.workspaceId(), item.itemId());
             }
             Future<?> sourceWrite;
             Future<AdmissionReceipt> admitted;

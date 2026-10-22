@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.AbstractResultAdmissionIntegrationTest;
+import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewAdmissionData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
@@ -661,6 +662,9 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                 .build();
         doReturn(snapshot).when(productItems).pin(eq(ref), eq(version));
         doReturn(Optional.of(snapshot)).when(productItems).current(ref);
+        doReturn(new ProductItemQuery.CurrentWorkVersion.Known(version.value()))
+                .when(productItems)
+                .currentWorkVersion(workspace, ref.itemId());
         when(budget.canRequest(workspace, ReviewKind.ITEM, null)).thenReturn(true);
         when(models.models(eq(workspace), anyList()))
                 .thenReturn(List.of(
