@@ -475,11 +475,11 @@ function serveProjectChoice(initial: ProjectChoice) {
 	return { changes, reads, next, stored };
 }
 
-function projectChoice(name: "All projects in the group" | "Only the repositories listed below") {
+function projectChoice(name: "All projects in the group" | "Only the projects listed below") {
 	return screen.getByRole("radio", { name });
 }
 
-function isChosen(name: "All projects in the group" | "Only the repositories listed below") {
+function isChosen(name: "All projects in the group" | "Only the projects listed below") {
 	return projectChoice(name).getAttribute("aria-checked") === "true";
 }
 
@@ -500,7 +500,7 @@ describe("GitLab project choice", () => {
 		await user.click(
 			await screen.findByRole(
 				"radio",
-				{ name: "Only the repositories listed below" },
+				{ name: "Only the projects listed below" },
 				ROUTE_RENDER_WAIT,
 			),
 		);
@@ -510,17 +510,17 @@ describe("GitLab project choice", () => {
 			expect(choice.changes).toStrictEqual(["SELECTED"]);
 			expect(isChosen("All projects in the group")).toBe(true);
 			expect(
-				Object.hasOwn(projectChoice("Only the repositories listed below").dataset, "disabled"),
+				Object.hasOwn(projectChoice("Only the projects listed below").dataset, "disabled"),
 			).toBe(true);
 			// A second press while the first is saved sends nothing.
-			await user.click(projectChoice("Only the repositories listed below"));
+			await user.click(projectChoice("Only the projects listed below"));
 			expect(choice.changes).toStrictEqual(["SELECTED"]);
 			expect(screen.queryByRole("alertdialog")).toBeNull();
 		} finally {
 			saved.resolve();
 		}
 
-		await waitFor(() => expect(isChosen("Only the repositories listed below")).toBe(true));
+		await waitFor(() => expect(isChosen("Only the projects listed below")).toBe(true));
 		await waitFor(() => expect(choice.reads.count).toBe(readsBefore + 1));
 		expect(screen.queryByText("Saving the project choice…")).toBeNull();
 		expect(choice.changes).toStrictEqual(["SELECTED"]);
@@ -536,7 +536,7 @@ describe("GitLab project choice", () => {
 			ROUTE_RENDER_WAIT,
 		);
 		// Taken while the page is not behind a modal; an open dialog makes it inert.
-		const selected = projectChoice("Only the repositories listed below");
+		const selected = projectChoice("Only the projects listed below");
 		await user.click(all);
 		await screen.findByRole("alertdialog", { name: "Add new projects from the group?" });
 
@@ -578,7 +578,7 @@ describe("GitLab project choice", () => {
 		await user.click(within(question).getByRole("button", { name: "Cancel" }));
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 		expect(choice.changes).toStrictEqual([]);
-		expect(isChosen("Only the repositories listed below")).toBe(true);
+		expect(isChosen("Only the projects listed below")).toBe(true);
 
 		await user.click(projectChoice("All projects in the group"));
 		const again = await screen.findByRole("alertdialog", {
@@ -601,7 +601,7 @@ describe("GitLab project choice", () => {
 		await user.click(
 			await screen.findByRole(
 				"radio",
-				{ name: "Only the repositories listed below" },
+				{ name: "Only the projects listed below" },
 				ROUTE_RENDER_WAIT,
 			),
 		);
@@ -610,8 +610,8 @@ describe("GitLab project choice", () => {
 		screen.getByText(conflict);
 		expect(isChosen("All projects in the group")).toBe(true);
 
-		await user.click(projectChoice("Only the repositories listed below"));
-		await waitFor(() => expect(isChosen("Only the repositories listed below")).toBe(true));
+		await user.click(projectChoice("Only the projects listed below"));
+		await waitFor(() => expect(isChosen("Only the projects listed below")).toBe(true));
 		await waitFor(() =>
 			expect(screen.queryByText("We could not change the project choice")).toBeNull(),
 		);
@@ -635,7 +635,7 @@ describe("GitLab project choice", () => {
 		choice.next.read = 200;
 		await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
 
-		await waitFor(() => expect(isChosen("Only the repositories listed below")).toBe(true));
+		await waitFor(() => expect(isChosen("Only the projects listed below")).toBe(true));
 		expect(screen.queryByText("We could not load the project choice")).toBeNull();
 		expect(choice.changes).toStrictEqual([]);
 	});

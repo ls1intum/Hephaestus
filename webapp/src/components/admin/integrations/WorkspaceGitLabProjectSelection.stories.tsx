@@ -33,7 +33,7 @@ export const AllProjects: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("radio", { name: "All projects in the group" })).toBeChecked();
 		await expect(
-			canvas.getByRole("radio", { name: "Only the repositories listed below" }),
+			canvas.getByRole("radio", { name: "Only the projects listed below" }),
 		).not.toBeChecked();
 		canvas.getByText(/members and teams still come from the whole group/iu);
 		canvas.getByText(/Projects you stopped stay stopped/u);
@@ -44,10 +44,10 @@ export const SelectedProjects: Story = {
 	args: { selection: "SELECTED" },
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByRole("radio", { name: "Only the repositories listed below" }),
+			canvas.getByRole("radio", { name: "Only the projects listed below" }),
 		).toBeChecked();
 		canvas.getByText(/New projects in the group are not added/u);
-		canvas.getByText(/which can be empty/u);
+		canvas.getByText(/To change the list, use Manage repositories below\./u);
 	},
 };
 
@@ -68,7 +68,7 @@ export const Saving: Story = {
 		await expect(canvas.getByRole("radio", { name: "All projects in the group" })).toBeChecked();
 		// The radio is a `<span role="radio">`; Base UI marks a disabled one with `data-disabled`.
 		await expect(
-			canvas.getByRole("radio", { name: "Only the repositories listed below" }),
+			canvas.getByRole("radio", { name: "Only the projects listed below" }),
 		).toHaveAttribute("data-disabled");
 	},
 };
@@ -109,7 +109,7 @@ export const RefreshFailed: Story = {
 		canvas.getByText("The project choice may be out of date");
 		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
 		await expect(
-			canvas.getByRole("radio", { name: "Only the repositories listed below" }),
+			canvas.getByRole("radio", { name: "Only the projects listed below" }),
 		).toBeChecked();
 		await expect(
 			canvas.queryByText("We could not load the project choice"),
@@ -132,7 +132,7 @@ export const SaveFailed: Story = {
 		canvas.getByText(/changed while we checked them\. Try again\./u);
 		await expect(canvas.getByRole("radio", { name: "All projects in the group" })).toBeChecked();
 		await expect(
-			canvas.getByRole("radio", { name: "Only the repositories listed below" }),
+			canvas.getByRole("radio", { name: "Only the projects listed below" }),
 		).not.toHaveAttribute("data-disabled");
 	},
 };
@@ -142,7 +142,7 @@ export const WideningConfirmation: Story = {
 	args: { selection: "SELECTED" },
 	play: async ({ canvas }) => {
 		// Taken before the modal opens: the open dialog makes the page behind it inert.
-		const selected = canvas.getByRole("radio", { name: "Only the repositories listed below" });
+		const selected = canvas.getByRole("radio", { name: "Only the projects listed below" });
 		await userEvent.click(canvas.getByRole("radio", { name: "All projects in the group" }));
 
 		const dialog = await screen.findByRole("alertdialog", {
@@ -167,7 +167,7 @@ export const WideningCancelled: Story = {
 
 		await waitFor(async () => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
 		await expect(
-			canvas.getByRole("radio", { name: "Only the repositories listed below" }),
+			canvas.getByRole("radio", { name: "Only the projects listed below" }),
 		).toBeChecked();
 		await expect(
 			canvas.getByRole("radio", { name: "All projects in the group" }),
@@ -185,11 +185,14 @@ export const Phone320: Story = {
 				"The GitLab connection, project selection or monitored projects changed while we checked them. Try again.",
 		}),
 	},
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	globals: { viewport: { value: "reflow", isRotated: false } },
+	parameters: { chromatic: { viewports: [320] } },
 	play: async ({ canvas }) => {
+		await expect(document.documentElement.clientWidth).toBe(320);
+		await expect(window.innerWidth).toBe(320);
 		await expectNoPageOverflow();
 		const width = document.documentElement.clientWidth;
-		for (const name of ["All projects in the group", "Only the repositories listed below"]) {
+		for (const name of ["All projects in the group", "Only the projects listed below"]) {
 			const label = canvas.getByText(name);
 			await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
 			await expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(width);

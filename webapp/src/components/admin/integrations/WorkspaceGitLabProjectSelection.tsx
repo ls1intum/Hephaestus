@@ -125,16 +125,23 @@ export function WorkspaceGitLabProjectSelection({
 					<Field orientation="horizontal">
 						<RadioGroupItem id={`${id}-selected`} value="SELECTED" />
 						<FieldContent className="min-w-0">
-							<FieldLabel htmlFor={`${id}-selected`}>Only the repositories listed below</FieldLabel>
+							<FieldLabel htmlFor={`${id}-selected`}>Only the projects listed below</FieldLabel>
 							<FieldDescription>
-								New projects in the group are not added. Use Add and Stop below to change the list,
-								which can be empty.
+								New projects in the group are not added. To change the list, use Manage repositories
+								below.
 							</FieldDescription>
 						</FieldContent>
 					</Field>
 				</RadioGroup>
-				{/* Exists before its words change, so a screen reader hears the save start. */}
-				<p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+				{/* Exists before its words change, so a screen reader hears the save start. While idle it
+				    is out of the flex flow, so the empty region adds no gap. */}
+				<p
+					role="status"
+					className={cn(
+						"flex items-center gap-2 text-sm text-muted-foreground",
+						!isSaving && "sr-only",
+					)}
+				>
 					{isSaving && (
 						<>
 							<Spinner className="size-4" />
@@ -158,7 +165,7 @@ export function WorkspaceGitLabProjectSelection({
 					members and teams still come from the whole group, and work that is already synced stays.
 				</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-4">
+			<CardContent className="flex flex-col gap-4">
 				{refreshFailure !== undefined && (
 					<QueryErrorAlert title="The project choice may be out of date" {...refreshFailure} />
 				)}
