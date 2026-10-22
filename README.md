@@ -1,10 +1,7 @@
 <div align="center">
   <h1>
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/hephaestus-lockup-dark.png">
-      <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/brand/hephaestus-lockup-light.png">
-      <img alt="Hephaestus" width="484" src="./docs/static/img/brand/hephaestus-lockup-light.png">
-    </picture>
+    <img alt="Hephaestus" width="484" src="./docs/static/img/brand/hephaestus-lockup-dark.png#gh-dark-mode-only">
+    <img alt="Hephaestus" width="484" src="./docs/static/img/brand/hephaestus-lockup-light.png#gh-light-mode-only">
   </h1>
   <p><strong>Learn from the work you already do</strong></p>
 
@@ -31,11 +28,8 @@ Every piece of feedback names its practice and points back to the reviewed work.
 Developers can ask why, disagree, or discuss the next step.
 
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-hero-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/landing-hero-light.png">
-    <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer asks a specific question. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png" width="1280">
-  </picture>
+  <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer asks a specific question. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-dark.png#gh-dark-mode-only" width="1280">
+  <img alt="An illustration of one change through a project. Issue #412 has no acceptance criteria. The pull request grows to 34 files. A reviewer asks a specific question. The pull request merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png#gh-light-mode-only" width="1280">
   <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://docs.hephaestus.build/user/ai-code-review">user guide</a> for the real interface.</sub></p>
 </div>
 
@@ -164,16 +158,12 @@ This let them make things for themselves.
 <p align="center">
   <strong>Developed by</strong><br><br>
   <a href="https://aet.cit.tum.de/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/readme-brand/aet-mark-dark.svg">
-      <img alt="Applied Education Technologies" align="middle" hspace="12" src="./webapp/public/brand/aet-mark.svg" height="72">
-    </picture>
+    <img alt="Applied Education Technologies" align="middle" hspace="12" src="./docs/static/img/readme-brand/aet-mark-dark.svg#gh-dark-mode-only" height="72">
+    <img alt="Applied Education Technologies" align="middle" hspace="12" src="./webapp/public/brand/aet-mark.svg#gh-light-mode-only" height="72">
   </a>
   <a href="https://www.tum.de/en/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/readme-brand/tum-logo-dark.svg">
-      <img alt="Technical University of Munich" align="middle" hspace="12" src="./webapp/public/brand/tum-logo.svg" height="56">
-    </picture>
+    <img alt="Technical University of Munich" align="middle" hspace="12" src="./docs/static/img/readme-brand/tum-logo-dark.svg#gh-dark-mode-only" height="56">
+    <img alt="Technical University of Munich" align="middle" hspace="12" src="./webapp/public/brand/tum-logo.svg#gh-light-mode-only" height="56">
   </a>
   <br>
   <sub><a href="https://aet.cit.tum.de/">Research Group for Applied Education Technologies</a> · <a href="https://www.tum.de/en/">Technical University of Munich</a></sub>
