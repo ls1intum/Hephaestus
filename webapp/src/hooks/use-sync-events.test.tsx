@@ -18,7 +18,7 @@ import {
 	listSlackChannelsOptions,
 	listSlackChannelsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import type { GitLabStoppedProject } from "@/api/types.gen";
+import type { GitLabStoppedProject, IntegrationCatalogEntry } from "@/api/types.gen";
 
 import { server } from "@/mocks/server";
 import { FakeEventSource } from "@/test/fake-event-source";
@@ -428,18 +428,27 @@ describe("useSyncEvents", () => {
 });
 
 describe("repository reads after a resources hint", () => {
-	it.each(["GITLAB", undefined] as const)(
-		"reads monitored projects and a new Stop receipt through HTTP with connection kind %s",
-		async (kind) => {
+	it.each<{ kind: string; catalog: IntegrationCatalogEntry[] | undefined; siblingReads: number }>([
+		{
+			kind: "GITLAB",
+			catalog: [
+				{ kind: "GITLAB", connected: true, connectionId: CONNECTION_ID, displayName: "GitLab" },
+			],
+			siblingReads: 1,
+		},
+		// With no cached kind the existing fallback also refreshes both sibling catalogs.
+		{ kind: "ABSENT", catalog: undefined, siblingReads: 2 },
+	])(
+		"reads monitored projects and a new Stop receipt through HTTP with connection kind $kind",
+		async ({ catalog, siblingReads }) => {
 			const queryClient = new QueryClient({
 				defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
 			});
-			if (kind !== undefined) {
-				queryClient.setQueryData(
-					getIntegrationCatalogQueryKey({ path: { workspaceSlug: WORKSPACE } }),
-					[{ kind, connected: true, connectionId: CONNECTION_ID, displayName: "GitLab" }],
-				);
-			}
+			// Undefined data stores no cache entry, so the absent case has no catalog, not an empty one.
+			queryClient.setQueryData(
+				getIntegrationCatalogQueryKey({ path: { workspaceSlug: WORKSPACE } }),
+				catalog,
+			);
 			const firstStop = {
 				repositoryItemId: "9001",
 				nameWithOwner: "acme/platform/api",
@@ -531,8 +540,6 @@ describe("repository reads after a resources hint", () => {
 				monitored = ["acme/platform/worker"];
 				stopped = [secondStop];
 				act(() => emitHint("resources"));
-				// With no cached kind the existing fallback also refreshes both sibling catalogs.
-				const siblingReads = kind === undefined ? 2 : 1;
 
 				await waitFor(() => {
 					expect(result.current.monitored.data).toStrictEqual(["acme/platform/worker"]);

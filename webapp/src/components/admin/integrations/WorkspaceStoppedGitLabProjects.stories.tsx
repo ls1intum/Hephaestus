@@ -1,8 +1,9 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import { expectDismissed, expectSettledVisible } from "@/stories/overlay";
 import { expectDialogFitsViewport, expectNoPageOverflow } from "@/stories/reflow";
+import { pending } from "@/test/async";
 
 import { WorkspaceStoppedGitLabProjects } from "./WorkspaceStoppedGitLabProjects";
 
@@ -27,14 +28,14 @@ const meta = {
 		],
 		isLoading: false,
 		error: null,
-		onRemove: fn(() => Promise.resolve()),
+		onRemove: fn(async () => undefined),
 	},
 } satisfies Meta<typeof WorkspaceStoppedGitLabProjects>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-async function openRemove(canvas: ReturnType<typeof within>, nameWithOwner: string) {
+async function openRemove(canvas: StoryContext["canvas"], nameWithOwner: string) {
 	await userEvent.click(
 		canvas.getByRole("button", { name: `Remove synced work from ${nameWithOwner}` }),
 	);
@@ -82,7 +83,7 @@ export const RemoveAccepted: Story = {
 /** A pending removal holds its confirmation: neither Cancel nor Escape can hide the answer. */
 export const RemovePending: Story = {
 	// Never answers, so the confirmation stays pending for the whole play.
-	args: { onRemove: fn(() => new Promise<void>(() => undefined)) },
+	args: { onRemove: fn(async (): Promise<void> => pending()) },
 	play: async ({ canvas }) => {
 		const dialog = await openRemove(canvas, "acme/platform/api");
 		await userEvent.click(within(dialog).getByRole("button", { name: "Remove synced work" }));
