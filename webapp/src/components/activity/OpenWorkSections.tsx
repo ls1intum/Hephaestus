@@ -33,8 +33,8 @@ export type OpenWorkState = PanelState<{ openWork: OpenWork; login: string }>;
  */
 export interface OpenWorkReviewNow {
 	onReviewNow: (work: WorkItem) => void;
-	/** The id of the work a review is being asked for, until the answer arrives. */
-	requesting?: number;
+	/** The ids of the work a review is being asked for, each until its answer arrives. */
+	requesting?: ReadonlySet<number>;
 }
 
 export interface OpenWorkSectionsProps {
@@ -230,7 +230,7 @@ function WorkList({
 					reviewNow={
 						reviewNow && {
 							onReviewNow: () => reviewNow.onReviewNow(work),
-							asking: reviewNow.requesting === work.id,
+							asking: reviewNow.requesting?.has(work.id) === true,
 						}
 					}
 				/>
