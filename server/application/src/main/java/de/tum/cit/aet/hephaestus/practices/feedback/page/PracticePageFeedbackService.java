@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackItemReferences;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackStoreService;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackVisibilityService;
@@ -20,6 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponseRep
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution;
+import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.feedbackmode.FeedbackModeResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
@@ -61,7 +61,7 @@ public class PracticePageFeedbackService {
     private final PracticePageFeedbackBasis basis;
     private final FeedbackResponseRepository responses;
     private final FeedbackVisibilityService visibility;
-    private final FeedbackItemReferences items;
+    private final ProductReferenceQuery items;
     private final CurrentDeveloperLookup currentDeveloperLookup;
     private final WorkspaceReviewDefaultsProvider defaults;
     private final Clock clock;
@@ -103,7 +103,7 @@ public class PracticePageFeedbackService {
                         card.evidence().stream().map(Result::getItemId),
                         card.resolution().cleanWork().stream().map(WorkResolution.Work::itemId)))
                 .collect(Collectors.toSet());
-        var references = items.find(workspaceId, itemIds);
+        var references = items.items(workspaceId, itemIds);
         return page.stream()
                 .map(card -> {
                     Instant readAt = card.feedback().getDeliveredAt();

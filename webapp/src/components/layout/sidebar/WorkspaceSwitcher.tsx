@@ -23,6 +23,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getWorkspaceAvatarUrl } from "@/lib/provider/avatar";
 import { firstNonBlank } from "@/lib/text";
 
+/**
+ * The account login shown under a workspace's name, unless it only repeats the name. The comparison is
+ * exact, so a login that differs in case still tells two workspaces apart.
+ */
+function distinctLogin(workspace: Pick<WorkspaceListItem, "displayName" | "accountLogin">) {
+	return workspace.accountLogin.trim() === workspace.displayName.trim()
+		? undefined
+		: workspace.accountLogin;
+}
+
 export function WorkspaceSwitcher({
 	workspaces,
 	activeWorkspace,
@@ -88,7 +98,7 @@ export function WorkspaceSwitcher({
 							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
 								<Plus className="size-4" />
 							</div>
-							<div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+							<div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:sr-only">
 								<span className="truncate font-semibold">Create workspace</span>
 							</div>
 						</SidebarMenuButton>
@@ -104,7 +114,7 @@ export function WorkspaceSwitcher({
 						<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
 							<ChevronsUpDown className="size-4" />
 						</div>
-						<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+						<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:sr-only">
 							<span className="truncate font-semibold">No workspace</span>
 						</div>
 					</SidebarMenuButton>
@@ -113,12 +123,18 @@ export function WorkspaceSwitcher({
 		);
 	}
 
+	const activeLogin = activeWorkspace ? distinctLogin(activeWorkspace) : "Select a workspace";
+
 	return (
 		<SidebarMenu>
 			<SidebarMenuItem>
 				<DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
 					<DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="h-auto min-h-12" />}>
-						<div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
+						{/* The avatar repeats the name beside it, so it is not part of the button's name. */}
+						<div
+							aria-hidden="true"
+							className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground"
+						>
 							<Avatar className="size-8 rounded-lg">
 								<AvatarImage
 									src={
@@ -129,7 +145,7 @@ export function WorkspaceSwitcher({
 												) ?? undefined)
 											: undefined
 									}
-									alt={activeWorkspace?.displayName}
+									alt=""
 								/>
 								<AvatarFallback className="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
 									{(
@@ -141,13 +157,14 @@ export function WorkspaceSwitcher({
 								</AvatarFallback>
 							</Avatar>
 						</div>
-						<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+						{/* Collapsed to an icon, the words leave the screen but stay the button's name. */}
+						<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:sr-only">
 							<span className="font-semibold wrap-anywhere">
 								{activeWorkspace?.displayName ?? "No workspace"}
 							</span>
-							<span className="text-xs wrap-anywhere text-muted-foreground">
-								{activeWorkspace?.accountLogin ?? "Select a workspace"}
-							</span>
+							{activeLogin !== undefined && (
+								<span className="text-xs wrap-anywhere text-muted-foreground">{activeLogin}</span>
+							)}
 						</div>
 						<ChevronsUpDown className="ml-auto group-data-[collapsible=icon]:hidden" />
 					</DropdownMenuTrigger>
@@ -161,48 +178,62 @@ export function WorkspaceSwitcher({
 							<DropdownMenuLabel className="text-xs text-muted-foreground">
 								Workspaces
 							</DropdownMenuLabel>
+							{workspaces.map((workspace, index) => {
+								const login = distinctLogin(workspace);
+								return (
+									<DropdownMenuItem
+										key={workspace.workspaceSlug}
+										onClick={() => onWorkspaceChange?.(workspace)}
+										className="gap-2 p-2"
+									>
+										<div
+											aria-hidden="true"
+											className="flex size-6 items-center justify-center overflow-clip rounded-sm"
+										>
+											<Avatar className="size-6 rounded-sm">
+												<AvatarImage
+													src={
+														getWorkspaceAvatarUrl(
+															workspace.providerType ?? "GITHUB",
+															workspace.accountLogin,
+														) ?? undefined
+													}
+													alt=""
+												/>
+												<AvatarFallback className="rounded-sm bg-sidebar-primary text-xs text-sidebar-primary-foreground">
+													{(workspace.displayName || workspace.workspaceSlug)
+														.slice(0, 2)
+														.toUpperCase()}
+												</AvatarFallback>
+											</Avatar>
+										</div>
+										<div className="flex min-w-0 flex-col leading-tight">
+											<span className="font-medium wrap-anywhere">{workspace.displayName}</span>
+											{login !== undefined && (
+												<span className="text-2xs wrap-anywhere text-muted-foreground">
+													{login}
+												</span>
+											)}
+										</div>
+										<DropdownMenuShortcut>
+											{navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl"}
+											{index + 1}
+										</DropdownMenuShortcut>
+									</DropdownMenuItem>
+								);
+							})}
 						</DropdownMenuGroup>
-						{workspaces.map((workspace, index) => (
-							<DropdownMenuItem
-								key={workspace.workspaceSlug}
-								onClick={() => onWorkspaceChange?.(workspace)}
-								className="gap-2 p-2"
-							>
-								<div className="flex size-6 items-center justify-center overflow-clip rounded-sm">
-									<Avatar className="size-6 rounded-sm">
-										<AvatarImage
-											src={
-												getWorkspaceAvatarUrl(
-													workspace.providerType ?? "GITHUB",
-													workspace.accountLogin,
-												) ?? undefined
-											}
-											alt={workspace.displayName}
-										/>
-										<AvatarFallback className="rounded-sm bg-sidebar-primary text-xs text-sidebar-primary-foreground">
-											{(workspace.displayName || workspace.workspaceSlug).slice(0, 2).toUpperCase()}
-										</AvatarFallback>
-									</Avatar>
-								</div>
-								<div className="flex flex-col leading-tight">
-									<span className="font-medium">{workspace.displayName}</span>
-									<span className="text-2xs text-muted-foreground">{workspace.accountLogin}</span>
-								</div>
-								<DropdownMenuShortcut>
-									{navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl"}
-									{index + 1}
-								</DropdownMenuShortcut>
-							</DropdownMenuItem>
-						))}
 						{onAddWorkspace && (
 							<>
 								<DropdownMenuSeparator />
-								<DropdownMenuItem className="gap-2 p-2" onClick={onAddWorkspace}>
-									<div className="flex size-6 items-center justify-center rounded-md border bg-background">
-										<Plus className="size-4" />
-									</div>
-									<div className="font-medium text-muted-foreground">Create workspace</div>
-								</DropdownMenuItem>
+								<DropdownMenuGroup>
+									<DropdownMenuItem className="gap-2 p-2" onClick={onAddWorkspace}>
+										<div className="flex size-6 items-center justify-center rounded-md border bg-background">
+											<Plus className="size-4" />
+										</div>
+										<div className="font-medium text-muted-foreground">Create workspace</div>
+									</DropdownMenuItem>
+								</DropdownMenuGroup>
 							</>
 						)}
 					</DropdownMenuContent>
