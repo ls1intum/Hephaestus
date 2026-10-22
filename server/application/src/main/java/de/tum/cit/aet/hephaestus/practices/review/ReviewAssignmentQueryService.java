@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
+import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
@@ -21,10 +22,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
@@ -129,13 +133,9 @@ public class ReviewAssignmentQueryService implements ReviewAssignmentQuery {
             if (ref.isEmpty()) return List.of();
             Long developer = null;
             if (!scan) {
-                var detail = row.getDetail();
-                if (detail == null || !detail.has("developerId")) return List.of();
-                var named = detail.path("developerId");
-                if (!named.isNull()) {
-                    if (!named.isIntegralNumber() || !named.canConvertToLong()) return List.of();
-                    developer = named.longValue();
-                }
+                var named = attribution(row.getDetail());
+                if (named.isEmpty()) return List.of();
+                developer = named.orElseThrow().developerId();
             }
             retained.add(new Retained(
                     new ReviewAssignmentId(reviewId, row.getPracticeId(), row.getItemId()),
@@ -144,4 +144,74 @@ public class ReviewAssignmentQueryService implements ReviewAssignmentQuery {
         }
         return List.copyOf(retained);
     }
+
+    /**
+     * Reads the asked reviews and the rows of exactly the asked pairs, in one scoped query each. A pair is answered only
+     * where its review has a row for its item. Rows are attributed as {@link #retained} reads them.
+     */
+    @Override
+    public Map<ReviewedItem, Recorded> recorded(long workspaceId, long developerId, Collection<ReviewedItem> reviewed) {
+        if (reviewed.isEmpty()) return Map.of();
+        var asked = List.copyOf(Set.copyOf(reviewed));
+        Map<UUID, Review> parents = reviews
+                .findByWorkspaceIdAndIdIn(
+                        workspaceId, asked.stream().map(ReviewedItem::reviewId).collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Review::getId, Function.identity()));
+        Map<ReviewedItem, List<ReviewItem>> rows = items
+                .findByWorkspaceIdAndReviewedItems(
+                        workspaceId,
+                        asked.stream().map(ReviewedItem::reviewId).toArray(UUID[]::new),
+                        asked.stream().map(ReviewedItem::itemId).toArray(Long[]::new))
+                .stream()
+                .collect(Collectors.groupingBy(row -> new ReviewedItem(row.getReviewId(), row.getItemId())));
+        var recorded = new HashMap<ReviewedItem, Recorded>();
+        for (var key : asked) {
+            var review = parents.get(key.reviewId());
+            var members = rows.get(key);
+            if (review == null || members == null) continue;
+            recorded.put(
+                    key,
+                    new Recorded(
+                            review.getStatus(),
+                            review.getStopReason(),
+                            review.getKind() == ReviewKind.ITEM ? counts(members, developerId) : null));
+        }
+        return Map.copyOf(recorded);
+    }
+
+    /**
+     * The developer's rows among one reviewed item's rows, by state. A row naming nobody or another developer is not
+     * theirs. One row that cannot say whose work it was could be theirs, so then nothing is counted, as when none is.
+     */
+    private static @Nullable AssignmentCounts counts(List<ReviewItem> rows, long developerId) {
+        long judged = 0;
+        long reused = 0;
+        long withheld = 0;
+        long pending = 0;
+        for (var row : rows) {
+            var named = attribution(row.getDetail());
+            if (named.isEmpty()) return null;
+            if (!Long.valueOf(developerId).equals(named.orElseThrow().developerId())) continue;
+            switch (row.getState()) {
+                case JUDGED -> judged++;
+                case REUSED -> reused++;
+                case WITHHELD -> withheld++;
+                case LISTED -> pending++;
+            }
+        }
+        long total = judged + reused + withheld + pending;
+        return total == 0 ? null : new AssignmentCounts(total, judged, reused, withheld, pending);
+    }
+
+    /** Whose work an ITEM review's row names; {@code developerId} is null for nobody. Empty when it cannot say. */
+    private static Optional<Attribution> attribution(@Nullable JsonNode detail) {
+        if (detail == null || !detail.has("developerId")) return Optional.empty();
+        var named = detail.path("developerId");
+        if (named.isNull()) return Optional.of(new Attribution(null));
+        if (!named.isIntegralNumber() || !named.canConvertToLong()) return Optional.empty();
+        return Optional.of(new Attribution(named.longValue()));
+    }
+
+    private record Attribution(@Nullable Long developerId) {}
 }

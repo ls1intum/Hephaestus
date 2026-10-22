@@ -115,6 +115,17 @@ public interface ReviewItemRepository extends JpaRepository<ReviewItem, ReviewIt
     /** Every assignment of the given reviews, for one read that resolves many results' producers at once. */
     List<ReviewItem> findByWorkspaceIdAndReviewIdIn(long workspaceId, Collection<UUID> reviewIds);
 
+    /**
+     * Every assignment of exactly the given (review, item) pairs, paired by position, in one read. Matching the pair, not
+     * each id alone, leaves out a review's other items and an item's other reviews.
+     */
+    @Query(value = """
+        SELECT m.* FROM review_item m WHERE m.workspace_id=:workspaceId AND (m.review_id,m.item_id) IN
+        (SELECT k.review_id,k.item_id FROM unnest(CAST(:reviewIds AS uuid[]),CAST(:itemIds AS bigint[]))
+          AS k(review_id,item_id))
+        """, nativeQuery = true)
+    List<ReviewItem> findByWorkspaceIdAndReviewedItems(long workspaceId, UUID[] reviewIds, Long[] itemIds);
+
     /** Every assignment that retains one of the given results, from any review, in one read. */
     List<ReviewItem> findByWorkspaceIdAndResultIdInOrderByReviewIdAscPracticeIdAscItemIdAsc(
             long workspaceId, Collection<UUID> resultIds);

@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -17,7 +19,10 @@ import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,8 +36,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * How many reads one retained run's attribution costs, and that its selection is all or nothing. The persisted scope
- * of the queries is proven against PostgreSQL in {@code ReviewAttemptsContentSourceIntegrationTest}.
+ * How many reads one retained run's attribution and its reviews' recorded states cost, that a run's selection is all
+ * or nothing, and that counts are never partly read. The persisted scope of the queries is proven against PostgreSQL in
+ * {@code ReviewAttemptsContentSourceIntegrationTest}.
  */
 class ReviewAssignmentQueryServiceRetainedTest extends BaseUnitTest {
     private static final long WORKSPACE = 1;
@@ -159,5 +165,66 @@ class ReviewAssignmentQueryServiceRetainedTest extends BaseUnitTest {
                 .as("one bound row without attribution makes the run unattributed")
                 .isEmpty();
         verify(items, never()).findByWorkspaceIdAndReviewIdAndItemIdIn(anyLong(), any(), any());
+    }
+
+    private static Review partialReview() {
+        return Review.builder()
+                .id(REVIEW)
+                .workspaceId(WORKSPACE)
+                .itemId(ITEM)
+                .kind(ReviewKind.ITEM)
+                .status(ReviewStatus.PARTIAL)
+                .stopReason(ReviewStopReason.EXECUTION_INCOMPLETE)
+                .build();
+    }
+
+    private static ReviewItem recorded(ReviewItem row, ReviewItemState state) {
+        row.setState(state);
+        return row;
+    }
+
+    @Test
+    void shouldCountOnlyTheDevelopersRowsOfAPairAskedTwiceInOneReadOfEach() {
+        var pair = new ReviewAssignmentQuery.ReviewedItem(REVIEW, ITEM);
+        when(reviews.findByWorkspaceIdAndIdIn(WORKSPACE, Set.of(REVIEW))).thenReturn(List.of(partialReview()));
+        when(items.findByWorkspaceIdAndReviewedItems(WORKSPACE, new UUID[] {REVIEW}, new Long[] {ITEM}))
+                .thenReturn(List.of(
+                        recorded(row(1), ReviewItemState.JUDGED),
+                        recorded(row(2), ReviewItemState.WITHHELD),
+                        recorded(row(3, json.createObjectNode().putNull("developerId")), ReviewItemState.WITHHELD),
+                        recorded(
+                                row(4, json.createObjectNode().put("developerId", DEVELOPER + 1)),
+                                ReviewItemState.WITHHELD)));
+
+        assertThat(service.recorded(WORKSPACE, DEVELOPER, List.of(pair, pair)))
+                .as("a row naming nobody or a colleague is not the developer's")
+                .containsOnly(entry(
+                        pair,
+                        new ReviewAssignmentQuery.Recorded(
+                                ReviewStatus.PARTIAL,
+                                ReviewStopReason.EXECUTION_INCOMPLETE,
+                                new ReviewAssignmentQuery.AssignmentCounts(2, 1, 0, 1, 0))));
+        verify(reviews, times(1)).findByWorkspaceIdAndIdIn(anyLong(), any());
+        verify(items, times(1)).findByWorkspaceIdAndReviewedItems(anyLong(), any(), any());
+    }
+
+    @Test
+    void shouldKeepHowTheReviewEndedButCountNothingWhenARowCannotSayWhoseWorkItWas() {
+        var pair = new ReviewAssignmentQuery.ReviewedItem(REVIEW, ITEM);
+        var otherItem = new ReviewAssignmentQuery.ReviewedItem(REVIEW, ITEM + 1);
+        var otherWorkspace = new ReviewAssignmentQuery.ReviewedItem(UUID.randomUUID(), ITEM);
+        when(reviews.findByWorkspaceIdAndIdIn(eq(WORKSPACE), any())).thenReturn(List.of(partialReview()));
+        when(items.findByWorkspaceIdAndReviewedItems(eq(WORKSPACE), any(), any()))
+                .thenReturn(List.of(
+                        recorded(row(1), ReviewItemState.JUDGED),
+                        recorded(row(2, json.createObjectNode()), ReviewItemState.WITHHELD)));
+
+        assertThat(service.recorded(WORKSPACE, DEVELOPER, List.of(pair, otherItem, otherWorkspace)))
+                .as("the review's end is known while its counts are not; no state is given for an item the review"
+                        + " has no row for, or for a review outside the workspace")
+                .containsOnly(entry(
+                        pair,
+                        new ReviewAssignmentQuery.Recorded(
+                                ReviewStatus.PARTIAL, ReviewStopReason.EXECUTION_INCOMPLETE, null)));
     }
 }

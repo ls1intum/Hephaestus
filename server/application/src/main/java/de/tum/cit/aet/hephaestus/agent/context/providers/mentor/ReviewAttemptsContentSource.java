@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
@@ -164,7 +165,7 @@ public class ReviewAttemptsContentSource implements ContentSource {
                 row.put("startedAt", job.getStartedAt().toString());
             if (job.getCompletedAt() != null)
                 row.put("completedAt", job.getCompletedAt().toString());
-            listed.add(new Listed(row, item));
+            listed.add(new Listed(row, item, new ReviewAssignmentQuery.ReviewedItem(job.getReviewId(), item.itemId())));
         }
         coverage.put("attributionComplete", attributionComplete);
         if (!attributionComplete)
@@ -176,13 +177,41 @@ public class ReviewAttemptsContentSource implements ContentSource {
                 ? Map.of()
                 : labels.labels(workspaceId, listed.stream().map(Listed::item).toList());
         listed.forEach(entry -> name(entry.row(), named.get(entry.item().itemId())));
+        // Asked only for reviewed work the source still permits, once per review and item however many runs it had.
+        Map<ReviewAssignmentQuery.ReviewedItem, ReviewAssignmentQuery.Recorded> recorded = listed.isEmpty()
+                ? Map.of()
+                : assignments.recorded(
+                        workspaceId,
+                        developerId,
+                        listed.stream().map(Listed::reviewed).collect(Collectors.toSet()));
+        listed.forEach(entry -> state(entry.row(), recorded.get(entry.reviewed())));
         // Absence is claimed only from a complete read: an unattributed run or a cut listing could be this item's.
         if (selection.isPresent() && rows.isEmpty())
             root.put("status", attributionComplete && candidates.size() <= 200 ? "NOT_FOUND" : "UNAVAILABLE");
         return root;
     }
 
-    private record Listed(ObjectNode row, ItemRef item) {}
+    private record Listed(ObjectNode row, ItemRef item, ReviewAssignmentQuery.ReviewedItem reviewed) {}
+
+    /**
+     * The review's recorded state and assignments for the developer on this work, beside the run's own state. Left
+     * out when the review cannot be read; the counts alone are left out when they cannot be complete.
+     */
+    private static void state(ObjectNode row, ReviewAssignmentQuery.@Nullable Recorded recorded) {
+        if (recorded == null) return;
+        row.put("reviewStatus", recorded.status().name());
+        var stopReason = recorded.stopReason();
+        if (stopReason != null) row.put("reviewStopReason", stopReason.name());
+        var counts = recorded.counts();
+        if (counts == null) return;
+        row.putObject("assignmentCounts")
+                .put("scope", "REVIEWED_ITEM")
+                .put("total", counts.total())
+                .put("judged", counts.judged())
+                .put("reused", counts.reused())
+                .put("withheld", counts.withheld())
+                .put("pending", counts.pending());
+    }
 
     /** The reviewed work's number, title and link as its source names it; absent when the source no longer can. */
     private static void name(ObjectNode row, @Nullable ItemLabel label) {

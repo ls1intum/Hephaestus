@@ -104,6 +104,8 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewQue
 
     Optional<Review> findByIdAndWorkspaceId(UUID id, long workspaceId);
 
+    List<Review> findByWorkspaceIdAndIdIn(long workspaceId, Collection<UUID> ids);
+
     Optional<Review> findByWorkspaceIdAndRequestKey(long workspaceId, UUID requestKey);
 
     Optional<Review> findByWorkspaceIdAndEventId(long workspaceId, UUID eventId);
