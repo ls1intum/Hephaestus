@@ -106,9 +106,14 @@ public class GitLabGraphQlClientProvider {
      * @throws IllegalStateException if scope is not active or has no token
      */
     public HttpGraphQlClient forScope(Long scopeId) {
-        String token = tokenService.getAccessToken(scopeId);
-        String serverUrl = tokenService.resolveServerUrl(scopeId);
+        return forScope(scopeId, tokenService.getAccessToken(scopeId), tokenService.resolveServerUrl(scopeId));
+    }
 
+    /**
+     * As {@link #forScope(Long)}, for a token and server URL the caller read together from one stored connection, so
+     * the token is only ever sent to the server it was stored with. The scope still observes the credential's health.
+     */
+    public HttpGraphQlClient forScope(Long scopeId, String token, String serverUrl) {
         return clientFactory.withBearerTokenAndAttribute(
                 baseClient,
                 serverUrl + GITLAB_GRAPHQL_PATH,

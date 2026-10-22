@@ -7,15 +7,21 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlInterceptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.CircuitBreakerOpenException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.credentials.GitLabCredentialHealthFilter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import java.net.URI;
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -24,6 +30,12 @@ import org.mockito.Mock;
 import org.springframework.graphql.client.GraphQlClientInterceptor;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 @Tag("unit")
 class GitLabGraphQlClientProviderTest extends BaseUnitTest {
@@ -92,6 +104,52 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
             when(tokenService.getAccessToken(1L)).thenThrow(new IllegalStateException("Scope 1 is not active"));
 
             assertThatThrownBy(() -> provider.forScope(1L)).isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    @Nested
+    class ForScopeWithCallerCredential {
+
+        private static final String TOKEN = "synthetic-token-read-with-its-server";
+
+        @Test
+        void shouldSendTheCallersTokenToTheCallersServerForTheScope() {
+            List<ClientRequest> sent = new CopyOnWriteArrayList<>();
+            WebClient transport = WebClient.builder()
+                    .exchangeFunction(request -> {
+                        sent.add(request);
+                        return Mono.just(ClientResponse.create(HttpStatus.OK)
+                                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                                .body("{\"data\":{\"probe\":true}}")
+                                .build());
+                    })
+                    .build();
+            var factory = new SilentModeGraphQlClientFactory(
+                    new SilentModeGraphQlInterceptor(mock(OutboundEgressGuard.class)));
+            var credentialHealth = mock(GitLabCredentialHealthFilter.class);
+            when(credentialHealth.observe(7L, TOKEN, false)).thenReturn(Mono.empty());
+            var bound = new GitLabGraphQlClientProvider(
+                    factory.create(transport, name -> Mono.just("query Probe { probe }")),
+                    tokenService,
+                    circuitBreaker,
+                    rateLimitTracker,
+                    factory,
+                    credentialHealth);
+
+            bound.forScope(7L, TOKEN, "https://gitlab.bound.example.test")
+                    .documentName("Probe")
+                    .execute()
+                    .block();
+
+            assertThat(sent).singleElement().satisfies(request -> {
+                assertThat(request.url()).isEqualTo(URI.create("https://gitlab.bound.example.test/api/graphql"));
+                assertThat(request.headers().get(HttpHeaders.AUTHORIZATION)).containsExactly("Bearer " + TOKEN);
+                assertThat(request.attribute(GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE))
+                        .contains(7L);
+            });
+            verify(credentialHealth).observe(7L, TOKEN, false);
+            // The scope's own token and server are never read for this client.
+            verifyNoInteractions(tokenService);
         }
     }
 

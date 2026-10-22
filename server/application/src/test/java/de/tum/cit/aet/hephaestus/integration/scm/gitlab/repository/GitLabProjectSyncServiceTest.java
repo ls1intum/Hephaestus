@@ -169,6 +169,40 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
                                 : GitLabSyncException.class);
     }
 
+    @ParameterizedTest
+    @CsvSource({"false", "true"})
+    void shouldReadAProjectOnlyWithTheTokenAndServerTheCallerReadTogether(boolean partial) {
+        var webClient = WebClient.builder()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                        .body("""
+                                {"data":{"project":{"id":"gid://gitlab/Project/123","fullPath":"course/project"}}%s}
+                                """.formatted(
+                                        partial
+                                                ? ",\"errors\":[{\"message\":\"Partial\",\"path\":[\"project\",\"group\"]}]"
+                                                : ""))
+                        .build()))
+                .build();
+        when(graphQlClientProvider.forScope(1L, "synthetic-token", "https://gitlab.example.test"))
+                .thenReturn(HttpGraphQlClient.builder(webClient)
+                        .documentSource(
+                                name -> Mono.just("query { project(fullPath: \"course/project\") { id fullPath } }"))
+                        .build());
+
+        if (partial) {
+            // The same complete-answer rule as the scope's own read: a partial answer confirms nothing.
+            assertThatThrownBy(() -> service.fetchProject(
+                            1L, "synthetic-token", "https://gitlab.example.test", "course/project"))
+                    .isInstanceOf(GitLabSyncException.class);
+        } else {
+            assertThat(service.fetchProject(1L, "synthetic-token", "https://gitlab.example.test", "course/project"))
+                    .hasValueSatisfying(
+                            project -> assertThat(project.fullPath()).isEqualTo("course/project"));
+        }
+        // The scope's token and server are not resolved again on their own.
+        verify(graphQlClientProvider, never()).forScope(anyLong());
+    }
+
     @Nested
     class SyncProject {
 

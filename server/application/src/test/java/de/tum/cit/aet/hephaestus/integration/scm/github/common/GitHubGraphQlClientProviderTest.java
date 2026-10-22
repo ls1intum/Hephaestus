@@ -4,23 +4,36 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlInterceptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimit;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import java.net.URI;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 class GitHubGraphQlClientProviderTest extends BaseUnitTest {
 
@@ -65,6 +78,40 @@ class GitHubGraphQlClientProviderTest extends BaseUnitTest {
 
         assertThat(result).isSameAs(guardedClient);
         verify(clientFactory).withBearerToken(baseClient, "github-token");
+    }
+
+    @Test
+    void shouldSendTheCapturedTokenOnlyToTheNativeGitHubEndpointWithoutResolvingTheScopeAgain() {
+        String token = "synthetic-token-read-with-the-connection";
+        List<ClientRequest> sent = new CopyOnWriteArrayList<>();
+        WebClient transport = WebClient.builder()
+                .baseUrl("https://api.github.com/graphql")
+                .exchangeFunction(request -> {
+                    sent.add(request);
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                            .body("{\"data\":{\"probe\":true}}")
+                            .build());
+                })
+                .build();
+        var factory =
+                new SilentModeGraphQlClientFactory(new SilentModeGraphQlInterceptor(mock(OutboundEgressGuard.class)));
+        var bound = new GitHubGraphQlClientProvider(
+                factory.create(transport, name -> Mono.just("query Probe { probe }")),
+                tokenProvider,
+                appTokens,
+                circuitBreaker,
+                rateLimitTracker,
+                rateLimitSeeder,
+                factory);
+
+        bound.withToken(token).documentName("Probe").execute().block();
+
+        assertThat(sent).singleElement().satisfies(request -> {
+            assertThat(request.url()).isEqualTo(URI.create("https://api.github.com/graphql"));
+            assertThat(request.headers().get(HttpHeaders.AUTHORIZATION)).containsExactly("Bearer " + token);
+        });
+        verifyNoInteractions(tokenProvider, appTokens, rateLimitSeeder);
     }
 
     @Nested

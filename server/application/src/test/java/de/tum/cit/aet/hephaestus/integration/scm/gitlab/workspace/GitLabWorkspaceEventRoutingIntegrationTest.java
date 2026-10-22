@@ -406,6 +406,12 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                         .map(repository -> reported(REPOSITORY_NATIVE_ID, repository.getNameWithOwner())))
                 .when(projectSyncService)
                 .fetchProjectById(anyLong(), eq(REPOSITORY_NATIVE_ID));
+        // An explicit Add or a narrowing asks GitLab with the token and server one connection read stores; it answers
+        // as each test arranged the scope's project read, and only for the stored token and server.
+        doAnswer(invocation -> projectSyncService.fetchProject(
+                        invocation.<Long>getArgument(0), invocation.<String>getArgument(3)))
+                .when(projectSyncService)
+                .fetchProject(anyLong(), eq("glpat-test"), eq(SERVER_URL), anyString());
         doReturn(Map.of(
                         MEMBER_USER_ID,
                         new GitLabUserLookup(
@@ -1305,8 +1311,11 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .getId();
         String target = GROUP + "/added-during-narrowing";
         long mirroredId = 2_216_090L;
-        // Another workspace recorded this path; GitLab never confirmed the id to this one.
+        // Another workspace recorded this path; GitLab confirms the project to this one before its Add waits.
         foreignRepository(target, mirroredId);
+        doReturn(Optional.of(reported(mirroredId, target)))
+                .when(projectSyncService)
+                .fetchProject(workspaceId, target);
         long actor = selectionAdmin("racing-narrowing-admin");
         CompletableFuture<Integer> lockedBy = new CompletableFuture<>();
         CountDownLatch narrow = new CountDownLatch(1);
@@ -1349,8 +1358,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                     .map(monitor -> monitor.getId() + ":" + monitor.getNativeId())
                     .toList()
                     .toString();
-            // The Add took the mirror's id without asking GitLab, in either outcome.
-            verify(projectSyncService, never()).fetchProject(workspaceId, target);
+            // The Add asked GitLab with this workspace's credential before it waited, not the shared mirror.
+            verify(projectSyncService).fetchProject(workspaceId, target);
 
             assertThat(addOutcome)
                     .as("Add outcome; monitors created at %s as id:nativeId %s", target, created)
@@ -1856,6 +1865,12 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         String renamed = GROUP + "/renamed-repository";
         project.setNameWithOwner(renamed);
         repositoryRepository.save(project);
+        doReturn(Optional.of(reported(project.getNativeId(), renamed)))
+                .when(projectSyncService)
+                .fetchProject(workspaceId, renamed);
+        doReturn(Optional.of(reported(NESTED_PROJECT_ID, NESTED_PROJECT)))
+                .when(projectSyncService)
+                .fetchProject(workspaceId, NESTED_PROJECT);
 
         assertThatThrownBy(() ->
                         workspaceRepositoryMonitorService.addRepositoryToMonitor(connected.getWorkspaceSlug(), renamed))

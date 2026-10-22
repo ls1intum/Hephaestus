@@ -84,11 +84,14 @@ public class GitLabTokenService {
      * @return the server URL (never null, never blank)
      */
     public String resolveServerUrl(Long scopeId) {
-        return tokenProvider
-                .getServerUrl(scopeId)
-                .filter(url -> !url.isBlank())
-                .map(GitLabTokenService::stripTrailingSlash)
-                .orElse(properties.defaultServerUrl());
+        return serverUrlOf(tokenProvider.getServerUrl(scopeId).orElse(null));
+    }
+
+    /** The server URL a connection configured, or the configured default when it names none. */
+    public String serverUrlOf(@Nullable String configured) {
+        return configured == null || configured.isBlank()
+                ? properties.defaultServerUrl()
+                : stripTrailingSlash(configured);
     }
 
     /**
