@@ -11,10 +11,12 @@ import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -25,8 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCaptureContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturePreparation;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewThreadContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturedWork;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCitableTexts;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -38,17 +39,18 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,7 +83,6 @@ public class ScmItemService implements ItemSource {
     private final ScmFileVersions fileVersions;
     private final ObjectMapper mapper;
     private final ScmWorkCapture workCapture;
-    private final ScmCaptureContributors contributors;
     private final Clock clock;
 
     @Override
@@ -168,6 +169,21 @@ public class ScmItemService implements ItemSource {
     }
 
     private ItemSnapshot work(ItemRef item) {
+        var observed = observe(item, true);
+        return new ItemSnapshot(
+                item,
+                Objects.requireNonNull(observed.version()),
+                observed.integration(),
+                observed.state(),
+                observed.roles(),
+                observed.label());
+    }
+
+    /**
+     * The work as stored now. A pull request without a stored diff base has no version only when {@code
+     * requireVersion} is off; otherwise every missing or malformed Git object refuses as before.
+     */
+    private Observed observe(ItemRef item, boolean requireVersion) {
         PullRequestReview review = null;
         ItemRef workItem = item;
         Issue work;
@@ -189,6 +205,7 @@ public class ScmItemService implements ItemSource {
         if (work instanceof PullRequest pull && !pull.getBaseRefName().isBlank())
             state.put("baseBranch", pull.getBaseRefName());
         ItemVersion version;
+        String linkedContext = null;
         if (review != null) {
             add(roles, AboutRole.REVIEWER, review.getAuthor());
             PullRequest pull = (PullRequest) work;
@@ -209,13 +226,15 @@ public class ScmItemService implements ItemSource {
                     .forEach(u -> add(roles, AboutRole.ASSIGNEE, u));
             if (work instanceof PullRequest pull) {
                 add(roles, AboutRole.MERGER, pull.getMergedBy());
-                version = ScmVersion.pullRequest(
-                        objectId(pull.getBaseRefOid()),
-                        objectId(pull.getHeadRefOid()),
-                        pull.getTitle(),
-                        pull.getBody());
-                var linkedVersion = closingContext(pull);
-                if (linkedVersion.isPresent()) version = ScmVersion.withContext(version, linkedVersion.get());
+                String head = objectId(pull.getHeadRefOid());
+                var linkedVersion = LinkedWorkItemContentSource.currentClosingMaterialVersion(pull);
+                linkedContext = linkedVersion.map(ItemVersion::value).orElse(null);
+                if (!requireVersion && pull.getBaseRefOid() == null) version = null;
+                else {
+                    version = ScmVersion.pullRequest(
+                            objectId(pull.getBaseRefOid()), head, pull.getTitle(), pull.getBody());
+                    if (linkedVersion.isPresent()) version = ScmVersion.withContext(version, linkedVersion.get());
+                }
             } else version = issueVersions.of(ScmEventPayload.IssueData.from(work));
         }
         String noun = work instanceof PullRequest
@@ -231,7 +250,123 @@ public class ScmItemService implements ItemSource {
                 repository.getNameWithOwner(),
                 review == null ? work.getHtmlUrl() : review.getHtmlUrl(),
                 integration.kind());
-        return new ItemSnapshot(item, version, integration, state, roles, label);
+        return new Observed(work, review, version, linkedContext, integration, state, roles, label);
+    }
+
+    private record Observed(
+            Issue work,
+            @Nullable PullRequestReview review,
+            @Nullable ItemVersion version,
+            @Nullable String linkedContext,
+            IntegrationRef integration,
+            Map<String, String> state,
+            List<RoleHolder> roles,
+            ItemLabel label) {}
+
+    /**
+     * What an occasion on {@code item} retains, read in the transaction that records it: the work as this transaction
+     * stores it at {@code version}, which the caller pinned under the item lock. Null for an item kind that retains
+     * nothing. When the record cannot be kept, it is an {@link ItemEventInput#unretained} statement of why: the work
+     * no longer has that version ({@code NOT_OBSERVED}), or {@link ScmWorkCapture#retain} refuses to keep it. The
+     * first record of an occasion stays; a redelivery never replaces it.
+     */
+    @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = ItemCaptureException.class)
+    public @Nullable String retain(ItemRef item, @Nullable ItemVersion version, FoundBy foundBy) {
+        if (!ScmWorkCapture.retains(item.kind())) return null;
+        Observed observed;
+        try {
+            observed = observe(item, false);
+        } catch (ItemCaptureException unavailable) {
+            // The occasion is still recorded; it keeps only the statement that its work could not be read.
+            return ItemEventInput.unretained(ScmWorkCapture.NOT_OBSERVED);
+        }
+        if (!Objects.equals(observed.version(), version)) return ItemEventInput.unretained(ScmWorkCapture.NOT_OBSERVED);
+        PullRequest pull = (PullRequest) observed.work();
+        PullRequestReview review = observed.review();
+        // Every person the record names, whatever their role: the author, assignees, merger and reviewer.
+        List<User> copied = new ArrayList<>(pull.getAssignees());
+        if (pull.getAuthor() != null) copied.add(pull.getAuthor());
+        if (pull.getMergedBy() != null) copied.add(pull.getMergedBy());
+        if (review != null && review.getAuthor() != null) copied.add(review.getAuthor());
+        var participants = copied.stream()
+                .collect(Collectors.toMap(User::getId, user -> user, (first, second) -> first, LinkedHashMap::new))
+                .values()
+                .stream()
+                .sorted(Comparator.comparing(User::getId))
+                .map(ScmOccasionEvidence.Participant::of)
+                .toList();
+        Instant observedAt = clock.instant();
+        var work = ScmCapturedWork.of(pull, review);
+        var evidence = new ScmOccasionEvidence(
+                ScmOccasionEvidence.SCHEMA,
+                item.kind().value(),
+                Objects.requireNonNull(item.sourceId()),
+                version == null ? null : version.value(),
+                version == null ? null : version.baseVersion(),
+                observed.linkedContext(),
+                observed.integration(),
+                observed.state(),
+                observed.roles(),
+                observed.label(),
+                work,
+                PullRequestContentSource.occasionRecord(pull, work, observedAt),
+                review == null ? null : ReviewThreadContentSource.occasionDecision(review, observedAt),
+                participants,
+                observedAt,
+                foundBy);
+        return workCapture.retain(evidence, item.itemId());
+    }
+
+    /**
+     * Pins an event review's occasion. A pull request or review occasion supplies its own version, state and roles
+     * from its retained record; the work must still exist in this workspace, and the source must still authorize it
+     * through the same connection. Without a usable record it refuses with
+     * {@link ItemCaptureCode#OCCASION_EVIDENCE_UNAVAILABLE}, never with the current work in its place. Other kinds pin
+     * as {@link #pin} does.
+     */
+    @Transactional(readOnly = true, noRollbackFor = ItemCaptureException.class)
+    @Override
+    public ItemSnapshot pinOccasion(ItemRef item, ItemVersion requested, UUID eventId) {
+        if (!ScmWorkCapture.retains(item.kind())) return pinItem(item, requested);
+        return occasion(item, requested, eventId).snapshot();
+    }
+
+    private record Retained(
+            ScmOccasionEvidence evidence,
+            ItemSnapshot snapshot,
+            Issue work,
+            @Nullable PullRequestReview review) {}
+
+    private Retained occasion(ItemRef item, ItemVersion requested, UUID eventId) {
+        var evidence = workCapture.occasion(item, eventId);
+        if (!evidence.matches(item, requested)) throw versionUnavailable();
+        items.require(item);
+        PullRequestReview review = null;
+        ItemRef workItem = item;
+        Issue work;
+        if (item.kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)) {
+            review = reviews.findById(Objects.requireNonNull(item.sourceId())).orElseThrow(ScmItemService::gone);
+            work = Objects.requireNonNull(review.getPullRequest(), "Provider review has no pull request");
+            workItem = items.parent(item, ScmItemEvents.PULL_REQUEST);
+            if (!Objects.equals(workItem.sourceId(), work.getId())) throw invisible();
+        } else
+            work = workLookup
+                    .find(item.kind(), Objects.requireNonNull(item.sourceId()))
+                    .orElseThrow(ScmItemService::gone);
+        // Current access, never the access the occasion had: the same connection must still authorize the work.
+        if (!authorize(workItem, work).equals(evidence.integration())
+                || !Objects.equals(evidence.work().sourceId(), work.getId())) throw versionUnavailable();
+        return new Retained(
+                evidence,
+                new ItemSnapshot(
+                        item,
+                        evidence.version(),
+                        evidence.integration(),
+                        evidence.state(),
+                        evidence.roles(),
+                        evidence.label()),
+                work,
+                review);
     }
 
     private ItemSnapshot repository(ItemRef item, @Nullable ItemVersion requested) {
@@ -315,7 +450,12 @@ public class ScmItemService implements ItemSource {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     @Override
     public CaptureContribution capture(ItemSnapshot pinned, CaptureRequest request) {
-        ItemSnapshot verified = pinItem(pinned.item(), pinned.version());
+        var eventId = request.eventId();
+        // An event review captures its retained occasion: the same record, checked against current access again.
+        var occasion = eventId == null || !ScmWorkCapture.retains(pinned.item().kind())
+                ? null
+                : occasion(pinned.item(), pinned.version(), eventId);
+        ItemSnapshot verified = occasion != null ? occasion.snapshot() : pinItem(pinned.item(), pinned.version());
         if (!verified.integration().equals(pinned.integration())
                 || !verified.roles().equals(pinned.roles())) throw versionUnavailable();
         if (!request.sourceContractVersion().equals("2.0.0") || request.scriptContractVersion() != 3)
@@ -324,7 +464,10 @@ public class ScmItemService implements ItemSource {
                 || pinned.item().kind().equals(ScmItemEvents.FILE)) return captureTree(pinned, request);
         Issue work;
         PullRequestReview review = null;
-        if (pinned.item().kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)) {
+        if (occasion != null) {
+            work = occasion.work();
+            review = occasion.review();
+        } else if (pinned.item().kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)) {
             review = reviews.findById(Objects.requireNonNull(pinned.item().sourceId()))
                     .orElseThrow(ScmItemService::gone);
             work = Objects.requireNonNull(review.getPullRequest());
@@ -334,46 +477,7 @@ public class ScmItemService implements ItemSource {
                             pinned.item().kind(),
                             Objects.requireNonNull(pinned.item().sourceId()))
                     .orElseThrow(ScmItemService::gone);
-        contributors.require(work, review, request.sources());
-        var permittedRequest = request;
-        if (request.sources().contains(PullRequestContentSource.CORE)
-                && !request.sources().contains(PullRequestContentSource.DIFF)
-                && request.permittedSources().contains(PullRequestContentSource.DIFF)
-                && !contributors.permitsCommitRecords(work, review)) {
-            // Withheld commit words do not withdraw the separately permitted pull request metadata.
-            var permitted = new HashSet<>(request.permittedSources());
-            permitted.remove(PullRequestContentSource.DIFF);
-            permittedRequest = new CaptureRequest(
-                    request.reviewId(),
-                    request.jobId(),
-                    request.attempt(),
-                    request.sources(),
-                    request.sourceContractVersion(),
-                    request.scriptContractVersion(),
-                    request.scanPaths(),
-                    permitted);
-        }
-        Repository repository = Objects.requireNonNull(work.getRepository());
-        PullRequest pull = work instanceof PullRequest p ? p : null;
-        ScmCapturedWork frozen = new ScmCapturedWork(
-                work.getId(),
-                repository.getId(),
-                work.getNumber(),
-                work.getHtmlUrl(),
-                repository.getNameWithOwner(),
-                work.getTitle(),
-                work.getBody(),
-                pull == null ? null : pull.getHeadRefOid(),
-                pull == null ? null : pull.getBaseRefOid(),
-                pull == null ? null : pull.getHeadRefName(),
-                pull == null ? null : pull.getBaseRefName(),
-                review == null ? null : review.getId(),
-                review == null || review.getAuthor() == null
-                        ? null
-                        : review.getAuthor().getId());
-        ScmCaptureContext context =
-                new ScmCaptureContext(pinned, permittedRequest, frozen, new ScmCapturePreparation(), clock.instant());
-        return workCapture.capture(context);
+        return workCapture.capture(pinned, request, work, review, occasion != null ? occasion.evidence() : null);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -522,7 +626,7 @@ public class ScmItemService implements ItemSource {
                 pull.getBaseRefName(),
                 pull.getTitle(),
                 pull.getBody(),
-                closingContext(pull).orElse(null)));
+                LinkedWorkItemContentSource.currentClosingMaterialVersion(pull).orElse(null)));
     }
 
     private IntegrationRef authorize(ItemRef workItem, Issue work) {
@@ -536,10 +640,6 @@ public class ScmItemService implements ItemSource {
         ItemRef holder = items.parent(workItem, ScmItemEvents.REPOSITORY);
         if (!Objects.equals(holder.sourceId(), repository.getId())) throw invisible();
         return repositories.authorize(workItem.workspaceId(), repository);
-    }
-
-    private static Optional<ItemVersion> closingContext(PullRequest pull) {
-        return LinkedWorkItemContentSource.currentClosingMaterialVersion(pull, List.copyOf(pull.getClosingIssues()));
     }
 
     private static String objectId(@Nullable String value) {

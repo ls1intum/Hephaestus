@@ -21,6 +21,9 @@
         "captured_at": {
           "type": "string"
         },
+        "observed_at": {
+          "type": "string"
+        },
         "mirror_synced_at": {
           "type": "string"
         }

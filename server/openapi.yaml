@@ -16629,6 +16629,7 @@ components:
           - PENDING_DEADLINE_EXCEEDED
           - ITEM_GONE
           - LEGACY_REVIEW_UNBOUND
+          - OCCASION_EVIDENCE_UNAVAILABLE
           - null
         reviewId:
           type:
@@ -24349,6 +24350,7 @@ components:
           - PENDING_DEADLINE_EXCEEDED
           - ITEM_GONE
           - LEGACY_REVIEW_UNBOUND
+          - OCCASION_EVIDENCE_UNAVAILABLE
           - null
         reviewId:
           type:

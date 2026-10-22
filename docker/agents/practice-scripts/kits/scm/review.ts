@@ -79,6 +79,8 @@ export interface ReviewDecision {
 	author?: string;
 	bot: boolean;
 	submittedAt?: string;
+	/** When Hephaestus read a retained decision; not the provider's submission time. */
+	observedAt?: string;
 	body?: string;
 	dismissed?: boolean;
 }
@@ -140,6 +142,7 @@ const reviewThreadsSchema = z.object({
 			author: z.string().optional(),
 			bot: z.boolean().optional(),
 			submittedAt: z.string().optional(),
+			observedAt: z.string().optional(),
 			body: z.string().optional(),
 			dismissed: z.boolean().optional(),
 		}),

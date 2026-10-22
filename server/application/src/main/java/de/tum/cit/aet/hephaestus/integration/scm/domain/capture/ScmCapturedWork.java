@@ -1,5 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 public record ScmCapturedWork(
@@ -19,5 +24,27 @@ public record ScmCapturedWork(
     public ScmCapturedWork {
         if (sourceId <= 0 || repositoryId <= 0 || number <= 0 || repositoryPath.isBlank())
             throw new IllegalArgumentException("Invalid pinned SCM work");
+    }
+
+    /** The work, and the submitted review when the item is one, as the mirror stores them now. */
+    public static ScmCapturedWork of(Issue work, @Nullable PullRequestReview review) {
+        Repository repository = Objects.requireNonNull(work.getRepository());
+        PullRequest pull = work instanceof PullRequest p ? p : null;
+        return new ScmCapturedWork(
+                work.getId(),
+                repository.getId(),
+                work.getNumber(),
+                work.getHtmlUrl(),
+                repository.getNameWithOwner(),
+                work.getTitle(),
+                work.getBody(),
+                pull == null ? null : pull.getHeadRefOid(),
+                pull == null ? null : pull.getBaseRefOid(),
+                pull == null ? null : pull.getHeadRefName(),
+                pull == null ? null : pull.getBaseRefName(),
+                review == null ? null : review.getId(),
+                review == null || review.getAuthor() == null
+                        ? null
+                        : review.getAuthor().getId());
     }
 }

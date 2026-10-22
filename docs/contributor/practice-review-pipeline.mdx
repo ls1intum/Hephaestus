@@ -136,17 +136,45 @@ Description and discussion capture can still succeed from synchronized provider 
 Readiness withholds practices that require the unavailable source and retains the precise reason in each source check.
 Neither a fetch failure nor an unavailable source is evidence of a problem in the work.
 
-A pull or merge request work record contains the mirror as capture reads it.
-Capture first verifies the mirror against the pinned version.
+A current pull or merge request work record contains the mirror as capture reads it.
+Current capture first verifies the mirror against the pinned version.
 If the version changed, for example its title, description, head or base, the capture stops.
 It uses none of the changed material.
 
 The record dates its read with `basis.captured_at`.
 This time is not the provider event time, the request time or a sync observation time.
 `basis.mirror_synced_at` dates the status fields separately.
-The record does not recover material of an earlier version.
+A current capture does not recover material of an earlier version.
 Records from earlier releases can name `admission_fields` and `admitted_at`.
 Readers keep those declarations as recorded.
+
+### Retained SCM occasions
+
+Pull request, merge request and submitted-review occasions keep their original record before review admission.
+The record includes the work's version, words, state and roles as Hephaestus stored the occasion.
+It does not reconstruct an earlier provider action.
+The record declares `basis.other_fields=OCCASION` and dates that read with `basis.observed_at`.
+A retained submitted decision also carries its own `observedAt`.
+
+Other discussions and decisions remain capture-time material.
+They are not a complete earlier discussion history.
+
+Admission and capture use the retained occasion while checking current workspace access and contributor permission.
+A later edit cannot replace the original record.
+A pending GitLab occasion can gain its diff base only while its original source fence holds.
+Its first words, people, state, roles and expiry stay unchanged.
+A submitted review on an older commit does not attest the current pull request's diff.
+
+An absent, oversized, expired or erased original records `OCCASION_EVIDENCE_UNAVAILABLE` and is withheld before admission.
+Temporary source failures and corrupt retained records remain faults that can be retried.
+A manual request still captures the current work under its normal version checks.
+Other item kinds, Slack and Outline retain their existing source contracts.
+
+The [personal data map](/admin/dsms/personal-data-map) owns retention and erasure of these records and their copies.
+The frozen expiry also bounds retained writer inputs and native session copies.
+Cleanup uses the existing sweep and runtime leases.
+Physical removal can follow the expiry.
+Earlier events have no retained original and are not backfilled from today's work.
 
 Preparation failures log exception class names and their cause chain once per attempt.
 These diagnostics exclude exception messages, credentials and provider bodies.

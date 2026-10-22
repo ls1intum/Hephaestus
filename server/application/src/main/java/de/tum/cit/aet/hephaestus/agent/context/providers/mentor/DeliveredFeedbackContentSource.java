@@ -67,6 +67,8 @@ public class DeliveredFeedbackContentSource implements ContentSource {
                     .put("destination", entry.destination().name());
             putBody(row, body);
             basis(row, entry);
+            var resolution = entry.resolution();
+            if (resolution != null) row.putObject("developerResponse").put("resolution", resolution.name());
         }
         return root;
     }

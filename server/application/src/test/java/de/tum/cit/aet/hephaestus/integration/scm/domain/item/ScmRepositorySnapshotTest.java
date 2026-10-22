@@ -50,7 +50,6 @@ class ScmRepositorySnapshotTest extends BaseUnitTest {
                 mock(ScmFileVersions.class),
                 new ObjectMapper(),
                 mock(ScmWorkCapture.class),
-                mock(ScmCaptureContributors.class),
                 Clock.systemUTC());
         var snapshot = service.pin(ref, null);
         assertThat(snapshot.state()).containsEntry("defaultBranch", branch);

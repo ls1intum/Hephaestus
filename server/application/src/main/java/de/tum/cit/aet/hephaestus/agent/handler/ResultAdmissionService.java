@@ -116,7 +116,16 @@ public class ResultAdmissionService {
     }
 
     private void retainCompositionInputs(AdmissionIdentity identity, ReviewJob job, String digest) {
-        if (assignments.review(job).kind() != ReviewKind.ITEM) return;
+        var review = assignments.review(job);
+        if (review.kind() != ReviewKind.ITEM) return;
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(ReviewCompositionBasis.RETENTION);
+        // A copy of an occasion's retained record is used no longer than the record itself.
+        var occasionExpiry = review.evidenceExpiresAt();
+        if (occasionExpiry != null) {
+            if (!occasionExpiry.isAfter(now)) return;
+            if (occasionExpiry.isBefore(expiresAt)) expiresAt = occasionExpiry;
+        }
         var copy = files.completeReceipt(identity).orElse(null);
         if (copy == null || !files.holdVouchingReceipt(identity, copy)) return;
         var original = files.originalPublicInputs(identity).orElse(null);
@@ -129,7 +138,7 @@ public class ResultAdmissionService {
         basis.setBasisVersion(ReviewCompositionBasis.VERSION);
         basis.setBasisDigest(ReviewCompositionBasis.digest(original));
         basis.setCopyId(copy);
-        basis.setExpiresAt(Instant.now().plus(ReviewCompositionBasis.RETENTION));
+        basis.setExpiresAt(expiresAt);
         var payload = mapper.createObjectNode();
         var staged = payload.putObject("files");
         original.forEach((path, bytes) -> staged.put(path, Base64.getEncoder().encodeToString(bytes)));

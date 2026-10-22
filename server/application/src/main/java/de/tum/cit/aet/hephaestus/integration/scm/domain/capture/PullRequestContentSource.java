@@ -120,9 +120,13 @@ public class PullRequestContentSource {
             return CaptureContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
         }
         ReviewRepositoryPreparer.PreparedReview prepared = null;
-        boolean cloneRequested = readsClone(selectedKinds)
-                || (selectedKinds.contains(CORE)
-                        && request.request().permittedSources().contains(DIFF));
+        var occasion = capture.occasion();
+        // A review submitted on an older commit attests no diff of the occasion's pair: its words stay without code.
+        boolean pairAttested = occasion == null || occasion.pairAttested();
+        boolean cloneRequested = pairAttested
+                && (readsClone(selectedKinds)
+                        || (selectedKinds.contains(CORE)
+                                && request.request().permittedSources().contains(DIFF)));
         boolean cloneEnabled = cloneRequested && gitRepositoryManager.isEnabled();
         if (cloneEnabled) {
             prepared = request.preparation().prepare(repositoryPreparer, capture);
@@ -142,11 +146,15 @@ public class PullRequestContentSource {
         var unavailable = request.preparation().unavailableReason();
         if (selectedKinds.contains(DIFF) && unavailable != null)
             states = Map.of(DIFF, new SourceCaptureState.Unavailable(unavailable));
+        if (selectedKinds.contains(DIFF) && !pairAttested)
+            states = Map.of(DIFF, new SourceCaptureState.Unavailable(SourceAbsenceReason.REVIEW_VERSION_UNAVAILABLE));
         if (prepared != null) {
             ensureRepositoryAvailable(new RepositoryKey(capture.workspaceId(), repositoryId));
         }
         if (selectedKinds.contains(CORE)) {
-            ObjectNode staged = workRecord(pullRequest, metadata, capture.capturedAt());
+            // An event review stages the record its occasion retained, whole: today's words and status never join it.
+            ObjectNode staged =
+                    occasion != null ? occasion.record() : workRecord(pullRequest, metadata, capture.capturedAt());
             storeMetadata(files, staged);
             // The words of the verified pinned version, read at capture. A body known to be absent
             // stages an empty description; a body the record does not carry as text stays unknown,
@@ -385,6 +393,19 @@ public class PullRequestContentSource {
             result.put("head_checks", pullRequest.getHeadCheckState().name());
         }
 
+        return result;
+    }
+
+    /**
+     * The work record of an occasion, as {@link #workRecord} reads it in the transaction that records the occasion.
+     * Its basis says so: every field describes the work when the occasion was observed, which is when Hephaestus stored
+     * it, not a provider time. The mirror sync time dates the status fields only.
+     */
+    public static ObjectNode occasionRecord(PullRequest pullRequest, ScmCapturedWork work, Instant observedAt) {
+        ObjectNode result = workRecord(pullRequest, work, null);
+        ObjectNode basis = (ObjectNode) result.get("basis");
+        basis.put("other_fields", "OCCASION");
+        putInstant(basis, "observed_at", observedAt);
         return result;
     }
 

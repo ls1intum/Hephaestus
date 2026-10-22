@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.math.BigDecimal;
@@ -27,6 +28,7 @@ public class ReviewSnapshotQueryService implements ReviewSnapshotQuery {
     private final ReviewPracticeRepository assignments;
     private final PracticeVersionRepository versions;
     private final ProductItemQuery items;
+    private final ProductItemRepository itemRows;
     private final JsonMapper json;
 
     @Override
@@ -66,6 +68,7 @@ public class ReviewSnapshotQueryService implements ReviewSnapshotQuery {
                             assignment.getMethod()));
                 }
             }
+            var eventId = review.getOrigin() == ReviewOrigin.EVENT ? review.getEventId() : null;
             return Optional.of(new ReviewSnapshot(
                     reviewId,
                     workspaceId,
@@ -76,7 +79,12 @@ public class ReviewSnapshotQueryService implements ReviewSnapshotQuery {
                             : new ItemVersion(review.getItemVersion(), review.getBaseVersion()),
                     review.getOrigin(),
                     review.getRolloutRevision(),
-                    pinned));
+                    pinned,
+                    eventId,
+                    eventId == null
+                            ? null
+                            : itemRows.event(workspaceId, review.getItemId(), eventId)
+                                    .getEvidenceExpiresAt()));
         });
     }
 }

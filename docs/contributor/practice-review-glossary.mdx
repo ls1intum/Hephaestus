@@ -96,6 +96,18 @@ The assignment is withheld and has no result pointer.
 `LEGACY_REVIEW_UNBOUND` marks a withheld item event from a release that keyed submitted reviews by the pull request head.
 The event stays on its pull request with its original name, revision and times. It names no review, so it cannot start one.
 
+**Retained occasion evidence** is the record of a pull request or submitted review that an item event keeps when it is recorded.
+It holds the version, review state, roles and work record as Hephaestus stored them at that moment.
+It also keeps the native identity of each person it names.
+
+An event review of that event reads only this record.
+It never reads the current work in its place.
+The record expires at a fixed time after the event is recorded.
+Expiry, erasure and removal of the item replace it with a statement of why it is gone.
+
+`OCCASION_EVIDENCE_UNAVAILABLE` marks a withheld item event whose retained occasion evidence is missing, expired, erased or too large to keep.
+The same name is the source capture code that causes it.
+
 ## Runtime terms
 
 | Term                           | Meaning                                                                                                   | Identifier                     |

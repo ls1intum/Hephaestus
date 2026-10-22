@@ -14,7 +14,14 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 @ConditionalOnServerRole
 @RequiredArgsConstructor
-@PersonDataStores({"oauth_state_nonce", "connection_audit", "sync_job", "item_event", "item_event_requester"})
+@PersonDataStores({
+    "oauth_state_nonce",
+    "connection_audit",
+    "sync_job",
+    "item_event",
+    "item_event_evidence",
+    "item_event_requester"
+})
 public class IntegrationCoreConnectionPersonDataCatalog implements PersonDataCatalog {
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -61,6 +68,27 @@ public class IntegrationCoreConnectionPersonDataCatalog implements PersonDataCat
                         "id,workspace_id,item_id,name,item_version,occurred_at,found_by,state,reason,decided_at,last_attempted_at,retry_at,requested_by_id,actor_user_id",
                         "id",
                         "actor_user_id=NULL",
+                        400),
+                // Retained occasion evidence copies words and people beyond the actor. It is selected by every person
+                // it copied, by mirror user or by the native identity it keeps, so a person whose mirror row is gone
+                // is still found. The personal export lists the occasion, not the other people's words. Erasure
+                // leaves only the statement that the record was erased and its fixed expiry, which names no person
+                // and still bounds the copies made from it.
+                new JdbcPersonDataStore(
+                        jdbc,
+                        mapper,
+                        "item_event_evidence",
+                        "item_event",
+                        "jsonb_typeof(t.evidence->'participants')='array' AND EXISTS (SELECT 1 FROM"
+                                + " jsonb_array_elements(t.evidence->'participants') p"
+                                + " WHERE CAST(p->>'userId' AS bigint) = ANY(:users)"
+                                + " OR EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb))"
+                                + " AS i(\"providerId\" bigint,subject text,\"teamId\" text)"
+                                + " WHERE CAST(p->'identity'->>'providerId' AS bigint)=i.\"providerId\""
+                                + " AND p->'identity'->>'subject'=i.subject))",
+                        "id,workspace_id,item_id,name,occurred_at,found_by,evidence_expires_at",
+                        "id",
+                        "evidence=jsonb_build_object('unretained','ERASED')",
                         400),
                 new JdbcPersonDataStore(
                         jdbc,

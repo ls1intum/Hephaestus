@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
 import static de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCaptureContext.OUTPUT_PREFIX;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
@@ -28,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -129,14 +131,27 @@ public class LinkedWorkItemContentSource {
                     closing.put(issue.getNumber(), issue);
                 }
             }
+            // An event review reads references from the words its occasion retained. The linked issues themselves are
+            // read now, so they are used only while their material is still the one the occasion recorded.
+            var occasion = capture.occasion();
+            String title = occasion != null ? m.title() : pullRequest == null ? null : pullRequest.getTitle();
+            String body = occasion != null ? m.body() : pullRequest == null ? null : pullRequest.getBody();
+            if (occasion != null
+                    && !Objects.equals(
+                            occasion.linkedContextVersion(),
+                            currentClosingMaterialVersion(m.head(), title, body, List.copyOf(closing.values()))
+                                    .map(ItemVersion::value)
+                                    .orElse(null)))
+                return CaptureContribution.unavailable(selectedKinds, SourceAbsenceReason.REVIEW_VERSION_UNAVAILABLE);
             Set<Integer> numbers = new LinkedHashSet<>(closing.keySet());
-            collect(NUMBER_REF, pullRequest == null ? null : pullRequest.getTitle(), numbers);
-            collect(NUMBER_REF, pullRequest == null ? null : withoutHtmlComments(pullRequest.getBody()), numbers);
+            collect(NUMBER_REF, title, numbers);
+            collect(NUMBER_REF, withoutHtmlComments(body), numbers);
             collect(
                     BRANCH_REF,
                     firstNonBlank(m.sourceBranch(), pullRequest == null ? null : pullRequest.getHeadRefName()),
                     numbers);
-            if (prepared != null) {
+            // A review on an older commit attests none of the commits up to the occasion's head.
+            if (prepared != null && (occasion == null || occasion.pairAttested())) {
                 gitRepositoryManager.forEachCommitMessage(
                         prepared.key(),
                         prepared.target(),
@@ -191,6 +206,11 @@ public class LinkedWorkItemContentSource {
         }
     }
 
+    /** The same context from the pull request's closing issues as it stores them now. */
+    public static Optional<ItemVersion> currentClosingMaterialVersion(PullRequest pullRequest) {
+        return currentClosingMaterialVersion(pullRequest, List.copyOf(pullRequest.getClosingIssues()));
+    }
+
     public static Optional<ItemVersion> currentClosingMaterialVersion(
             PullRequest pullRequest, List<Issue> closingIssues) {
         return currentClosingMaterialVersion(
@@ -199,7 +219,7 @@ public class LinkedWorkItemContentSource {
 
     /** The same context from a pull request's stored head, title and description, without its entity. */
     public static Optional<ItemVersion> currentClosingMaterialVersion(
-            @Nullable String head, String title, @Nullable String body, List<Issue> closingIssues) {
+            @Nullable String head, @Nullable String title, @Nullable String body, List<Issue> closingIssues) {
         if (closingIssues.isEmpty() || closingIssues.stream().anyMatch(issue -> issue.getDeletedAt() != null)) {
             return Optional.empty();
         }

@@ -984,6 +984,57 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         assertThat(trace).doesNotExist();
     }
 
+    @Test
+    void shouldRemoveRawTranscriptAtTheOriginalOccasionDeadline() throws Exception {
+        var layout = new FabricLayout(root.toString());
+        var copies = personCopies();
+        var job = launched();
+        var deadline = clock.instant().plus(Duration.ofHours(1));
+        job.setCapture(new JsonMapper().createObjectNode().put(JobEvidenceFiles.COPIES_EXPIRE_AT, deadline.toString()));
+        when(copies.traceCustody(job.getId(), 1L, 0)).thenReturn(EvidenceFolderPersonDataCatalog.TraceCustody.INDEXED);
+        var lease = runtimeLease(layout, job);
+        try (lease) {
+            new JobEvidenceFiles(layout, jobs, clock, copies)
+                    .bind(job.getId(), 0, IMAGE)
+                    .accept(TRACED_UPLOAD);
+        }
+        job.setStatus(ReviewJobStatus.COMPLETED);
+        Path trace = traceOf(layout, job, 0);
+        var record = new JsonMapper().readTree(Files.readString(trace.resolve("record.json")));
+        assertThat(record.path("retention").asString()).isEqualTo("NATIVE_TRANSCRIPT");
+        assertThat(Instant.parse(record.path("expiresAt").asString())).isEqualTo(deadline);
+
+        new JobEvidenceFiles(layout, jobs, Clock.offset(clock, Duration.ofMinutes(59)), copies).cleanAfterRestart();
+        assertThat(trace.resolve("0001.jsonl")).exists();
+        new JobEvidenceFiles(layout, jobs, Clock.offset(clock, Duration.ofHours(1)), copies).cleanEndedAttempts();
+        assertThat(trace).doesNotExist();
+    }
+
+    @ParameterizedTest
+    // Both timestamps are relative to this class's fixed clock; the malformed value must not grant a fresh day.
+    @ValueSource(strings = {"2026-09-11T11:59:59Z", "2026-09-11T12:00:00Z", "not-a-date"})
+    void shouldKeepNoRawTranscriptWithAnExpiredOrUnreadableOccasionDeadline(String deadline) throws Exception {
+        var layout = new FabricLayout(root.toString());
+        var copies = personCopies();
+        var job = launched();
+        job.setCapture(new JsonMapper().createObjectNode().put(JobEvidenceFiles.COPIES_EXPIRE_AT, deadline));
+        when(copies.traceCustody(job.getId(), 1L, 0)).thenReturn(EvidenceFolderPersonDataCatalog.TraceCustody.INDEXED);
+        var lease = runtimeLease(layout, job);
+        try (lease) {
+            new JobEvidenceFiles(layout, jobs, clock, copies)
+                    .bind(job.getId(), 0, IMAGE)
+                    .accept(TRACED_UPLOAD);
+        }
+        Path trace = traceOf(layout, job, 0);
+        assertThat(trace.resolve("0001.jsonl")).doesNotExist();
+        assertThat(trace.resolve("manifest.json")).doesNotExist();
+        var text = Files.readString(trace.resolve("record.json"));
+        var record = new JsonMapper().readTree(text);
+        assertThat(record.path("retention").asString()).isEqualTo("METADATA_ONLY");
+        assertThat(record.path("contentUnavailable").asString()).isEqualTo("OCCASION_EVIDENCE_UNAVAILABLE");
+        assertThat(text).doesNotContain("Jane", "jane", "/workspace", "people/");
+    }
+
     private static ReviewJob job() {
         var workspace = new Workspace();
         workspace.setId(1L);

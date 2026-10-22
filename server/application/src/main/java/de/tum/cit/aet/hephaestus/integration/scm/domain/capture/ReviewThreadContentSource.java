@@ -17,11 +17,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,6 +34,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component
@@ -71,7 +74,11 @@ public class ReviewThreadContentSource {
         this.reviewRepository = reviewRepository;
     }
 
-    private ObjectNode collect(long pullRequestId, ScmCapturedWork metadata) {
+    /**
+     * @param occasionDecision the submitted review's decision as its occasion retained it; it takes the place of that
+     *     review as stored now, which may have been edited since
+     */
+    private ObjectNode collect(long pullRequestId, ScmCapturedWork metadata, @Nullable ObjectNode occasionDecision) {
         try {
             List<Long> threadIds =
                     new ArrayList<>(threadRepository.findRecentIdsByPullRequestId(pullRequestId, Pageable.unpaged()));
@@ -85,7 +92,14 @@ public class ReviewThreadContentSource {
                     PullRequestReview::getSubmittedAt, Comparator.nullsLast(Comparator.naturalOrder())));
 
             ObjectNode root = objectMapper.createObjectNode();
-            if (metadata.reviewSourceId() != null) {
+            if (occasionDecision != null) {
+                // The reviewer as the occasion named them; a later rename does not change who the feedback is about.
+                if (occasionDecision.has("author") && occasionDecision.has("authorId")) {
+                    ObjectNode recipient = root.putObject("reviewRecipient");
+                    recipient.set("author", occasionDecision.get("author"));
+                    recipient.set("authorId", occasionDecision.get("authorId"));
+                }
+            } else if (metadata.reviewSourceId() != null) {
                 Long reviewId = metadata.reviewSourceId();
                 Long aboutUserId = metadata.reviewerUserId();
                 for (PullRequestReview review : reviews) {
@@ -113,23 +127,20 @@ public class ReviewThreadContentSource {
             root.set("threads", threadArray);
 
             ArrayNode decisionArray = objectMapper.createArrayNode();
+            boolean occasionStaged = occasionDecision == null;
             for (PullRequestReview review : reviews) {
                 if (review == null || review.getState() == null) {
                     continue;
                 }
-                if (review.getState() == PullRequestReview.State.PENDING
-                        || review.getState() == PullRequestReview.State.UNKNOWN) {
+                if (occasionDecision != null && Objects.equals(review.getId(), metadata.reviewSourceId())) {
+                    if (decides(occasionDecision)) decisionArray.add(occasionDecision);
+                    occasionStaged = true;
                     continue;
                 }
-                // A COMMENTED review with no body is the container of inline comments — GitHub's
-                // batch, or the row GitLab's sync makes per discussion and author — and its
-                // substance is already in comments.json. Listing it here would be a decision that
-                // decided nothing.
-                if (review.getState() == PullRequestReview.State.COMMENTED && isBlank(review.getBody())) {
-                    continue;
-                }
-                decisionArray.add(toDecision(review));
+                if (decides(review.getState(), review.getBody())) decisionArray.add(decision(review));
             }
+            if (!occasionStaged && occasionDecision != null && decides(occasionDecision))
+                decisionArray.add(occasionDecision);
             root.set("reviewDecisions", decisionArray);
             // A withdrawn or replaced decision may be gone, so this list is no event history.
             root.put("decisionHistoryComplete", false);
@@ -156,7 +167,8 @@ public class ReviewThreadContentSource {
         if (pullRequest == null || pullRequest.getDeletedAt() != null) {
             return CaptureContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
         }
-        ObjectNode root = collect(pullRequestId, metadata);
+        var occasion = request.occasion();
+        ObjectNode root = collect(pullRequestId, metadata, occasion == null ? null : occasion.decision());
         boolean empty =
                 root.path("threads").isEmpty() && root.path("reviewDecisions").isEmpty();
         Map<String, byte[]> files = new LinkedHashMap<>();
@@ -225,8 +237,37 @@ public class ReviewThreadContentSource {
         return node;
     }
 
-    private ObjectNode toDecision(PullRequestReview review) {
-        ObjectNode node = objectMapper.createObjectNode();
+    /**
+     * A submitted review's decision as {@link #decision} reads it in the transaction that records the review's
+     * occasion. {@code observedAt} is when Hephaestus stored it, not a provider time.
+     */
+    public static ObjectNode occasionDecision(PullRequestReview review, Instant observedAt) {
+        ObjectNode node = decision(review);
+        node.put("observedAt", observedAt.toString());
+        return node;
+    }
+
+    private static boolean decides(ObjectNode decision) {
+        PullRequestReview.State state;
+        try {
+            state = PullRequestReview.State.valueOf(decision.path("state").asString(""));
+        } catch (IllegalArgumentException unknown) {
+            return false;
+        }
+        return decides(state, decision.path("body").asString(""));
+    }
+
+    private static boolean decides(PullRequestReview.State state, @Nullable String body) {
+        if (state == PullRequestReview.State.PENDING || state == PullRequestReview.State.UNKNOWN) return false;
+        // A COMMENTED review with no body is the container of inline comments — GitHub's
+        // batch, or the row GitLab's sync makes per discussion and author — and its
+        // substance is already in comments.json. Listing it here would be a decision that
+        // decided nothing.
+        return state != PullRequestReview.State.COMMENTED || !isBlank(body);
+    }
+
+    private static ObjectNode decision(PullRequestReview review) {
+        ObjectNode node = JsonNodeFactory.instance.objectNode();
         node.put("nativeId", review.getNativeId());
         node.put("state", review.getState().name());
         if (review.isDismissed()) {

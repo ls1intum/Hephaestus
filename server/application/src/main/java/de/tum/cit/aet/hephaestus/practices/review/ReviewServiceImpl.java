@@ -2,8 +2,11 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -112,7 +115,24 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ReviewRequestRejected(
                     ReviewRequestRejected.Reason.BUDGET_UNAVAILABLE, "The review budget is unavailable.");
         var ref = items.require(request.workspaceId(), request.itemId());
-        var pinned = items.pin(ref, request.version());
+        // An event review keeps the occasion's own version, state and roles once its source retained them. Every
+        // decision below still reads the workspace, its members and their choices as they are now.
+        var occasion = request.origin() == ReviewOrigin.EVENT ? request.eventId() : null;
+        var requestedVersion = request.version();
+        ItemSnapshot pinned;
+        try {
+            pinned = occasion != null && requestedVersion != null
+                    ? items.pinOccasion(ref, requestedVersion, occasion)
+                    : items.pin(ref, requestedVersion);
+        } catch (ItemCaptureException unavailable) {
+            // Settled here, not in the listener: any other exception leaving this method rolls the transaction back.
+            if (unavailable.code() != ItemCaptureCode.OCCASION_EVIDENCE_UNAVAILABLE) throw unavailable;
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.ITEM_INELIGIBLE,
+                    "The occasion kept no record of the work as it was.",
+                    ReviewRequestReason.OCCASION_EVIDENCE_UNAVAILABLE,
+                    unavailable);
+        }
         var now = clock.instant();
         Instant ordered = now;
         ItemEventName event = null;

@@ -71,7 +71,10 @@ public class ItemIndexService {
     }
 
     public boolean remove(long workspaceId, long itemId, Instant at) {
-        return repository.remove(workspaceId, itemId, at) == 1;
+        boolean removed = repository.remove(workspaceId, itemId, at) == 1;
+        // A removed item keeps its occasions' audit facts, not the words and people they retained.
+        if (removed) events.forgetEvidence(workspaceId, itemId);
+        return removed;
     }
 
     public boolean restore(long workspaceId, long itemId) {

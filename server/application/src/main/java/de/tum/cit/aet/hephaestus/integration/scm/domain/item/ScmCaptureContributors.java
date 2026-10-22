@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -31,9 +32,10 @@ public class ScmCaptureContributors {
     private final ScmCaptureConsent consent;
     private final ScmContributorQueryRepository queries;
 
-    boolean permitsCommitRecords(Issue work, @Nullable PullRequestReview review) {
+    boolean permitsCommitRecords(
+            Issue work, @Nullable PullRequestReview review, Collection<ScmCaptureConsent.Contributor> retained) {
         try {
-            require(work, review, Set.of(PullRequestContentSource.DIFF));
+            require(work, review, Set.of(PullRequestContentSource.DIFF), retained);
             return true;
         } catch (ItemCaptureException failure) {
             if (failure.code() != ItemCaptureCode.CONSENT_WITHHELD) throw failure;
@@ -41,7 +43,15 @@ public class ScmCaptureContributors {
         }
     }
 
-    void require(Issue work, @Nullable PullRequestReview review, Set<SourceKind> selected) {
+    /**
+     * @param retained the people whose identities and words an event review's occasion retained, also when they no
+     *     longer appear on the work or in the mirror
+     */
+    void require(
+            Issue work,
+            @Nullable PullRequestReview review,
+            Set<SourceKind> selected,
+            Collection<ScmCaptureConsent.Contributor> retained) {
         List<User> contributors = new ArrayList<>(work.getAssignees());
         if (work.getAuthor() != null) contributors.add(work.getAuthor());
         if (review != null && review.getAuthor() != null) contributors.add(review.getAuthor());
@@ -59,6 +69,9 @@ public class ScmCaptureContributors {
             ids.addAll(queries.treeContributors(
                     Objects.requireNonNull(work.getRepository()).getId()));
         users.findAllById(ids.stream().distinct().toList()).forEach(contributors::add);
-        consent.require(contributors);
+        var everyone = new ArrayList<ScmCaptureConsent.Contributor>();
+        contributors.forEach(user -> everyone.add(ScmCaptureConsent.Contributor.of(user)));
+        everyone.addAll(retained);
+        consent.requireContributors(everyone);
     }
 }

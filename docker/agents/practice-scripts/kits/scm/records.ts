@@ -10,14 +10,16 @@ function notKnownWhenUnnamed<const T extends readonly [string, ...string[]]>(val
 export const pullRequestRecordSchema = z.object({
 	/**
 	 * Which time each part describes. A current record reads every field at capture, at `captured_at`, which is not the
-	 * provider event time. Older records may contain `admission_fields` and `admitted_at` declarations.
-	 * Readers preserve these declarations as recorded.
+	 * provider event time. The record of an event review's occasion (`other_fields: "OCCASION"`) was read when
+	 * Hephaestus stored the occasion, at `observed_at`, also not a provider time. Older records may contain
+	 * `admission_fields` and `admitted_at` declarations. Readers preserve these declarations as recorded.
 	 */
 	basis: z.object({
 		admission_fields: z.array(z.string()).optional(),
 		admitted_at: z.string().optional(),
 		other_fields: z.string(),
 		captured_at: z.string().optional(),
+		observed_at: z.string().optional(),
 		mirror_synced_at: z.string().optional(),
 	}),
 	pr_number: z.int(),

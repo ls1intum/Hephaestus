@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
+import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
 import de.tum.cit.aet.hephaestus.agent.handler.DefaultReviewExecutionHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
@@ -861,7 +862,8 @@ public class ReviewJobExecutor {
                         preparedInputs.filesOnDisk(),
                         preparedInputs.directories(),
                         job.getAttempt(),
-                        preparedInputs.automatedReviewReadinessReport());
+                        preparedInputs.automatedReviewReadinessReport(),
+                        preparedInputs.copiesExpireAt());
             }
             return new PreparedSandbox(sandboxSpec, preparedInputs);
         } catch (RuntimeException exception) {
@@ -879,7 +881,8 @@ public class ReviewJobExecutor {
                 preparedInputs.filesOnDisk(),
                 preparedInputs.directories(),
                 attempt,
-                preparedInputs.automatedReviewReadinessReport());
+                preparedInputs.automatedReviewReadinessReport(),
+                preparedInputs.copiesExpireAt());
     }
 
     // Persist provenance before provider execution; results without their original input identity cannot be admitted.
@@ -891,12 +894,15 @@ public class ReviewJobExecutor {
             Map<String, Path> inputPaths,
             List<EvidenceDirectory> inputDirectories,
             int attempt,
-            @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport) {
+            @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport,
+            @Nullable Instant copiesExpireAt) {
         String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, inputPaths, inputDirectories, jobId);
         JsonNode capture = capture(snapshotMetadata(inputFiles, inputPaths), automatedReviewReadinessReport);
         var stamp = capture instanceof ObjectNode object ? object : objectMapper.createObjectNode();
         if (promptDigest != null) stamp.put("promptDigest", promptDigest);
         stamp.put("inputsDigest", inputsDigest);
+        // The attempt's transcript binds to this, so no copy it keeps outlives the occasion record its inputs copy.
+        if (copiesExpireAt != null) stamp.put(JobEvidenceFiles.COPIES_EXPIRE_AT, copiesExpireAt.toString());
         stamp.set(
                 "directories",
                 objectMapper.valueToTree(

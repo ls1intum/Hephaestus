@@ -5,14 +5,26 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
+/** @param occasion what an event review's occasion retained; null when the capture reads the current work */
 public record ScmCaptureContext(
         ItemSnapshot pinned,
         CaptureRequest request,
         ScmCapturedWork work,
         ScmCapturePreparation preparation,
-        Instant capturedAt) {
+        Instant capturedAt,
+        @Nullable ScmCapturedOccasion occasion) {
     public static final String OUTPUT_PREFIX = "context/";
+
+    public ScmCaptureContext(
+            ItemSnapshot pinned,
+            CaptureRequest request,
+            ScmCapturedWork work,
+            ScmCapturePreparation preparation,
+            Instant capturedAt) {
+        this(pinned, request, work, preparation, capturedAt, null);
+    }
 
     public long workspaceId() {
         return pinned.item().workspaceId();

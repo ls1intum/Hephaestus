@@ -144,7 +144,11 @@ public class DefaultReviewExecutionHandler {
                                                 .scan())
                                         .context()));
         }
-        var snapshot = source.pin(item, pinned.getFirst().version());
+        // An event review captures what its occasion retained, never the work as it changed since.
+        var occasion = review.kind() == ReviewKind.ITEM ? review.eventId() : null;
+        var snapshot = occasion == null
+                ? source.pin(item, pinned.getFirst().version())
+                : source.pinOccasion(item, pinned.getFirst().version(), occasion);
         Set<String> scanPaths = null;
         if (review.kind() == ReviewKind.SCAN) {
             scanPaths = new HashSet<>();
@@ -165,7 +169,9 @@ public class DefaultReviewExecutionHandler {
                             required,
                             SandboxLayout.SOURCE_CONTRACT_VERSION,
                             SandboxLayout.PRACTICE_CONTRACT_VERSION,
-                            scanPaths));
+                            scanPaths,
+                            required,
+                            occasion));
             try {
                 var manifest = Objects.requireNonNull(evidence.manifest());
                 var now = clock.instant();
@@ -253,7 +259,9 @@ public class DefaultReviewExecutionHandler {
                                 .orElseThrow(
                                         () -> new IllegalStateException("The captured item kind has no descriptor")),
                         mapper);
-                var prepared = files.prepare(job, evidence.withFiles(staged), report);
+                // The attempt's copies of the occasion's record are kept no longer than the record itself.
+                var prepared = files.prepare(job, evidence.withFiles(staged), report)
+                        .withCopiesExpireAt(review.evidenceExpiresAt());
                 if (decisions.stream().noneMatch(AutomatedReviewReadinessDecision::ready))
                     throw new InsufficientEvidenceException(
                             "No assigned practice has its required captured evidence", prepared);
