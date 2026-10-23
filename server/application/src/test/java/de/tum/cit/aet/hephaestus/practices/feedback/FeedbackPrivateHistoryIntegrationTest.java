@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.RetainedFeedbackTestData;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
@@ -116,6 +117,12 @@ class FeedbackPrivateHistoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private FeedbackCopyRepository copies;
+
+    @Autowired
+    private FeedbackRepository feedbacks;
+
+    @Autowired
+    private FeedbackBasisRepository bases;
 
     @Autowired
     private LlmConnectionRepository connections;
@@ -466,6 +473,80 @@ class FeedbackPrivateHistoryIntegrationTest extends BaseIntegrationTest {
             assertThat(copiedJobs(current)).isEmpty();
             assertThat(copiedSubjects(current)).containsExactly("999");
             assertThat(receipt(current).toString()).isEqualTo(before);
+        }
+    }
+
+    @Test
+    void shouldKeepConversationOpenWhenTheResultWasAlreadyConfirmedOnTheWork() {
+        var privateWords = "Words Heph said in an earlier conversation.";
+        var privateWitness =
+                historical(scenario, FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, privateWords, "701");
+        try (var captured = admittedResult(scenario, Instant.now(), "999")) {
+            var current = captured.job();
+            var result = captured.result();
+            long workspaceId = scenario.workspace().getId();
+            long developerId = Objects.requireNonNull(scenario.account().getId());
+            assertThat(captured.inputs().filesOnDisk()).containsKey("context/history-fixture.txt");
+            assertThat(result.getOutcome()).isEqualTo(ResultOutcome.NOT_MET);
+            assertThat(result.getDeveloperId()).isEqualTo(developerId);
+
+            var publicWords = "The summary posted on the work about this result.";
+            var onWork = fixtures.feedback(result, FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, publicWords);
+            copies.saveAndFlush(RetainedFeedbackTestData.posted(
+                    onWork,
+                    FeedbackCopyKind.SUMMARY,
+                    0,
+                    "note-confirmed-on-work",
+                    "https://private-history.example/merge_requests/1#note_1"));
+
+            assertThat(feedbacks.findByIdAndWorkspaceId(onWork.getId(), workspaceId))
+                    .as("the public feedback this result's developer received on the work")
+                    .hasValueSatisfying(row -> {
+                        assertThat(row.getDestination()).isEqualTo(FeedbackDestination.ON_WORK);
+                        assertThat(row.getState()).isEqualTo(FeedbackState.DELIVERED);
+                        assertThat(row.getDeveloperId()).isEqualTo(developerId);
+                        assertThat(row.getBody()).isEqualTo(publicWords);
+                        assertThat(row.getDeliveredAt()).isNotNull();
+                    });
+            assertThat(bases.findByWorkspaceIdAndFeedbackIdOrderByOrdinalAscIdAsc(workspaceId, onWork.getId()))
+                    .as("the public feedback rests on this result")
+                    .singleElement()
+                    .satisfies(basis -> {
+                        assertThat(basis.getResultId()).isEqualTo(result.getId());
+                        assertThat(basis.getDeveloperId()).isEqualTo(developerId);
+                    });
+            assertThat(copies.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(workspaceId, onWork.getId()))
+                    .as("its summary was posted on the work")
+                    .singleElement()
+                    .satisfies(copy -> {
+                        assertThat(copy.getKind()).isEqualTo(FeedbackCopyKind.SUMMARY);
+                        assertThat(copy.getState()).isEqualTo(FeedbackCopyState.POSTED);
+                        assertThat(copy.getPostedAt()).isNotNull();
+                        assertThat(copy.getExternalRef()).isEqualTo("note-confirmed-on-work");
+                        assertThat(copy.getBody())
+                                .as("a summary copy keeps no words; they are the feedback's")
+                                .isNull();
+                    });
+
+            var response = admission.admittedResponse(current);
+
+            // A posted public summary is not a reason to close the private conversation route.
+            assertConversationOpen(response);
+            var history = Objects.requireNonNull(response.privateHistory());
+            assertThat(history.delivered())
+                    .as("the private witness is delivery history; the public words on the work are not")
+                    .singleElement()
+                    .satisfies(row -> {
+                        assertThat(row.id())
+                                .isEqualTo(privateWitness.feedback().getId())
+                                .isNotEqualTo(onWork.getId());
+                        assertThat(row.destination()).isEqualTo(FeedbackDestination.CONVERSATION);
+                        assertThat(row.body()).isEqualTo(privateWords).isNotEqualTo(publicWords);
+                    });
+            assertThat(history.queued())
+                    .as("public feedback is never a queued private replacement target")
+                    .extracting(PrivateFeedbackHistoryDTO.Queued::feedbackId)
+                    .doesNotContain(onWork.getId());
         }
     }
 

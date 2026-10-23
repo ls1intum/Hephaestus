@@ -49,7 +49,6 @@ class FeedbackDeliveryRoleContextTest {
             FeedbackPreparationStore.class,
             FeedbackMarkListener.class,
             FeedbackPublicHistory.class,
-            FeedbackAnchorEligibility.class,
             FeedbackResponseSuppressionFilter.class,
             RepeatedSummaryCheck.class);
 

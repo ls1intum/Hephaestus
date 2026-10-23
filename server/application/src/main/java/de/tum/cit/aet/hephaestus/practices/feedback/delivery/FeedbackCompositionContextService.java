@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
@@ -49,8 +48,6 @@ public class FeedbackCompositionContextService {
     private final PracticePageSupportReader pageSupport;
     private final PracticePageFeedbackRouter pageRouter;
     private final FeedbackGate gate;
-    private final FeedbackBasisRepository basis;
-    private final FeedbackAnchorEligibility anchors;
     private final ResultHistoryQuery history;
     private final MentorReadinessQuery mentor;
     private final Clock clock;
@@ -207,11 +204,7 @@ public class FeedbackCompositionContextService {
         if (!mentor.isReady(review.workspaceId()))
             return new ConversationAdmission(
                     ConversationDecision.MENTOR_UNAVAILABLE, FeedbackStopReason.RECIPIENT_UNAVAILABLE);
-        if (anchors.hasInlineAnchor(review, result))
-            return new ConversationAdmission(ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW);
-        if (basis.hasConfirmedOnWork(review.workspaceId(), developer, result.getId()))
-            return new ConversationAdmission(
-                    ConversationDecision.ALREADY_DELIVERED_ON_WORK, FeedbackStopReason.NOTHING_NEW);
+        // A place or a delivery on the work does not close the conversation: each destination is judged on its own.
         return new ConversationAdmission(ConversationDecision.ADMIT, null);
     }
 

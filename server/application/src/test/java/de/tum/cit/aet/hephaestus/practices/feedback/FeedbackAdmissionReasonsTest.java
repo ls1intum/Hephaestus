@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackAnchorEligibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackCompositionContextService;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackPreparationService;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackResponseSuppressionFilter;
@@ -43,7 +42,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewInlineAnchorQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
@@ -118,8 +116,6 @@ class FeedbackAdmissionReasonsTest {
             support,
             new PracticePageFeedbackRouter(),
             gate,
-            basis,
-            new FeedbackAnchorEligibility(catalog, mock(ReviewInlineAnchorQuery.class)),
             mock(ResultHistoryQuery.class),
             mock(MentorReadinessQuery.class),
             clock);
