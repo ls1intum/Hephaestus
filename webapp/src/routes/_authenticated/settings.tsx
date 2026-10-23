@@ -386,7 +386,7 @@ function RouteComponent() {
 		identities: linkedIdentitiesQuery.data ?? [],
 		providers: identityProvidersQuery.data ?? [],
 		linkedProviders,
-		onLink: (registrationId) => linkAccount(registrationId, "/settings"),
+		onLink: (registrationId) => linkAccount(registrationId, location.href),
 		// Guard against a double-submit: the trigger uses aria-disabled (kept focusable for the
 		// busy announcement), which does not block clicks, so a mid-flight re-confirm would fire a
 		// second DELETE against the already-removed row.
@@ -425,7 +425,7 @@ function RouteComponent() {
 		canConnectSlack: Boolean(slackProvider?.registrationId),
 		onConnectSlack: () => {
 			if (hasText(slackProvider?.registrationId)) {
-				linkAccount(slackProvider.registrationId, "/settings");
+				linkAccount(slackProvider.registrationId, location.href);
 			}
 		},
 		// One write per workspace at a time; another workspace's write never holds this one up.

@@ -140,7 +140,7 @@ export const AccountMenu: Story = {
 		await expect(activity).toHaveAttribute("href", "/w/demo-workspace/activity");
 		await expect(menu.getByRole("menuitem", { name: "Settings" })).toHaveAttribute(
 			"href",
-			"/settings",
+			"/settings?chromeWorkspace=demo-workspace",
 		);
 	},
 };

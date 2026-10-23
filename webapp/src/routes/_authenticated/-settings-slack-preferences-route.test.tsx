@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import type {
 	IdentityProviderView,
@@ -13,9 +13,12 @@ import type { Wire } from "@/lib/dates";
 import { identityProviders, linkedIdentities } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
 import { type Deferred, deferred } from "@/test/async";
+import { captureNavigation, restoreNavigation } from "@/test/navigation";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 30_000 });
+
+afterEach(restoreNavigation);
 
 const slackProvider: IdentityProviderView = {
 	registrationId: "slack",
@@ -204,6 +207,36 @@ async function startBothWrites(user: UserEvent, slack: SlackServer) {
 }
 
 describe("Slack channel-message choices on the settings page", () => {
+	it.each(["/settings", "/settings?chromeWorkspace=beta#slack"])(
+		"keeps the current settings destination when connecting Slack from %s",
+		async (returnTo) => {
+			server.use(
+				http.get("*/identity-providers", () =>
+					HttpResponse.json([...identityProviders, slackProvider]),
+				),
+				http.get("*/user/identities", () => HttpResponse.json(linkedIdentities)),
+				http.get("*/user/slack/preferences", () => HttpResponse.json({ workspaces: [] })),
+			);
+			renderRouteAt(returnTo);
+			const region = await screen.findByRole("region", { name: "Slack" }, ROUTE_RENDER_WAIT);
+			const connect = await within(region).findByRole("button", { name: "Connect Slack" });
+			const assigned = captureNavigation();
+
+			await userEvent.click(connect);
+
+			await waitFor(() => expect(assigned).toHaveLength(1));
+			const [target] = assigned;
+			assert(target !== undefined);
+			const authorization = new URL(target);
+			expect(authorization.origin + authorization.pathname).toBe(
+				"http://localhost:8080/auth/login",
+			);
+			expect(authorization.searchParams.get("provider")).toBe("slack");
+			expect(authorization.searchParams.get("mode")).toBe("link");
+			expect(authorization.searchParams.get("returnTo")).toBe(returnTo);
+		},
+	);
+
 	it("keeps a workspace's write pending after a later write to another workspace finishes first", async () => {
 		const user = userEvent.setup();
 		const slack = serveSlack();
