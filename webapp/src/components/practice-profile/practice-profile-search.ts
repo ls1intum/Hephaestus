@@ -78,7 +78,6 @@ export const REVIEW_SELECTION_CLEARED = {
 	reviewTab: undefined,
 	reviewGroup: undefined,
 	reviewPractice: undefined,
-	reviewResult: undefined,
 } satisfies PracticeGroupDetailSelection;
 
 /** The review level's tabs, from the `reviewTab` search param. */
@@ -131,12 +130,13 @@ export const DEFAULT_PRACTICE_TAB: PracticeTab = "feedback";
 /** The selection inside an open level; each is cleared when its level closes. */
 export interface PracticeGroupDetailSelection {
 	practiceTab?: PracticeTab;
+	/** Exact observation selected independently of loaded review pages. */
+	observation?: string;
 	reviewKind?: string;
 	reviewSince?: ReviewTimeframe;
 	reviewTab?: ReviewTab;
 	reviewGroup?: string;
 	reviewPractice?: string;
-	reviewResult?: string;
 }
 
 /**
@@ -156,13 +156,13 @@ const practiceProfileFilterSchema = z.object({
 		.catch(DEFAULT_PRACTICE_GROUP_SORT),
 	feedback: z.enum(FEEDBACK_TABS).default(DEFAULT_FEEDBACK_TAB).catch(DEFAULT_FEEDBACK_TAB),
 	practiceTab: z.enum(PRACTICE_TABS).default(DEFAULT_PRACTICE_TAB).catch(DEFAULT_PRACTICE_TAB),
+	observation: z.uuid().optional().catch(undefined),
 	// A free string, for the reason `TraceKindFilter` gives.
 	reviewKind: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
 	reviewSince: z.enum(REVIEW_TIMEFRAMES).optional().catch(undefined),
 	reviewTab: z.enum(REVIEW_TABS).default(DEFAULT_REVIEW_TAB).catch(DEFAULT_REVIEW_TAB),
 	reviewGroup: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
 	reviewPractice: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
-	reviewResult: z.uuid().optional().catch(undefined),
 });
 
 /** Each param at its default, which the route leaves out of the URL. */
@@ -185,10 +185,10 @@ export const PRACTICE_PROFILE_SEARCH_PARAMS: (keyof PracticeProfileSearch)[] = [
  */
 export const PRACTICE_PROFILE_LEVEL_PARAMS = [
 	"practiceTab",
+	"observation",
 	"reviewKind",
 	"reviewSince",
 	"reviewTab",
 	"reviewGroup",
 	"reviewPractice",
-	"reviewResult",
 ] as const satisfies readonly (keyof PracticeGroupDetailSelection)[];

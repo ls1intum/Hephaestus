@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.trace;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.practices.PracticeItemOptions;
 import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
@@ -33,6 +34,7 @@ public class OwnItemTraceQueryService {
     private final ResultPresentation presentation;
     private final CurrentDeveloperLookup developer;
     private final EvidenceAuthorization authorization;
+    private final PracticeItemOptions itemOptions;
 
     public OwnItemTraceDTO own(long ws, long itemId, UUID reviewId) {
         var item = query.requireItem(ws, itemId);
@@ -54,8 +56,19 @@ public class OwnItemTraceQueryService {
                 visible.isEmpty()
                         ? List.of()
                         : query.events(ws, itemId, PageRequest.ofSize(100)).stream()
-                                .map(e -> new OwnItemEventDTO(e.name(), e.occurredAt()))
+                                .map(e -> new OwnItemEventDTO(
+                                        e.name(), displayName(item.kind(), e.name()), e.occurredAt()))
                                 .toList(),
                 presentation.lists(ws, views.views(ws, visible), permitted));
+    }
+
+    private String displayName(String kind, String eventName) {
+        return itemOptions.all().stream()
+                .filter(descriptor -> descriptor.kind().value().equals(kind))
+                .flatMap(descriptor -> descriptor.events().stream())
+                .filter(event -> event.name().value().equals(eventName))
+                .map(event -> event.displayName())
+                .findFirst()
+                .orElse("Activity recorded");
     }
 }

@@ -28,8 +28,16 @@ const meta = {
 		filters: {},
 		onFiltersChange: fn(),
 		onOpenPractice: fn(),
+		observationLink: (result) => (
+			<InlineLink
+				href={`#observation-${result.id}`}
+				aria-label={`Open observation for ${result.practiceName}`}
+			>
+				Open observation
+			</InlineLink>
+		),
 		earlierReviewLink: () => <InlineLink href="#earlier">Open the earlier review</InlineLink>,
-		emptyMessage: "This review recorded no result about you.",
+		emptyMessage: "This review recorded no observation about you.",
 	},
 	argTypes: {
 		results: { control: false },
@@ -44,7 +52,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Two controllers query the database directly")).toBeVisible();
-		await expect(canvas.getByText("Not met · 2 problems")).toBeVisible();
+		await expect(canvas.getByText("2 problems")).toBeVisible();
 		await expect(canvas.queryByText("Major")).not.toBeInTheDocument();
 	},
 };
@@ -63,16 +71,12 @@ export const MarkedIncorrect: Story = {
 	},
 };
 
-export const FocusedPractice: Story = {
-	args: {
-		focusPracticeSlug: notMet.practiceSlug,
-		renderResult: (resultId) => <p>Evidence for {resultId}</p>,
-	},
+export const ExactObservationLink: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(`Evidence for ${notMet.id}`)).toBeVisible();
 		await expect(
-			canvas.getByRole("button", { name: `Hide evidence for ${notMet.practiceName}` }),
-		).toHaveAttribute("aria-expanded", "true");
+			canvas.getByRole("link", { name: `Open observation for ${notMet.practiceName}` }),
+		).toHaveAttribute("href", `#observation-${notMet.id}`);
+		await expect(canvas.queryByRole("button", { name: /^Show evidence/u })).toBeNull();
 	},
 };
 
@@ -85,13 +89,14 @@ export const Filtered: Story = {
 };
 
 export const NarrowViewport: Story = {
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	globals: { viewport: { value: "reflow" } },
+	parameters: { chromatic: { viewports: [320] } },
 };
 
 export const Empty: Story = {
 	args: { results: [] },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("This review recorded no result about you.")).toBeVisible();
+		await expect(canvas.getByText("This review recorded no observation about you.")).toBeVisible();
 	},
 };
 

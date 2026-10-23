@@ -18463,12 +18463,15 @@ components:
     OwnItemEvent:
       type: object
       properties:
+        displayName:
+          type: string
         name:
           type: string
         occurredAt:
           type: string
           format: date-time
       required:
+      - displayName
       - name
       - occurredAt
     OwnItemTrace:

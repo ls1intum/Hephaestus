@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { GroupRef, PracticeGroupStanding } from "@/api/types.gen";
+import type { GroupRef, PracticeGroupStanding, ResultList } from "@/api/types.gen";
 import { type LoadState, loadProps } from "@/components/common/panel-state";
 import type { DetailStackEntry } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
@@ -81,6 +81,9 @@ export interface PracticeGroupDetailDrawerProps {
 	ratingProps?: (feedbackId: string) => FeedbackRatingProps;
 	/** The practice level's tab, from the route's search params; the route owns the navigation. */
 	practiceTab: PracticeTab;
+	renderObservation?: (result: ResultList) => ReactNode;
+	selectedObservationId?: string;
+	selectedObservation?: ReactNode;
 	/** How many rows the practice level's feed draws while its first page loads. */
 	skeletonRows: number;
 	/** The two review levels; the drawer adds where each sits and which review is open. */
@@ -120,6 +123,9 @@ export function PracticeGroupDetailDrawer({
 	groupOverview,
 	ratingProps,
 	practiceTab,
+	renderObservation,
+	selectedObservationId,
+	selectedObservation,
 	skeletonRows,
 	reviews,
 	onSelectionChange,
@@ -210,6 +216,9 @@ export function PracticeGroupDetailDrawer({
 								described={detail.described}
 								guidance={detail.guidance}
 								feed={detail.feed}
+								renderObservation={renderObservation}
+								selectedObservationId={selectedObservationId}
+								selectedObservation={selectedObservation}
 								feedbackCards={feedbackCards}
 								ratingProps={ratingProps}
 								skeletonRows={skeletonRows}

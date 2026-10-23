@@ -3089,6 +3089,7 @@ export type OwnFeedbackRef = {
 };
 
 export type OwnItemEvent = {
+    displayName: string;
     name: string;
     occurredAt: string;
 };

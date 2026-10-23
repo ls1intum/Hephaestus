@@ -157,7 +157,7 @@ export const MarkedIncorrect: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Marked incorrect")).toBeVisible();
 		await expect(
-			canvas.getByText("A workspace admin marked this result as incorrect."),
+			canvas.getByText("A workspace admin marked this observation as incorrect."),
 		).toBeVisible();
 	},
 };
@@ -313,7 +313,7 @@ export const HiddenHistoryText: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("Result text unavailable");
+		canvas.getByText("Observation text unavailable");
 		canvas.getByText(metWithoutSummary.practiceName);
 	},
 };

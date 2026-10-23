@@ -1,12 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import type { DetailStackEntry } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerHeader } from "@/components/layout/detail-drawer/DetailDrawerHeader";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import type { PracticeGuidanceState } from "@/components/practice-guidance/PracticeIntro";
+import { ReviewResultDetails } from "@/components/profile/ReviewResultRow";
 import type { ReviewFeedState } from "@/components/profile/reviews";
 import { DrawerBody, DrawerTitle } from "@/components/ui/drawer";
+import { Skeleton } from "@/components/ui/skeleton";
 import { hasText } from "@/lib/text";
 import { withPageBehind, withProvider } from "@/stories/decorators";
 import { useFeedbackRatings } from "@/stories/feedback-ratings";
@@ -157,7 +160,7 @@ export const Default: Story = {
 		await expectSettledVisible(await screen.findByRole("heading", { level: 2, name: "Feedback" }));
 		const [first, second, third] = screen.getAllByRole("tab");
 		await expect(first).toHaveAccessibleName("Feedback 1");
-		await expect(second).toHaveAccessibleName("Results 3");
+		await expect(second).toHaveAccessibleName("Observations 3");
 		await expect(third).toHaveAccessibleName("Guide");
 		const intro = screen.getByRole("region", { name: "Introduction" });
 		await expect(precedes(intro, screen.getByRole("tablist", { name: "Practice" }))).toBe(true);
@@ -168,25 +171,29 @@ export const Default: Story = {
 			"aria-selected",
 			"true",
 		);
-		await expect(screen.getByRole("tab", { name: "Results 3" })).toHaveAttribute(
+		await expect(screen.getByRole("tab", { name: "Observations 3" })).toHaveAttribute(
 			"aria-selected",
 			"false",
 		);
-		await expect(screen.queryByRole("heading", { name: "Results" })).not.toBeInTheDocument();
+		await expect(screen.queryByRole("heading", { name: "Observations" })).not.toBeInTheDocument();
 	},
 };
 
-export const ResultsTab: Story = {
-	args: { tab: "results" },
+export const ObservationsTab: Story = {
+	args: {
+		tab: "results",
+		renderObservation: (result) =>
+			result.id === detailResult.id ? <ReviewResultDetails result={detailResult} /> : undefined,
+	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("heading", { name: "Results" }));
+		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
 		await expect(screen.getByRole("tab", { name: "Guide" })).toHaveAttribute(
 			"aria-selected",
 			"false",
 		);
 		// Below the top, dismissing returns to the group behind, so the control says Back.
 		await expect(screen.getByRole("button", { name: "Back" })).toBeVisible();
-		await expect(screen.getByRole("tab", { name: "Results 3" })).toHaveAttribute(
+		await expect(screen.getByRole("tab", { name: "Observations 3" })).toHaveAttribute(
 			"aria-selected",
 			"true",
 		);
@@ -206,7 +213,7 @@ export const RequestedReviewClean: Story = {
 		feed: { ...readyFeed, reviews: [requestedCleanReview, ...detailReviews] },
 	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("heading", { name: "Results" }));
+		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
 		await expect(screen.getAllByText("Needs attention")).not.toHaveLength(0);
 		await expect(
 			screen.getByText(/A requested review is evidence only and does not change your standing\./u),
@@ -252,7 +259,7 @@ export const FeedbackEmpty: Story = {
 		await expectSettledVisible(await screen.findByText("No feedback yet"));
 		await expect(
 			screen.getByText(
-				"Feedback appears here once a review sees the same pattern in your work more than once. Feedback posted on a single piece of work stays there. Open its result to find recorded comment links.",
+				"Feedback appears here once a review sees the same pattern in your work more than once. Feedback posted on a single piece of work stays there. Open its observation to find recorded comment links.",
 			),
 		).toBeVisible();
 		await expect(screen.getByRole("heading", { level: 2, name: "Feedback" })).toBeVisible();
@@ -265,8 +272,8 @@ export const FeedbackOnTheWorkOnly: Story = {
 	args: { tab: "feedback", feedbackCards: [] },
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("No feedback yet"));
-		await userEvent.click(screen.getByRole("tab", { name: "Results 3" }));
-		await expect(screen.getByRole("tab", { name: "Results 3" })).toHaveAttribute(
+		await userEvent.click(screen.getByRole("tab", { name: "Observations 3" }));
+		await expect(screen.getByRole("tab", { name: "Observations 3" })).toHaveAttribute(
 			"aria-selected",
 			"true",
 		);
@@ -322,7 +329,7 @@ export const WithoutGuide: Story = {
 export const WithoutWhereYouStand: Story = {
 	args: { tab: "results" },
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("heading", { name: "Results" }));
+		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
 		await expect(screen.queryByText("Where you stand")).not.toBeInTheDocument();
 		await expect(
 			screen.queryByText(/counts most, and older work counts less/u),
@@ -335,8 +342,8 @@ export const MoreToLoad: Story = {
 	args: { tab: "results", feed: { ...readyFeed, hasMore: true } },
 	play: async () => {
 		await expectSettledVisible(await screen.findByRole("button", { name: "View earlier reviews" }));
-		await expect(screen.getByRole("tab", { name: "Results" })).toBeVisible();
-		await expect(screen.queryByRole("tab", { name: /^Results \d/u })).not.toBeInTheDocument();
+		await expect(screen.getByRole("tab", { name: "Observations" })).toBeVisible();
+		await expect(screen.queryByRole("tab", { name: /^Observations \d/u })).not.toBeInTheDocument();
 		// The feedback cards arrive in one piece, so that tab is counted either way.
 		await expect(screen.getByRole("tab", { name: "Feedback 1" })).toBeVisible();
 	},
@@ -379,7 +386,7 @@ export const Loading: Story = {
 	},
 };
 
-export const LoadingResults: Story = {
+export const LoadingObservations: Story = {
 	args: { isLoading: true, practice: undefined, tab: "results" },
 	play: async () => {
 		await screen.findByText("Loading reviews…");
@@ -409,7 +416,7 @@ export const GuidanceOnly: Story = {
 		await expect(screen.getByText(bundledPractice.whyItMatters)).toBeVisible();
 		await expect(screen.getByRole("heading", { level: 3, name: "Practice guide" })).toBeVisible();
 		await expect(screen.queryByRole("tab")).toBeNull();
-		await expect(screen.queryByRole("heading", { name: "Results" })).toBeNull();
+		await expect(screen.queryByRole("heading", { name: "Observations" })).toBeNull();
 		await expect(screen.queryByText("Not reviewed")).toBeNull();
 	},
 };
@@ -447,7 +454,7 @@ export const MobileReflow: Story = {
 	args: { tab: "results" },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("heading", { name: "Results" }));
+		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
 		// The frontmost panel: the group level behind it is a placeholder with no body to measure.
 		const panels = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
 		const frontmost = [...panels].at(-1);
@@ -525,4 +532,56 @@ export const NeverAppliedDark: Story = {
 export const NeverAppliedPhone: Story = {
 	args: { practice: describedPractice, neverApplied: true },
 	globals: { viewport: { value: "mobile" } },
+};
+
+export const ObservationLoading: Story = {
+	args: {
+		tab: "results",
+		renderObservation: () => (
+			<div aria-busy="true" className="flex flex-col gap-3">
+				<span className="sr-only">Loading observation…</span>
+				<Skeleton className="h-5 w-3/4" />
+				<Skeleton className="h-16 w-full" />
+			</div>
+		),
+	},
+};
+
+export const ObservationError: Story = {
+	args: {
+		tab: "results",
+		renderObservation: () => (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not load this observation"
+				onRetry={fn()}
+			/>
+		),
+	},
+	play: async () => {
+		await expectSettledVisible(await screen.findByRole("heading", { name: "Observations" }));
+		await expect(screen.getByText("We could not load this observation")).toBeVisible();
+		await expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
+	},
+};
+
+export const CompleteObservationPhone: Story = {
+	...ObservationsTab,
+	globals: { viewport: { value: "reflow" } },
+	play: async () => {
+		await expect(window.innerWidth).toBe(320);
+		const heading = await screen.findByRole("heading", { name: "Observations" });
+		await expectSettledVisible(heading);
+		await expect(
+			screen.getByText("Move the class in one commit and add the cache in the next."),
+		).toBeVisible();
+		await expect(
+			screen.getByText("Say in the description that the loader now caches per workspace."),
+		).toBeVisible();
+		const panel = heading.closest<HTMLElement>('[data-slot="drawer-popup"]');
+		if (panel === null) {
+			throw new Error("The observation belongs to a drawer");
+		}
+		await expectNoPanelOverflow(panel);
+	},
 };

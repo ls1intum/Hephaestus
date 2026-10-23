@@ -98,7 +98,9 @@ export const openProfileReviewDetail: ProfileReviewDetail = {
 	trace: {
 		item: tracedMergeRequest,
 		review: openReview,
-		events: [{ name: "Review requested", occurredAt: daysBefore(2) }],
+		events: [
+			{ name: "Review requested", displayName: "Activity recorded", occurredAt: daysBefore(2) },
+		],
 		results: openProfileReview.results,
 	},
 };

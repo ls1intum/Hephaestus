@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 
-import type { PracticeStanding, ReviewedPractice } from "@/api/types.gen";
+import type {
+	PracticeStanding,
+	ReviewedPractice,
+	ResultList,
+	ProfileReview,
+} from "@/api/types.gen";
 import {
 	PracticeTabsList,
 	PracticeTabsRail,
@@ -46,7 +51,7 @@ import { requestedReviewNote } from "./requested-review-note";
 
 const TAB_LABELS: Record<PracticeTab, string> = {
 	feedback: "Feedback",
-	results: "Results",
+	results: "Observations",
 	guide: "Guide",
 };
 
@@ -78,6 +83,9 @@ export interface PracticeDetailLevelProps {
 	tab: PracticeTab;
 	onTabChange?: (tab: PracticeTab) => void;
 	feed?: ReviewFeedState;
+	renderObservation?: (result: ResultList) => ReactNode;
+	selectedObservationId?: string;
+	selectedObservation?: ReactNode;
 	/** The developer's practice feedback; the level shows the cards written about this practice. */
 	feedbackCards?: PracticeFeedbackCardEntry[];
 	/**
@@ -124,6 +132,9 @@ export function PracticeDetailLevel({
 	tab,
 	onTabChange,
 	feed = EMPTY_REVIEW_FEED,
+	renderObservation,
+	selectedObservationId,
+	selectedObservation,
 	feedbackCards = NO_CARDS,
 	ratingProps,
 	skeletonRows,
@@ -149,7 +160,7 @@ export function PracticeDetailLevel({
 	// Feedback arrives whole; paged results cannot supply an exact tab count.
 	const counts: Partial<Record<PracticeTab, number>> = {
 		results:
-			feed.status === "ready" && !feed.hasMore
+			feed.status === "ready" && !feed.hasMore && selectedObservationId === undefined
 				? reviews.reduce((count, review) => count + review.results.length, 0)
 				: undefined,
 		feedback: feedbackCount,
@@ -159,15 +170,6 @@ export function PracticeDetailLevel({
 	// lands on the feedback.
 	const tabs = PRACTICE_TABS.filter((candidate) => candidate !== "guide" || guide !== undefined);
 	const shownTab = tabs.includes(tab) ? tab : DEFAULT_PRACTICE_TAB;
-	// No "Learn more" on a card here: the practice's introduction already leads this level.
-	const feedbackCard = (card: PracticeFeedbackCardEntry) => (
-		<PracticeFeedbackCard
-			key={card.feedbackId}
-			card={card}
-			{...ratingProps?.(card.feedbackId)}
-			onOpenGroup={onOpenGroup && (() => onOpenGroup())}
-		/>
-	);
 
 	let body: ReactNode;
 	if (isLoading) {
@@ -197,12 +199,12 @@ export function PracticeDetailLevel({
 				onRetry={onRetry}
 			/>
 		);
-	} else if (practice) {
-		const requestedNote = requestedReviewNote(practice, reviews);
+	} else if (practice || selectedObservation !== undefined) {
+		const requestedNote = practice ? requestedReviewNote(practice, reviews) : undefined;
 		body = (
 			<>
 				{neverApplied && <p className="max-w-2xl text-sm">{NEVER_APPLIED.description}</p>}
-				<PracticeIntro practice={practice} guidance={guidance} />
+				<PracticeIntro practice={practice ?? described ?? NO_WORDS} guidance={guidance} />
 				<Tabs
 					value={shownTab}
 					onValueChange={(next) => {
@@ -223,56 +225,27 @@ export function PracticeDetailLevel({
 						</PracticeTabsList>
 					</PracticeTabsRail>
 					<TabsContent value="feedback" className="min-w-0">
-						<Section
-							size="lg"
-							title="Feedback"
-							description="Feedback about patterns in your work: the open card, then the ones that resolved, newest first."
-						>
-							{feedbackCount === 0 ? (
-								<FeedbackEmpty description="Feedback appears here once a review sees the same pattern in your work more than once. Feedback posted on a single piece of work stays there. Open its result to find recorded comment links." />
-							) : (
-								<div className="flex flex-col gap-6">
-									{feedback.open && (
-										<LabelledBlock
-											label="Current feedback"
-											as="h3"
-											className="flex flex-col gap-2.5"
-										>
-											{feedbackCard(feedback.open)}
-										</LabelledBlock>
-									)}
-									{feedback.resolved.length > 0 && (
-										<LabelledBlock
-											label="Resolved feedback"
-											as="h3"
-											className="flex flex-col gap-2.5"
-										>
-											{feedback.resolved.map(feedbackCard)}
-										</LabelledBlock>
-									)}
-								</div>
-							)}
-						</Section>
+						<PracticeFeedbackSection
+							feedback={feedback}
+							ratingProps={ratingProps}
+							onOpenGroup={onOpenGroup}
+						/>
 					</TabsContent>
 					<TabsContent value="results" className="min-w-0">
 						<Section
 							size="lg"
-							title="Results"
+							title="Observations"
 							description="Reviews of your work that reached this practice, newest first: what each recorded, the evidence, and the next step."
 						>
 							{hasText(requestedNote) && <p className="max-w-2xl text-sm">{requestedNote}</p>}
-							<ReviewFeed
+							<ObservationHistory
 								feed={feed}
 								reviews={reviews}
+								selectedId={selectedObservationId}
+								selected={selectedObservation}
+								renderObservation={renderObservation}
 								skeletonRows={skeletonRows}
 								responses={responses}
-								// The rows are this practice's own, so none repeats its name under the summary.
-								showPracticeName={false}
-								// Every row here reviews the same practice, so the newest is the one the reader
-								// came for; the rest are its history and wait for a press.
-								initiallyOpen="newest"
-								emptyTitle="No results yet"
-								emptyDescription="They appear after Hephaestus reviews your work."
 							/>
 						</Section>
 					</TabsContent>
@@ -334,31 +307,135 @@ export function PracticeDetailLevel({
 				current="Practice"
 				title={practice?.name ?? described?.name ?? "Practice"}
 				chips={
-					practice && (
-						<>
-							{/* A practice that never applied has no trend, as its folded row shows. */}
-							{neverApplied ? (
-								<NeverAppliedBadge scope="practice" />
-							) : (
-								<>
-									<StandingBadge
-										standing={practice.standing}
-										scope="practice"
-										support={practice.trendSupport ?? undefined}
-									/>
-									<TrendNote
-										direction={practice.direction ?? undefined}
-										support={practice.trendSupport ?? undefined}
-										scope="practice"
-									/>
-									<StandingBasisNote basis={practice.basis} />
-								</>
-							)}
-						</>
-					)
+					practice && <PracticeStandingChips practice={practice} neverApplied={neverApplied} />
 				}
 			/>
 			<DrawerBody className="flex flex-col gap-6 pt-2">{body}</DrawerBody>
+		</>
+	);
+}
+
+/** Where the reader stands on the practice, under the level's title. */
+function PracticeStandingChips({
+	practice,
+	neverApplied,
+}: {
+	practice: PracticeStanding;
+	neverApplied: boolean;
+}) {
+	// A practice that never applied has no trend, as its folded row shows.
+	if (neverApplied) {
+		return <NeverAppliedBadge scope="practice" />;
+	}
+	return (
+		<>
+			<StandingBadge
+				standing={practice.standing}
+				scope="practice"
+				support={practice.trendSupport ?? undefined}
+			/>
+			<TrendNote
+				direction={practice.direction ?? undefined}
+				support={practice.trendSupport ?? undefined}
+				scope="practice"
+			/>
+			<StandingBasisNote basis={practice.basis} />
+		</>
+	);
+}
+
+/** The Feedback tab: the practice's one open card, then the cards the work resolved. */
+function PracticeFeedbackSection({
+	feedback,
+	ratingProps,
+	onOpenGroup,
+}: {
+	feedback: ReturnType<typeof feedbackCardsOf>;
+	ratingProps?: (feedbackId: string) => FeedbackRatingProps;
+	onOpenGroup?: () => void;
+}) {
+	// No "Learn more" on a card here: the practice's introduction already leads this level.
+	const feedbackCard = (card: PracticeFeedbackCardEntry) => (
+		<PracticeFeedbackCard
+			key={card.feedbackId}
+			card={card}
+			{...ratingProps?.(card.feedbackId)}
+			onOpenGroup={onOpenGroup && (() => onOpenGroup())}
+		/>
+	);
+	return (
+		<Section
+			size="lg"
+			title="Feedback"
+			description="Feedback about patterns in your work: the open card, then the ones that resolved, newest first."
+		>
+			{feedback.open === undefined && feedback.resolved.length === 0 ? (
+				<FeedbackEmpty description="Feedback appears here once a review sees the same pattern in your work more than once. Feedback posted on a single piece of work stays there. Open its observation to find recorded comment links." />
+			) : (
+				<div className="flex flex-col gap-6">
+					{feedback.open && (
+						<LabelledBlock label="Current feedback" as="h3" className="flex flex-col gap-2.5">
+							{feedbackCard(feedback.open)}
+						</LabelledBlock>
+					)}
+					{feedback.resolved.length > 0 && (
+						<LabelledBlock label="Resolved feedback" as="h3" className="flex flex-col gap-2.5">
+							{feedback.resolved.map(feedbackCard)}
+						</LabelledBlock>
+					)}
+				</div>
+			)}
+		</Section>
+	);
+}
+
+/** A linked observation does not depend on how far its surrounding history has loaded. */
+function ObservationHistory({
+	feed,
+	reviews,
+	selectedId,
+	selected,
+	renderObservation,
+	skeletonRows,
+	responses,
+}: {
+	feed: ReviewFeedState;
+	reviews: ProfileReview[];
+	selectedId?: string;
+	selected?: ReactNode;
+	renderObservation?: (result: ResultList) => ReactNode;
+	skeletonRows: number;
+	responses?: FeedbackResponseControls;
+}) {
+	const remaining = reviews
+		.map((review) => ({
+			...review,
+			results: review.results.filter((result) => result.id !== selectedId),
+		}))
+		.filter((review) => review.results.length > 0);
+	const onlySelected =
+		selected !== undefined &&
+		feed.status === "ready" &&
+		remaining.length === 0 &&
+		!feed.hasMore &&
+		!feed.isLoadingMore &&
+		feed.refreshFailure === undefined;
+	return (
+		<>
+			{selected}
+			{!onlySelected && (
+				<ReviewFeed
+					feed={feed}
+					reviews={remaining}
+					skeletonRows={skeletonRows}
+					responses={responses}
+					renderObservation={renderObservation}
+					showPracticeName={false}
+					initiallyOpen="newest"
+					emptyTitle={selected === undefined ? "No observations yet" : "No other observations yet"}
+					emptyDescription="They appear after Hephaestus reviews your work."
+				/>
+			)}
 		</>
 	);
 }

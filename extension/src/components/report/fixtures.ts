@@ -29,7 +29,13 @@ export const OWN_TRACE: OwnItemTrace = {
 		createdAt: minutesBefore(50),
 		completedAt: minutesBefore(42),
 	},
-	events: [{ name: "Marked ready for review", occurredAt: minutesBefore(50) }],
+	events: [
+		{
+			name: "scm.pull_request.ready",
+			displayName: "Marked ready for review",
+			occurredAt: minutesBefore(50),
+		},
+	],
 	results: [],
 };
 

@@ -1,4 +1,5 @@
-import type { ProfileReview } from "@/api/types.gen";
+import type { ReactNode } from "react";
+import type { ProfileReview, ResultList } from "@/api/types.gen";
 
 import { ReviewCard } from "./ReviewCard";
 import type { FeedbackResponseControls } from "./reviews";
@@ -8,6 +9,8 @@ export interface ReviewTimelineProps {
 	reviews: ProfileReview[];
 	/** The reader's response to each piece of feedback, handed to every card. */
 	responses?: FeedbackResponseControls;
+	/** Route-owned, lazy detail for one observation. */
+	renderObservation?: (result: ResultList) => ReactNode;
 	/** Off on a practice's own level, where every row is that practice and no row repeats it. */
 	showPracticeName?: boolean;
 	/**
@@ -26,6 +29,7 @@ export interface ReviewTimelineProps {
 export function ReviewTimeline({
 	reviews,
 	responses,
+	renderObservation,
 	showPracticeName = true,
 	initiallyOpen = "all",
 	continues = false,
@@ -42,6 +46,7 @@ export function ReviewTimeline({
 					key={review.review.id}
 					review={review}
 					responses={responses}
+					renderObservation={renderObservation}
 					showPracticeName={showPracticeName}
 					initiallyOpen={cardInitiallyOpen(initiallyOpen, index)}
 					tailContinues={continues && index === reviews.length - 1}

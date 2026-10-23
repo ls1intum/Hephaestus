@@ -1,5 +1,5 @@
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { cn } from "cn";
 import type { ItemRef, ProfileReview, ResultList } from "@/api/types.gen";
@@ -20,6 +20,8 @@ export interface ReviewCardProps {
 	review: ProfileReview;
 	/** The reader's response to each piece of feedback; absent leaves no response controls. */
 	responses?: FeedbackResponseControls;
+	/** Route-owned, lazy detail for one observation. */
+	renderObservation?: (result: ResultList) => ReactNode;
 	/** Off on a practice's own level, where every row is that practice and no row repeats it. */
 	showPracticeName?: boolean;
 	/**
@@ -41,6 +43,7 @@ function resultPriority({ outcome }: ResultList): number {
 export function ReviewCard({
 	review,
 	responses,
+	renderObservation,
 	showPracticeName = true,
 	initiallyOpen = "all",
 	tailContinues = false,
@@ -73,6 +76,8 @@ export function ReviewCard({
 						<ReviewResultRow
 							key={result.id}
 							result={result}
+							responses={responses}
+							details={renderObservation?.(result)}
 							defaultOpen={initiallyOpen === "all" || (initiallyOpen === "first" && index === 0)}
 							showPracticeName={showPracticeName}
 							work={merged ? <ReviewedItem item={review.review.item} tone="line" /> : undefined}
@@ -90,7 +95,7 @@ export function ReviewCard({
 						>
 							{showAllResults
 								? "Show less"
-								: `Show ${hiddenCount} more ${hiddenCount === 1 ? "result" : "results"}`}
+								: `Show ${hiddenCount} more ${hiddenCount === 1 ? "observation" : "observations"}`}
 							{showAllResults ? (
 								<ChevronUpIcon data-icon="inline-end" />
 							) : (
@@ -99,7 +104,7 @@ export function ReviewCard({
 						</Button>
 					</div>
 				)}
-				{feedback.length > 0 && (
+				{renderObservation === undefined && feedback.length > 0 && (
 					<div className="border-t bg-sidebar px-4 py-3">
 						<OwnFeedbackList feedback={feedback} responses={responses} />
 					</div>

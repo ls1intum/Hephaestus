@@ -6,16 +6,16 @@ description: See how your work stands across practice groups, which practices we
 
 Use your Practice profile to read feedback, choose a next step, and check the evidence behind your practice standing.
 Other developers cannot see it.
-They see your results only as part of the counts on [Practices across the workspace](#practices-across-the-workspace).
+They see your observations only as part of the counts on [Practices across the workspace](#practices-across-the-workspace).
 [Your data in Hephaestus](./privacy.mdx#ai-processing-and-visibility) lists who else can.
 
-The profile uses practice review results about your work on pull requests, merge requests, issues, conversations, and documents.
+The profile uses practice review observations about your work on pull requests, merge requests, issues, conversations, and documents.
 This includes the reviews you write.
 Feedback on a pull request, merge request or issue addresses its author’s work.
 Feedback about your reviewing stays on your own Practice profile or in your own conversation.
 It never compares you with other developers.
 
-Results from an earlier version of practice review stay in your history, with a note that their evidence cannot be verified.
+Observations from an earlier version of practice review stay in your history, with a note that their evidence cannot be verified.
 Earlier feedback cards are marked as unverified history.
 They do not show whether the current standard is met and do not count as current proof.
 You can still read their retained text and evidence when access to their sources is available.
@@ -37,7 +37,7 @@ It can instead say that the review stopped before it finished.
 While a review runs, the chip reads **Review running** and names the work.
 Both states open [Reviews of your work](#reviews-of-your-work).
 
-A review appears here after it records a result about your work.
+A review appears here after it records an observation about your work.
 The chip keeps your latest recorded review even when it is older than the standing’s 90-day window or its evidence is hidden.
 Before your first recorded review, the chip reads **No review yet**.
 
@@ -90,7 +90,7 @@ The card opens again when you undo the response.
 
 If you think that the feedback is wrong, select **Disagree** beside **Not helpful**.
 Write one or two sentences on what is wrong, then select **Send**.
-Workspace admins read your sentence and can correct the results or withdraw the card.
+Workspace admins read your sentence and can correct the observations or withdraw the card.
 The card stays open until then.
 **Disagree** saves a disagreement on the feedback.
 To take the disagreement back, select **Disagree** again.
@@ -105,7 +105,7 @@ If you already saw the card, a recent withdrawal appears under **All** as a shor
 A card you had not seen never appears.
 A withdrawn card accepts no new response.
 It resolved nothing and says nothing about your standing.
-The results stay unchanged.
+The observations stay unchanged.
 
 Later reviews and Heph do not receive the withdrawn text.
 If the admin restores the card, it returns as it was.
@@ -123,8 +123,8 @@ If you take back your rating, the disagreement stays.
 
 Workspace admins can see that you have a current answer to feedback and when that record was made.
 A rating without an answer, including its time, stays private.
-Workspace admins read the sentence of a current disagreement on the results behind it.
-They can mark a result incorrect or withdraw the card.
+Workspace admins read the sentence of a current disagreement on the observations behind it.
+They can mark an observation incorrect or withdraw the card.
 The card text stays private to you.
 Nobody else sees your other notes.
 
@@ -144,7 +144,7 @@ Each card has four parts:
 
 The line shows up to five of the most recent pieces of work behind this feedback, ordered by when they were reviewed.
 One mark at its start counts the earlier pieces that are not shown.
-Each piece has the same icon as its results.
+Each piece has the same icon as its observations.
 A wrench shows work that needed attention, and a check in a circle shows clean work.
 
 A thin upright mark with the caption **Feedback created** separates the work before the feedback from the work after it.
@@ -158,15 +158,15 @@ The links, the buttons, and the work on the line keep their own action.
 
 ## Reviews of your work
 
-The title chip opens the reviews that recorded a result about your work, newest first and grouped by day.
-A review that still runs may not appear yet, because a review appears only after it records a result about your work.
+The title chip opens the reviews that recorded an observation about your work, newest first and grouped by day.
+A review that still runs may not appear yet, because a review appears only after it records an observation about your work.
 The newest review has the **Latest** tag.
 
 A review that someone requested has the **Requested** tag.
-It is a real review and retains earlier results in history.
-The newest eligible result follows recorded order, regardless of who started it.
+It is a real review and retains earlier observations in history.
+The newest eligible observation follows recorded order, regardless of who started it.
 An older review cannot replace newer proof.
-A marked current result does not make an earlier result current again.
+A marked current observation does not make an earlier observation current again.
 Repository scans have no developer and do not move your personal standing.
 
 Each row names the work and links to the original.
@@ -177,7 +177,7 @@ A review that failed or was cancelled says *Stopped before it finished*.
 A review that waits or runs says so.
 
 Below that, it counts each practice once by its outcome: **Met**, **Does not apply**, or **Could not determine**.
-It then counts the practices the review reached, including those with no recorded result about you.
+It then counts the practices the review reached, including those with no recorded observation about you.
 
 For feedback on GitLab, **Read the feedback on the merge request** opens the comment or diff discussion.
 
@@ -201,13 +201,12 @@ It shows the link to the original work, the date, and the number of practices re
 It also shows **Request review** when you may request a review.
 Two tabs follow:
 
-- **Every practice** lists the practices behind the review. Each shows its result or explains why it sent no feedback. During a review, practices appear as the review reaches them.
-- **What we noticed** lists all recorded events about the work in order. It shows what happened, how the review noticed it, and whether a review started.
+- **Every practice** lists the review's observations. Each shows its outcome and a count when it records problems. Select **Open observation** to read that exact observation in its practice. During a review, practices appear as the review reaches them.
+- **What we noticed** shows recent recorded activity on the work, oldest first.
 
 In **Every practice**, these filters apply:
 
 - **Group** selects one practice group.
-- **Review on** selects an event, such as new commits pushed.
 - **Practice** filters names by the text you enter.
 
 ## The practice group table
@@ -251,7 +250,7 @@ The practice panel starts with an introduction:
 Tabs follow the introduction:
 
 - **Feedback** shows the feedback about this practice. The panel opens on it.
-- **Results** shows results by review, with response controls.
+- **Observations** shows observations by review. Open an observation to read its available explanation, problems and next steps, evidence, and recorded feedback links. Response controls appear when you can respond.
 - **Guide** explains the practice in more depth. It can show more pictures and links. It appears only for a practice that has a guide.
 
 To open a practice from a feedback card, select **Learn more about this practice**.
@@ -265,12 +264,12 @@ It is a label, not a button.
 Feedback posted on a pull request, merge request, or issue stays on that work, not under **Feedback**.
 
 1. Open the practice panel.
-2. Select the **Results** tab.
-3. Open the result.
+2. Select the **Observations** tab.
+3. Open the observation to read its available explanation, problems and next steps, evidence, and recorded feedback links.
 
 Under **Feedback**, select **Read the feedback comment** to open a recorded comment.
 If several comments carry the feedback, their links appear together.
-If no comment link was recorded, use the result’s link to the original work.
+If no comment link was recorded, use the observation’s link to the original work.
 
 Feedback that a workspace admin withdrew does not appear here, in **Reviews of your work**, or on a review.
 If the admin restores it, it returns with your earlier response.
@@ -290,7 +289,7 @@ It also tells you how much of your work was reviewed for the practice or the gro
 For example: "Read from your last 4 reviewed pull requests. In the last 90 days, 11 pull requests were reviewed for this practice."
 
 A piece of work counts when a review could judge the practice on it.
-Eligible decided results provide the evidence for these counts.
+Eligible decided observations provide the evidence for these counts.
 Your standing uses automatic reviews first.
 Requested reviews contribute where those reviews establish no standing.
 
@@ -381,5 +380,5 @@ At the end of the page, **See your own standing** opens **All practice groups** 
 
 Before the first review, each practice counts as **Not reviewed**.
 The chip reads **No review yet** and no feedback appears.
-The first review with a recorded result fills the page.
+The first review with a recorded observation fills the page.
 To request a review of eligible work, use **Request review** on [Activity](./activity.mdx#request-a-review).

@@ -56,7 +56,13 @@ const TRACE: OwnItemTrace = {
 		createdAt: "2026-09-26T11:00:00Z",
 		completedAt: null,
 	},
-	events: [{ name: "Review requested", occurredAt: "2026-09-26T11:00:00Z" }],
+	events: [
+		{
+			name: "Review requested",
+			displayName: "Activity recorded",
+			occurredAt: "2026-09-26T11:00:00Z",
+		},
+	],
 	results: [],
 };
 const SUBMITTED: ReviewRequestOutcome = {

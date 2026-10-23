@@ -1,5 +1,4 @@
-import { ChevronRightIcon } from "lucide-react";
-import { Fragment, type ReactNode, useId, useState } from "react";
+import { type ReactNode, useId } from "react";
 
 import type { GroupRef, ResultList } from "@/api/types.gen";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
@@ -11,15 +10,10 @@ import {
 	UNASSIGNED_GROUP_VISUAL,
 } from "@/components/practice-vocabulary/group-visuals";
 import { GroupName } from "@/components/practice-vocabulary/GroupName";
-import {
-	type Outcome,
-	OUTCOME_DEFS,
-	outcomeLabel,
-} from "@/components/practice-vocabulary/outcome-defs";
+import { type Outcome, OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
 import { RESULT_MARK_DEFS } from "@/components/practice-vocabulary/result-mark-defs";
 import { StatusLabel, StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,16 +44,8 @@ export interface ReviewPracticeTableProps {
 	emptyMessage: string;
 	/** How a result reused from an earlier review links to it; the caller owns where reviews open. */
 	earlierReviewLink?: (reviewId: string) => ReactNode;
-	/**
-	 * One result in full, with its problems and evidence. Given, a row opens in place to show it;
-	 * the caller reads each one only when its row opens.
-	 */
-	renderResult?: (resultId: string) => ReactNode;
-	/**
-	 * The practice the reader came to see: its rows open on arrival, with `renderResult`, and the
-	 * first scrolls into view once. Closing it closes it like any other row.
-	 */
-	focusPracticeSlug?: string;
+	/** Link to this exact observation in its practice. */
+	observationLink?: (result: ResultList) => ReactNode;
 	/**
 	 * Each row's outcome as words, with a badge kept for an outcome that went wrong, and no tooltip
 	 * stop: for a level that keeps its focus stops for what the reader acts on.
@@ -89,35 +75,9 @@ export function ReviewPracticeTable({
 	onOpenPractice,
 	emptyMessage,
 	earlierReviewLink,
-	renderResult,
-	focusPracticeSlug,
+	observationLink,
 	plainState = false,
 }: ReviewPracticeTableProps) {
-	const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
-	const [focusClosed, setFocusClosed] = useState(false);
-	const [focusLanded, setFocusLanded] = useState(false);
-	const openOnArrival = (result: ResultList) =>
-		result.practiceSlug === focusPracticeSlug && !focusClosed;
-	const landOnFocus = (node: HTMLElement | null) => {
-		if (node) {
-			node.scrollIntoView({ block: "start" });
-			setFocusLanded(true);
-		}
-	};
-	const toggle = (result: ResultList) => {
-		if (openOnArrival(result) && !opened.has(result.id)) {
-			setFocusClosed(true);
-			return;
-		}
-		setOpened((previous) => {
-			const next = new Set(previous);
-			if (!next.delete(result.id)) {
-				next.add(result.id);
-			}
-			return next;
-		});
-	};
-	const detailIdBase = useId();
 	const groupNameOf = (result: ResultList) => groupOf(result.practiceSlug)?.name ?? UNGROUPED;
 	const groupNames = [...new Set(results.map(groupNameOf))].sort((left, right) =>
 		left.localeCompare(right),
@@ -131,7 +91,6 @@ export function ReviewPracticeTable({
 	);
 	const hasFilter = hasText(filters.group) || needle !== "";
 	const practiceFilterId = useId();
-	const focusRow = rows.find((result) => result.practiceSlug === focusPracticeSlug);
 
 	return (
 		<div className="flex min-w-0 flex-col gap-3">
@@ -163,14 +122,14 @@ export function ReviewPracticeTable({
 				</div>
 			</FilterToolbar>
 			{hasFilter && rows.length !== results.length && (
-				<ResultCount total={rows.length} noun={["result", "results"]} hasFilter />
+				<ResultCount total={rows.length} noun={["observation", "observations"]} hasFilter />
 			)}
 			<PracticesFrame>
 				{rows.length === 0 && (
 					<TableRow variant="static">
 						<TableCell colSpan={3} className="p-4 whitespace-normal">
 							<p className="text-sm text-muted-foreground">
-								{results.length > 0 ? "No results match your filters." : emptyMessage}
+								{results.length > 0 ? "No observations match your filters." : emptyMessage}
 							</p>
 						</TableCell>
 					</TableRow>
@@ -179,76 +138,48 @@ export function ReviewPracticeTable({
 					const group = groupOf(result.practiceSlug);
 					const visual =
 						group === undefined ? UNASSIGNED_GROUP_VISUAL : getGroupVisual(group.icon, group.color);
-					const expandable = renderResult !== undefined;
-					const open = expandable && (opened.has(result.id) || openOnArrival(result));
-					const detailId = `${detailIdBase}-${result.id}`;
-					const lands = expandable && !focusLanded && result === focusRow;
 					const earlierReview = earlierReviewOf(result, reviewId);
 					return (
-						<Fragment key={result.id}>
-							<TableRow ref={lands ? landOnFocus : undefined}>
-								<TableCell className="align-top whitespace-normal">
-									<ResultOutcome outcome={result.outcome} plain={plainState} />
-								</TableCell>
-								<TableCell className="align-top whitespace-normal">
-									<span className="flex min-w-0 flex-col items-start gap-1">
-										<PracticePill
-											name={result.practiceName}
-											onOpen={
-												onOpenPractice === undefined
-													? undefined
-													: () => onOpenPractice(result.practiceSlug)
-											}
-										/>
-										<GroupName
-											name={groupNameOf(result)}
-											icon={visual.Icon}
-											pill={group === undefined ? undefined : visual.pill}
-											className="text-xs"
-										/>
-									</span>
-								</TableCell>
-								<TableCell className="align-top whitespace-normal">
-									<span className="flex max-w-lg min-w-0 flex-col items-start gap-1 text-sm text-pretty">
-										{hasText(result.summary) && (
-											<span className="font-medium">{result.summary.trim()}</span>
-										)}
-										<span className="text-muted-foreground">
-											{outcomeLabel(result.outcome, result.problems.length)}
-										</span>
-										{result.markedIncorrectAt !== null && (
-											<StatusBadge def={RESULT_MARK_DEFS.INCORRECT} />
-										)}
-										{earlierReview !== undefined && earlierReviewLink?.(earlierReview)}
-									</span>
-									{expandable && (
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											className="group mt-1 -ml-2"
-											aria-expanded={open}
-											aria-controls={open ? detailId : undefined}
-											onClick={() => toggle(result)}
-										>
-											<ChevronRightIcon
-												aria-hidden
-												className="transition-transform group-aria-expanded:rotate-90 motion-reduce:transition-none"
-											/>
-											{open ? "Hide evidence" : "Show evidence"}
-											<span className="sr-only"> for {result.practiceName}</span>
-										</Button>
+						<TableRow key={result.id}>
+							<TableCell className="align-top whitespace-normal">
+								<ResultOutcome outcome={result.outcome} plain={plainState} />
+							</TableCell>
+							<TableCell className="align-top whitespace-normal">
+								<span className="flex min-w-0 flex-col items-start gap-1">
+									<PracticePill
+										name={result.practiceName}
+										onOpen={
+											onOpenPractice === undefined
+												? undefined
+												: () => onOpenPractice(result.practiceSlug)
+										}
+									/>
+									<GroupName
+										name={groupNameOf(result)}
+										icon={visual.Icon}
+										pill={group === undefined ? undefined : visual.pill}
+										className="text-xs"
+									/>
+								</span>
+							</TableCell>
+							<TableCell className="align-top whitespace-normal">
+								<span className="flex max-w-lg min-w-0 flex-col items-start gap-1 text-sm text-pretty">
+									{hasText(result.summary) && (
+										<span className="font-medium">{result.summary.trim()}</span>
 									)}
-								</TableCell>
-							</TableRow>
-							{open && (
-								<TableRow variant="static" id={detailId}>
-									<TableCell colSpan={3} className="bg-muted/30 p-4 whitespace-normal">
-										{renderResult(result.id)}
-									</TableCell>
-								</TableRow>
-							)}
-						</Fragment>
+									<span className="text-muted-foreground">
+										{result.problems.length > 0
+											? `${result.problems.length} ${result.problems.length === 1 ? "problem" : "problems"}`
+											: null}
+									</span>
+									{result.markedIncorrectAt !== null && (
+										<StatusBadge def={RESULT_MARK_DEFS.INCORRECT} />
+									)}
+									{observationLink?.(result)}
+									{earlierReview !== undefined && earlierReviewLink?.(earlierReview)}
+								</span>
+							</TableCell>
+						</TableRow>
 					);
 				})}
 			</PracticesFrame>
@@ -290,7 +221,7 @@ function PracticesFrame({ busy = false, children }: { busy?: boolean; children: 
 						<TableHead scope="col" className="w-64">
 							Practice
 						</TableHead>
-						<TableHead scope="col">Result</TableHead>
+						<TableHead scope="col">Observation</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>{children}</TableBody>

@@ -2,7 +2,7 @@ import { ExternalLinkIcon, PlayIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type { GroupRef, ProfileReviewDetail } from "@/api/types.gen";
+import type { GroupRef, ProfileReviewDetail, ResultList } from "@/api/types.gen";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import {
@@ -63,13 +63,7 @@ export interface ProfileReviewLevelProps {
 	onTabChange: (tab: ReviewTab) => void;
 	filters: ReviewPracticeFilters;
 	onFiltersChange: (filters: ReviewPracticeFilters) => void;
-	focusResultId?: string;
-	/**
-	 * One result in full, with its problems, open questions and evidence, which the route reads when
-	 * its row opens. Without it a row shows the result's list facts alone.
-	 */
-	renderResult?: (resultId: string) => ReactNode;
-	eventLabel: (name: string) => string;
+	observationLink?: (result: ResultList) => ReactNode;
 	/** The reader's responses to the feedback this review gave them; absent where they may not respond. */
 	responses?: FeedbackResponseControls;
 	onReviewNow?: (itemId: string) => void;
@@ -121,9 +115,7 @@ export function ProfileReviewLevel({
 	onTabChange,
 	filters,
 	onFiltersChange,
-	focusResultId,
-	renderResult,
-	eventLabel,
+	observationLink,
 	responses,
 	onReviewNow,
 	requesting,
@@ -188,19 +180,16 @@ export function ProfileReviewLevel({
 							onFiltersChange={onFiltersChange}
 							onOpenPractice={onOpenPractice}
 							earlierReviewLink={earlierReviewLink}
-							renderResult={renderResult}
-							focusPracticeSlug={
-								results.find((result) => result.id === focusResultId)?.practiceSlug
-							}
+							observationLink={observationLink}
 							emptyMessage={
 								isActiveReview(review.status)
-									? "Results appear here as the review reaches each practice."
-									: "This review recorded no result about you, so there is nothing to list here."
+									? "Observations appear here as the review reaches each practice."
+									: "This review recorded no observation about you, so there is nothing to list here."
 							}
 						/>
 					</TabsContent>
 					<TabsContent value="noticed" className="min-w-0">
-						<TraceEventTimeline events={trace.events} eventLabel={eventLabel} />
+						<TraceEventTimeline events={trace.events} />
 					</TabsContent>
 				</Tabs>
 			</>

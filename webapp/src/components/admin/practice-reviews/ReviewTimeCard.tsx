@@ -50,9 +50,7 @@ export interface ReviewTimeCardProps {
  * review's trace names, Until asked, Queue, Preparation, Execution and To developer, with the
  * unsplit Run of older reviews where the range has some, each as wide as its share of the reviews'
  * total time, with a legend of that share of the median, so the parts add up to it. Then how many
- * reviews of the range finished, opening them. How many of them finished after the merge, and the
- * feedback lost because the work merged first, are said in the (i): the reviews list cannot filter by
- * them, so as figures they would open nothing. Where no time to a comment on the work was measured, as in a
+ * reviews of the range finished, opening them. Where no time to a comment on the work was measured, as in a
  * course whose feedback goes to the practice pages or waits for approval, the part says so and
  * measures to the end of the review instead. A missing time is not a missing event: comments may
  * still have been delivered, and reviews may still have finished. What each figure means is in the
