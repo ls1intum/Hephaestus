@@ -155,18 +155,14 @@ function comboboxes(group: HTMLElement) {
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await canvas.findByText("20 pieces of feedback.");
-		// The same order as on every tab: the scope, which applies to every tab, then this list's own
-		// facets and its sort, all in one row.
+		// The same order as on every tab: the scope, which applies to every tab, with the time order
+		// after its date, then this list's own facets, all in one row.
 		const scope = canvas.getByRole("group", { name: "Applies to every tab" });
-		await expect(comboboxes(scope)).toStrictEqual(["Developer", "Group", "Practice"]);
+		await expect(comboboxes(scope).slice(0, 3)).toStrictEqual(["Developer", "Group", "Practice"]);
 		within(scope).getByRole("button", { name: "Composed" });
+		within(scope).getByRole("combobox", { name: /Sort/u });
 		const filters = canvas.getByRole("group", { name: "Filters" });
-		await expect(comboboxes(filters).slice(0, 3)).toStrictEqual([
-			"Delivery",
-			"Destination",
-			"Why withheld",
-		]);
-		within(filters).getByRole("combobox", { name: /Sort/u });
+		await expect(comboboxes(filters)).toStrictEqual(["Delivery", "Destination", "Why withheld"]);
 		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
 		canvas.getByTitle("It said nothing the developer was not already told.");
 		canvas.getByTitle("Found while reviewing past work, which is measured but never sent.");

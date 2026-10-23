@@ -231,9 +231,14 @@ function actionability(row: ReviewResult): number {
 	}
 }
 
+/** The fixtures come newest first, as the server sends them; `OLDEST` turns them round. */
+function byTime<T>(rows: readonly T[], url: URL): readonly T[] {
+	return single(url, "sort") === "OLDEST" ? [...rows].reverse() : rows;
+}
+
 function sortResults(rows: readonly ReviewResult[], url: URL) {
 	if (single(url, "sort") !== "ACTIONABILITY") {
-		return rows;
+		return byTime(rows, url);
 	}
 	// Ties are newest first, as on the server.
 	return [...rows].sort(
@@ -347,7 +352,10 @@ export function reviewHandlers({
 		),
 		...resultHandlers(resultRows, requireResultSort),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/problems", ({ request }) =>
-			springPage(filterProblems(reviewProblems, new URL(request.url)), new URL(request.url)),
+			springPage(
+				byTime(filterProblems(reviewProblems, new URL(request.url)), new URL(request.url)),
+				new URL(request.url),
+			),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/problems/:problemId", ({ params }) =>
 			HttpResponse.json(problemDetail(String(params.problemId))),
@@ -452,7 +460,7 @@ export function feedbackHandlers(rows: readonly ReviewFeedback[] = reviewFeedbac
 			const url = new URL(request.url);
 			const filtered = filterFeedback(rows, url);
 			// The fixture is newest first, as the endpoint's default order is.
-			return springPage(single(url, "sort") === "OLDEST" ? [...filtered].reverse() : filtered, url);
+			return springPage(byTime(filtered, url), url);
 		}),
 		...feedbackCountHandlers(rows),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", ({ params }) =>
@@ -511,7 +519,7 @@ function reviewDetailHandlers() {
 	return [
 		http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
 			const url = new URL(request.url);
-			return springPage(filterReviews(reviews, url), url);
+			return springPage(byTime(filterReviews(reviews, url), url), url);
 		}),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId", ({ params }) =>
 			HttpResponse.json(reviewDetail(String(params.reviewId))),

@@ -32,8 +32,10 @@ const COUNT_READ = {
 	refetchInterval: () => (sessionRetriesQueries() ? COUNT_REFRESH_MS : false),
 } as const;
 
-export function useReviewTabCounts(workspaceSlug: string, scope: ReviewScopeSearch) {
+export function useReviewTabCounts(workspaceSlug: string, search: ReviewScopeSearch) {
 	const path = { workspaceSlug };
+	// An order changes no count, so the counts do not read again when it changes.
+	const scope = { ...search, order: undefined };
 	const reviews = useQuery({
 		...listReviewsOptions({ path, query: reviewsQuery(scope, COUNT_PAGE) }),
 		...COUNT_READ,

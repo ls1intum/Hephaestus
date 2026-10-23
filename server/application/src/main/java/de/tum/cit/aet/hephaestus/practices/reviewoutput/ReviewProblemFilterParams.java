@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ProblemQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.result.ResultQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewListSort;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import java.time.Instant;
 import java.util.List;
@@ -27,7 +28,8 @@ public record ReviewProblemFilterParams(
         @Nullable Instant to,
         @Nullable UUID resultId,
         @Nullable String path,
-        @Nullable Boolean openOnly) {
+        @Nullable Boolean openOnly,
+        @Nullable ReviewListSort sort) {
     public ResultQueryFilter toResultFilter() {
         return new ReviewResultFilterParams(
                         reviewId,
@@ -48,6 +50,7 @@ public record ReviewProblemFilterParams(
     }
 
     public ProblemQueryFilter toProblemFilter() {
-        return new ProblemQueryFilter(resultId, path, severity, openOnly == null || openOnly);
+        return new ProblemQueryFilter(
+                resultId, path, severity, openOnly == null || openOnly, sort == null ? ReviewListSort.NEWEST : sort);
     }
 }

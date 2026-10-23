@@ -3970,7 +3970,7 @@ export const listReviewedPractices = <ThrowOnError extends boolean = false>(opti
 /**
  * List practice reviews with result and feedback outcomes
  *
- * Results are ordered newest first.
+ * Reviews are ordered by when they were created, newest first unless sort is OLDEST.
  */
 export const listReviews = <ThrowOnError extends boolean = false>(options: Options<ListReviewsData, ThrowOnError>): RequestResult<ListReviewsResponses, ListReviewsErrors, ThrowOnError> => (options.client ?? client).get<ListReviewsResponses, ListReviewsErrors, ThrowOnError>({
     responseTransformer: listReviewsResponseTransformer,
@@ -4120,6 +4120,8 @@ export const getReviewOverview = <ThrowOnError extends boolean = false>(options:
 
 /**
  * List review problems
+ *
+ * Problems are ordered by when their result was recorded, newest first unless sort is OLDEST.
  */
 export const listReviewProblems = <ThrowOnError extends boolean = false>(options: Options<ListReviewProblemsData, ThrowOnError>): RequestResult<ListReviewProblemsResponses, unknown, ThrowOnError> => (options.client ?? client).get<ListReviewProblemsResponses, unknown, ThrowOnError>({
     responseTransformer: listReviewProblemsResponseTransformer,

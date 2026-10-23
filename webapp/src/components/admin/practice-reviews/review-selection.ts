@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { hasText } from "@/lib/text";
 
-import type { ReviewScope, ReviewScopeSearch } from "./review-scope";
+import type { ReviewScope } from "./review-scope";
 
 export type ReviewSelection =
 	| { kind: "item"; itemId: string }
@@ -33,7 +33,7 @@ const selectionSearchSchema = z.object({
 	selected: z.literal(true).optional().catch(undefined),
 });
 
-export function parseSelectionSearch(search: unknown): Partial<ReviewScopeSearch> {
+export function parseSelectionSearch(search: unknown): Partial<ReviewScope> {
 	const parsed = selectionSearchSchema.safeParse(search);
 	return parsed.success ? parsed.data : {};
 }

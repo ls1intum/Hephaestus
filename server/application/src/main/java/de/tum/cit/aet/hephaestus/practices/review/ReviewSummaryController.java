@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewTimingDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewUsageDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewListSort;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -83,7 +84,7 @@ public class ReviewSummaryController {
     @GetMapping
     @Operation(
             summary = "List practice reviews with result and feedback outcomes",
-            description = "Results are ordered newest first.",
+            description = "Reviews are ordered by when they were created, newest first unless sort is OLDEST.",
             operationId = "listReviews")
     @ApiResponse(responseCode = "200", description = "Paginated review summaries returned")
     @ApiResponse(
@@ -98,7 +99,9 @@ public class ReviewSummaryController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
             @Valid @ParameterObject ReviewFilterParams filter) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+        // The native query orders the rows; the sort here keeps the page's sort metadata truthful.
+        Sort.Direction direction = filter.sort() == ReviewListSort.OLDEST ? Sort.Direction.ASC : Sort.Direction.DESC;
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, "createdAt", "id"));
         return ResponseEntity.ok(
                 PageResponseDTO.from(queryService.list(workspaceContext.id(), filter.validated(), pageable)));
     }

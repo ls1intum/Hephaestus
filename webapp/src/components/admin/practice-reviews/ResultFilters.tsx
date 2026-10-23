@@ -16,12 +16,11 @@ import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { nonEmpty } from "@/lib/search-params";
 
 import { type ListFacet, listFacet } from "./AppliedFacetPills";
-import { clearedScope, hasAppliedScope, readScope } from "./review-scope";
-import type { ResultSort, ResultsSearch } from "./review-search";
+import { clearedScopeFilters, hasAppliedScope, readScope } from "./review-scope";
+import type { ResultsSearch } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
 import type { ReviewPeople } from "./ReviewPersonFacet";
-import type { ScopeRecordFilter } from "./ReviewScopeFilters";
-import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
+import type { OwnOrder, ScopeRecordFilter } from "./ReviewScopeFilters";
 
 const OUTCOME_OPTIONS = statusFacetOptions(OUTCOME_DEFS);
 const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
@@ -84,10 +83,20 @@ export function hasAssessmentFilter(search: AssessmentSearch): boolean {
 	);
 }
 
-const SORT_ITEMS: [ReviewSortItem<ResultSort>, ...ReviewSortItem<ResultSort>[]] = [
-	{ value: "NEWEST", label: "Newest first" },
-	{ value: "ACTIONABILITY", label: "Most actionable first" },
-];
+/**
+ * "Most actionable first": no time order, so this list offers it after the shared ones, in the scope
+ * bar's order select, and keeps it to itself.
+ */
+export function actionableOrder(
+	search: ResultsSearch,
+	onPatch: (patch: Partial<ResultsSearch>) => void,
+): OwnOrder {
+	return {
+		item: { value: "ACTIONABILITY", label: "Most actionable first" },
+		active: search.order === "ACTIONABILITY",
+		onSelect: () => onPatch({ order: "ACTIONABILITY" }),
+	};
+}
 
 /**
  * The facets this list owns, cleared: what the toolbar's Reset clears. `order` is excluded, because
@@ -105,7 +114,7 @@ export function clearedResultFacets(): Partial<ResultsSearch> {
 }
 
 export function clearedResultFilters(): Partial<ResultsSearch> {
-	return { ...clearedResultFacets(), ...clearedScope() };
+	return { ...clearedResultFacets(), ...clearedScopeFilters() };
 }
 
 function hasResultFacet(search: ResultsSearch): boolean {
@@ -198,17 +207,12 @@ export function ResultFilters({
 			people={people}
 			personName={subjectName}
 			record={record}
+			ownOrder={actionableOrder(search, onPatch)}
 			facets={
 				<>
 					{outcome.control}
 					{severity.control}
 					{disagreement.control}
-					{/* `Reset` leaves the sort alone: it orders the set and does not narrow it. */}
-					<ReviewSortSelect
-						items={SORT_ITEMS}
-						value={search.order}
-						onChange={(order) => onPatch({ order })}
-					/>
 				</>
 			}
 			pills={[...outcome.pills, ...severity.pills, ...disagreement.pills]}

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewListSort;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
 import java.time.Instant;
@@ -17,7 +18,8 @@ public record ReviewFilterParams(
         @Nullable String practiceSlug,
         @Nullable String groupSlug,
         @Nullable Instant from,
-        @Nullable Instant to) {
+        @Nullable Instant to,
+        @Nullable ReviewListSort sort) {
     public ReviewFilterParams validated() {
         QueryFilterSupport.requireWindow(from, to);
         return this;

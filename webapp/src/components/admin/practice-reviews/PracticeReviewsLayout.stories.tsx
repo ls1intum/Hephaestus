@@ -106,6 +106,11 @@ export const ScopeAboveTheTabs: Story = {
 			within(scope).getByRole("combobox", { name });
 		}
 		within(scope).getByRole("button", { name: "Recorded" });
+		// The time order follows the date it orders by, so it holds for every tab.
+		await expect(within(scope).getByRole("combobox", { name: /Sort/u })).toHaveTextContent(
+			"Newest first",
+		);
+		await expect(within(filters).queryByRole("combobox", { name: /Sort/u })).toBeNull();
 		within(filters).getByRole("combobox", { name: "Outcome" });
 		within(filters).getByRole("combobox", { name: "Severity" });
 		within(filters).getByText("7 results.");
@@ -137,6 +142,22 @@ export const ScopeAndTracking: Story = {
 		await expect(
 			within(filters).queryByRole("button", { name: "Clear scope" }),
 		).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Oldest first, chosen on another tab: the order comes with the scope, and "Clear scope" offers to
+ * put it back although no part of the scope narrows the list.
+ */
+export const OldestFirstFromTheScope: Story = {
+	args: { children: <ResultsTab search={{ ...UNFILTERED, order: "OLDEST" }} /> },
+	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/results" } },
+	play: async ({ canvas }) => {
+		const { scope } = layoutOf(canvas);
+		await expect(within(scope).getByRole("combobox", { name: /Sort/u })).toHaveTextContent(
+			"Oldest first",
+		);
+		within(scope).getByRole("button", { name: "Clear scope" });
 	},
 };
 

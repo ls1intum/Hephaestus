@@ -68,7 +68,10 @@ public class PracticeReviewOutputController {
     }
 
     @GetMapping("/problems")
-    @Operation(operationId = "listReviewProblems", summary = "List review problems")
+    @Operation(
+            operationId = "listReviewProblems",
+            summary = "List review problems",
+            description = "Problems are ordered by when their result was recorded, newest first unless sort is OLDEST.")
     public PageResponseDTO<ReviewProblemDTO> problems(
             WorkspaceContext ws,
             @Valid @ParameterObject ReviewProblemFilterParams filter,

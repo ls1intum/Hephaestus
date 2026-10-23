@@ -9,25 +9,19 @@ import { nonEmpty } from "@/lib/search-params";
 
 import { listFacet } from "./AppliedFacetPills";
 import type { PracticeFacetOption } from "./ResultFilters";
-import { clearedScope, hasAppliedScope, readScope } from "./review-scope";
-import type { FeedbackSearch, FeedbackSort } from "./review-search";
+import { clearedScopeFilters, hasAppliedScope, readScope } from "./review-scope";
+import type { FeedbackSearch } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
-import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
 
 const STATE_OPTIONS = statusFacetOptions(DELIVERY_STATE_DEFS);
 const DESTINATION_OPTIONS = statusFacetOptions(FEEDBACK_DESTINATION_DEFS);
 const WITHHELD_FAMILY_OPTIONS = statusFacetOptions(WITHHOLDING_FAMILY_DEFS);
 
-const SORT_ITEMS: [ReviewSortItem<FeedbackSort>, ...ReviewSortItem<FeedbackSort>[]] = [
-	{ value: "NEWEST", label: "Newest first" },
-	{ value: "OLDEST", label: "Oldest first" },
-];
-
 /**
- * The facets this list owns, cleared: what the toolbar's Reset clears. `order` is excluded, as on the
- * results list, and so is the shared scope, which "Clear scope" owns.
+ * The facets this list owns, cleared: what the toolbar's Reset clears. The shared scope, the time
+ * order included, is excluded, because "Clear scope" owns it.
  */
 export function clearedFeedbackFacets(): Partial<FeedbackSearch> {
 	return {
@@ -42,7 +36,7 @@ export function clearedFeedbackFacets(): Partial<FeedbackSearch> {
 
 /** Every filter on this list, the shared scope included: what the empty list's button clears. */
 export function clearedFeedbackFilters(): Partial<FeedbackSearch> {
-	return { ...clearedFeedbackFacets(), ...clearedScope() };
+	return { ...clearedFeedbackFacets(), ...clearedScopeFilters() };
 }
 
 function hasFeedbackFacet(search: FeedbackSearch): boolean {
@@ -124,11 +118,6 @@ export function FeedbackFilters({
 					{state.control}
 					{destination.control}
 					{withheld.control}
-					<ReviewSortSelect
-						items={SORT_ITEMS}
-						value={search.order}
-						onChange={(order) => onPatch({ order })}
-					/>
 				</>
 			}
 			pills={[...state.pills, ...destination.pills, ...withheld.pills]}

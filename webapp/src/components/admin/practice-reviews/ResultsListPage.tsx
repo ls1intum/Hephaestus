@@ -66,7 +66,13 @@ export function ResultsListPage({
 				search={search}
 				onPatch={onSearchChange}
 				onReset={() => onSearchChange(clearedResultFacets())}
-				onClearScope={() => onSearchChange(clearedScope())}
+				// "Most actionable first" is this list's own, not the scope's, so it outlasts "Clear scope".
+				onClearScope={() =>
+					onSearchChange({
+						...clearedScope(),
+						order: search.order === "ACTIONABILITY" ? search.order : undefined,
+					})
+				}
 				groups={groups}
 				practices={practices}
 				people={people}

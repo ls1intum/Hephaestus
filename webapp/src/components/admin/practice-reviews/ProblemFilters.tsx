@@ -10,7 +10,7 @@ import {
 	markFilterPills,
 	type PracticeFacetOption,
 } from "./ResultFilters";
-import { clearedScope, hasAppliedScope, readScope } from "./review-scope";
+import { clearedScopeFilters, hasAppliedScope, readScope } from "./review-scope";
 import type { ProblemsSearch } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
 import type { ReviewPeople } from "./ReviewPersonFacet";
@@ -29,7 +29,7 @@ export function clearedProblemFacets(): Partial<ProblemsSearch> {
 }
 
 export function clearedProblemFilters(): Partial<ProblemsSearch> {
-	return { ...clearedProblemFacets(), ...clearedScope() };
+	return { ...clearedProblemFacets(), ...clearedScopeFilters() };
 }
 
 function hasProblemFacet(search: ProblemsSearch): boolean {

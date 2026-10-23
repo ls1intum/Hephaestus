@@ -5425,7 +5425,7 @@ export const listReviewsQueryKey = (options: Options<ListReviewsData>) => create
 /**
  * List practice reviews with result and feedback outcomes
  *
- * Results are ordered newest first.
+ * Reviews are ordered by when they were created, newest first unless sort is OLDEST.
  */
 export const listReviewsOptions = (options: Options<ListReviewsData>) => queryOptions<ListReviewsResponse, ListReviewsError, ListReviewsResponse, ReturnType<typeof listReviewsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -5445,7 +5445,7 @@ export const listReviewsInfiniteQueryKey = (options: Options<ListReviewsData>): 
 /**
  * List practice reviews with result and feedback outcomes
  *
- * Results are ordered newest first.
+ * Reviews are ordered by when they were created, newest first unless sort is OLDEST.
  */
 export const listReviewsInfiniteOptions = (options: Options<ListReviewsData>) => {
     const opts = infiniteQueryOptions<ListReviewsResponse, ListReviewsError, InfiniteData<ListReviewsResponse>, QueryKey<Options<ListReviewsData>>, number | Pick<QueryKey<Options<ListReviewsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
@@ -5678,6 +5678,8 @@ export const listReviewProblemsQueryKey = (options: Options<ListReviewProblemsDa
 
 /**
  * List review problems
+ *
+ * Problems are ordered by when their result was recorded, newest first unless sort is OLDEST.
  */
 export const listReviewProblemsOptions = (options: Options<ListReviewProblemsData>) => queryOptions<ListReviewProblemsResponse, DefaultError, ListReviewProblemsResponse, ReturnType<typeof listReviewProblemsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -5696,6 +5698,8 @@ export const listReviewProblemsInfiniteQueryKey = (options: Options<ListReviewPr
 
 /**
  * List review problems
+ *
+ * Problems are ordered by when their result was recorded, newest first unless sort is OLDEST.
  */
 export const listReviewProblemsInfiniteOptions = (options: Options<ListReviewProblemsData>) => {
     const opts = infiniteQueryOptions<ListReviewProblemsResponse, DefaultError, InfiniteData<ListReviewProblemsResponse>, QueryKey<Options<ListReviewProblemsData>>, number | Pick<QueryKey<Options<ListReviewProblemsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(

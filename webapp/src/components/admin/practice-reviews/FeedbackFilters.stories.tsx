@@ -201,14 +201,22 @@ export const NothingMatches: Story = {
 	},
 };
 
+// The time order is the shared scope's: it sits above the tabs, Reset keeps it, "Clear scope" ends it.
 export const SortIsNotAFilter: Story = {
 	args: {
 		search: { ...UNFILTERED, state: ["AWAITING_APPROVAL"] },
 		total: 3,
 	},
 	play: async ({ args, canvas, userEvent }) => {
-		const sort = canvas.getByRole("combobox", { name: /Sort/u });
+		const scope = canvas.getByRole("group", { name: "Applies to every tab" });
+		const sort = within(scope).getByRole("combobox", { name: /Sort/u });
+		await expect(
+			within(canvas.getByRole("group", { name: "Filters" })).queryByRole("combobox", {
+				name: /Sort/u,
+			}),
+		).toBeNull();
 		await expect(sort).toHaveTextContent("Newest first");
+		await expect(within(scope).queryByRole("button", { name: "Clear scope" })).toBeNull();
 		await userEvent.click(sort);
 		await userEvent.click(await screen.findByRole("option", { name: "Oldest first" }));
 		await expect(args.onPatch).toHaveBeenCalledWith({ order: "OLDEST" });
@@ -222,6 +230,13 @@ export const SortIsNotAFilter: Story = {
 		await userEvent.click(await screen.findByRole("option", { name: "Newest first" }));
 		await expect(args.onPatch).toHaveBeenLastCalledWith({ order: undefined });
 		await waitFor(async () => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+
+		await userEvent.click(sort);
+		await userEvent.click(await screen.findByRole("option", { name: "Oldest first" }));
+		await waitFor(async () => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+		await userEvent.click(within(scope).getByRole("button", { name: "Clear scope" }));
+		await expect(args.onClearScope).toHaveBeenCalled();
+		await expect(sort).toHaveTextContent("Newest first");
 	},
 };
 
