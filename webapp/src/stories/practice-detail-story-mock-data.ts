@@ -74,7 +74,10 @@ function detailPractice(slug: string): PracticeStanding {
 	return practice;
 }
 
-const pullRequest902: ItemRef = pullRequest(902);
+const pullRequest902: ItemRef = {
+	...pullRequest(902),
+	title: "Move the practice loader into the catalogue package",
+};
 
 export function reviewRef(
 	id: string,
@@ -192,7 +195,7 @@ const pullRequestItself: EvidenceCitation[] = [
 		path: "inputs/context/metadata.json",
 		startLine: 4,
 		endLine: 4,
-		quote: '"title" : "Page size"',
+		quote: `"title" : ${JSON.stringify(pullRequest902.title)}`,
 	}),
 	cited({
 		sourceKind: "scm.pull-request.core",
@@ -200,12 +203,13 @@ const pullRequestItself: EvidenceCitation[] = [
 		path: "inputs/context/metadata.json",
 		startLine: 9,
 		endLine: 9,
-		quote: '"body" : ""',
+		quote:
+			'"body" : "Move the loader into the catalogue package so catalogue code lives together."',
 	}),
 ];
 
 const DETAIL_REVIEW = "00000000-0000-0000-0000-000000000101";
-const DETAIL_RESULT = "00000000-0000-0000-0000-000000000102";
+const DETAIL_RESULT = "00000000-0000-4000-8000-000000000102";
 
 export const detailFeedback: OwnFeedbackRef = ownFeedback("00000000-0000-0000-0000-000000000103", {
 	copies: [

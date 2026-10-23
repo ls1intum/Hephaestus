@@ -16,6 +16,7 @@ import { daysBefore } from "@/stories/story-clock";
 import { levelsOpenedBy } from "@/test/detail-stack";
 
 import {
+	practiceLevel,
 	REVIEW_SELECTION_CLEARED,
 	reviewLevel,
 	REVIEWS_LEVEL,
@@ -29,8 +30,8 @@ const { review } = detail;
 const loaded = { status: "ready", detail } satisfies ProfileReviewDetailState;
 const REQUESTED_REVIEW_ID = "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01";
 
-const [unfocused, focused] = detail.results;
-if (!unfocused || !focused) {
+const [, focused] = detail.results;
+if (!focused) {
 	throw new Error("The review carries a second result");
 }
 
@@ -38,10 +39,6 @@ const readyWith = (fields: Partial<typeof detail>): ProfileReviewDetailState => 
 	status: "ready",
 	detail: { ...detail, ...fields },
 });
-
-const EVENT_LABELS: Record<string, string | undefined> = {
-	"scm.pull_request.ready": "Marked ready for review",
-};
 
 const practiceTable = () => screen.getByRole("table", { name: "Every practice in this review" });
 
@@ -77,11 +74,19 @@ const meta = {
 		positionOnWork: 2,
 		groupOf: () => groups[0],
 		onOpenPractice: fn(),
+		observationLink: (result) => (
+			<DetailStackLink
+				aria-label={`Open observation for ${result.practiceName}`}
+				entry={practiceLevel(result.practiceSlug)}
+				levelSearch={{ practiceTab: "results", observation: result.id }}
+			>
+				Open observation
+			</DetailStackLink>
+		),
 		tab: "practices",
 		onTabChange: fn(),
 		filters: {},
 		onFiltersChange: fn(),
-		eventLabel: (name) => EVENT_LABELS[name] ?? name,
 		onReviewNow: fn(),
 	},
 	argTypes: { path: { control: false }, requestOutcome: { control: false } },
@@ -135,16 +140,13 @@ export const Default: Story = {
 	},
 };
 
-export const OpenedAtAResult: Story = {
-	args: {
-		focusResultId: focused.id,
-		renderResult: (resultId) => <p>The result {resultId} in full</p>,
-	},
+export const ExactObservationLinks: Story = {
 	play: async () => {
 		await settledReviewPanel();
 		const table = within(practiceTable());
-		await expect(table.getByText(`The result ${focused.id} in full`)).toBeVisible();
-		await expect(table.queryByText(`The result ${unfocused.id} in full`)).toBeNull();
+		const link = table.getByRole("link", { name: `Open observation for ${focused.practiceName}` });
+		await expect(link).toHaveAttribute("href", expect.stringContaining(focused.id));
+		await expect(table.queryByRole("button", { name: /^Show evidence/u })).toBeNull();
 	},
 };
 
@@ -154,7 +156,13 @@ export const WhatWeNoticed: Story = {
 		state: readyWith({
 			trace: {
 				...detail.trace,
-				events: [{ name: "scm.pull_request.ready", occurredAt: daysBefore(2) }],
+				events: [
+					{
+						name: "scm.pull_request.ready",
+						displayName: "Marked ready for review",
+						occurredAt: daysBefore(2),
+					},
+				],
 			},
 		}),
 	},
@@ -225,7 +233,7 @@ export const NothingRecorded: Story = {
 		await settledReviewPanel();
 		await expect(
 			screen.getByText(
-				"This review recorded no result about you, so there is nothing to list here.",
+				"This review recorded no observation about you, so there is nothing to list here.",
 			),
 		).toBeVisible();
 		await expect(screen.queryByRole("list", { name: "Your feedback" })).toBeNull();
@@ -246,7 +254,7 @@ export const RunningWithNothingRecorded: Story = {
 		await expect(panel.queryByText("Reviewed")).toBeNull();
 		await expect(screen.getByText("Running")).toBeVisible();
 		await expect(
-			screen.getByText("Results appear here as the review reaches each practice."),
+			screen.getByText("Observations appear here as the review reaches each practice."),
 		).toBeVisible();
 		await expect(screen.queryByText(/recorded no result/u)).toBeNull();
 	},

@@ -8,6 +8,7 @@ import {
 
 import { getOwnResultOptions } from "@/api/@tanstack/react-query.gen";
 import type { GroupRef } from "@/api/types.gen";
+import { InlineLink } from "@/components/common/InlineLink";
 import { combinePanelStates, queryLoadState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { parseDetailStack } from "@/components/layout/detail-drawer/detail-stack";
@@ -38,7 +39,7 @@ import { PracticeProfilePage } from "@/components/practice-profile/PracticeProfi
 import { RefusalFixLink } from "@/components/practice-trace/RefusalFixLink";
 import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequestedNotice";
 import { TraceRefusalAlert } from "@/components/practice-trace/TraceRefusalAlert";
-import { ReviewResultRow } from "@/components/profile/ReviewResultRow";
+import { ReviewResultDetails, ReviewResultRow } from "@/components/profile/ReviewResultRow";
 import type { FeedbackResponseControls } from "@/components/profile/reviews";
 import { Skeleton } from "@/components/ui/skeleton";
 import { REVIEW_PAGE_SIZE, usePracticeGroupDetail } from "@/hooks/use-practice-group-detail";
@@ -47,6 +48,7 @@ import { usePracticeProfileOverview } from "@/hooks/use-practice-profile-overvie
 import { usePracticeProfileReviews } from "@/hooks/use-practice-profile-reviews";
 import { usePracticeStandings } from "@/hooks/use-practice-standings";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
+import { formatShortDay, formatTime } from "@/lib/dates";
 import { pageHead } from "@/lib/page-title";
 import { hasText } from "@/lib/text";
 import { hasMinimumWorkspaceRole } from "@/lib/workspace-roles";
@@ -105,6 +107,8 @@ function PracticeProfile() {
 		enabled: featureState.practicesEnabled === true,
 	});
 	const openReviewId = openLevelId(detailStack, "review");
+	const openPracticeSlug = openLevelId(detailStack, "practice");
+	const selectedObservationId = openPracticeSlug === undefined ? undefined : search.observation;
 	const reviews = usePracticeProfileReviews({
 		workspaceSlug,
 		listOpen: openLevelId(detailStack, "reviews") !== undefined || openReviewId !== undefined,
@@ -206,6 +210,27 @@ function PracticeProfile() {
 				ratingProps={readOnly ? undefined : feedback.ratingProps}
 				onOpenPractice={(practiceSlug) => stackControls.open(practiceLevel(practiceSlug))}
 				practiceTab={search.practiceTab}
+				renderObservation={(result) => (
+					<OwnObservationDetail
+						workspaceSlug={workspaceSlug}
+						resultId={result.id}
+						practiceSlug={result.practiceSlug}
+						responses={readOnly ? undefined : detail.responses}
+						layout="body"
+					/>
+				)}
+				selectedObservationId={selectedObservationId}
+				selectedObservation={
+					selectedObservationId !== undefined && openPracticeSlug !== undefined ? (
+						<OwnObservationDetail
+							workspaceSlug={workspaceSlug}
+							resultId={selectedObservationId}
+							practiceSlug={openPracticeSlug}
+							responses={readOnly ? undefined : detail.responses}
+							layout="row"
+						/>
+					) : undefined
+				}
 				skeletonRows={REVIEW_PAGE_SIZE}
 				reviews={{
 					list: {
@@ -243,15 +268,23 @@ function PracticeProfile() {
 						filters: { group: search.reviewGroup, practice: search.reviewPractice },
 						onFiltersChange: (next) =>
 							setView({ reviewGroup: next.group, reviewPractice: next.practice }),
-						focusResultId: search.reviewResult,
-						renderResult: (resultId) => (
-							<OwnResultDetail
-								workspaceSlug={workspaceSlug}
-								resultId={resultId}
-								responses={readOnly ? undefined : detail.responses}
-							/>
+						observationLink: (result) => (
+							<InlineLink
+								aria-label={`Open observation for ${result.practiceName}`}
+								render={
+									<DetailStackLink
+										entry={practiceLevel(result.practiceSlug)}
+										levelSearch={{
+											...REVIEW_SELECTION_CLEARED,
+											practiceTab: "results",
+											observation: result.id,
+										}}
+									/>
+								}
+							>
+								Open observation
+							</InlineLink>
 						),
-						eventLabel: (name) => name,
 						groupOf,
 						onOpenPractice: openPractice,
 					},
@@ -281,21 +314,25 @@ function PracticeProfile() {
 	);
 }
 
-function OwnResultDetail({
+function OwnObservationDetail({
 	workspaceSlug,
 	resultId,
+	practiceSlug,
 	responses,
+	layout,
 }: {
 	workspaceSlug: string;
 	resultId: string;
+	practiceSlug: string;
 	responses?: FeedbackResponseControls;
+	layout: "row" | "body";
 }) {
 	const result = useQuery(getOwnResultOptions({ path: { workspaceSlug, resultId } }));
 	if (result.isError) {
 		return (
 			<QueryErrorAlert
 				error={result.error}
-				title="We could not load this result"
+				title="We could not load this observation"
 				onRetry={() => {
 					void result.refetch();
 				}}
@@ -303,14 +340,52 @@ function OwnResultDetail({
 		);
 	}
 	if (result.isPending) {
-		return <Skeleton className="h-24 w-full" />;
+		return (
+			<div aria-busy="true" className="flex flex-col gap-3">
+				<span className="sr-only">Loading observation…</span>
+				<Skeleton className="h-5 w-3/4" />
+				<Skeleton className="h-16 w-full" />
+				<Skeleton className="h-16 w-full" />
+			</div>
+		);
 	}
-	return (
-		<ReviewResultRow
-			result={result.data}
-			defaultOpen
-			showPracticeName={false}
-			responses={responses}
-		/>
+	// The own endpoint owns authorization. The destination also checks identity, so a stale or
+	// incorrectly routed response never places another practice's words under this practice.
+	if (result.data.id !== resultId || result.data.practiceSlug !== practiceSlug) {
+		return (
+			<p className="text-sm">
+				This observation does not belong to this practice. Open it from its review.
+			</p>
+		);
+	}
+	return layout === "body" ? (
+		<ReviewResultDetails result={result.data} responses={responses} />
+	) : (
+		<ol
+			aria-label="Selected observation"
+			className="overflow-hidden rounded-xl border bg-background"
+		>
+			<ReviewResultRow
+				result={result.data}
+				defaultOpen
+				responses={responses}
+				details={<ReviewResultDetails result={result.data} responses={responses} />}
+				work={
+					<span className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+						{hasText(result.data.item.url) ? (
+							<InlineLink href={result.data.item.url} external>
+								{result.data.item.label}
+							</InlineLink>
+						) : (
+							result.data.item.label
+						)}
+						<span>{result.data.item.container}</span>
+						<time dateTime={result.data.recordedAt.toISOString()}>
+							{formatShortDay(result.data.recordedAt)} {formatTime(result.data.recordedAt)}
+						</time>
+					</span>
+				}
+			/>
+		</ol>
 	);
 }

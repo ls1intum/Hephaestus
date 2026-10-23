@@ -80,6 +80,8 @@ export interface ReviewResultRowProps {
 	work?: ReactNode;
 	/** The reader's response to the result's feedback; absent leaves no response controls. */
 	responses?: FeedbackResponseControls;
+	/** Full observation content, read lazily by the route when this row opens. */
+	details?: ReactNode;
 }
 
 const NO_OPEN_QUESTIONS: OpenQuestion[] = [];
@@ -160,6 +162,7 @@ export function ReviewResultRow({
 	showPracticeName = true,
 	work,
 	responses,
+	details,
 }: ReviewResultRowProps) {
 	const outcome = OUTCOME_DEFS[result.outcome];
 	const OutcomeIcon = outcome.icon;
@@ -169,7 +172,11 @@ export function ReviewResultRow({
 	const feedback = isResultDetail(result) ? result.feedback : [];
 	const hasWorkLine = rendersContent(work);
 	const hasBody =
-		markedIncorrect || note !== undefined || hasReasons(reasons) || feedback.length > 0;
+		rendersContent(details) ||
+		markedIncorrect ||
+		note !== undefined ||
+		hasReasons(reasons) ||
+		feedback.length > 0;
 	const summary = resultSummary(result);
 	const showPill = showPracticeName && summary !== result.practiceName;
 
@@ -182,7 +189,7 @@ export function ReviewResultRow({
 			<span className="flex min-w-0 basis-full flex-col items-start gap-1 text-sm sm:flex-1 sm:basis-0">
 				<span className="font-medium text-foreground">{summary}</span>
 				{result.summary === null && (
-					<span className="text-xs text-muted-foreground">Result text unavailable</span>
+					<span className="text-xs text-muted-foreground">Observation text unavailable</span>
 				)}
 				{showPill && <PracticePill name={result.practiceName} />}
 			</span>
@@ -239,25 +246,51 @@ export function ReviewResultRow({
 				</div>
 				<CollapsibleContent className="border-t bg-sidebar">
 					<div className="flex min-w-0 flex-col gap-3.5 px-4 pt-3.5 pb-4">
-						{markedIncorrect && (
-							<p className="text-sm">
-								<span className="font-medium">
-									A workspace admin marked this result as incorrect.
-								</span>{" "}
-								It no longer counts toward your standing or what Heph knows about your work.
-							</p>
-						)}
-						{note !== undefined && <p className="text-sm text-muted-foreground">{note}</p>}
-						<ReasonSections reasons={reasons} />
-						{feedback.length > 0 && (
-							<DetailSection label="Feedback" className="gap-2">
-								<OwnFeedbackList feedback={feedback} responses={responses} />
-							</DetailSection>
-						)}
+						{details ?? <ReviewResultDetails result={result} responses={responses} />}
 					</div>
 				</CollapsibleContent>
 			</Collapsible>
 		</li>
+	);
+}
+
+/** The observation body has one owner, whether its row carries full data or reads it on opening. */
+export function ReviewResultDetails({
+	result,
+	responses,
+}: {
+	result: ResultList | ResultDetail;
+	responses?: FeedbackResponseControls;
+}) {
+	const markedIncorrect = result.markedIncorrectAt !== null;
+	const note = claimCurrentnessNote(result.currentness);
+	const reasons = reasonsOf(result);
+	const feedback = isResultDetail(result) ? result.feedback : [];
+	if (!markedIncorrect && note === undefined && !hasReasons(reasons) && feedback.length === 0) {
+		return (
+			<p className="text-sm text-muted-foreground">
+				No explanation, evidence or feedback is available for this observation.
+			</p>
+		);
+	}
+	return (
+		<>
+			{markedIncorrect && (
+				<p className="text-sm">
+					<span className="font-medium">
+						A workspace admin marked this observation as incorrect.
+					</span>{" "}
+					It no longer counts toward your standing or what Heph knows about your work.
+				</p>
+			)}
+			{note !== undefined && <p className="text-sm text-muted-foreground">{note}</p>}
+			<ReasonSections reasons={reasons} />
+			{feedback.length > 0 && (
+				<DetailSection label="Feedback" className="gap-2">
+					<OwnFeedbackList feedback={feedback} responses={responses} />
+				</DetailSection>
+			)}
+		</>
 	);
 }
 

@@ -2417,6 +2417,7 @@ export const zOwnFeedbackRef = z.object({
 });
 
 export const zOwnItemEvent = z.object({
+    displayName: z.string(),
     name: z.string(),
     occurredAt: z.iso.datetime({ offset: true }).pipe(z.coerce.date())
 });

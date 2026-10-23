@@ -21,7 +21,7 @@ import { ReviewTimeline, type ReviewTimelineProps } from "./ReviewTimeline";
 
 export interface ReviewFeedProps extends Pick<
 	ReviewTimelineProps,
-	"responses" | "showPracticeName" | "initiallyOpen"
+	"responses" | "showPracticeName" | "initiallyOpen" | "renderObservation"
 > {
 	feed: ReviewFeedState;
 	/**
@@ -43,6 +43,7 @@ export function ReviewFeed({
 	responses,
 	showPracticeName,
 	initiallyOpen,
+	renderObservation,
 	emptyTitle,
 	emptyDescription,
 	emptyAction,
@@ -78,7 +79,9 @@ export function ReviewFeed({
 		return (
 			<div className="flex flex-col items-start gap-2">
 				{refreshAlert}
-				<p className="text-sm text-muted-foreground">The latest reviews have no results here.</p>
+				<p className="text-sm text-muted-foreground">
+					The latest reviews have no observations here.
+				</p>
 				{emptyAction}
 				{/* The earlier reviews will appear here, so their placeholders do. */}
 				{loadingMore !== undefined && <ReviewTimeline reviews={[]} loadingMore={loadingMore} />}
@@ -111,6 +114,7 @@ export function ReviewFeed({
 				responses={responses}
 				showPracticeName={showPracticeName}
 				initiallyOpen={initiallyOpen}
+				renderObservation={renderObservation}
 				continues={feed.hasMore}
 				loadingMore={loadingMore}
 			/>

@@ -1,11 +1,11 @@
 ---
 title: Practice feedback language
-description: Product terms for practices, results, feedback and people.
+description: Product terms for practices, observations, feedback and people.
 ---
 
 # Practice feedback language
 
-This page owns product terms for practices, results, feedback and people.
+This page owns product terms for practices, observations, feedback and people.
 The [review glossary](./practice-review-glossary.mdx) owns review operation and runtime terms.
 Use both pages with the [writing standard](./simplified-technical-english.md).
 Define each term on one page only.
@@ -48,7 +48,7 @@ This table records only their retired names.
 | No messages yet | No feedback yet |
 | This message | This feedback |
 | Message details | Feedback details |
-| Findings behind this message | Results behind this feedback |
+| Findings behind this message | Observations behind this feedback |
 
 ## Practices
 
@@ -71,27 +71,30 @@ This table records only their retired names.
 | **Lapse** | Work that does not follow a practice, shown in a practice visual or guide. | bad example, anti-pattern, violation |
 | **Figure** | One picture in a practice guide, with a description in the guide text. | illustration, image, embedded image |
 
-## Results
+## Observations
 
 | Term | Meaning | Avoid for this concept |
 | --- | --- | --- |
-| **Result** | A record from reviewing one practice for one item at a version, about a developer when the practice has a role. | observation, finding, detection, verdict |
-| **Outcome** | The value of a result: Met, Not met, Does not apply, or Could not determine. | presence, assessment, Not applicable, Undetermined |
-| **Problem** | One problem that a Not met result records at a place in the work, with its own severity. | observation, finding, signal, violation, lapse |
+| **Observation** | A record from reviewing one practice for one item at a version, about a developer when the practice has a role. | finding, detection, verdict |
+| **Outcome** | The value of an observation: Met, Not met, Does not apply, or Could not determine. | presence, assessment, Not applicable, Undetermined |
+| **Problem** | One problem that a Not met observation records at a place in the work, with its own severity. | observation, finding, signal, violation, lapse |
 | **Severity** | How much a problem weighs: Critical, Major, Minor, or Trivial. | Info, informational |
-| **Example** | An optional place in the work that a result cites to show the practice done well. |  |
+| **Example** | An optional place in the work that an observation cites to show the practice done well. |  |
 | **Open question** | A question about the work that the evidence cannot answer. It is never feedback. |  |
 | **Not reviewed** | A selected item/practice pair that a closed review did not judge or reuse. It is not an outcome. |  |
-| **Withheld result** | A candidate result that [admission](./practice-review-pipeline.mdx#admit-results) did not accept. It records the reason. |  |
+| **Withheld result** | A candidate observation that [admission](./practice-review-pipeline.mdx#admit-results) did not accept. It records the reason. |  |
 | **Withheld feedback** | Feedback that the server did not deliver. Its state is `WITHHELD` and its stop reason records why. |  |
-| **Mark** | An admin record that a result is incorrect or accepted. Removing the mark reverses it. | invalidation |
-| **Marked incorrect** | A result that a workspace admin marked as wrong when made. It remains in history. | invalidated, deleted, retracted |
-| **Accepted** | An admin record that excludes a result from open-problem lists. It does not change its outcome or cancel an incorrect mark. |  |
-| **Developer** | The person a result concerns. Feedback based on that result goes only to that person. | learner |
+| **Mark** | An admin record that an observation is incorrect or accepted. Removing the mark reverses it. | invalidation |
+| **Marked incorrect** | An observation that a workspace admin marked as wrong when made. It remains in history. | invalidated, deleted, retracted |
+| **Accepted** | An admin record that excludes an observation from open-problem lists. It does not change its outcome or cancel an incorrect mark. |  |
+| **Developer** | The person an observation concerns. Feedback based on that observation goes only to that person. | learner |
 
-### Result outcomes
+Existing storage, API contracts and generated types name this record `Result`.
+The product calls it an observation.
 
-A result applies only within its recorded evidence boundary.
+### Observation outcomes
+
+An observation applies only within its recorded evidence boundary.
 It does not establish a developer's mastery or the correctness of a whole repository.
 
 | Outcome | Label | Evidence requirement |
@@ -101,11 +104,11 @@ It does not establish a developer's mastery or the correctness of a whole reposi
 | DOES_NOT_APPLY | Does not apply | An evidenced fact excludes the practice from this work. |
 | COULD_NOT_DETERMINE | Could not determine | Available evidence cannot answer at least one material question. |
 
-One result has one outcome.
-A Not met result has one or more problems.
+One observation has one outcome.
+A Not met observation has one or more problems.
 Other outcomes have no problems.
 A script gives each problem its severity.
-The server records the worst problem's severity on the result.
+The server records the worst problem's severity on the observation.
 Other outcomes have no severity.
 
 With a problem and an unresolved question, the outcome is Not met.
@@ -113,13 +116,13 @@ With no problem and a material unresolved question, the outcome is Could not det
 Met requires complete relevant coverage and no open question.
 Does not apply requires the fact that excludes the practice.
 
-The server can withhold a candidate result at admission.
-A withheld candidate creates no result row.
+The server can withhold a candidate observation at admission.
+A withheld candidate creates no observation row.
 It never becomes Met because its problems were refused.
 A withheld attempt is shown separately from Not reviewed in a scan report.
 
 Missing capture, a failed read, a timeout, a spent budget and a script error are operational failures.
-They create no result.
+They create no observation.
 They are not open questions about the work.
 
 ### Problems and severity
@@ -142,12 +145,12 @@ It is not advice with no problem behind it.
 ### Examples and open questions
 
 An example has one citation and a short note.
-Only Met and Not met results can have an example.
-An example cannot cite a place that a problem of the same result cites.
+Only Met and Not met observations can have an example.
+An example cannot cite a place that a problem of the same observation cites.
 It teaches the practice and is never delivered alone as praise.
 
 An open question states what the evidence cannot answer and what would settle it.
-Only Not met and Could not determine results can have open questions.
+Only Not met and Could not determine observations can have open questions.
 Could not determine requires at least one.
 Hephaestus never sends an open question as feedback.
 

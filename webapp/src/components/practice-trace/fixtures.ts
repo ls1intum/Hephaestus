@@ -422,9 +422,18 @@ export const ownResults: ResultList[] = [notMetOwnResult, metOwnResult, reusedOw
 export const ownItemTrace: OwnItemTrace = {
 	item: PULL_REQUEST_1423,
 	review: readyReview,
-	events: itemEvents
-		.filter((event) => event.occurredAt <= readyReview.createdAt)
-		.map(({ name, occurredAt }) => ({ name, occurredAt })),
+	events: [
+		{
+			name: "scm.pull_request.opened",
+			displayName: "Opened",
+			occurredAt: new Date("2026-08-05T08:02:00Z"),
+		},
+		{
+			name: "scm.pull_request.ready",
+			displayName: "Marked ready for review",
+			occurredAt: new Date("2026-08-06T10:15:00Z"),
+		},
+	],
 	results: ownResults,
 };
 
