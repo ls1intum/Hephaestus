@@ -124,6 +124,45 @@ export const VersionsFailed: Story = {
 	},
 };
 
+/** A saved history fold does not hide a failed version read. */
+export const FoldedVersionsFail: Story = {
+	play: async ({ args, mount, userEvent }) => {
+		await mount();
+		let panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: SHEET_SECTIONS.state }));
+		await expect(panel.getByRole("button", { name: SHEET_SECTIONS.state })).toHaveAttribute(
+			"aria-expanded",
+			"false",
+		);
+		const retry = fn();
+		await mount(
+			<InLevelStack entry={practiceLevel(String(practice?.slug))} path={args.path}>
+				{(level) => (
+					<PracticeLevel
+						{...args}
+						{...level}
+						versions={{ status: "error", error: new Error("Network down"), onRetry: retry }}
+					/>
+				)}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		await expect(panel.getByText("We could not load the versions of this practice")).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await mount(
+			<InLevelStack entry={practiceLevel(String(practice?.slug))} path={args.path}>
+				{(level) => <PracticeLevel {...args} {...level} />}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		const restored = panel.getByRole("button", { name: SHEET_SECTIONS.state });
+		await expect(restored).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(restored);
+		await expect(restored).toHaveAttribute("aria-expanded", "true");
+	},
+};
+
 /** A practice the workspace no longer has says so. */
 export const NoLongerInTheWorkspace: Story = {
 	args: {

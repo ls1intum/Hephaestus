@@ -75,6 +75,8 @@ export function WorkLevel({
 	const events = eventsState?.status === "ready" ? eventsState.events : [];
 	const latest = latestEvent(events);
 	const latestReview = reviews[0];
+	const factsFailed = factsState?.status === "error";
+	const eventsFailed = eventsState?.status === "error";
 	const header = (
 		<ReviewLevelHeader
 			nested={nested}
@@ -146,7 +148,10 @@ export function WorkLevel({
 			<DrawerBody className="flex flex-col gap-8 pt-2">
 				{requestOutcome}
 				<SectionStack>
-					<SheetSection part="what" foldKey={levelFoldKey("work", "what")}>
+					<SheetSection
+						part="what"
+						foldKey={factsFailed ? undefined : levelFoldKey("work", "what")}
+					>
 						<ReviewFactGrid>
 							<ReviewFact label="Kind">{itemKindLabel(item.kind, 1, item.provider)}</ReviewFact>
 							{hasText(item.container) && !item.label.includes(item.container) && (
@@ -171,7 +176,7 @@ export function WorkLevel({
 									</ReviewFact>
 								))}
 						</ReviewFactGrid>
-						{factsState?.status === "error" && (
+						{factsFailed && (
 							<QueryErrorAlert
 								error={factsState.error}
 								title="We could not load what the provider reports about this work"
@@ -181,11 +186,11 @@ export function WorkLevel({
 					</SheetSection>
 					<SheetSection
 						part="state"
-						foldKey={levelFoldKey("work", "state")}
+						foldKey={eventsFailed ? undefined : levelFoldKey("work", "state")}
 						description="Reviews of this work and what became of its recorded events."
 					>
 						{eventsState?.status === "loading" && <LevelBodySkeleton />}
-						{eventsState?.status === "error" && (
+						{eventsFailed && (
 							<QueryErrorAlert
 								error={eventsState.error}
 								title="We could not load the events on this work"

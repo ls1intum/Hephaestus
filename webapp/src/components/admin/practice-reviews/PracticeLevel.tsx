@@ -140,7 +140,10 @@ export function PracticeLevel({
 							headingLevel={4}
 						/>
 					</SheetSection>
-					<SheetSection part="state" foldKey={levelFoldKey("practice", "state")}>
+					<SheetSection
+						part="state"
+						foldKey={versions?.status === "error" ? undefined : levelFoldKey("practice", "state")}
+					>
 						<SheetHistory
 							events={[
 								...practiceHistory(practice),

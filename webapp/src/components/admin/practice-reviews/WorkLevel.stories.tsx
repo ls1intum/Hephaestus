@@ -134,6 +134,86 @@ export const FoldsASection: Story = {
 	},
 };
 
+/** A saved fold leaves a failed facts read and Retry visible. */
+export const FoldedFactsFail: Story = {
+	play: async ({ args, mount, userEvent }) => {
+		await mount();
+		let panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: SHEET_SECTIONS.what }));
+		await expect(panel.getByRole("button", { name: SHEET_SECTIONS.what })).toHaveAttribute(
+			"aria-expanded",
+			"false",
+		);
+		const retry = fn();
+		await mount(
+			<InLevelStack entry={itemLevel(reviewItem.id)} path={args.path}>
+				{(level) => (
+					<WorkLevel
+						{...args}
+						{...level}
+						facts={{ status: "error", error: new Error("Network down"), onRetry: retry }}
+					/>
+				)}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		await expect(
+			panel.getByText("We could not load what the provider reports about this work"),
+		).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await mount(
+			<InLevelStack entry={itemLevel(reviewItem.id)} path={args.path}>
+				{(level) => <WorkLevel {...args} {...level} />}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		const restored = panel.getByRole("button", { name: SHEET_SECTIONS.what });
+		await expect(restored).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(restored);
+		await expect(restored).toHaveAttribute("aria-expanded", "true");
+	},
+};
+
+/** A saved fold leaves a failed events read and Retry visible. */
+export const FoldedEventsFail: Story = {
+	play: async ({ args, mount, userEvent }) => {
+		await mount();
+		let panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: SHEET_SECTIONS.state }));
+		await expect(panel.getByRole("button", { name: SHEET_SECTIONS.state })).toHaveAttribute(
+			"aria-expanded",
+			"false",
+		);
+		const retry = fn();
+		await mount(
+			<InLevelStack entry={itemLevel(reviewItem.id)} path={args.path}>
+				{(level) => (
+					<WorkLevel
+						{...args}
+						{...level}
+						events={{ status: "error", error: new Error("Network down"), onRetry: retry }}
+					/>
+				)}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		await expect(panel.getByText("We could not load the events on this work")).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await mount(
+			<InLevelStack entry={itemLevel(reviewItem.id)} path={args.path}>
+				{(level) => <WorkLevel {...args} {...level} />}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		const restored = panel.getByRole("button", { name: SHEET_SECTIONS.state });
+		await expect(restored).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(restored);
+		await expect(restored).toHaveAttribute("aria-expanded", "true");
+	},
+};
+
 /** Upgraded history: each event started a review it no longer links to. The header counts what the badges say. */
 export const StartedEventsWithoutReviewLink: Story = {
 	args: {

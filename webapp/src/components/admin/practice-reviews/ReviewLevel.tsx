@@ -844,7 +844,7 @@ function ReviewFeedbackChecks({ state }: { state: PanelState<{ checks: FeedbackC
 			level={3}
 			size="lg"
 			title="Feedback checks of the review"
-			foldKey={levelFoldKey("review", "feedback-checks")}
+			foldKey={state.status === "error" ? undefined : levelFoldKey("review", "feedback-checks")}
 			className="min-w-0"
 		>
 			{state.status === "loading" && <LevelBodySkeleton />}

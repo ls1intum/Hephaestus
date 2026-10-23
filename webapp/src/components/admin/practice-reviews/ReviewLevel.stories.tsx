@@ -711,6 +711,47 @@ export const FeedbackChecksFailed: Story = {
 	},
 };
 
+/** A saved fold must not conceal a later failed read or its retry. */
+export const FoldedFeedbackChecksFail: Story = {
+	args: {
+		feedbackChecks: { status: "ready", checks: reviewFeedbackChecksOf(reviewDetailCompleted) },
+	},
+	play: async ({ args, mount, userEvent }) => {
+		await mount();
+		let panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: "Feedback checks of the review" }));
+		await expect(
+			panel.getByRole("button", { name: "Feedback checks of the review" }),
+		).toHaveAttribute("aria-expanded", "false");
+		const retry = fn();
+		await mount(
+			<InLevelStack entry={reviewLevel(reviewDetailCompleted.id)} path={args.path}>
+				{(level) => (
+					<ReviewLevel
+						{...args}
+						{...level}
+						feedbackChecks={{ status: "error", error: { status: 500 }, onRetry: retry }}
+					/>
+				)}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		await expect(panel.getByText("We could not load the feedback checks")).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await mount(
+			<InLevelStack entry={reviewLevel(reviewDetailCompleted.id)} path={args.path}>
+				{(level) => <ReviewLevel {...args} {...level} />}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		const restored = panel.getByRole("button", { name: "Feedback checks of the review" });
+		await expect(restored).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(restored);
+		await expect(restored).toHaveAttribute("aria-expanded", "true");
+	},
+};
+
 export const WithPracticeScripts: Story = {
 	args: { review: ready(withScripts) },
 	play: async () => {
