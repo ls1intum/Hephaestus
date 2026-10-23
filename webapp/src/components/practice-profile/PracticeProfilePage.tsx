@@ -20,7 +20,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 
 import { newestFirst } from "./practice-feedback-cards";
 import { FeedbackEmpty, type FeedbackEmptyProps } from "./practice-profile-blocks";
-import { FEEDBACK_TABS, type FeedbackTab } from "./practice-profile-search";
+import { FEEDBACK_TABS, type FeedbackTab, type PracticeTab } from "./practice-profile-search";
 import { PracticeProfilePageHeader } from "./PracticeProfilePageHeader";
 
 export interface PracticeProfilePageProps {
@@ -39,11 +39,11 @@ export interface PracticeProfilePageProps {
 	ratingProps?: (feedbackId: string) => FeedbackRatingProps;
 	onOpenGroup?: (group: GroupRef) => void;
 	/**
-	 * Opens a practice's detail level from a feedback card. The level opens on the feedback written
-	 * about the practice, under the catalog's words on it, so a card's "Learn more about this
-	 * practice" and a practice named in the text land in the same place.
+	 * Opens a practice's detail level from a feedback card. A practice named in the text opens on the
+	 * level's default tab, the feedback written about it; the card's "Learn more about this practice"
+	 * asks for the Guide tab, where the practice is explained.
 	 */
-	onOpenPractice?: (practiceSlug: string) => void;
+	onOpenPractice?: (practiceSlug: string, tab?: PracticeTab) => void;
 	/** The tab over the feedback cards, from the route's `feedback` search param. */
 	feedbackTab: FeedbackTab;
 	onFeedbackTabChange?: (tab: FeedbackTab) => void;
@@ -174,7 +174,9 @@ export function PracticeProfilePage({
 										key={card.feedbackId}
 										card={card}
 										{...ratingProps?.(card.feedbackId)}
-										onLearnMore={onOpenPractice && (() => onOpenPractice(card.practiceSlug))}
+										onLearnMore={
+											onOpenPractice && (() => onOpenPractice(card.practiceSlug, "guide"))
+										}
 										onOpenPractice={onOpenPractice}
 										onOpenGroup={onOpenGroup && openGroupBySlug}
 									/>

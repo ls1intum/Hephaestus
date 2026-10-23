@@ -6,7 +6,7 @@ import type { DetailStackEntry } from "@/components/layout/detail-drawer/detail-
 import { DetailDrawerHeader } from "@/components/layout/detail-drawer/DetailDrawerHeader";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import type { PracticeGuidanceState } from "@/components/practice-guidance/PracticeIntro";
-import { ReviewResultDetails } from "@/components/profile/ReviewResultRow";
+import { ReviewResultDetails, ReviewResultRow } from "@/components/profile/ReviewResultRow";
 import type { ReviewFeedState } from "@/components/profile/reviews";
 import { DrawerBody, DrawerTitle } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -162,10 +162,13 @@ export const Default: Story = {
 		await expect(first).toHaveAccessibleName("Feedback 1");
 		await expect(second).toHaveAccessibleName("Observations 3");
 		await expect(third).toHaveAccessibleName("Guide");
-		const intro = screen.getByRole("region", { name: "Introduction" });
-		await expect(precedes(intro, screen.getByRole("tablist", { name: "Practice" }))).toBe(true);
+		// The feedback leads its tab; the introduction and its picture wait in the Guide tab.
+		await expect(screen.queryByRole("region", { name: "Introduction" })).not.toBeInTheDocument();
 		await expect(
-			within(intro).getByRole("figure", { name: focusedChanges.whatGoodLooksLike ?? "" }),
+			within(screen.getByRole("tabpanel", { name: "Feedback 1" })).getByRole("heading", {
+				level: 2,
+				name: "Feedback",
+			}),
 		).toBeVisible();
 		await expect(screen.getByRole("tab", { name: "Feedback 1" })).toHaveAttribute(
 			"aria-selected",
@@ -204,6 +207,94 @@ export const ObservationsTab: Story = {
 		await expect(screen.queryByText(metWithoutSummary.practiceName)).not.toBeInTheDocument();
 		await expect(screen.getByRole("heading", { name: focusedChanges.name })).toBeVisible();
 		await expect(screen.queryByText(/is evidence only/u)).not.toBeInTheDocument();
+	},
+};
+
+/** The observation a review linked to, as the route reads it whole and hands it to the level. */
+const selectedArgs = {
+	tab: "results",
+	selectedObservationId: detailResult.id,
+	selectedObservation: (
+		<ol
+			aria-label="Selected observation"
+			className="overflow-hidden rounded-xl border bg-background"
+		>
+			<ReviewResultRow
+				result={detailResult}
+				defaultOpen
+				details={<ReviewResultDetails result={detailResult} />}
+			/>
+		</ol>
+	),
+} satisfies Partial<PracticeDetailLevelProps>;
+
+/**
+ * Opened from a review at one observation: it leads the Observations tab, right under the tab
+ * rail, though the practice has its introduction, picture and guide. They wait in the Guide tab,
+ * and going there and back keeps the same observation in front.
+ */
+export const SelectedObservation: Story = {
+	args: selectedArgs,
+	play: async () => {
+		const selected = await screen.findByRole("list", { name: "Selected observation" });
+		await expectSettledVisible(selected);
+		const observations = screen.getByRole("tabpanel", { name: "Observations" });
+		await expect(within(observations).getByRole("list", { name: "Selected observation" })).toBe(
+			selected,
+		);
+		await expect(
+			within(selected).getByText("Move the class in one commit and add the cache in the next."),
+		).toBeVisible();
+		await expect(screen.queryByRole("region", { name: "Introduction" })).not.toBeInTheDocument();
+		await expect(precedes(screen.getByRole("tablist", { name: "Practice" }), selected)).toBe(true);
+
+		await userEvent.click(screen.getByRole("tab", { name: "Guide" }));
+		const guide = await screen.findByRole("tabpanel", { name: "Guide" });
+		const intro = within(guide).getByRole("region", { name: "Introduction" });
+		await expect(
+			within(intro).getByRole("figure", { name: focusedChanges.whatGoodLooksLike ?? "" }),
+		).toBeVisible();
+		await expect(
+			within(guide).getByRole("heading", { level: 3, name: "Practice guide" }),
+		).toBeVisible();
+		await expect(screen.queryByRole("list", { name: "Selected observation" })).toBeNull();
+
+		await userEvent.click(screen.getByRole("tab", { name: "Observations" }));
+		const back = await screen.findByRole("list", { name: "Selected observation" });
+		await expect(within(back).getByText(newestSummary)).toBeVisible();
+		await expect(screen.queryByRole("region", { name: "Introduction" })).not.toBeInTheDocument();
+	},
+};
+
+/** A practice with no standing still shows the linked observation, and its words in the Guide tab. */
+export const SelectedObservationWithoutStanding: Story = {
+	args: {
+		...selectedArgs,
+		practice: undefined,
+		described: { name: "Pair on schema changes", ...bundledPractice },
+	},
+	play: async () => {
+		await expectSettledVisible(await screen.findByRole("list", { name: "Selected observation" }));
+		await expect(screen.queryByText("Not reviewed")).toBeNull();
+		await expect(screen.queryByRole("region", { name: "Introduction" })).not.toBeInTheDocument();
+		await userEvent.click(screen.getByRole("tab", { name: "Guide" }));
+		const guide = await screen.findByRole("tabpanel", { name: "Guide" });
+		await expect(within(guide).getByText(bundledPractice.whyItMatters)).toBeVisible();
+	},
+};
+
+export const SelectedObservationPhone: Story = {
+	args: selectedArgs,
+	globals: { viewport: { value: "reflow" } },
+	play: async () => {
+		await expect(window.innerWidth).toBe(320);
+		await expect(window.innerHeight).toBe(568);
+		const selected = await screen.findByRole("list", { name: "Selected observation" });
+		await expectSettledVisible(selected);
+		// On arrival, before any scroll, the observation already starts inside the screen.
+		await expect(selected.getBoundingClientRect().top).toBeLessThan(window.innerHeight);
+		await expect(screen.queryByRole("region", { name: "Introduction" })).not.toBeInTheDocument();
+		await expectNoPanelOverflow(screen.getByRole("dialog", { name: focusedChanges.name }));
 	},
 };
 
@@ -303,17 +394,49 @@ export const GuideTab: Story = {
 		await expect(
 			within(panel).getByRole("img", { name: /^Three changes follow in order/u }),
 		).toBeVisible();
-		await expect(screen.getByRole("region", { name: "Introduction" })).toBeVisible();
+		// The introduction and its picture lead the tab, then the guide.
+		const intro = within(panel).getByRole("region", { name: "Introduction" });
+		await expect(
+			within(intro).getByRole("figure", { name: focusedChanges.whatGoodLooksLike ?? "" }),
+		).toBeVisible();
+		await expect(
+			precedes(intro, within(panel).getByRole("heading", { level: 3, name: "Practice guide" })),
+		).toBe(true);
 		await expect(screen.queryByText("Read more")).not.toBeInTheDocument();
 	},
 };
 
-/**
- * A practice with a picture and no guide has no Guide tab, so a link that asks for the guide lands
- * on the feedback instead of an empty tab.
- */
-export const WithoutGuide: Story = {
+/** A practice with a picture and no guide still has its Guide tab: the introduction and picture. */
+export const WithoutLongGuide: Story = {
 	args: { tab: "guide", guidance: { ...readyGuidance, guide: null } },
+	play: async () => {
+		const panel = await screen.findByRole("tabpanel", { name: "Guide" });
+		await expectSettledVisible(panel);
+		await expect(screen.getByRole("tab", { name: "Guide" })).toHaveAttribute(
+			"aria-selected",
+			"true",
+		);
+		const intro = within(panel).getByRole("region", { name: "Introduction" });
+		await expect(within(intro).getByText(focusedChanges.whyItMatters ?? "")).toBeVisible();
+		await expect(
+			within(intro).getByRole("img", { name: bundledGuidance.visual.alt }),
+		).toBeVisible();
+		await expect(
+			within(panel).queryByRole("heading", { name: "Practice guide" }),
+		).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * A practice with no words, picture or guide has nothing for a Guide tab, so a link that asks for
+ * the guide lands on the feedback instead of an empty tab.
+ */
+export const NothingToExplain: Story = {
+	args: {
+		tab: "guide",
+		practice: { ...focusedChanges, whyItMatters: null, whatGoodLooksLike: null },
+		guidance: { ...readyGuidance, visual: null, guide: null },
+	},
 	play: async () => {
 		await expectSettledVisible(await screen.findByRole("heading", { level: 2, name: "Feedback" }));
 		await expect(screen.getByRole("tab", { name: "Feedback 1" })).toHaveAttribute(
@@ -321,7 +444,7 @@ export const WithoutGuide: Story = {
 			"true",
 		);
 		await expect(screen.queryByRole("tab", { name: "Guide" })).not.toBeInTheDocument();
-		await expect(screen.getByRole("img", { name: bundledGuidance.visual.alt })).toBeVisible();
+		await expect(screen.queryByRole("region", { name: "Introduction" })).not.toBeInTheDocument();
 	},
 };
 
@@ -364,7 +487,7 @@ export const NotReviewed: Story = {
 		feed: { ...readyFeed, reviews: [] },
 	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("region", { name: "Introduction" }));
+		await expectSettledVisible(await screen.findByRole("heading", { level: 2, name: "Feedback" }));
 		await expect(screen.getAllByText("Not reviewed")).toHaveLength(1);
 		await expect(screen.queryByText(/No practice in this group/u)).not.toBeInTheDocument();
 		await expect(screen.queryByText(/Read from|counts most/u)).not.toBeInTheDocument();
