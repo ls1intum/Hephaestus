@@ -92,6 +92,8 @@ runs:
     # Both modes end here: pnpm/setup installs a Node runtime of its own, so the pinned one is
     # selected last to win on PATH. setup-node reads `pnpm store path`, which needs pnpm installed.
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      env:
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: "1"
       with:
         node-version-file: package.json
         cache: ${{ inputs.install == 'frozen' && 'pnpm' || '' }}
