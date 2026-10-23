@@ -38,9 +38,19 @@ ENV BUILD_GIT_BRANCH=$COOLIFY_BRANCH BUILD_GIT_COMMIT=$SOURCE_COMMIT
 
 COPY --from=build /repo/webapp/dist /usr/share/nginx/html
 COPY webapp/docker/entrypoint.sh /entrypoint.sh
+COPY webapp/docker/nginx-globals.conf /etc/nginx/hephaestus/globals.conf
+COPY webapp/docker/nginx-http.conf /etc/nginx/hephaestus/http.conf
+COPY webapp/docker/nginx-main.conf /etc/nginx/nginx.conf
 COPY webapp/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY webapp/docker/security-headers.conf /etc/nginx/security-headers.conf
+# The maintenance page mode, which docker/compose.proxy.yaml runs with `nginx -c`.
+COPY webapp/docker/nginx-maintenance.conf /etc/nginx/hephaestus/maintenance.conf
+COPY webapp/docker/maintenance.html /usr/share/nginx/maintenance/index.html
 COPY webapp/src/environment/index.ts /app/src/environment/index.ts
 RUN chmod +x /entrypoint.sh
-EXPOSE 80
+# The base image's nginx user. Numeric, so Kubernetes can verify runAsNonRoot. Root owns every
+# file above; this user only reads them and writes to /tmp/hephaestus-webapp, which every service
+# that runs the image mounts as a writable directory.
+USER 101:101
+EXPOSE 8080
 ENTRYPOINT ["/bin/bash", "-c", "/entrypoint.sh && exec nginx -g 'daemon off;'"]

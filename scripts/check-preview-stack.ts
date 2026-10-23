@@ -225,11 +225,10 @@ const RENDER_ENV: Record<string, string> = {
 
 /**
  * Capabilities a service may add back after `cap_drop: ALL`. Each set is the minimum found by running
- * the image with less; the application server needs none.
+ * the image with less; the application server and the webapp, which run as non-root users, need none.
  */
 const ALLOWED_CAPABILITIES: Record<string, readonly string[]> = {
 	postgres: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"],
-	webapp: ["CHOWN", "SETGID", "SETUID"],
 };
 
 /** Values the server refuses to start without: it validates them before the context is built, so an

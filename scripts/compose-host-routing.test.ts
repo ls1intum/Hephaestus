@@ -23,6 +23,90 @@ await test("reference application services do not publish host ports", () => {
 	}
 });
 
+/** A repository file, addressed relative to this test. */
+function read(file: string): string {
+	return readFileSync(new URL(file, import.meta.url), "utf8");
+}
+
+/** The port of the first `listen` directive in an nginx config. */
+function listenPort(conf: string): string | undefined {
+	return /^\s*listen (?<port>\d+);$/mu.exec(conf)?.groups?.port;
+}
+
+/** The PID file and temp paths an nginx config writes to. */
+function writesIn(conf: string): string[] {
+	return [...conf.matchAll(/^\s*(?:pid|\w+_temp_path) (?<path>\S+);$/gmu)].map(
+		(match) => match.groups?.path ?? "",
+	);
+}
+
+/** The backend ports of the Traefik services whose name matches `service`, a regex fragment. */
+function servicePorts(file: string, service: string): (string | undefined)[] {
+	return [
+		...read(file).matchAll(
+			new RegExp(`services\\.${service}\\.loadbalancer\\.server\\.port=(?<port>\\d+)`, "gu"),
+		),
+	].map((match) => match.groups?.port);
+}
+
+await test("every service that runs the webapp image uses one unprivileged port and one writable directory", () => {
+	// The image runs as UID 101 with no capabilities on a read-only root, so a listener, Traefik
+	// service or probe left on the old port 80, or a service without the runtime directory, reaches
+	// nothing while the container itself still looks up.
+	assert.equal(listenPort(read("../webapp/docker/nginx.conf")), "8080");
+	const dockerfile = read("../webapp/Dockerfile");
+	assert.match(dockerfile, /^EXPOSE 8080$/mu);
+	assert.match(dockerfile, /^USER 101:101$/mu);
+	const runtimeDirectory = "/tmp/hephaestus-webapp";
+	// The PID file and the temp paths have one home, which both server modes include.
+	const writes = [
+		...writesIn(read("../webapp/docker/nginx-globals.conf")),
+		...writesIn(read("../webapp/docker/nginx-http.conf")),
+	];
+	assert.equal(writes.length, 6, "the shared files set the PID file and all five temp paths");
+	for (const target of writes) {
+		assert.ok(target.startsWith(`${runtimeDirectory}/`), `${target} is outside the mount`);
+	}
+	for (const mode of ["nginx-main.conf", "nginx-maintenance.conf"]) {
+		const conf = read(`../webapp/docker/${mode}`);
+		assert.deepEqual(writesIn(conf), [], `${mode} sets its own PID or temp path`);
+		assert.match(conf, /^include \/etc\/nginx\/hephaestus\/globals\.conf;$/mu, mode);
+		assert.match(conf, /^\s+include \/etc\/nginx\/hephaestus\/http\.conf;$/mu, mode);
+	}
+
+	const probe = ["CMD", "curl", "-f", "http://127.0.0.1:8080/"];
+	const mount = `${runtimeDirectory}:uid=101,gid=101,mode=0700,size=16m`;
+	for (const [file, service] of [
+		["../docker/compose.app.yaml", "webapp"],
+		["../docker/preview/compose.app.yaml", "webapp"],
+		["../docker/compose.proxy.yaml", "maintenance"],
+	] as const) {
+		const document = parseDocument(read(file));
+		const at = `${file} ${service}`;
+		const sequence = (key: string) => {
+			const node = document.getIn(["services", service, ...key.split(".")], true);
+			assert.ok(isSeq(node), `${at} ${key}`);
+			return node.toJSON();
+		};
+		assert.deepEqual(sequence("healthcheck.test"), probe, at);
+		assert.equal(document.getIn(["services", service, "read_only"]), true, at);
+		assert.deepEqual(sequence("tmpfs"), [mount], at);
+		assert.deepEqual(sequence("cap_drop"), ["ALL"], at);
+		assert.deepEqual(sequence("security_opt"), ["no-new-privileges:true"], at);
+		assert.ok(!document.hasIn(["services", service, "cap_add"]), at);
+		assert.ok(!document.hasIn(["services", service, "user"]), at);
+	}
+	assert.deepEqual(servicePorts("../docker/compose.app.yaml", "https?-webapp"), ["8080", "8080"]);
+	assert.deepEqual(servicePorts("../docker/compose.proxy.yaml", "maintenance"), ["8080"]);
+	assert.equal(listenPort(read("../webapp/docker/nginx-maintenance.conf")), "8080");
+	const expose = parseDocument(read("../docker/preview/compose.app.yaml")).getIn(
+		["services", "webapp", "expose"],
+		true,
+	);
+	assert.ok(isSeq(expose));
+	assert.deepEqual(expose.toJSON(), ["8080"]);
+});
+
 /** Every `traefik.http.routers.<name>.<key>=` value in a stack's Compose file. */
 function labels(stack: (typeof STACKS)[number], key: string): { router: string; value: string }[] {
 	const file = readFileSync(new URL(`../docker/compose.${stack}.yaml`, import.meta.url), "utf8");
@@ -338,29 +422,50 @@ await test("Compose passes the operator's pool size and memory headroom to the w
 	}
 });
 
-await test("maintenance uses the verified webapp image without its application startup or files", () => {
-	const document = parseDocument(
-		readFileSync(new URL("../docker/compose.proxy.yaml", import.meta.url), "utf8"),
-	);
+await test("maintenance runs the verified webapp image's own maintenance mode, without its application startup or files", () => {
+	const document = parseDocument(read("../docker/compose.proxy.yaml"));
 	assert.equal(
 		document.getIn(["services", "maintenance", "image"]),
 		`\${HEPHAESTUS_IMAGE_WEBAPP:?verified release lock required}`,
 	);
 	const entrypoint = document.getIn(["services", "maintenance", "entrypoint"]);
 	assert.ok(isSeq(entrypoint));
-	assert.deepEqual(entrypoint.toJSON(), ["nginx", "-g", "daemon off;"]);
-	const configuration = document.getIn(["configs", "nginx-default-config", "content"]);
-	assert.equal(typeof configuration, "string");
-	assert.match(String(configuration), /root \/usr\/share\/nginx\/maintenance;/u);
-	assert.doesNotMatch(String(configuration), /\/usr\/share\/nginx\/html/u);
-	const mounts = document.getIn(["services", "maintenance", "configs"]);
-	assert.ok(isSeq(mounts));
-	assert.ok(
-		mounts.items.some(
-			(mount) =>
-				isMap(mount) &&
-				mount.get("source") === "maintenance-page" &&
-				mount.get("target") === "/usr/share/nginx/maintenance/index.html",
+	const modeConfig = "/etc/nginx/hephaestus/maintenance.conf";
+	assert.deepEqual(entrypoint.toJSON(), ["nginx", "-c", modeConfig, "-g", "daemon off;"]);
+
+	// A read-only service cannot take Compose content configs, and the page must not depend on a
+	// release checkout on the host: the image carries both files, and nothing is mounted over them.
+	for (const key of ["configs", "volumes", "environment", "command"]) {
+		assert.ok(!document.hasIn(["services", "maintenance", key]), `maintenance sets ${key}`);
+	}
+	const configs = document.get("configs");
+	assert.ok(isMap(configs));
+	assert.deepEqual(
+		configs.items.map((pair) => (isScalar(pair.key) ? pair.key.value : pair.key)),
+		["traefik-dynamic", "traefik-start"],
+	);
+
+	const dockerfile = read("../webapp/Dockerfile");
+	const copied = new Map(
+		[...dockerfile.matchAll(/^COPY (?<source>webapp\/docker\/\S+) (?<target>\/\S+)$/gmu)].map(
+			(match) => [match.groups?.target, match.groups?.source],
 		),
 	);
+	assert.equal(copied.get(modeConfig), "webapp/docker/nginx-maintenance.conf");
+	assert.equal(
+		copied.get("/usr/share/nginx/maintenance/index.html"),
+		"webapp/docker/maintenance.html",
+	);
+	const configuration = read("../webapp/docker/nginx-maintenance.conf");
+	assert.match(configuration, /^\s+root \/usr\/share\/nginx\/maintenance;$/mu);
+	assert.doesNotMatch(configuration, /\/usr\/share\/nginx\/html|conf\.d|hephaestus-webapp;/u);
+	// Every file either mode includes from the image is baked into it.
+	for (const conf of [configuration, read("../webapp/docker/nginx-main.conf")]) {
+		for (const match of conf.matchAll(/^\s*include (?<path>\/etc\/nginx\/hephaestus\/\S+);$/gmu)) {
+			const included = match.groups?.path;
+			assert.ok(included !== undefined);
+			assert.ok(copied.has(included), `${included} is not in the image`);
+		}
+	}
+	assert.match(read("../webapp/docker/maintenance.html"), /We&rsquo;ll be back soon!/u);
 });

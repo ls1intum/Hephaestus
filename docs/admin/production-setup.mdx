@@ -42,6 +42,25 @@ It contains:
   It issues cookie-session JWTs.
   See [ADR 0017](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0017-replace-keycloak-with-spring-native-auth.md).
 
+## Webapp container
+
+The webapp image runs nginx as an unprivileged user and needs no capabilities.
+
+| Property         | Value                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| User and group   | UID `101`, GID `101`                                                                        |
+| Port             | `8080`, plain HTTP. Your proxy handles TLS.                                              |
+| Health check     | `GET /` on port `8080` returns `200`                                                        |
+| Writable path    | `/tmp/hephaestus-webapp` only. It holds the page shell, the runtime configuration and the nginx files. |
+| Root file system | Can be read-only                                                                            |
+
+The reference stack runs the container with a read-only root file system, all capabilities dropped and `no-new-privileges`.
+It mounts a 16 MiB `tmpfs` at `/tmp/hephaestus-webapp`, owned by UID 101 with mode `0700`.
+The maintenance page uses the same image and the same settings.
+The self-host stack uses the same settings.
+If you run the image on another platform, mount an empty directory at `/tmp/hephaestus-webapp` that UID 101 can write, for example an `emptyDir` with `fsGroup: 101`.
+To mount legal overrides, see [Legal Pages](./legal-pages).
+
 ## Clocks
 
 Keep the clock of every host that runs a Hephaestus role or PostgreSQL synchronized by NTP.
