@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type {
+	PracticeGuidanceDto,
 	PracticeStanding,
 	ReviewedPractice,
 	ResultList,
@@ -73,12 +74,12 @@ export interface PracticeDetailLevelProps {
 	described?: Pick<ReviewedPractice, "name" | "whyItMatters" | "whatGoodLooksLike">;
 	/**
 	 * The practice's guidance, which loads on its own after the standing: the picture joins the
-	 * introduction, and a guide adds the Guide tab.
+	 * introduction in the Guide tab, and a guide follows it there.
 	 */
 	guidance: PracticeGuidanceState;
 	/**
-	 * The tab asked for, from the route's `practiceTab` search param. Guide on a practice with no
-	 * guide shows the feedback.
+	 * The tab asked for, from the route's `practiceTab` search param. Guide on a practice with
+	 * nothing to explain shows the feedback.
 	 */
 	tab: PracticeTab;
 	onTabChange?: (tab: PracticeTab) => void;
@@ -102,6 +103,20 @@ export interface PracticeDetailLevelProps {
 	onRetry?: () => void;
 	/** Every review so far found that the practice did not apply; the level says so. */
 	neverApplied?: boolean;
+}
+
+type PracticeWords = Pick<PracticeStanding, "whyItMatters" | "whatGoodLooksLike">;
+
+/**
+ * Whether the Guide tab has anything to hold: the introduction's words, a picture or a guide, or
+ * the sentence of a practice that never applied. Until the guidance answers, the picture may still
+ * come.
+ */
+function offersGuide(words: PracticeWords, guidance: PracticeGuidanceState, neverApplied: boolean) {
+	if (neverApplied || hasText(words.whyItMatters) || hasText(words.whatGoodLooksLike)) {
+		return true;
+	}
+	return guidance.status !== "ready" || guidance.visual != null || guidance.guide != null;
 }
 
 /**
@@ -166,9 +181,12 @@ export function PracticeDetailLevel({
 		feedback: feedbackCount,
 	};
 	const guide = guidance.status === "ready" ? (guidance.guide ?? undefined) : undefined;
-	// The Guide tab exists only once a guide has arrived; until then, or without one, a link to it
-	// lands on the feedback.
-	const tabs = PRACTICE_TABS.filter((candidate) => candidate !== "guide" || guide !== undefined);
+	const words = practice ?? described ?? NO_WORDS;
+	// The Guide tab holds the introduction, its picture and any guide, so the feedback and the
+	// observations each lead their own tab. A practice with none of them has no Guide tab, and a link
+	// to it lands on the feedback.
+	const hasGuide = offersGuide(words, guidance, neverApplied);
+	const tabs = PRACTICE_TABS.filter((candidate) => candidate !== "guide" || hasGuide);
 	const shownTab = tabs.includes(tab) ? tab : DEFAULT_PRACTICE_TAB;
 
 	let body: ReactNode;
@@ -202,75 +220,67 @@ export function PracticeDetailLevel({
 	} else if (practice || selectedObservation !== undefined) {
 		const requestedNote = practice ? requestedReviewNote(practice, reviews) : undefined;
 		body = (
-			<>
-				{neverApplied && <p className="max-w-2xl text-sm">{NEVER_APPLIED.description}</p>}
-				<PracticeIntro practice={practice ?? described ?? NO_WORDS} guidance={guidance} />
-				<Tabs
-					value={shownTab}
-					onValueChange={(next) => {
-						const chosen = tabs.find((candidate) => candidate === next);
-						if (chosen) {
-							onTabChange?.(chosen);
-						}
-					}}
-					className="gap-4"
-				>
-					<PracticeTabsRail>
-						<PracticeTabsList aria-label="Practice">
-							{tabs.map((candidate) => (
-								<PracticeTabsTrigger key={candidate} value={candidate} count={counts[candidate]}>
-									{TAB_LABELS[candidate]}
-								</PracticeTabsTrigger>
-							))}
-						</PracticeTabsList>
-					</PracticeTabsRail>
-					<TabsContent value="feedback" className="min-w-0">
-						<PracticeFeedbackSection
-							feedback={feedback}
-							ratingProps={ratingProps}
-							onOpenGroup={onOpenGroup}
+			<Tabs
+				value={shownTab}
+				onValueChange={(next) => {
+					const chosen = tabs.find((candidate) => candidate === next);
+					if (chosen) {
+						onTabChange?.(chosen);
+					}
+				}}
+				className="gap-4"
+			>
+				<PracticeTabsRail>
+					<PracticeTabsList aria-label="Practice">
+						{tabs.map((candidate) => (
+							<PracticeTabsTrigger key={candidate} value={candidate} count={counts[candidate]}>
+								{TAB_LABELS[candidate]}
+							</PracticeTabsTrigger>
+						))}
+					</PracticeTabsList>
+				</PracticeTabsRail>
+				<TabsContent value="feedback" className="min-w-0">
+					<PracticeFeedbackSection
+						feedback={feedback}
+						ratingProps={ratingProps}
+						onOpenGroup={onOpenGroup}
+					/>
+				</TabsContent>
+				<TabsContent value="results" className="min-w-0">
+					<Section
+						size="lg"
+						title="Observations"
+						description="Reviews of your work that reached this practice, newest first. An observation you opened from a review comes first."
+					>
+						{hasText(requestedNote) && <p className="max-w-2xl text-sm">{requestedNote}</p>}
+						<ObservationHistory
+							feed={feed}
+							reviews={reviews}
+							selectedId={selectedObservationId}
+							selected={selectedObservation}
+							renderObservation={renderObservation}
+							skeletonRows={skeletonRows}
+							responses={responses}
+						/>
+					</Section>
+				</TabsContent>
+				{hasGuide && (
+					<TabsContent value="guide" className="min-w-0">
+						<PracticeGuidance
+							words={words}
+							guidance={guidance}
+							guide={guide}
+							neverApplied={neverApplied}
 						/>
 					</TabsContent>
-					<TabsContent value="results" className="min-w-0">
-						<Section
-							size="lg"
-							title="Observations"
-							description="Reviews of your work that reached this practice, newest first: what each recorded, the evidence, and the next step."
-						>
-							{hasText(requestedNote) && <p className="max-w-2xl text-sm">{requestedNote}</p>}
-							<ObservationHistory
-								feed={feed}
-								reviews={reviews}
-								selectedId={selectedObservationId}
-								selected={selectedObservation}
-								renderObservation={renderObservation}
-								skeletonRows={skeletonRows}
-								responses={responses}
-							/>
-						</Section>
-					</TabsContent>
-					{guide && (
-						<TabsContent value="guide" className="min-w-0">
-							{/* `h3`: the guide's own headings are `h4`, and the outline may not skip a level. */}
-							<Section size="lg" level={3} title="Practice guide">
-								<PracticeGuideMarkdown guide={guide} />
-							</Section>
-						</TabsContent>
-					)}
-				</Tabs>
-			</>
+				)}
+			</Tabs>
 		);
 	} else if (guidance.status === "ready") {
 		body = (
 			<>
 				<p className="max-w-2xl text-sm">{GUIDANCE_ONLY}</p>
-				<PracticeIntro practice={described ?? NO_WORDS} guidance={guidance} />
-				{guide && (
-					// The guide uses h4 headings; its parent must be h3 to preserve the outline.
-					<Section size="lg" level={3} title="Practice guide">
-						<PracticeGuideMarkdown guide={guide} />
-					</Section>
-				)}
+				<PracticeGuidance words={words} guidance={guidance} guide={guide} neverApplied={false} />
 			</>
 		);
 	} else if (guidance.status === "loading") {
@@ -344,6 +354,35 @@ function PracticeStandingChips({
 	);
 }
 
+/**
+ * What explains the practice: why it matters with its picture, then its guide. The Guide tab holds
+ * it, so it never stands between the tab rail and the feedback or an observation a link opened.
+ */
+function PracticeGuidance({
+	words,
+	guidance,
+	guide,
+	neverApplied,
+}: {
+	words: PracticeWords;
+	guidance: PracticeGuidanceState;
+	guide?: PracticeGuidanceDto["guide"];
+	neverApplied: boolean;
+}) {
+	return (
+		<div className="flex min-w-0 flex-col gap-6">
+			{neverApplied && <p className="max-w-2xl text-sm">{NEVER_APPLIED.description}</p>}
+			<PracticeIntro practice={words} guidance={guidance} />
+			{guide && (
+				// `h3`: the guide's own headings are `h4`, and the outline may not skip a level.
+				<Section size="lg" level={3} title="Practice guide">
+					<PracticeGuideMarkdown guide={guide} />
+				</Section>
+			)}
+		</div>
+	);
+}
+
 /** The Feedback tab: the practice's one open card, then the cards the work resolved. */
 function PracticeFeedbackSection({
 	feedback,
@@ -354,7 +393,7 @@ function PracticeFeedbackSection({
 	ratingProps?: (feedbackId: string) => FeedbackRatingProps;
 	onOpenGroup?: () => void;
 }) {
-	// No "Learn more" on a card here: the practice's introduction already leads this level.
+	// No "Learn more" on a card here: this level is the practice, and its Guide tab explains it.
 	const feedbackCard = (card: PracticeFeedbackCardEntry) => (
 		<PracticeFeedbackCard
 			key={card.feedbackId}

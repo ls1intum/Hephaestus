@@ -75,8 +75,8 @@ export const Default: Story = {
 		).toBe(true);
 		await expect(canvas.queryByRole("img", { name: HEPH_LABEL })).toBeNull();
 		await expect(canvas.queryByText("What changed")).toBeNull();
-		// A card's practice pill and its "Learn more" both open the practice's level, where its
-		// introduction leads.
+		// A card's practice pill opens the practice's level on its default tab; its "Learn more" asks
+		// for the Guide tab, where the practice is explained.
 		const [card] = canvas.getAllByRole("article");
 		if (!card) {
 			throw new Error("The Open tab shows a card");
@@ -89,7 +89,10 @@ export const Default: Story = {
 			within(card).getByRole("button", { name: "Learn more about this practice" }),
 		);
 		await expect(args.onOpenPractice).toHaveBeenCalledTimes(2);
-		await expect(args.onOpenPractice).toHaveBeenLastCalledWith("scope-one-reviewable-change");
+		await expect(args.onOpenPractice).toHaveBeenLastCalledWith(
+			"scope-one-reviewable-change",
+			"guide",
+		);
 		// The card's group name opens the group the page knows by that slug.
 		await userEvent.click(within(card).getByRole("button", { name: "Packaging work for review" }));
 		await expect(args.onOpenGroup).toHaveBeenLastCalledWith(groups[0]);

@@ -31,6 +31,7 @@ import {
 	practiceLevel,
 	type PracticeProfileSearch,
 	practiceProfileSearchSchema,
+	type PracticeTab,
 	REVIEW_SELECTION_CLEARED,
 	reviewLevel,
 } from "@/components/practice-profile/practice-profile-search";
@@ -166,13 +167,14 @@ function PracticeProfile() {
 	// One level in, one level out: a practice is its group, then the practice over it, so the
 	// level's back arrow lands on the group and the browser's Back button agrees with it. A list
 	// that is open stays underneath. A practice whose standing this workspace does not carry opens
-	// alone and the level says so.
-	const openPractice = (practiceSlug: string) => {
+	// alone and the level says so. A tab asked for, such as a card's "Learn more" asking for the
+	// guide, is the practice level's own search; without one the level opens on its default tab.
+	const openPractice = (practiceSlug: string, practiceTab?: PracticeTab) => {
 		const groupSlug = practiceStandings.find((entry) => entry.slug === practiceSlug)?.groupSlug;
-		void stackControls.push([
-			...(hasText(groupSlug) ? [practiceGroupLevel(groupSlug)] : []),
-			practiceLevel(practiceSlug),
-		]);
+		void stackControls.push(
+			[...(hasText(groupSlug) ? [practiceGroupLevel(groupSlug)] : []), practiceLevel(practiceSlug)],
+			practiceTab === undefined ? undefined : { practiceTab },
+		);
 	};
 
 	return (

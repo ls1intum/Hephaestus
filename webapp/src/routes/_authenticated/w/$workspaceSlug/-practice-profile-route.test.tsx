@@ -702,7 +702,7 @@ describe("practice profile route", () => {
 		await waitFor(() => expect(router.state.location.searchStr).not.toContain("practiceTab"));
 	});
 
-	it("opens a link to the guide on the feedback when the practice has no guide", async () => {
+	it("opens a link to the guide on the introduction and picture when the practice has no long guide", async () => {
 		const { visual } = bundledGuidance;
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", () =>
@@ -713,11 +713,15 @@ describe("practice profile route", () => {
 			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([group, practiceEntry]))}&practiceTab=guide`,
 		);
 		// The picture is in, so the guidance has settled without a guide.
-		await screen.findByRole("img", { name: visual.alt }, ROUTE_RENDER_WAIT);
+		const picture = await screen.findByRole("img", { name: visual.alt }, ROUTE_RENDER_WAIT);
 
-		const feedback = await screen.findByRole("tab", { name: /^Feedback/u }, SETTLE_WAIT);
-		expect(feedback.getAttribute("aria-selected")).toBe("true");
-		expect(screen.queryByRole("tab", { name: "Guide" })).toBeNull();
+		const tab = await screen.findByRole("tab", { name: "Guide" }, SETTLE_WAIT);
+		expect(tab.getAttribute("aria-selected")).toBe("true");
+		const panel = screen.getByRole("tabpanel", { name: "Guide" });
+		expect(within(panel).getByRole("region", { name: "Introduction" }).contains(picture)).toBe(
+			true,
+		);
+		expect(within(panel).queryByRole("heading", { name: "Practice guide" })).toBeNull();
 	});
 
 	it("keeps the URL silent on the default feedback tab and spells every other one", async () => {
@@ -1182,6 +1186,43 @@ describe("complete practice observations", () => {
 		expect(reads).toBe(2);
 	});
 
+	it("leads with the selected observation and keeps it through a visit to the Guide tab", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", () =>
+				HttpResponse.json(bundledGuidance),
+			),
+			http.get("*/workspaces/:workspaceSlug/practices/results/:resultId", () =>
+				HttpResponse.json(completeObservation),
+			),
+		);
+		const { router } = renderRouteAtWithRouter(observationPage());
+		const selected = await screen.findByRole(
+			"list",
+			{ name: "Selected observation" },
+			ROUTE_RENDER_WAIT,
+		);
+		const observations = screen.getByRole("tabpanel", { name: "Observations" });
+		expect(within(observations).getByRole("list", { name: "Selected observation" })).toBe(selected);
+		// The guidance carries a picture and a guide; neither stands above the observation.
+		const guideTab = await screen.findByRole("tab", { name: "Guide" }, SETTLE_WAIT);
+		expect(screen.queryByRole("region", { name: "Introduction" })).toBeNull();
+
+		fireEvent.click(guideTab);
+		const intro = await screen.findByRole("region", { name: "Introduction" }, SETTLE_WAIT);
+		await within(intro).findByRole("img", { name: bundledGuidance.visual.alt }, SETTLE_WAIT);
+		screen.getByRole("heading", { level: 4, name: "How to do it" });
+		expect(screen.queryByRole("list", { name: "Selected observation" })).toBeNull();
+		await waitFor(() => expect(router.state.location.search.practiceTab).toBe("guide"));
+		expect(router.state.location.search.observation).toBe(completeObservation.id);
+
+		fireEvent.click(screen.getByRole("tab", { name: "Observations" }));
+		const back = await screen.findByRole("list", { name: "Selected observation" }, SETTLE_WAIT);
+		assert(completeObservation.explanation !== null);
+		await within(back).findByText(completeObservation.explanation);
+		expect(router.state.location.search.observation).toBe(completeObservation.id);
+		expect(screen.queryByRole("region", { name: "Introduction" })).toBeNull();
+	});
+
 	it("does not invent explanation or evidence when the retained detail makes them unavailable", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/results/:resultId", () =>
@@ -1309,9 +1350,37 @@ describe("practice introduction", () => {
 
 		await openPractice(router);
 
+		// The level opens on its feedback; the introduction and its picture are the Guide tab's.
+		const tab = await screen.findByRole("tab", { name: "Guide" }, SETTLE_WAIT);
+		expect(screen.queryByRole("region", { name: "Introduction" })).toBeNull();
+		fireEvent.click(tab);
 		const intro = await screen.findByRole("region", { name: "Introduction" }, SETTLE_WAIT);
 		await within(intro).findByRole("img", { name: guidance.visual.alt }, SETTLE_WAIT);
 		expect(guidanceAsked).toStrictEqual([practice.slug]);
+	});
+
+	it("opens a feedback card's Learn more on the practice's introduction and picture", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/feedback/practice-page", () =>
+				HttpResponse.json([feedback]),
+			),
+		);
+		const { router } = renderRouteAtWithRouter(PAGE);
+
+		fireEvent.click(
+			await screen.findByRole(
+				"button",
+				{ name: "Learn more about this practice" },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+
+		const tab = await screen.findByRole("tab", { name: "Guide" }, SETTLE_WAIT);
+		expect(tab.getAttribute("aria-selected")).toBe("true");
+		await waitFor(() => expect(router.state.location.search.practiceTab).toBe("guide"));
+		expect(stackInSearch(router.state.location.search.detail)).toContain(practiceEntry);
+		const intro = await screen.findByRole("region", { name: "Introduction" }, SETTLE_WAIT);
+		await within(intro).findByRole("img", { name: guidance.visual.alt }, SETTLE_WAIT);
 	});
 
 	it("opens the guide a link asks for, in the practice's Guide tab", async () => {
