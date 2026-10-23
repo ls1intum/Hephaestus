@@ -191,7 +191,13 @@ export default function Header({
 													</DropdownMenuItem>
 												)}
 												<DropdownMenuItem
-													render={<Link to="/settings" className="[&]:no-underline" />}
+													render={
+														<Link
+															to="/settings"
+															search={{ chromeWorkspace: workspaceSlug }}
+															className="[&]:no-underline"
+														/>
+													}
 												>
 													<Settings />
 													<span>Settings</span>

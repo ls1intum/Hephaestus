@@ -8,15 +8,18 @@ import {
 	within,
 } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import type { IdentityProviderView, IdentityView, LinkedProvider } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
+import { captureNavigation, restoreNavigation } from "@/test/navigation";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 30_000 });
+
+afterEach(restoreNavigation);
 
 /** A connected account as the server keeps it: the identity row and the origin it is linked to. */
 interface Connected {
@@ -129,6 +132,29 @@ function connectAction(region: BoundFunctions<typeof queries>, label: string) {
 }
 
 describe("connected accounts on the settings page", () => {
+	it.each(["/settings", "/settings?chromeWorkspace=beta#connected-accounts"])(
+		"keeps the current settings destination when connecting an account from %s",
+		async (returnTo) => {
+			serveAccount([github, publicGitLab]);
+			renderRouteAt(returnTo);
+			const region = await connectedAccounts();
+			const assigned = captureNavigation();
+
+			fireEvent.click(region.getByRole("button", { name: "Connect LRZ GitLab" }));
+
+			await waitFor(() => expect(assigned).toHaveLength(1));
+			const [target] = assigned;
+			assert(target !== undefined);
+			const authorization = new URL(target);
+			expect(authorization.origin + authorization.pathname).toBe(
+				"http://localhost:8080/auth/login",
+			);
+			expect(authorization.searchParams.get("provider")).toBe("gitlab-lrz");
+			expect(authorization.searchParams.get("mode")).toBe("link");
+			expect(authorization.searchParams.get("returnTo")).toBe(returnTo);
+		},
+	);
+
 	it("offers another GitLab instance while GitLab.com is connected, until that instance is connected too", async () => {
 		const account = serveAccount([github, publicGitLab]);
 		renderRouteAt("/settings");

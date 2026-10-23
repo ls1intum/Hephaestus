@@ -319,9 +319,12 @@ Declare routes with `createFileRoute`. Keep loaders side-effect free and prefer
 auth) on the router context. Never hand-edit `routeTree.gen.ts` — there is no `tsr` CLI here. The
 TanStack Router Vite plugin regenerates it when the dev server runs.
 
-The route's `workspaceSlug` is the only source for workspace-scoped data. There is no store. The app
-chrome renders on routes whose URL names none, so it reads `chromeWorkspaceSlug`, which falls back to
-the first workspace.
+The route's `workspaceSlug` is the only source for workspace-scoped data. There is no store.
+
+The app chrome reads `chromeWorkspaceSlug`: on global settings and instance-admin routes, the validated
+`chromeWorkspace` search parameter preserves the selected member workspace. A path slug takes
+precedence. An unknown member context selects none. Bare global URLs fall back to the first workspace.
+Only those global destinations retain this search parameter. It never substitutes for scoped data.
 
 ## Role-based gating (OWNER > ADMIN > MEMBER)
 

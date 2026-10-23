@@ -87,7 +87,7 @@ export function AppSidebar({
 	}
 
 	if (context === "admin") {
-		sidebarContent = <NavSuperAdmin />;
+		sidebarContent = <NavSuperAdmin workspaceSlug={activeWorkspace?.workspaceSlug} />;
 	} else if (administrationWorkspace && administrationWorkspaceSlug !== undefined) {
 		contextHeader = (
 			<NavContextHeader

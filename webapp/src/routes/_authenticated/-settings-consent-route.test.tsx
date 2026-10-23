@@ -33,6 +33,22 @@ describe("account settings and a notice that falls due again", () => {
 		await waitFor(() => expect(router.state.location.pathname).toBe("/consent"));
 		expect(router.state.location.search).toMatchObject({ returnTo: "/settings" });
 	});
+	it("preserves workspace context and the section when fresh consent returns to settings", async () => {
+		let current: typeof consent = consent;
+		server.use(http.get("*/user/consent", () => HttpResponse.json(current)));
+		const { router, queryClient } = renderRouteAtWithRouter(
+			"/settings?chromeWorkspace=beta#research",
+		);
+		await screen.findByRole("heading", { name: "User settings" }, ROUTE_RENDER_WAIT);
+
+		current = { ...consent, completed: false, researchOrganization: "Another lab" };
+		await queryClient.invalidateQueries({ queryKey: getConsentStatusQueryKey({}) });
+
+		await waitFor(() => expect(router.state.location.pathname).toBe("/consent"));
+		expect(router.state.location.search).toMatchObject({
+			returnTo: "/settings?chromeWorkspace=beta#research",
+		});
+	});
 });
 
 function showConsent(status: typeof consent, onSave: (body: ResearchConsent) => void) {

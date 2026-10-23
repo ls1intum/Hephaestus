@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Outlet, redirect, useMatchRoute } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Outlet,
+	redirect,
+	retainSearchParams,
+	useMatchRoute,
+} from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import type { Route as RootRoute } from "@/routes/__root";
 
 import { adminGetInstanceSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import { SilentModeBanner } from "@/components/admin/instance/SilentModeBanner";
@@ -16,6 +23,9 @@ import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-ref
  * visible wherever the operator navigates.
  */
 export const Route = createFileRoute("/_authenticated/admin")({
+	search: {
+		middlewares: [retainSearchParams<typeof RootRoute.types.fullSearchSchema>(["chromeWorkspace"])],
+	},
 	beforeLoad: async ({ context }) => {
 		const user = await resolveCurrentUser(context.queryClient);
 		if (!isAppAdmin(user)) {

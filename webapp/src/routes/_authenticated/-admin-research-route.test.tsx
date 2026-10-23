@@ -4,7 +4,12 @@ import { HttpResponse, http } from "msw";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { getPasskeyStatusOptions } from "@/api/@tanstack/react-query.gen";
-import type { AdminWorkspaceView, PasskeyStatus, ResearchRemovalDisclosure } from "@/api/types.gen";
+import type {
+	AdminWorkspaceView,
+	InstanceSettings,
+	PasskeyStatus,
+	ResearchRemovalDisclosure,
+} from "@/api/types.gen";
 import { WORDING_VERSION } from "@/components/auth/consent-wording";
 import type { Wire } from "@/lib/dates";
 import { server } from "@/mocks/server";
@@ -77,6 +82,9 @@ function serveResearch(options: {
 					? {}
 					: { researchOrganization: options.organization }),
 			}),
+		),
+		http.get("*/admin/settings", () =>
+			HttpResponse.json({ silentModeEngaged: false, etag: '"1"' } satisfies Wire<InstanceSettings>),
 		),
 		http.get("*/admin/workspaces", () => HttpResponse.json([course])),
 		http.post("*/admin/research-disclosures/removal-checks", () => {
@@ -500,7 +508,12 @@ describe("research datasets route", () => {
 	it("keeps the export when the passkey status cannot be read, and reads it again on retry", async () => {
 		serveResearch({ organization: "TUM AET", open: [] });
 		let reads = 0;
+		let deliveryReads = 0;
 		server.use(
+			http.get("*/admin/settings", () => {
+				deliveryReads += 1;
+				return HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 });
+			}),
 			http.get(
 				"*/user/passkeys",
 				() => {
@@ -517,20 +530,48 @@ describe("research datasets route", () => {
 		const user = userEvent.setup();
 		renderRouteAt("/admin/research");
 
-		await screen.findByText("We could not load your passkey status", undefined, ROUTE_RENDER_WAIT);
+		const passkeyTitle = await screen.findByText(
+			"We could not load your passkey status",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		const deliveryTitle = await screen.findByText(
+			"We could not load the instance delivery state",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		const passkeyAlert = passkeyTitle.closest<HTMLElement>('[role="alert"]');
+		const deliveryAlert = deliveryTitle.closest<HTMLElement>('[role="alert"]');
+		assert(passkeyAlert !== null);
+		assert(deliveryAlert !== null);
+		expect(passkeyAlert).not.toBe(deliveryAlert);
+		expect(
+			within(passkeyAlert).getByRole("button", { name: "Retry" }).hasAttribute("disabled"),
+		).toBe(false);
+		expect(
+			within(deliveryAlert).getByRole("button", { name: "Retry" }).hasAttribute("disabled"),
+		).toBe(false);
+		expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(2);
+		expect(reads).toBe(1);
+		expect(deliveryReads).toBe(1);
 		// The server's answer is classified, not read as a lost connection.
-		screen.getByText(/Try again in a moment/u);
+		within(passkeyAlert).getByText(/Try again in a moment/u);
 		expect(screen.queryByText(/Check your connection/u)).toBeNull();
 		expect(screen.queryByText(/checks are disabled/u)).toBeNull();
 		expect(screen.queryByText(/you cannot export, check or update datasets/u)).toBeNull();
 		const exportButton = await screen.findByRole("button", { name: "Export and download" });
 		expect(exportButton.hasAttribute("disabled")).toBe(false);
 
-		const retry = screen.getByRole("button", { name: "Retry" });
+		const retry = within(passkeyAlert).getByRole("button", { name: "Retry" });
 		expect(retry.hasAttribute("disabled")).toBe(false);
 		await user.click(retry);
 		await screen.findByText(/Extra authentication checks are disabled on this instance/u);
 		expect(reads).toBe(2);
+		expect(deliveryReads).toBe(1);
+		expect(screen.queryByText("We could not load your passkey status")).toBeNull();
+		expect(
+			within(deliveryAlert).getByRole("button", { name: "Retry" }).hasAttribute("disabled"),
+		).toBe(false);
 	});
 
 	it("does not present cached policy as current after a failed refresh, and recovers on retry", async () => {

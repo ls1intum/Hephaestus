@@ -355,7 +355,11 @@ function ProductFeedbackControls({ workspaceSlug }: { workspaceSlug?: string }) 
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-	validateSearch: (search): { login?: boolean; survey?: string } => ({
+	validateSearch: (search): { login?: boolean; survey?: string; chromeWorkspace?: string } => ({
+		chromeWorkspace:
+			typeof search.chromeWorkspace === "string" && search.chromeWorkspace.trim().length > 0
+				? search.chromeWorkspace
+				: undefined,
 		survey:
 			typeof search.survey === "string" && search.survey.length > 0 ? search.survey : undefined,
 		login: search.login === true || search.login === "true" ? true : undefined,
