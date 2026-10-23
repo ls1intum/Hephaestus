@@ -62,7 +62,7 @@ public class TurnContextFolder {
     /** How long staging may take at most; the turn's deadline bounds it further. */
     private static final Duration STAGE_TIME = Duration.ofSeconds(60);
 
-    /** The command's own timeout, then its kill after two seconds, then this margin before the worker kills it. */
+    /** The command's own timeout, then its kill after two seconds, then this margin before the worker cancels it. */
     private static final Duration KILL_MARGIN = Duration.ofSeconds(5);
 
     private static final Duration READ_TIME = Duration.ofSeconds(30);
@@ -100,37 +100,6 @@ public class TurnContextFolder {
             export LC_ALL=C
             printf '%s %s %s %s\\n' "$c" "$(wc -l < "$o")" "$(wc -c < "$o")" "$(tail -n 1 "$o" | wc -c)"
             tail -c 51202 "$o"
-            """;
-
-    /**
-     * Arguments: the archive's length, then the top-level paths it writes. Run as root; the folder is read-only after.
-     * The runtime does not close stdin after the archive, so {@code head} ends the input at its length.
-     */
-    static final String ADD_SCRIPT = """
-            set -e
-            n=$1; shift
-            chmod u+w /workspace
-            for d; do if [ -e "/workspace/$d" ]; then chmod -R u+w "/workspace/$d"; fi; done
-            head -c "$n" | tar -x --no-same-owner -C /workspace
-            for d; do if [ -e "/workspace/$d" ]; then chmod -R a-w "/workspace/$d"; fi; done
-            chmod a-w /workspace
-            """;
-
-    /**
-     * Arguments: the archive's length, the target directory, then its ancestors below {@code /workspace}. Replaces the
-     * target with the archive on stdin. Run as root; the folder is read-only after.
-     */
-    static final String LOAD_SCRIPT = """
-            set -e
-            n=$1; t=$2; shift 2
-            chmod u+w /workspace
-            for d; do if [ -d "$d" ]; then chmod u+w "$d"; fi; done
-            if [ -e "$t" ]; then chmod -R u+w "$t"; rm -rf -- "$t"; fi
-            mkdir -p -- "$t"
-            head -c "$n" | tar -x --no-same-owner -C "$t"
-            chmod -R a-w "$t"
-            for d; do chmod a-w "$d"; done
-            chmod a-w /workspace
             """;
 
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -250,8 +219,6 @@ public class TurnContextFolder {
                                                 Integer.toString(number),
                                                 seconds,
                                                 command),
-                                        false,
-                                        null,
                                         time.plus(KILL_MARGIN),
                                         OUTPUT_LIMIT)));
             });
@@ -261,7 +228,7 @@ public class TurnContextFolder {
             }
             long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
             if (run.timedOut()) {
-                killCommands(sandbox);
+                cancelCommands(sandbox);
                 log.info("Turn sandbox command killed: turnId={}, elapsedMs={}", turn.turnId(), elapsedMs);
                 return result(null, "", false, true, null);
             }
@@ -273,7 +240,7 @@ public class TurnContextFolder {
             boolean timedOut = exitCode == 124 || exitCode == 137;
             if (timedOut) {
                 // A child that left the command's process group, with setsid for example, outlives timeout.
-                killCommands(sandbox);
+                cancelCommands(sandbox);
             }
             String fullOutput = "/tmp/heph-out/" + number + ".log";
             PiText.Tail tail = PiText.bash(
@@ -512,8 +479,6 @@ public class TurnContextFolder {
                                         file,
                                         Long.toString(first),
                                         Long.toString(lines)),
-                                false,
-                                null,
                                 shortest(READ_TIME, left(deadline)),
                                 OUTPUT_LIMIT));
     }
@@ -531,42 +496,36 @@ public class TurnContextFolder {
         return NODES.objectNode().put("ok", true).put("text", page.text());
     }
 
-    /** Adds files to the folder as root, then makes it read-only again. */
+    /** Adds files to the folder, which is read-only for the model again after it. */
     private void add(TurnSandboxes.Sandbox sandbox, Map<String, byte[]> files, Instant deadline) throws IOException {
         byte[] archive = FolderArchive.files(files);
-        List<String> argv = new ArrayList<>(List.of("sh", "-c", ADD_SCRIPT, "add", Integer.toString(archive.length)));
-        files.keySet().stream()
+        List<String> names = files.keySet().stream()
                 .map(path -> path.contains("/") ? path.substring(0, path.indexOf('/')) : path)
                 .distinct()
-                .forEach(argv::add);
+                .toList();
         try (InputStream in = new ByteArrayInputStream(archive)) {
-            staged(sandboxes
+            sandboxes
                     .runtime()
-                    .exec(
+                    .stage(
                             sandbox.containerId(),
-                            new ExecSandboxes.Command(argv, true, in, shortest(STAGE_TIME, left(deadline)), 4096)));
+                            new ExecSandboxes.Add(names, in, archive.length, shortest(STAGE_TIME, left(deadline))));
         }
     }
 
+    /** Replaces the loaded item's directory in the folder, which is read-only for the model again after it. */
     private void stageLoaded(TurnSandboxes.Sandbox sandbox, ContextLoader.Loaded loaded, Instant deadline)
             throws IOException {
         String relative = ContextFolderPaths.relative(loaded.path())
                 .filter(path -> !path.isEmpty())
                 .orElseThrow(() -> new SandboxException("A context loader named a path outside the folder"));
-        List<String> argv = new ArrayList<>(List.of("sh", "-c", LOAD_SCRIPT, "load"));
         Path archive = FolderArchive.directory(loaded.directory());
-        argv.add(Long.toString(Files.size(archive)));
-        argv.add(ContextFolderPaths.absolute(relative));
-        String[] segments = relative.split("/", -1);
-        for (int end = 1; end < segments.length; end++) {
-            argv.add(ContextFolderPaths.absolute(String.join("/", Arrays.copyOfRange(segments, 0, end))));
-        }
         try (InputStream in = Files.newInputStream(archive)) {
-            staged(sandboxes
+            sandboxes
                     .runtime()
-                    .exec(
+                    .stage(
                             sandbox.containerId(),
-                            new ExecSandboxes.Command(argv, true, in, shortest(STAGE_TIME, left(deadline)), 4096)));
+                            new ExecSandboxes.Replace(
+                                    relative, in, Files.size(archive), shortest(STAGE_TIME, left(deadline))));
         } finally {
             Files.deleteIfExists(archive);
         }
@@ -587,45 +546,26 @@ public class TurnContextFolder {
         argv.addAll(command);
         ExecSandboxes.Execution run;
         try {
-            run = sandboxes
-                    .runtime()
-                    .exec(sandbox.containerId(), new ExecSandboxes.Command(argv, false, null, time, SUMMARY_LIMIT));
+            run = sandboxes.runtime().exec(sandbox.containerId(), new ExecSandboxes.Command(argv, time, SUMMARY_LIMIT));
         } catch (SandboxException failed) {
             log.debug("A load's summary failed: {}", failed.getClass().getSimpleName());
             return "";
         }
         if (run.timedOut()) {
-            // The sandbox stays usable: its supervisor runs as root, out of the sandbox user's reach.
-            killCommands(sandbox);
+            // The sandbox stays usable: the cancellation ends the sandbox user's processes only.
+            cancelCommands(sandbox);
             return "";
         }
         return new String(run.stdout(), StandardCharsets.UTF_8).strip();
     }
 
-    private static void staged(ExecSandboxes.Execution run) {
-        Integer exit = run.exitCode();
-        if (exit == null || exit != 0) {
-            // The exit is the classification; the sandbox's stderr can name the staged files and stays out.
-            log.warn("Staging into a turn sandbox exited with {}", exit);
-            throw new SandboxException("Staging into the turn sandbox failed: exit " + exit);
-        }
-    }
-
-    /**
-     * Ends every process of the sandbox's user: {@code kill -1} reaches all of them, a detached one too, and spares
-     * only the calling process and the init process.
-     */
-    private void killCommands(TurnSandboxes.Sandbox sandbox) {
+    /** Ends every process of the sandbox's user, a detached one too; the sandbox stays in use. */
+    private void cancelCommands(TurnSandboxes.Sandbox sandbox) {
         try {
-            sandboxes
-                    .runtime()
-                    .exec(
-                            sandbox.containerId(),
-                            new ExecSandboxes.Command(
-                                    List.of("sh", "-c", "kill -KILL -1"), false, null, Duration.ofSeconds(5), 1024));
+            sandboxes.runtime().cancelCommands(sandbox.containerId());
         } catch (SandboxException e) {
             log.debug(
-                    "Could not kill the commands of a turn sandbox: {}",
+                    "Could not cancel the commands of a turn sandbox: {}",
                     e.getClass().getSimpleName());
         }
     }

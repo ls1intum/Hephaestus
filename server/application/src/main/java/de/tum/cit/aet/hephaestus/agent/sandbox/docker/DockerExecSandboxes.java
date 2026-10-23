@@ -18,6 +18,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +32,9 @@ import org.slf4j.LoggerFactory;
 /**
  * {@link ExecSandboxes} on the Docker daemon of the practice review sandboxes. A sandbox is a container of the agent
  * image with the review's hardened host configuration, network mode {@code none} and an init process that reaps
- * orphaned processes. Its command sleeps; work arrives through {@code docker exec}.
+ * orphaned processes. Its command sleeps; work arrives through {@code docker exec}. A staging runs as root, so the
+ * folder it writes belongs to root and is read-only after it. A command and the cancellation of commands run as
+ * {@link ExecSandboxes#SANDBOX_USER}. The init process and its sleep run as root, out of that user's reach.
  *
  * <p>Labels record this installation ({@link SandboxLabels#OWNER}), the sandbox id and the worker that created it
  * ({@link SandboxCreator}). {@link SandboxReconciler} ignores these containers: they have no job id and no session id.
@@ -46,6 +51,52 @@ public class DockerExecSandboxes implements ExecSandboxes, AutoCloseable {
 
     private static final SecurityProfile PROFILE =
             new SecurityProfile(null, "none", List.of("ALL"), Map.of("/workspace", WORKSPACE_TMPFS));
+
+    private static final String ROOT = "0:0";
+    private static final String UNPRIVILEGED = SANDBOX_USER + ":" + SANDBOX_USER;
+    private static final String WORKSPACE = "/workspace";
+
+    /**
+     * Arguments: the archive's length, then the entries in {@code /workspace} that it writes. Runs as root; the folder
+     * is read-only after. The runtime does not close stdin after the archive, so {@code head} ends the input at its
+     * length.
+     */
+    private static final String ADD_SCRIPT = """
+            set -e
+            n=$1; shift
+            chmod u+w /workspace
+            for d; do if [ -e "/workspace/$d" ]; then chmod -R u+w "/workspace/$d"; fi; done
+            head -c "$n" | tar -x --no-same-owner -C /workspace
+            for d; do if [ -e "/workspace/$d" ]; then chmod -R a-w "/workspace/$d"; fi; done
+            chmod a-w /workspace
+            """;
+
+    /**
+     * Arguments: the archive's length, the target directory, then its ancestors below {@code /workspace}. Replaces the
+     * target with the archive on stdin. Runs as root; the folder is read-only after.
+     */
+    private static final String REPLACE_SCRIPT = """
+            set -e
+            n=$1; t=$2; shift 2
+            chmod u+w /workspace
+            for d; do if [ -d "$d" ]; then chmod u+w "$d"; fi; done
+            if [ -e "$t" ]; then chmod -R u+w "$t"; rm -rf -- "$t"; fi
+            mkdir -p -- "$t"
+            head -c "$n" | tar -x --no-same-owner -C "$t"
+            chmod -R a-w "$t"
+            for d; do chmod a-w "$d"; done
+            chmod a-w /workspace
+            """;
+
+    /**
+     * {@code kill -1} reaches every process of the sandbox user, a detached one too, and spares only the calling process
+     * and the init process. The image has no {@code pkill}.
+     */
+    private static final List<String> CANCEL_COMMAND = List.of("sh", "-c", "kill -KILL -1");
+
+    private static final Duration CANCEL_TIME = Duration.ofSeconds(5);
+    private static final int CANCEL_OUTPUT_LIMIT = 1024;
+    private static final int STAGING_OUTPUT_LIMIT = 4096;
 
     private final DockerClient client;
     private final DockerClientOperations operations;
@@ -132,8 +183,8 @@ public class DockerExecSandboxes implements ExecSandboxes, AutoCloseable {
                     .withHostName(HOSTNAME)
                     // The init process and its sleep run as root, so that the sandbox user's kill -1 cannot end
                     // the sandbox; every command names its own user.
-                    .withUser("0:0")
-                    .withWorkingDir("/workspace")
+                    .withUser(ROOT)
+                    .withWorkingDir(WORKSPACE)
                     .withEntrypoint("sleep")
                     .withCmd("infinity")
                     .exec()
@@ -148,13 +199,55 @@ public class DockerExecSandboxes implements ExecSandboxes, AutoCloseable {
 
     @Override
     public Execution exec(String sandbox, Command command) {
+        return run(sandbox, command.argv(), UNPRIVILEGED, null, command.timeout(), command.outputLimit());
+    }
+
+    @Override
+    public void stage(String sandbox, Staging staging) {
+        List<String> argv = new ArrayList<>(List.of("sh", "-c"));
+        switch (staging) {
+            case Add add -> {
+                argv.addAll(List.of(ADD_SCRIPT, "add", Long.toString(add.size())));
+                argv.addAll(add.names());
+            }
+            case Replace replace -> {
+                argv.addAll(List.of(REPLACE_SCRIPT, "replace", Long.toString(replace.size())));
+                String[] names = replace.directory().split("/", -1);
+                argv.add(WORKSPACE + "/" + replace.directory());
+                for (int end = 1; end < names.length; end++) {
+                    argv.add(WORKSPACE + "/" + String.join("/", Arrays.copyOfRange(names, 0, end)));
+                }
+            }
+        }
+        Execution staged = run(sandbox, argv, ROOT, staging.archive(), staging.timeout(), STAGING_OUTPUT_LIMIT);
+        Integer exit = staged.exitCode();
+        if (exit == null || exit != 0) {
+            // The exit is the classification; the sandbox's stderr can name the staged files and stays out.
+            log.warn("Staging into a turn sandbox exited with {}", exit);
+            throw new SandboxException("Staging into the turn sandbox failed: exit " + exit);
+        }
+    }
+
+    /** Its own exit says nothing: {@code kill} fails when no process of the user is left to end. */
+    @Override
+    public void cancelCommands(String sandbox) {
+        run(sandbox, CANCEL_COMMAND, UNPRIVILEGED, null, CANCEL_TIME, CANCEL_OUTPUT_LIMIT);
+    }
+
+    private Execution run(
+            String sandbox,
+            List<String> argv,
+            String user,
+            @Nullable InputStream stdin,
+            Duration timeout,
+            int outputLimit) {
         String execId;
         try {
             execId = client.execCreateCmd(sandbox)
-                    .withCmd(command.argv().toArray(String[]::new))
-                    .withUser(command.root() ? "0:0" : SANDBOX_USER + ":" + SANDBOX_USER)
-                    .withWorkingDir("/workspace")
-                    .withAttachStdin(command.stdin() != null)
+                    .withCmd(argv.toArray(String[]::new))
+                    .withUser(user)
+                    .withWorkingDir(WORKSPACE)
+                    .withAttachStdin(stdin != null)
                     .withAttachStdout(true)
                     .withAttachStderr(true)
                     .withTty(false)
@@ -166,14 +259,12 @@ public class DockerExecSandboxes implements ExecSandboxes, AutoCloseable {
         } catch (DockerException e) {
             throw new SandboxInfrastructureException("Could not run a command in a turn sandbox", e);
         }
-        Output output = new Output(command.outputLimit());
+        Output output = new Output(outputLimit);
         boolean completed;
         try (Output callback = output) {
             var start = client.execStartCmd(execId).withDetach(false).withTty(false);
-            InputStream stdin = command.stdin();
             if (stdin != null) start.withStdIn(stdin);
-            completed = start.exec(callback)
-                    .awaitCompletion(Math.max(1, command.timeout().toMillis()), TimeUnit.MILLISECONDS);
+            completed = start.exec(callback).awaitCompletion(Math.max(1, timeout.toMillis()), TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new SandboxException("Interrupted while a turn sandbox ran a command", e);
