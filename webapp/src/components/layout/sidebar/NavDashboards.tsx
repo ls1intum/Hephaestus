@@ -1,22 +1,19 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
-import { Activity, Building2, ChartNoAxesGantt, ChevronRight, Compass, Users } from "lucide-react";
+import { Activity, Building2, ChartNoAxesGantt, Compass, UserRound, Users } from "lucide-react";
 
 import { ACROSS_THE_WORKSPACE } from "@/components/practices-across-the-workspace/across-workspace-copy";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
 	SidebarMenu,
-	SidebarMenuAction,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarMenuSub,
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
 
-import { useSectionOpen } from "./use-section-open";
+import { NavSection } from "./NavSection";
 
 export function NavDashboards({
 	workspaceSlug,
@@ -37,14 +34,10 @@ export function NavDashboards({
 		matchRoute({ to: "/w/$workspaceSlug/workspace-activity", fuzzy: true }),
 	);
 	const onTeams = Boolean(matchRoute({ to: "/w/$workspaceSlug/teams", fuzzy: true }));
-	// Anywhere in the section, the profile with its slide-in layers included, keeps the pages under it
-	// in sight; the chevron still folds them away by itself.
-	const [practicesOpen, setPracticesOpen] = useSectionOpen(
-		onPracticeProfile || onAcrossTheWorkspace,
-	);
 	// On a phone the sidebar is a sheet with full labels, never icon-only.
 	const { isMobile, state } = useSidebar();
 	const iconOnly = !isMobile && state === "collapsed";
+	const profileLink = <Link to="/w/$workspaceSlug/practice-profile" params={{ workspaceSlug }} />;
 	const acrossLink = (
 		<Link to="/w/$workspaceSlug/practices-across-the-workspace" params={{ workspaceSlug }} />
 	);
@@ -53,54 +46,33 @@ export function NavDashboards({
 		<SidebarGroup>
 			<SidebarGroupLabel>Dashboards</SidebarGroupLabel>
 			<SidebarMenu>
-				{/* The profile is the parent's own link, so one press reaches it from anywhere and unfolds
-				    the pages under it; the chevron beside it folds and unfolds them on its own. */}
+				{/* Folds like the admin sections: the row opens and closes its pages, the profile among them.
+				    Icon-only, the row is the profile's own link, so it stays one press away. */}
 				{practicesEnabled && (
-					<Collapsible
-						open={practicesOpen}
-						onOpenChange={setPracticesOpen}
-						render={<SidebarMenuItem />}
+					<NavSection
+						label="Your practices"
+						icon={<Compass />}
+						// Anywhere in the section, the profile with its slide-in layers included, opens it.
+						active={onPracticeProfile || onAcrossTheWorkspace}
+						landingLink={profileLink}
+						// Icon-only, the workspace view has its own icon below, so one entry is active.
+						landingActive={onPracticeProfile}
 					>
-						<SidebarMenuButton
-							tooltip="Practice profile"
-							// One active item in every mode: the view's own entry when it is in sight, else its parent.
-							isActive={onPracticeProfile || (onAcrossTheWorkspace && !practicesOpen && !iconOnly)}
-							render={<Link to="/w/$workspaceSlug/practice-profile" params={{ workspaceSlug }} />}
-							// Unfolds even when the reader is already on the profile and had folded it.
-							onClick={() => setPracticesOpen(true)}
-						>
-							<Compass />
-							<span>Practice profile</span>
-						</SidebarMenuButton>
-						{/* Icon-only, nothing can unfold, so the view gets its own icon below instead. */}
-						{!iconOnly && (
-							<>
-								<CollapsibleTrigger
-									render={
-										// `size-6`, `top-1`: a 24px target (WCAG 2.2 SC 2.5.8) centred on the 32px row,
-										// since the primitive's 20px box drops its larger hit area from `md` up.
-										<SidebarMenuAction
-											aria-label="Pages under Practice profile"
-											className="top-1 size-6 peer-data-[size=default]/menu-button:top-1 aria-expanded:rotate-90"
-										/>
-									}
-								>
-									<ChevronRight aria-hidden />
-								</CollapsibleTrigger>
-								<CollapsibleContent>
-									<SidebarMenuSub aria-label="Practice profile">
-										<SidebarMenuSubItem>
-											<SidebarMenuSubButton isActive={onAcrossTheWorkspace} render={acrossLink}>
-												<ChartNoAxesGantt aria-hidden />
-												<span>{ACROSS_THE_WORKSPACE}</span>
-											</SidebarMenuSubButton>
-										</SidebarMenuSubItem>
-									</SidebarMenuSub>
-								</CollapsibleContent>
-							</>
-						)}
-					</Collapsible>
+						<SidebarMenuSubItem>
+							<SidebarMenuSubButton isActive={onPracticeProfile} render={profileLink}>
+								<UserRound aria-hidden />
+								<span>Practice profile</span>
+							</SidebarMenuSubButton>
+						</SidebarMenuSubItem>
+						<SidebarMenuSubItem>
+							<SidebarMenuSubButton isActive={onAcrossTheWorkspace} render={acrossLink}>
+								<ChartNoAxesGantt aria-hidden />
+								<span>{ACROSS_THE_WORKSPACE}</span>
+							</SidebarMenuSubButton>
+						</SidebarMenuSubItem>
+					</NavSection>
 				)}
+				{/* Icon-only, nothing can unfold, so the view gets its own icon below instead. */}
 				{practicesEnabled && iconOnly && (
 					<SidebarMenuItem>
 						<SidebarMenuButton

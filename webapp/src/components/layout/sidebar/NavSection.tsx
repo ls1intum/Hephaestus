@@ -24,6 +24,11 @@ export interface NavSectionProps {
 	 * reaches its entries.
 	 */
 	landingLink: ReactElement;
+	/**
+	 * The landing link's own page is current, in the icon-only sidebar. Defaults to `active`; a
+	 * section whose entries keep icons of their own there passes its landing page alone.
+	 */
+	landingActive?: boolean;
 	children: ReactNode;
 }
 
@@ -31,7 +36,15 @@ export interface NavSectionProps {
  * A collapsible sidebar entry, composed from the `Collapsible` and `SidebarMenu*` primitives as
  * shadcn's collapsible sidebar does. The kit has no section component of its own.
  */
-export function NavSection({ label, icon, active, badge, landingLink, children }: NavSectionProps) {
+export function NavSection({
+	label,
+	icon,
+	active,
+	badge,
+	landingLink,
+	landingActive = active,
+	children,
+}: NavSectionProps) {
 	const [open, setOpen] = useSectionOpen(active);
 	// On a phone the sidebar is a sheet with full labels, never icon-only.
 	const { isMobile, state } = useSidebar();
@@ -46,7 +59,7 @@ export function NavSection({ label, icon, active, badge, landingLink, children }
 	// `SidebarMenuBadge` hides itself in the icon-only sidebar, so the tooltip carries the count.
 	const tooltip = shown ? `${label} (${shown.phrase})` : label;
 	const button = collapsed ? (
-		<SidebarMenuButton tooltip={tooltip} isActive={active} render={landingLink}>
+		<SidebarMenuButton tooltip={tooltip} isActive={landingActive} render={landingLink}>
 			{icon}
 			{name}
 		</SidebarMenuButton>
