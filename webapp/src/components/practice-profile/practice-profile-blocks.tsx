@@ -89,8 +89,8 @@ export function LevelLead({ children }: { children: ReactNode }) {
 
 export interface LabelledBlockProps {
 	label: string;
-	/** `h3` inside a section that has its own heading. */
-	as?: "h2" | "h3";
+	/** `h3` inside a section that has its own heading, `h4` inside a record sheet's section. */
+	as?: "h2" | "h3" | "h4";
 	className?: string;
 	children: ReactNode;
 }

@@ -12,6 +12,11 @@ import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
+import {
+	expectSectionHeadings,
+	expectSectionLines,
+	expectSectionsFold,
+} from "@/stories/section-lines";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { levelsOpenedBy } from "@/test/detail-stack";
 import { precedes } from "@/test/dom";
@@ -35,6 +40,7 @@ import {
 	uncertainWriteFeedbackDetail,
 	withdrawnFeedbackDetail,
 } from "./fixtures";
+import { forgetLevelFolds } from "./level-folds";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { resultSummary } from "./result-words";
 import { developerLabel } from "./review-format";
@@ -228,6 +234,11 @@ const meta = {
 			{(level) => <FeedbackLevel {...args} {...level} />}
 		</InLevelStack>
 	),
+	// A fold is kept in this browser, so every story starts with all sections open.
+	beforeEach: () => {
+		forgetLevelFolds("feedback");
+		return () => forgetLevelFolds("feedback");
+	},
 } satisfies Meta<typeof FeedbackLevel>;
 
 export default meta;
@@ -293,12 +304,22 @@ export const Withheld: Story = {
 	},
 };
 
+/** The level's default: delivered feedback, with its sections parted, at one size, and foldable. */
 export const Delivered: Story = {
 	args: { feedback: ready(approvedFeedbackDetail) },
-	play: async () => {
+	play: async ({ userEvent }) => {
 		const panelElement = await settledDrawerPanel();
 		const panel = within(panelElement);
+		// What it is, State and history, What it says, Based on, Checks, Technical.
+		await expectSectionLines(panelElement, 5);
+		await expectSectionHeadings(panelElement);
+		await expectSectionsFold(panelElement, userEvent);
 		await expectHeaderChip(panelElement, "Delivered");
+		// The section is called "Checks", so the box under it says no title of its own, and its steps
+		// sit one level below the section.
+		const checks = within(panel.getByRole("region", { name: "Checks" }));
+		await expect(checks.queryByRole("heading", { name: "Feedback checks" })).toBeNull();
+		await expect(checks.getAllByRole("heading", { level: 4 }).length).toBeGreaterThan(0);
 		const events = history(panelElement);
 		events.getByText("Approved");
 		events.getByText("by Grace Hopper");

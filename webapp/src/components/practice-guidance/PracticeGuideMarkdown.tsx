@@ -12,6 +12,8 @@ import { PRACTICE_VISUAL_WIDTH, PracticeVisual } from "./PracticeVisual";
 export interface PracticeGuideMarkdownProps {
 	/** The guide: its Markdown and the SVG figures the Markdown shows by name. */
 	guide: PracticeGuide;
+	/** The level of the guide's own headings, one below the label it sits under. */
+	headingLevel?: 4 | 5;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface PracticeGuideMarkdownProps {
  * on the prose's ground at the width the introduction gives its picture. Any other image source, and a figure the guide does not
  * carry, draws nothing, so the guide loads nothing from elsewhere.
  */
-export function PracticeGuideMarkdown({ guide }: PracticeGuideMarkdownProps) {
+export function PracticeGuideMarkdown({ guide, headingLevel = 4 }: PracticeGuideMarkdownProps) {
 	const renderFigure = ({ src, alt }: UntrustedMarkdownImage) => {
 		const svg = guideFigure(guide.figures, src);
 		return svg === undefined ? null : (
@@ -35,7 +37,9 @@ export function PracticeGuideMarkdown({ guide }: PracticeGuideMarkdownProps) {
 		<div
 			className={cn(UNTRUSTED_MARKDOWN_PROSE, "max-w-2xl text-sm text-pretty prose-figure:my-2")}
 		>
-			<UntrustedMarkdown renderImage={renderFigure}>{guide.markdown}</UntrustedMarkdown>
+			<UntrustedMarkdown renderImage={renderFigure} headingLevel={headingLevel}>
+				{guide.markdown}
+			</UntrustedMarkdown>
 		</div>
 	);
 }

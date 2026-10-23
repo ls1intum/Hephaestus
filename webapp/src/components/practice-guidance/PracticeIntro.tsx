@@ -21,6 +21,8 @@ export interface PracticeIntroProps {
 	practice: Pick<PracticeStanding, "whyItMatters" | "whatGoodLooksLike">;
 	/** The picture, which arrives after the words. The guide is the level's Guide tab. */
 	guidance: PracticeGuidanceState;
+	/** The level of the "What good looks like" label: `h4` inside a record sheet's section. */
+	labelAs?: "h2" | "h4";
 }
 
 /**
@@ -29,7 +31,7 @@ export interface PracticeIntroProps {
  * fails. Everything shares one text column and the body size, `text-sm`, as the guide does: the lead
  * stands out by its place and its ink, not by a larger size.
  */
-export function PracticeIntro({ practice, guidance }: PracticeIntroProps) {
+export function PracticeIntro({ practice, guidance, labelAs = "h2" }: PracticeIntroProps) {
 	// `ssr: false`, or a level that mounts with the request in flight shows the skeleton at once.
 	const showSkeleton = useSpinDelay(guidance.status === "loading", {
 		delay: 1000,
@@ -71,7 +73,7 @@ export function PracticeIntro({ practice, guidance }: PracticeIntroProps) {
 				</p>
 			)}
 			{settled !== undefined && visual === undefined && hasText(caption) && (
-				<LabelledBlock label="What good looks like" className="flex flex-col gap-1.5">
+				<LabelledBlock label="What good looks like" as={labelAs} className="flex flex-col gap-1.5">
 					<p className="text-sm text-pretty">{caption}</p>
 				</LabelledBlock>
 			)}

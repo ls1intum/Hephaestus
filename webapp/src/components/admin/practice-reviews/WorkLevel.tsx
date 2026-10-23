@@ -8,6 +8,7 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
+import { SectionStack } from "@/components/layout/SectionStack";
 import { RefusalFixLink } from "@/components/practice-trace/RefusalFixLink";
 import {
 	ITEM_EVENT_FOUND_BY,
@@ -20,6 +21,7 @@ import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { itemKindLabel, itemName } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
+import { levelFoldKey } from "./level-folds";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
 import {
 	type SheetEvent,
@@ -73,6 +75,8 @@ export function WorkLevel({
 	const events = eventsState?.status === "ready" ? eventsState.events : [];
 	const latest = latestEvent(events);
 	const latestReview = reviews[0];
+	const factsFailed = factsState?.status === "error";
+	const eventsFailed = eventsState?.status === "error";
 	const header = (
 		<ReviewLevelHeader
 			nested={nested}
@@ -143,69 +147,76 @@ export function WorkLevel({
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
 				{requestOutcome}
-				<SheetSection part="what">
-					<ReviewFactGrid>
-						<ReviewFact label="Kind">{itemKindLabel(item.kind, 1, item.provider)}</ReviewFact>
-						{hasText(item.container) && !item.label.includes(item.container) && (
-							<ReviewFact label="Where">{item.container}</ReviewFact>
-						)}
-						{hasText(item.path) && (
-							<ReviewFact label="Path">
-								<code className="break-all">{item.path}</code>
-							</ReviewFact>
-						)}
-						{hasText(item.parentId) && (
-							<ReviewFact label="Part of">
-								<InlineLink render={<DetailStackLink entry={itemLevel(item.parentId)} />}>
-									Open the work it belongs to
-								</InlineLink>
-							</ReviewFact>
-						)}
-						{factsState?.status === "ready" &&
-							factsState.facts.map((fact) => (
-								<ReviewFact key={fact.name} label={fact.name}>
-									<FactValue fact={fact} />
+				<SectionStack>
+					<SheetSection
+						part="what"
+						foldKey={factsFailed ? undefined : levelFoldKey("work", "what")}
+					>
+						<ReviewFactGrid>
+							<ReviewFact label="Kind">{itemKindLabel(item.kind, 1, item.provider)}</ReviewFact>
+							{hasText(item.container) && !item.label.includes(item.container) && (
+								<ReviewFact label="Where">{item.container}</ReviewFact>
+							)}
+							{hasText(item.path) && (
+								<ReviewFact label="Path">
+									<code className="break-all">{item.path}</code>
 								</ReviewFact>
+							)}
+							{hasText(item.parentId) && (
+								<ReviewFact label="Part of">
+									<InlineLink render={<DetailStackLink entry={itemLevel(item.parentId)} />}>
+										Open the work it belongs to
+									</InlineLink>
+								</ReviewFact>
+							)}
+							{factsState?.status === "ready" &&
+								factsState.facts.map((fact) => (
+									<ReviewFact key={fact.name} label={fact.name}>
+										<FactValue fact={fact} />
+									</ReviewFact>
+								))}
+						</ReviewFactGrid>
+						{factsFailed && (
+							<QueryErrorAlert
+								error={factsState.error}
+								title="We could not load what the provider reports about this work"
+								onRetry={factsState.onRetry}
+							/>
+						)}
+					</SheetSection>
+					<SheetSection
+						part="state"
+						foldKey={eventsFailed ? undefined : levelFoldKey("work", "state")}
+						description="Reviews of this work and what became of its recorded events."
+					>
+						{eventsState?.status === "loading" && <LevelBodySkeleton />}
+						{eventsFailed && (
+							<QueryErrorAlert
+								error={eventsState.error}
+								title="We could not load the events on this work"
+								onRetry={eventsState.onRetry}
+							/>
+						)}
+						{(eventsState === undefined || eventsState.status === "ready") &&
+							(history.length === 0 ? (
+								<p className="text-sm text-muted-foreground">No event was recorded on this work.</p>
+							) : (
+								<SheetHistory events={history} />
 							))}
-					</ReviewFactGrid>
-					{factsState?.status === "error" && (
-						<QueryErrorAlert
-							error={factsState.error}
-							title="We could not load what the provider reports about this work"
-							onRetry={factsState.onRetry}
-						/>
-					)}
-				</SheetSection>
-				<SheetSection
-					part="state"
-					description="Reviews of this work and what became of its recorded events."
-				>
-					{eventsState?.status === "loading" && <LevelBodySkeleton />}
-					{eventsState?.status === "error" && (
-						<QueryErrorAlert
-							error={eventsState.error}
-							title="We could not load the events on this work"
-							onRetry={eventsState.onRetry}
-						/>
-					)}
-					{(eventsState === undefined || eventsState.status === "ready") &&
-						(history.length === 0 ? (
-							<p className="text-sm text-muted-foreground">No event was recorded on this work.</p>
-						) : (
-							<SheetHistory events={history} />
-						))}
-				</SheetSection>
-				<SheetTechnical
-					facts={[
-						{ label: "Work ID", value: <code>{item.id}</code>, copy: item.id },
-						{ label: "Kind", value: <code>{item.kind}</code> },
-						{
-							label: "Latest version",
-							value: hasText(latest?.itemVersion) ? <code>{latest.itemVersion}</code> : "—",
-							copy: latest?.itemVersion ?? undefined,
-						},
-					]}
-				/>
+					</SheetSection>
+					<SheetTechnical
+						foldKey={levelFoldKey("work", "technical")}
+						facts={[
+							{ label: "Work ID", value: <code>{item.id}</code>, copy: item.id },
+							{ label: "Kind", value: <code>{item.kind}</code> },
+							{
+								label: "Latest version",
+								value: hasText(latest?.itemVersion) ? <code>{latest.itemVersion}</code> : "—",
+								copy: latest?.itemVersion ?? undefined,
+							},
+						]}
+					/>
+				</SectionStack>
 			</DrawerBody>
 			{onRequestReview !== undefined && (
 				<DrawerFooter>

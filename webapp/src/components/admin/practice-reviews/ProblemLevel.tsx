@@ -8,11 +8,14 @@ import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
+import { SectionStack } from "@/components/layout/SectionStack";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { DrawerBody } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
 
+import { levelFoldKey } from "./level-folds";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
+import { SheetSection } from "./RecordSheet";
 import { citationLocation, ResultEvidence } from "./ResultEvidence";
 import { resultLevel } from "./review-levels";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
@@ -69,49 +72,67 @@ export function ProblemLevel({ nested, path, problem: state }: ProblemLevelProps
 		<>
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
-				<ReviewFactGrid>
-					<ReviewFact label="Practice">
-						<span className="break-words">{state.problem.practiceName}</span>
-					</ReviewFact>
-					{location !== undefined && (
-						<ReviewFact label="Location">
-							<span className="font-mono text-xs break-all">{location}</span>
-						</ReviewFact>
-					)}
-					<ReviewFact label="Result">
-						{/* One record sheet stands at a time (`layeredStack`): its parent takes its place, and Back returns here. */}
-						<DetailStackLink
-							entry={resultLevel(state.problem.resultId)}
-							single
-							className="underline-offset-4 hover:underline"
+				<SectionStack>
+					<SheetSection part="what" foldKey={levelFoldKey("problem", "what")}>
+						<ReviewFactGrid>
+							<ReviewFact label="Practice">
+								<span className="break-words">{state.problem.practiceName}</span>
+							</ReviewFact>
+							{location !== undefined && (
+								<ReviewFact label="Location">
+									<span className="font-mono text-xs break-all">{location}</span>
+								</ReviewFact>
+							)}
+							<ReviewFact label="Result">
+								{/* One record sheet stands at a time (`layeredStack`): its parent takes its place, and Back returns here. */}
+								<DetailStackLink
+									entry={resultLevel(state.problem.resultId)}
+									single
+									className="underline-offset-4 hover:underline"
+								>
+									{state.problem.result.summary ?? state.problem.result.practiceName}
+								</DetailStackLink>
+							</ReviewFact>
+						</ReviewFactGrid>
+					</SheetSection>
+					{!state.problem.evidenceHidden && hasText(problem.explanation) && (
+						<Section
+							level={3}
+							size="lg"
+							title="Why this was raised"
+							foldKey={levelFoldKey("problem", "why")}
 						>
-							{state.problem.result.summary ?? state.problem.result.practiceName}
-						</DetailStackLink>
-					</ReviewFact>
-				</ReviewFactGrid>
-				{state.problem.evidenceHidden ? (
-					<p className="text-sm text-muted-foreground">The evidence of this problem is hidden.</p>
-				) : (
-					<>
-						{hasText(problem.explanation) && (
-							<Section level={3} size="sm" title="Why this was raised">
-								{/* The review writes its explanation in Markdown. */}
-								<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
-									<UntrustedMarkdown>{problem.explanation}</UntrustedMarkdown>
-								</div>
-							</Section>
-						)}
-						<Section level={3} size="sm" title="Evidence">
+							{/* The review writes its explanation in Markdown. */}
+							<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
+								<UntrustedMarkdown>{problem.explanation}</UntrustedMarkdown>
+							</div>
+						</Section>
+					)}
+					{!state.problem.evidenceHidden && (
+						<Section
+							level={3}
+							size="lg"
+							title="Evidence"
+							foldKey={levelFoldKey("problem", "evidence")}
+						>
 							<ResultEvidence citations={problem.citations} />
 						</Section>
-						{hasText(problem.nextStep) && (
-							<Section level={3} size="sm" title="Next step">
-								<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
-									<UntrustedMarkdown>{problem.nextStep}</UntrustedMarkdown>
-								</div>
-							</Section>
-						)}
-					</>
+					)}
+					{!state.problem.evidenceHidden && hasText(problem.nextStep) && (
+						<Section
+							level={3}
+							size="lg"
+							title="Next step"
+							foldKey={levelFoldKey("problem", "next-step")}
+						>
+							<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
+								<UntrustedMarkdown>{problem.nextStep}</UntrustedMarkdown>
+							</div>
+						</Section>
+					)}
+				</SectionStack>
+				{state.problem.evidenceHidden && (
+					<p className="text-sm text-muted-foreground">The evidence of this problem is hidden.</p>
 				)}
 				<p className="text-sm text-muted-foreground">
 					A mark applies to the whole result, not to one problem. Open the result to mark it

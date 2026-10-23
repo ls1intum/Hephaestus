@@ -34,14 +34,14 @@ function SafeAnchor({ href, children, className }: AnchorHTMLAttributes<HTMLAnch
 }
 
 /** Carries {@link UntrustedMarkdownProps.headingLevel} to the headings. */
-const HeadingLevelContext = createContext<3 | 4>(4);
+const HeadingLevelContext = createContext<3 | 4 | 5>(4);
 
 /**
  * Every heading in the body takes one level, so a composed message cannot outrank the page heading
  * or the heading of the section it sits under. The visual size comes from the prose classes below.
  */
 function DemotedHeading({ children, className }: HTMLAttributes<HTMLHeadingElement>) {
-	const Heading = useContext(HeadingLevelContext) === 3 ? "h3" : "h4";
+	const Heading = `h${useContext(HeadingLevelContext)}` as const;
 	return <Heading className={className}>{children}</Heading>;
 }
 
@@ -181,7 +181,7 @@ export interface UntrustedMarkdownProps {
 	 */
 	streaming?: boolean;
 	/** The level of every heading in the body: one below the heading of the section it sits under. */
-	headingLevel?: 3 | 4;
+	headingLevel?: 3 | 4 | 5;
 }
 
 /**

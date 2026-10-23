@@ -47,7 +47,7 @@ function AccordionTrigger({
 	children,
 	headingLevel = 3,
 	...props
-}: AccordionPrimitive.Trigger.Props & { headingLevel?: 2 | 3 | 4 }) {
+}: AccordionPrimitive.Trigger.Props & { headingLevel?: 2 | 3 | 4 | 5 }) {
 	const Heading = `h${headingLevel}` as const;
 	return (
 		// `w-full min-w-0 flex-1`, not the bare `flex` shadcn ships. Base UI's Header renders an `<h3>`

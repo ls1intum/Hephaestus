@@ -25,6 +25,8 @@ export interface WorkspacePracticeDefinitionProps {
 	notice?: ReactNode;
 	/** What the practice script needs, beside its code; see `PracticeDefinitionPreview`. */
 	practiceScript?: ReactNode;
+	/** `4` under a record sheet's `h3` section; see `PracticeDefinitionPreview`. */
+	headingLevel?: 4;
 }
 
 export function WorkspacePracticeDefinition({
@@ -35,6 +37,7 @@ export function WorkspacePracticeDefinition({
 	resetAction,
 	notice,
 	practiceScript,
+	headingLevel,
 }: WorkspacePracticeDefinitionProps) {
 	const { feedbackMode, currentVersion } = practice;
 	return (
@@ -73,6 +76,7 @@ export function WorkspacePracticeDefinition({
 				version={currentVersion.number}
 				options={definitionOptions}
 				practiceScript={practiceScript}
+				headingLevel={headingLevel}
 			/>
 		</div>
 	);

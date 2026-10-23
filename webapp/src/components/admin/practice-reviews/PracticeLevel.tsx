@@ -11,12 +11,14 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { detailStackKey } from "@/components/layout/detail-drawer/detail-stack";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
+import { SectionStack } from "@/components/layout/SectionStack";
 import { FEEDBACK_MODE_DEFS } from "@/components/practice-vocabulary/feedback-mode-defs";
 import { FeedbackModeSourceNote } from "@/components/practice-vocabulary/FeedbackModeSourceNote";
 import { DrawerBody } from "@/components/ui/drawer";
 import { feedbackModeSourceOf } from "@/lib/practice-feedback-mode";
 import { hasText } from "@/lib/text";
 
+import { levelFoldKey } from "./level-folds";
 import {
 	type SheetEvent,
 	SheetHistory,
@@ -127,47 +129,58 @@ export function PracticeLevel({
 	return (
 		<>
 			{header}
-			<DrawerBody className="flex flex-col gap-8 pt-2">
-				<SheetSection part="what">
-					<WorkspacePracticeDefinition
-						practice={practice}
-						definitionOptions={state.definitionOptions}
-						groupName={groupName}
-						showStanding={false}
-					/>
-				</SheetSection>
-				<SheetSection part="state">
-					<SheetHistory
-						events={[
-							...practiceHistory(practice),
-							...(versions?.status === "ready" ? versions.versions.map(versionEvent) : []),
+			<DrawerBody className="pt-2">
+				<SectionStack>
+					<SheetSection part="what" foldKey={levelFoldKey("practice", "what")}>
+						<WorkspacePracticeDefinition
+							practice={practice}
+							definitionOptions={state.definitionOptions}
+							groupName={groupName}
+							showStanding={false}
+							headingLevel={4}
+						/>
+					</SheetSection>
+					<SheetSection
+						part="state"
+						foldKey={versions?.status === "error" ? undefined : levelFoldKey("practice", "state")}
+					>
+						<SheetHistory
+							events={[
+								...practiceHistory(practice),
+								...(versions?.status === "ready" ? versions.versions.map(versionEvent) : []),
+							]}
+						/>
+						{versions?.status === "error" && (
+							<QueryErrorAlert
+								error={versions.error}
+								title="We could not load the versions of this practice"
+								onRetry={versions.onRetry}
+							/>
+						)}
+					</SheetSection>
+					<SheetTechnical
+						foldKey={levelFoldKey("practice", "technical")}
+						facts={[
+							{ label: "Slug", value: <code>{practice.slug}</code>, copy: practice.slug },
+							{ label: "Practice ID", value: practice.id, copy: practice.id },
+							{
+								label: "Group",
+								value: hasText(practice.groupSlug) ? (
+									<code>{practice.groupSlug}</code>
+								) : (
+									"Unassigned"
+								),
+							},
+							{ label: "Current version", value: String(practice.currentVersion.number) },
+							{
+								label: "Practice script",
+								value: hasText(practice.currentVersion.definition?.script)
+									? "Written for this practice"
+									: "Built-in",
+							},
 						]}
 					/>
-					{versions?.status === "error" && (
-						<QueryErrorAlert
-							error={versions.error}
-							title="We could not load the versions of this practice"
-							onRetry={versions.onRetry}
-						/>
-					)}
-				</SheetSection>
-				<SheetTechnical
-					facts={[
-						{ label: "Slug", value: <code>{practice.slug}</code>, copy: practice.slug },
-						{ label: "Practice ID", value: practice.id, copy: practice.id },
-						{
-							label: "Group",
-							value: hasText(practice.groupSlug) ? <code>{practice.groupSlug}</code> : "Unassigned",
-						},
-						{ label: "Current version", value: String(practice.currentVersion.number) },
-						{
-							label: "Practice script",
-							value: hasText(practice.currentVersion.definition?.script)
-								? "Written for this practice"
-								: "Built-in",
-						},
-					]}
-				/>
+				</SectionStack>
 			</DrawerBody>
 		</>
 	);

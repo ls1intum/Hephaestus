@@ -10,6 +10,11 @@ import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
+import {
+	expectSectionHeadings,
+	expectSectionLines,
+	expectSectionsFold,
+} from "@/stories/section-lines";
 import { minutesBefore } from "@/stories/story-clock";
 import { levelsOpenedBy, listOpenedBy } from "@/test/detail-stack";
 
@@ -30,6 +35,7 @@ import {
 	reviewUsageUnpriced,
 	resultCounts,
 } from "./fixtures";
+import { forgetLevelFolds } from "./level-folds";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { REQUEST_BLOCKED } from "./RequestReviewAction";
 import { reviewLevel } from "./review-levels";
@@ -83,6 +89,11 @@ const meta = {
 			{(level) => <ReviewLevel {...args} {...level} />}
 		</InLevelStack>
 	),
+	// A fold is kept in this browser, so every story starts with all sections open.
+	beforeEach: () => {
+		forgetLevelFolds("review");
+		return () => forgetLevelFolds("review");
+	},
 } satisfies Meta<typeof ReviewLevel>;
 
 export default meta;
@@ -102,6 +113,10 @@ export const Default: Story = {
 			"Every practice",
 			SHEET_SECTIONS.technical,
 		]);
+		// One line between each two sections, one section size, and every section folds.
+		await expectSectionLines(panelElement, 3);
+		await expectSectionHeadings(panelElement);
+		await expectSectionsFold(panelElement, userEvent);
 		// Status, time from request and the finishing time once, in the status line.
 		const status = panelElement.querySelector("[data-sheet-status]");
 		await expect(status).toHaveTextContent(/Complete.*5 min from request.*finished/u);
@@ -693,6 +708,47 @@ export const FeedbackChecksFailed: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		panel.getByText("We could not load the feedback checks");
+	},
+};
+
+/** A saved fold must not conceal a later failed read or its retry. */
+export const FoldedFeedbackChecksFail: Story = {
+	args: {
+		feedbackChecks: { status: "ready", checks: reviewFeedbackChecksOf(reviewDetailCompleted) },
+	},
+	play: async ({ args, mount, userEvent }) => {
+		await mount();
+		let panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: "Feedback checks of the review" }));
+		await expect(
+			panel.getByRole("button", { name: "Feedback checks of the review" }),
+		).toHaveAttribute("aria-expanded", "false");
+		const retry = fn();
+		await mount(
+			<InLevelStack entry={reviewLevel(reviewDetailCompleted.id)} path={args.path}>
+				{(level) => (
+					<ReviewLevel
+						{...args}
+						{...level}
+						feedbackChecks={{ status: "error", error: { status: 500 }, onRetry: retry }}
+					/>
+				)}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		await expect(panel.getByText("We could not load the feedback checks")).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await mount(
+			<InLevelStack entry={reviewLevel(reviewDetailCompleted.id)} path={args.path}>
+				{(level) => <ReviewLevel {...args} {...level} />}
+			</InLevelStack>,
+		);
+		panel = within(await settledDrawerPanel());
+		const restored = panel.getByRole("button", { name: "Feedback checks of the review" });
+		await expect(restored).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(restored);
+		await expect(restored).toHaveAttribute("aria-expanded", "true");
 	},
 };
 
