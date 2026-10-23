@@ -260,7 +260,9 @@ export const PartialReview: Story = {
 	args: { state: readyWith({ review: { ...review, status: "PARTIAL" } }) },
 	play: async () => {
 		const panel = within(await settledReviewPanel());
-		await expect(panel.getByText("Partial")).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Partial" })).toHaveAccessibleDescription(
+			"The review’s results cover only the work it reached.",
+		);
 		await expect(panel.queryByText(/did not finish|stopped before/iu)).toBeNull();
 		await expect(
 			within(practiceTable()).getByRole("button", { name: focused.practiceName }),
