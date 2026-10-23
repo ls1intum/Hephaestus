@@ -947,6 +947,9 @@ logging:
                 max-length: 8192
                 max-throwable-depth: 32
                 include-hashes: true
+                # The root cause first, then each wrapper: when a long chain of wrappers reaches the bound,
+                # the outermost frames are cut, not the failure that started it.
+                root: first
     level:
         # Hibernate logs the driver's message for every failed statement, and PostgreSQL's message
         # quotes rejected row values. The exception still reaches the caller, which logs its class.
