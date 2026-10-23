@@ -34,11 +34,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The Practice profile row folds like the admin sections; its pages, the profile first, sit under it. */
+/** The "Your practices" row folds like the admin sections; its pages, the profile first, sit under it. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		// The Practice profile is the workspace home, so its row leads; Activity follows it.
-		const section = canvas.getByRole("button", { name: "Practice profile" });
+		// The Practice profile is the workspace home, so its section leads; Activity follows it.
+		const section = canvas.getByRole("button", { name: "Your practices" });
 		await expect(section).toHaveAttribute("aria-expanded", "false");
 		const links = canvas.getAllByRole("link");
 		await expect(links.map((link) => link.textContent)).toEqual([
@@ -53,8 +53,8 @@ export const Default: Story = {
 /** Opened, the profile and the workspace's view of the same groups sit under the row. */
 export const PracticePagesOpen: Story = {
 	play: async ({ canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Practice profile" }));
-		const pages = within(canvas.getByRole("list", { name: "Practice profile" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Your practices" }));
+		const pages = within(canvas.getByRole("list", { name: "Your practices" }));
 		await expect(pages.getAllByRole("link").map((link) => link.textContent)).toEqual([
 			"Practice profile",
 			"Across the workspace",
@@ -74,7 +74,7 @@ export const PracticePagesOpen: Story = {
 export const PressingTheRowTogglesItsPages: Story = {
 	parameters: { router: { initialUrl: "/w/aet/activity" } },
 	play: async ({ canvas }) => {
-		const section = canvas.getByRole("button", { name: "Practice profile" });
+		const section = canvas.getByRole("button", { name: "Your practices" });
 		await expect(section).toHaveAttribute("aria-expanded", "false");
 		await userEvent.click(section);
 		await expect(section).toHaveAttribute("aria-expanded", "true");
@@ -90,9 +90,9 @@ export const PressingTheRowTogglesItsPages: Story = {
 export const PressingTheProfileEntryOpensIt: Story = {
 	parameters: { router: { initialUrl: "/w/aet/activity" } },
 	play: async ({ canvas }) => {
-		const section = canvas.getByRole("button", { name: "Practice profile" });
+		const section = canvas.getByRole("button", { name: "Your practices" });
 		await userEvent.click(section);
-		const pages = within(canvas.getByRole("list", { name: "Practice profile" }));
+		const pages = within(canvas.getByRole("list", { name: "Your practices" }));
 		await userEvent.click(pages.getByRole("link", { name: "Practice profile" }));
 		await expect(pages.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
 			"data-active",
@@ -107,7 +107,7 @@ export const PressingTheProfileEntryOpensIt: Story = {
 export const PracticeProfileFolded: Story = {
 	parameters: { router: { initialUrl: "/w/aet/practice-profile" } },
 	play: async ({ canvas }) => {
-		const section = canvas.getByRole("button", { name: "Practice profile" });
+		const section = canvas.getByRole("button", { name: "Your practices" });
 		await expect(section).toHaveAttribute("aria-expanded", "true");
 		await expect(section).not.toHaveAttribute("data-active");
 		await userEvent.click(section);
@@ -125,7 +125,7 @@ export const PracticeProfileWithLayerOpen: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Practice profile" })).toHaveAttribute(
+		await expect(canvas.getByRole("button", { name: "Your practices" })).toHaveAttribute(
 			"aria-expanded",
 			"true",
 		);
@@ -139,7 +139,7 @@ export const PracticeProfileWithLayerOpen: Story = {
 export const PracticePagesFolded: Story = {
 	decorators: [withIconOnlySidebar],
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("link", { name: "Practice profile" })).toHaveAttribute(
+		await expect(canvas.getByRole("link", { name: "Your practices" })).toHaveAttribute(
 			"href",
 			"/w/aet/practice-profile",
 		);
@@ -158,7 +158,7 @@ export const AcrossTheWorkspaceActiveFolded: Story = {
 		await expect(canvas.getByRole("link", { name: "Across the workspace" })).toHaveAttribute(
 			"data-active",
 		);
-		await expect(canvas.getByRole("link", { name: "Practice profile" })).not.toHaveAttribute(
+		await expect(canvas.getByRole("link", { name: "Your practices" })).not.toHaveAttribute(
 			"data-active",
 		);
 	},
@@ -174,7 +174,7 @@ export const AcrossTheWorkspaceActive: Story = {
 		await expect(canvas.getByRole("link", { name: "Practice profile" })).not.toHaveAttribute(
 			"data-active",
 		);
-		await expect(canvas.getByRole("button", { name: "Practice profile" })).not.toHaveAttribute(
+		await expect(canvas.getByRole("button", { name: "Your practices" })).not.toHaveAttribute(
 			"data-active",
 		);
 	},

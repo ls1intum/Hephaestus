@@ -50,7 +50,7 @@ export function NavDashboards({
 				    Icon-only, the row is the profile's own link, so it stays one press away. */}
 				{practicesEnabled && (
 					<NavSection
-						label="Practice profile"
+						label="Your practices"
 						icon={<Compass />}
 						// Anywhere in the section, the profile with its slide-in layers included, opens it.
 						active={onPracticeProfile || onAcrossTheWorkspace}
