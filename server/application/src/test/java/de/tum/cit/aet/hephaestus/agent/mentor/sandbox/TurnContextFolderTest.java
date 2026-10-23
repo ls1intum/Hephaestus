@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ExecSandboxes;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.TurnJwt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ContextLoadException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ContextLoader;
@@ -22,7 +23,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -47,6 +47,7 @@ class TurnContextFolderTest extends BaseUnitTest {
     private final FakeExecSandboxes runtime = new FakeExecSandboxes();
     private final TurnSandboxes sandboxes = new TurnSandboxes(runtime, 0);
     private final List<List<String>> staged = new ArrayList<>();
+    private final Map<String, String> stagedFiles = new LinkedHashMap<>();
     private final DefaultListableBeanFactory beans = new DefaultListableBeanFactory();
     private final TurnContextFolder folder = new TurnContextFolder(
             sandboxes, beans.getBeanProvider(ContextLoader.class), Clock.fixed(NOW, ZoneOffset.UTC));
@@ -83,18 +84,11 @@ class TurnContextFolderTest extends BaseUnitTest {
         };
     }
 
-    /** Answers the scripts as the sandbox would: staging records its archive, a read finds the staged files. */
+    /** Answers as the sandbox would: staging records its archive, a read finds the staged files. */
     private void sandboxAnswers(String execStdout) {
+        runtime.onStage = staging -> staged.add(entries(staging.archive()));
         runtime.answer = command -> {
             String script = command.argv().get(2);
-            if (script.equals(TurnContextFolder.ADD_SCRIPT) || script.equals(TurnContextFolder.LOAD_SCRIPT)) {
-                assertThat(command.root()).as("staging runs as root").isTrue();
-                staged.add(entries(Objects.requireNonNull(command.stdin())));
-                return execution(0, "");
-            }
-            assertThat(command.root())
-                    .as("the model's commands run unprivileged")
-                    .isFalse();
             if (script.equals(TurnContextFolder.READ_SCRIPT)) {
                 String file = command.argv().get(4);
                 boolean present =
@@ -112,12 +106,16 @@ class TurnContextFolderTest extends BaseUnitTest {
         return new ExecSandboxes.Execution(exit, stdout.getBytes(StandardCharsets.UTF_8), new byte[0], false);
     }
 
-    private static List<String> entries(InputStream archive) {
+    /** The files of a staged archive, by name; their contents go to {@link #stagedFiles}. */
+    private List<String> entries(InputStream archive) {
         List<String> names = new ArrayList<>();
         try (var tar = new TarArchiveInputStream(archive)) {
             TarArchiveEntry entry;
             while ((entry = tar.getNextEntry()) != null) {
-                if (!entry.isDirectory()) names.add(entry.getName());
+                if (!entry.isDirectory()) {
+                    names.add(entry.getName());
+                    stagedFiles.put(entry.getName(), new String(tar.readAllBytes(), StandardCharsets.UTF_8));
+                }
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -137,6 +135,11 @@ class TurnContextFolderTest extends BaseUnitTest {
         assertThat(first.path("ok").asBoolean()).as(first.toString()).isTrue();
         assertThat(second.path("text").asString()).isEqualTo("{\n");
         assertThat(staged).containsExactly(List.of("inputs/context/user.json", "INDEX.md"));
+        assertThat(runtime.stagings)
+                .singleElement()
+                .isInstanceOfSatisfying(
+                        ExecSandboxes.Add.class, add -> assertThat(add.names()).containsExactly("inputs", "INDEX.md"));
+        assertThat(stagedFiles).containsEntry("inputs/context/user.json", "{\n  \"counts\" : 3\n}");
         assertThat(runtime.createdCount()).isOne();
     }
 
@@ -151,6 +154,9 @@ class TurnContextFolderTest extends BaseUnitTest {
 
         assertThat(item.path("ok").asBoolean()).as(item.toString()).isTrue();
         assertThat(staged.getLast()).containsExactly("inputs/context/issue/7.json");
+        assertThat(runtime.stagings.getLast())
+                .isInstanceOfSatisfying(
+                        ExecSandboxes.Add.class, add -> assertThat(add.names()).containsExactly("inputs"));
         assertThat(unknown.path("error").asString()).isEqualTo("NOT_FOUND");
         assertThat(unknown.path("detail").asString()).isEqualTo("File not found: inputs/context/issue/8.json");
     }
@@ -199,8 +205,7 @@ class TurnContextFolderTest extends BaseUnitTest {
 
         assertThat(ran.path("timedOut").asBoolean()).isTrue();
         assertThat(ran.path("exitCode").isNull()).isTrue();
-        assertThat(runtime.commands.getLast().argv()).containsExactly("sh", "-c", "kill -KILL -1");
-        assertThat(runtime.commands.getLast().root()).isFalse();
+        assertThat(runtime.cancelled).containsExactly("container-1");
     }
 
     @Test
@@ -233,12 +238,11 @@ class TurnContextFolderTest extends BaseUnitTest {
         assertThat(loaded.path("path").asString()).isEqualTo("repos/github.com/acme/api");
         assertThat(loaded.path("resolved").path("cite").asString()).isEqualTo("@abcdef1");
         assertThat(staged.getLast()).containsExactly("README.md");
-        assertThat(runtime.commands.getLast().argv())
-                .contains(
-                        "/workspace/repos/github.com/acme/api",
-                        "/workspace/repos",
-                        "/workspace/repos/github.com",
-                        "/workspace/repos/github.com/acme");
+        assertThat(stagedFiles).containsEntry("README.md", "# API\n");
+        assertThat(runtime.stagings.getLast())
+                .isInstanceOfSatisfying(
+                        ExecSandboxes.Replace.class,
+                        replace -> assertThat(replace.directory()).isEqualTo("repos/github.com/acme/api"));
         assertThat(folder.load(turn, turn.expiresAt(), documents(), "repos/github.com/acme/hidden")
                         .path("error")
                         .asString())
@@ -301,7 +305,6 @@ class TurnContextFolderTest extends BaseUnitTest {
 
         assertThat(loaded.path("note").asString()).isEqualTo("Loaded.\nMerge base with main: abcdef123456");
         ExecSandboxes.Command summary = runtime.commands.getLast();
-        assertThat(summary.root()).as("the model's own user runs it").isFalse();
         assertThat(summary.argv()).containsSubsequence("/workspace/repos/github.com/acme/api", "git-summary", "main");
     }
 
@@ -351,9 +354,9 @@ class TurnContextFolderTest extends BaseUnitTest {
         ObjectNode ran = folder.exec(turn(Duration.ofMinutes(5)), NOW.plusSeconds(300), documents(), "sleep 100", 1000);
 
         assertThat(ran.path("timedOut").asBoolean()).isTrue();
-        assertThat(runtime.commands.getLast().argv())
+        assertThat(runtime.cancelled)
                 .as("a child that left the process group dies too")
-                .containsExactly("sh", "-c", "kill -KILL -1");
+                .containsExactly("container-1");
     }
 
     @Test
@@ -363,11 +366,13 @@ class TurnContextFolderTest extends BaseUnitTest {
         beans.registerSingleton("loader", new Loader(checkout));
         TurnJwt turn = turn(Duration.ofMinutes(5));
         folder.read(turn, turn.expiresAt(), documents(), "INDEX.md", null, null);
-        var staging = runtime.answer;
-        runtime.answer = command -> command.argv().get(2).equals(TurnContextFolder.LOAD_SCRIPT)
-                ? new ExecSandboxes.Execution(
-                        2, new byte[0], "tar: no space left".getBytes(StandardCharsets.UTF_8), false)
-                : staging.apply(command);
+        var stage = runtime.onStage;
+        runtime.onStage = staging -> {
+            if (staging instanceof ExecSandboxes.Replace) {
+                throw new SandboxException("Staging into the turn sandbox failed: exit 2");
+            }
+            stage.accept(staging);
+        };
 
         ObjectNode failed = folder.load(turn, turn.expiresAt(), documents(), "repos/github.com/acme/api");
 
@@ -408,9 +413,9 @@ class TurnContextFolderTest extends BaseUnitTest {
         CompletableFuture<ObjectNode> loading = CompletableFuture.supplyAsync(
                 () -> folder.load(turn, turn.expiresAt(), documents(), "repos/github.com/acme/api"));
         Thread.sleep(300);
-        assertThat(runtime.commands)
+        assertThat(runtime.stagings)
                 .as("the load waits for the command")
-                .noneMatch(command -> command.argv().get(2).equals(TurnContextFolder.LOAD_SCRIPT));
+                .noneMatch(ExecSandboxes.Replace.class::isInstance);
 
         commandEnds.countDown();
         assertThat(running.get().path("ok").asBoolean()).isTrue();
@@ -480,6 +485,7 @@ class TurnContextFolderTest extends BaseUnitTest {
         assertThat(loaded.path("note").asString())
                 .as("a summary that timed out is left out")
                 .isEqualTo("Loaded.");
+        assertThat(runtime.cancelled).as("its processes end").containsExactly(sandbox.containerId());
         assertThat(folder.exec(turn, turn.expiresAt(), documents(), "true", null)
                         .path("ok")
                         .asBoolean())

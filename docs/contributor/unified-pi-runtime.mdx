@@ -584,7 +584,10 @@ These rules apply to the endpoints:
 - A path that leaves `/workspace` gets the same `NOT_FOUND` text as an absent file. `read` also reads `/tmp/heph-out/<n>.log`.
 - A page is at most 2,000 lines or 50 KB (`PiText`). A longer line gets Pi's notice with a `sed` command.
 - A command runs as `timeout --kill-after=2s <t> bash -c …`. The bound `t` is the smallest of the asked timeout, 60 seconds, and the time left in the turn.
-- If a command still runs 5 seconds after its bound, the worker runs `kill -KILL -1` as the sandbox user. The image has no `pkill`.
+- The worker cancels sandbox commands that exceed their bound by 5 seconds or are killed by their timeout (`ExecSandboxes.cancelCommands`).
+  The cancellation ends every process of the sandbox user, also a child that left the command's process group.
+  The sandbox stays in use for the next calls.
+  On Docker, the worker runs `kill -KILL -1` as the sandbox user, because the image has no `pkill`.
 - `exec` writes the full output to `/tmp/heph-out/<n>.log` and returns the last 2,000 lines or 50 KB, with Pi's notice.
 - The command gets no environment from the host or the worker. `GIT_CONFIG_*` sets `safe.directory=*`, because root owns the folder.
 - A load path is `repos/<host>/<full path>[@ref]`. A ref is a branch, a SHA, `pull/N` on GitHub, or `merge-request/N` on GitLab.
@@ -612,7 +615,7 @@ The request fixtures `sandbox-read`, `sandbox-exec` and `sandbox-load` in `agent
 | Property | Value |
 | --- | --- |
 | Image and policy | The agent image of the release, under `ContainerSecurityPolicy` |
-| Process | `sleep infinity` under Docker `--init`, as user 1000 |
+| Process | `sleep infinity` under Docker `--init`, as root. Commands run as user 1000. |
 | Folder | `/workspace`, a tmpfs of 512 MiB, read-only for the user |
 | Scratch | `/tmp`, the tmpfs of the policy |
 | Network | `none` |
@@ -659,9 +662,18 @@ The call after it gets a new sandbox.
 
 #### Staging
 
-`TurnContextFolder` stages the folder on the first call of an attempt.
-It sends INDEX.md and the attempt's documents as one tar on the standard input of `docker exec --user 0`.
-The script extracts the tar into `/workspace` and then runs `chmod -R a-w`.
+`TurnContextFolder` stages the folder on the first call of an attempt (`ExecSandboxes.stage`).
+An `Add` sends INDEX.md and the attempt's documents as one tar into `/workspace`.
+A load sends a `Replace`: the tar replaces one directory, for example `repos/<host>/<path>`, with all its contents.
+The worker owns the tar stream, and the sandbox reads exactly its size.
+A staged path is a plain path in `/workspace`.
+After a staging, the sandbox user cannot write the folder or what the tar wrote.
+
+`exec` runs commands only as the sandbox user, so no command can stage.
+A failed staging can leave part of the tar, so the worker removes that sandbox.
+
+On Docker, a staging is a script that runs through `docker exec --user 0`.
+The script extracts the tar and then runs `chmod -R a-w`.
 The script reads the stream with `head -c`, because docker-java does not close the standard input of an exec.
 
 `HephTurnContexts` builds the fixed documents once for each attempt, as JSON with times in the developer's time zone.

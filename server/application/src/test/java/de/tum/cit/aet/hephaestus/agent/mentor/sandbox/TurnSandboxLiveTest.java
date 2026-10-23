@@ -19,11 +19,14 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +52,9 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Heph's context folder in real turn sandboxes on the local Docker daemon, with the agent image named by
- * {@code HEPHAESTUS_AGENT_IMAGE_REFERENCE}: staging, {@code read}, {@code bash} with Git on a loaded repository, the
- * read-only folder, the timeout, and the removal of a sandbox while its command runs. It logs the time of each step.
+ * {@code HEPHAESTUS_AGENT_IMAGE_REFERENCE}: staging and replacing with exact bytes, {@code read}, {@code bash} with Git
+ * on a loaded repository, the read-only folder, the timeout and its cancellation of a detached child, and the removal
+ * of a sandbox while its command runs. It logs the time of each step.
  */
 @LiveDockerTest
 @Tag("live")
@@ -173,8 +177,38 @@ class TurnSandboxLiveTest {
         assertThat(history.path("exitCode").asInt()).as(history.toString()).isZero();
         assertThat(history.path("output").asString()).contains("Second commit", "First commit");
 
+        assertThat(folder.exec(turn, turn.expiresAt(), documents(), "sha256sum inputs/context/user.json", null)
+                        .path("output")
+                        .asString())
+                .as("the added document has its exact bytes")
+                .startsWith(sha256("{\n  \"counts\" : 3\n}"));
+        assertThat(folder.exec(
+                                turn,
+                                turn.expiresAt(),
+                                documents(),
+                                "sha256sum repos/github.com/acme/api/README.md",
+                                null)
+                        .path("output")
+                        .asString())
+                .as("the loaded file has its exact bytes")
+                .startsWith(sha256("# API\n\nSecond line.\n"));
+
         ObjectNode write = folder.exec(turn, turn.expiresAt(), documents(), "touch INDEX.md.new || echo refused", null);
         assertThat(write.path("output").asString()).contains("refused");
+        ObjectNode append = folder.exec(
+                turn,
+                turn.expiresAt(),
+                documents(),
+                "(echo x >> inputs/context/user.json) 2>/dev/null || echo refused",
+                null);
+        assertThat(append.path("output").asString()).contains("refused");
+        ObjectNode addition = folder.exec(
+                turn,
+                turn.expiresAt(),
+                documents(),
+                "touch repos/github.com/acme/api/new 2>/dev/null || echo refused",
+                null);
+        assertThat(addition.path("output").asString()).contains("refused");
         ObjectNode environment = folder.exec(turn, turn.expiresAt(), documents(), "env | grep -c TOKEN || true", null);
         assertThat(environment.path("output").asString().strip()).isEqualTo("0");
 
@@ -188,11 +222,37 @@ class TurnSandboxLiveTest {
                         .asString())
                 .startsWith("1\n2\n");
 
+        Files.delete(repository.resolve("README.md"));
+        Files.writeString(repository.resolve("NOTES.md"), "notes\n");
+        ObjectNode reloaded = folder.load(turn, turn.expiresAt(), documents(), "repos/github.com/acme/api");
+        assertThat(reloaded.path("ok").asBoolean()).as(reloaded.toString()).isTrue();
+        assertThat(folder.exec(turn, turn.expiresAt(), documents(), "ls repos/github.com/acme/api", null)
+                        .path("output")
+                        .asString())
+                .as("a second load replaces the directory")
+                .isEqualTo("NOTES.md\n");
+
         long timeoutStarted = System.nanoTime();
-        ObjectNode slow = folder.exec(turn, turn.expiresAt(), documents(), "sleep 30", 1000);
+        ObjectNode slow = folder.exec(
+                turn,
+                turn.expiresAt(),
+                documents(),
+                "setsid sh -c 'echo $$ > /tmp/detached.pid; exec sleep 300' & sleep 30",
+                1000);
         log.info("TIMING exec with a 1 s timeout: {} ms", millis(timeoutStarted));
         assertThat(slow.path("timedOut").asBoolean()).as(slow.toString()).isTrue();
         assertThat(millis(timeoutStarted)).isLessThan(10_000);
+        ObjectNode detached = folder.exec(
+                turn,
+                turn.expiresAt(),
+                documents(),
+                "[ -s /tmp/detached.pid ] || { echo missing; exit 0; }; p=$(cat /tmp/detached.pid);"
+                        + " for i in 1 2 3 4 5 6 7 8 9 10; do"
+                        + " kill -0 \"$p\" 2>/dev/null || { echo gone; exit 0; }; sleep 0.2; done; echo alive",
+                null);
+        assertThat(detached.path("output").asString())
+                .as("the cancellation ends a child that left the command's process group")
+                .isEqualTo("gone\n");
         ObjectNode after = folder.exec(turn, turn.expiresAt(), documents(), "echo still here", null);
         assertThat(after.path("output").asString())
                 .as("the kill of the sandbox user's processes leaves the sandbox running")
@@ -345,6 +405,11 @@ class TurnSandboxLiveTest {
                 public void close() {}
             };
         }
+    }
+
+    private static String sha256(String content) throws NoSuchAlgorithmException {
+        return HexFormat.of()
+                .formatHex(MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8)));
     }
 
     private static long millis(long startedNanos) {
