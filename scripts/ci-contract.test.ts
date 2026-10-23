@@ -667,6 +667,7 @@ void describe("CI contract", () => {
 		assert.deepEqual(matrixValues(matrix, "shard"), [
 			"providers",
 			"runtime-and-startup",
+			"practices-and-agent",
 			"application",
 		]);
 		assert.equal(

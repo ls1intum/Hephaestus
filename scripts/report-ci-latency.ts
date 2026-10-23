@@ -39,10 +39,11 @@ export function selectLatencyRuns(value: unknown, releaseBranch: string, now: nu
 		);
 }
 
-// The sampling window still holds runs from before the integration tier gained a third shard.
+// The sampling window still holds runs from earlier integration shard layouts.
 const INTEGRATION_LAYOUTS = [
 	["providers-and-startup", "application"],
 	["providers", "runtime-and-startup", "application"],
+	["providers", "runtime-and-startup", "practices-and-agent", "application"],
 ];
 
 export function isFullVerification(jobs: readonly { name: string }[]) {

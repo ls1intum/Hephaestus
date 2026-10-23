@@ -849,10 +849,12 @@ If no such default-branch commit exists, the run builds every image itself. `det
 
 - `Quality` legs and `Test` suites start from source. `Build` gates start when `App Server: Package`
   uploads its artifact.
-- `App Server: Integration` has three shards.
+- `App Server: Integration` has four shards.
   `providers` selects the `integration` package.
   `runtime-and-startup` selects the `core.database`, `agent.job` and `core.privacy` packages, plus `StartupBudgetIntegrationTest`.
-  Package patterns include their subpackages. `application` excludes the selections of both other shards.
+  `practices-and-agent` selects the `practices` and `agent` packages.
+  It excludes the `runtime-and-startup` selection, so `agent.job` stays in that shard.
+  Package patterns include their subpackages. `application` excludes the selections of all other shards.
   All shards retain the `integration` tag
   filter and run in separate JVMs and Testcontainers databases. The startup test and the
   `core.database` tests own databases separate from other Spring contexts. Gradle's native test filters partition

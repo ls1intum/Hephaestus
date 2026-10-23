@@ -20,6 +20,7 @@ const requiredJobs = [
 	"Test / App Server: Integration (application)",
 	"Test / App Server: Integration (providers)",
 	"Test / App Server: Integration (runtime-and-startup)",
+	"Test / App Server: Integration (practices-and-agent)",
 	"Security / Dependencies, secrets, and policy",
 	"CI Status Gate",
 ];
@@ -108,14 +109,21 @@ await test("every required artifact, test, security and final verdict must succe
 	}
 });
 
-await test("a run from the earlier two-shard integration layout cannot approve reuse", async () => {
-	const data = fixture();
-	data.jobs = [
-		...data.jobs.filter((job) => !job.name.startsWith("Test / App Server: Integration (")),
-		{ name: "Test / App Server: Integration (providers-and-startup)", conclusion: "success" },
-		{ name: "Test / App Server: Integration (application)", conclusion: "success" },
-	];
-	assert.equal(await resolve(data), undefined);
+await test("a run from an earlier integration shard layout cannot approve reuse", async () => {
+	for (const shards of [
+		["providers-and-startup", "application"],
+		["providers", "runtime-and-startup", "application"],
+	]) {
+		const data = fixture();
+		data.jobs = [
+			...data.jobs.filter((job) => !job.name.startsWith("Test / App Server: Integration (")),
+			...shards.map((shard) => ({
+				name: `Test / App Server: Integration (${shard})`,
+				conclusion: "success",
+			})),
+		];
+		assert.equal(await resolve(data), undefined, shards.join(","));
+	}
 });
 
 await test("rejects expired, unhashed and foreign artifacts even when the run passed", async () => {
