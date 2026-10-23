@@ -1,9 +1,8 @@
-import { ChevronRightIcon, CopyIcon } from "lucide-react";
+import { CopyIcon } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
 import { Section } from "@/components/layout/Section";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { copyToClipboard } from "@/lib/clipboard";
 import { hasText } from "@/lib/text";
 
@@ -13,8 +12,10 @@ import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 /**
  * The parts every record sheet of Practice reviews is built from, in the same order on every sheet:
  * the header's one status line, then "What it is", "State and history", "Details", "Technical"
- * (open by default) and the actions as the footer. The status of the record is said in the
- * status line only, a past event only in the history, and every time absolute.
+ * and the actions as the footer. The status of the record is said in the status line only, a past
+ * event only in the history, and every time absolute. Every sheet's sections take the size of a
+ * practice surface's sections. Every sheet stands its sections in a `SectionStack` and lets each
+ * of them fold under its own key (`levelFoldKey`), open by default.
  */
 
 export interface SheetStatusLineProps {
@@ -79,6 +80,7 @@ export function SheetSection({
 	title,
 	description,
 	actions,
+	foldKey,
 	children,
 }: {
 	part: Exclude<keyof typeof SHEET_SECTIONS, "technical">;
@@ -86,14 +88,18 @@ export function SheetSection({
 	title?: string;
 	description?: ReactNode;
 	actions?: React.ReactElement;
+	/** Lets the admin fold the section away, kept per sheet and section (`levelFoldKey`). */
+	foldKey?: string;
 	children: ReactNode;
 }) {
 	return (
 		<Section
 			level={3}
+			size="lg"
 			title={title ?? SHEET_SECTIONS[part]}
 			description={description}
 			actions={actions}
+			foldKey={foldKey}
 			className="min-w-0"
 			data-sheet-section={part}
 		>
@@ -180,23 +186,24 @@ export interface TechnicalFact {
 
 export function SheetTechnical({
 	facts,
+	foldKey,
 	children,
 }: {
 	facts: readonly TechnicalFact[];
+	/** Where the fold is kept (`levelFoldKey`); identifiers are what an admin folds away first. */
+	foldKey: string;
 	children?: ReactNode;
 }) {
 	return (
-		<Collapsible data-sheet-section="technical" className="min-w-0" defaultOpen>
-			<h3 className="text-lg font-semibold">
-				<CollapsibleTrigger className="group -ml-1 inline-flex min-h-6 items-center gap-1.5 rounded-md px-1 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-					<ChevronRightIcon
-						aria-hidden
-						className="size-4 transition-transform group-data-[panel-open]:rotate-90 motion-reduce:transition-none"
-					/>
-					{SHEET_SECTIONS.technical}
-				</CollapsibleTrigger>
-			</h3>
-			<CollapsibleContent className="mt-3 space-y-4">
+		<Section
+			level={3}
+			size="lg"
+			title={SHEET_SECTIONS.technical}
+			foldKey={foldKey}
+			className="min-w-0"
+			data-sheet-section="technical"
+		>
+			<div className="space-y-4">
 				<ReviewFactGrid>
 					{facts.map((fact) => (
 						<ReviewFact key={fact.label} label={fact.label}>
@@ -221,7 +228,7 @@ export function SheetTechnical({
 					))}
 				</ReviewFactGrid>
 				{children}
-			</CollapsibleContent>
-		</Collapsible>
+			</div>
+		</Section>
 	);
 }

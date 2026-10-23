@@ -35,6 +35,12 @@ export interface PracticeDefinitionPreviewProps {
 	 * models to assign, so the catalog passes none.
 	 */
 	practiceScript?: ReactNode;
+	/**
+	 * `4` where the definition sits under a record sheet's `h3` section: its labels and folds take
+	 * `h4`, and the headings of the guide and of the criteria `h5`. Left out, it keeps the levels of
+	 * the practice pages.
+	 */
+	headingLevel?: 4;
 }
 
 function Lines({ lines }: { lines: readonly string[] }) {
@@ -56,6 +62,7 @@ export function PracticeDefinitionPreview({
 	options,
 	version,
 	practiceScript,
+	headingLevel,
 }: PracticeDefinitionPreviewProps) {
 	const itemType = options.itemTypes.find((candidate) => candidate.kind === kind);
 	const eventLabel = (name: string) =>
@@ -76,6 +83,7 @@ export function PracticeDefinitionPreview({
 	return (
 		<div className="space-y-6">
 			<PracticeIntro
+				labelAs={headingLevel === 4 ? "h4" : "h2"}
 				practice={guidance}
 				guidance={{
 					status: "ready",
@@ -86,9 +94,13 @@ export function PracticeDefinitionPreview({
 			/>
 
 			{guidance.guide !== null && (
-				// `h3`: the guide's own headings are `h4`, and the outline may not skip a level.
-				<LabelledBlock label="Guide" as="h3" className="flex flex-col gap-3">
-					<PracticeGuideMarkdown guide={guidance.guide} />
+				// One above the guide's own headings, as the outline may not skip a level.
+				<LabelledBlock
+					label="Guide"
+					as={headingLevel === 4 ? "h4" : "h3"}
+					className="flex flex-col gap-3"
+				>
+					<PracticeGuideMarkdown guide={guidance.guide} headingLevel={headingLevel === 4 ? 5 : 4} />
 				</LabelledBlock>
 			)}
 
@@ -138,18 +150,20 @@ export function PracticeDefinitionPreview({
 
 			<Accordion aria-label="Practice review details">
 				<AccordionItem value="review-rule">
-					<AccordionTrigger>How it decides</AccordionTrigger>
+					<AccordionTrigger headingLevel={headingLevel}>How it decides</AccordionTrigger>
 					<AccordionContent>
 						{/* The editor promises "Markdown is supported", and this is the one definition field
 						    that uses it. `max-w-2xl` because the drawer reaches 62rem. */}
 						<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "max-w-2xl")}>
-							<UntrustedMarkdown>{definition.criteria}</UntrustedMarkdown>
+							<UntrustedMarkdown headingLevel={headingLevel === 4 ? 5 : 4}>
+								{definition.criteria}
+							</UntrustedMarkdown>
 						</div>
 					</AccordionContent>
 				</AccordionItem>
 				{script !== null && (
 					<AccordionItem value="practice-script">
-						<AccordionTrigger>Practice script</AccordionTrigger>
+						<AccordionTrigger headingLevel={headingLevel}>Practice script</AccordionTrigger>
 						{/* Gaps rather than margins: the panel's own paragraph margin would double them. */}
 						<AccordionContent className="flex flex-col gap-4 [&_p:not(:last-child)]:mb-0">
 							{practiceScript}

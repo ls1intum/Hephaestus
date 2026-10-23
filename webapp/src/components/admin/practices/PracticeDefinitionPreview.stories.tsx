@@ -267,3 +267,33 @@ export const WithVisualAndGuide: Story = {
 		);
 	},
 };
+
+/**
+ * Under a record sheet's `h3` section (the admin's practice sheet), every label and fold steps down
+ * one level, so the outline skips none; Practice setup and the catalog keep the levels above.
+ */
+export const UnderASheetSection: Story = {
+	args: {
+		...WithVisualAndGuide.args,
+		headingLevel: 4,
+		definition: {
+			...definition,
+			script: null,
+			criteria: CriteriaIsMarkdown.args?.definition?.criteria ?? "",
+			guidance: { ...definition.guidance, ...bundledPractice, guide: bundledGuidance.guide },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.queryAllByRole("heading", { level: 2 })).toHaveLength(0);
+		await expect(canvas.queryAllByRole("heading", { level: 3 })).toHaveLength(0);
+		canvas.getByRole("heading", { level: 4, name: "What good looks like" });
+		const guide = canvas.getByRole("region", { name: "Guide" });
+		within(guide).getByRole("heading", { level: 4, name: "Guide" });
+		within(guide).getByRole("heading", { level: 5, name: "How to do it" });
+		await userEvent.click(canvas.getByRole("button", { name: "How it decides" }));
+		canvas.getByRole("heading", { level: 4, name: "How it decides" });
+		await expect(
+			await canvas.findByRole("heading", { name: "The standard", level: 5 }),
+		).toBeVisible();
+	},
+};

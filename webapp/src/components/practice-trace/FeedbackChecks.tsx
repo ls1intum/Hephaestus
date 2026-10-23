@@ -19,18 +19,28 @@ import {
 
 export interface FeedbackChecksProps {
 	checks: FeedbackCheck[];
+	/**
+	 * Set where the section around the box is already called "Checks": the box then names itself
+	 * only when a check stopped the feedback, and its steps take the level below that section's.
+	 */
+	inChecksSection?: boolean;
 }
 
-export function FeedbackChecks({ checks }: FeedbackChecksProps) {
+export function FeedbackChecks({ checks, inChecksSection = false }: FeedbackChecksProps) {
 	if (checks.length === 0) {
 		return null;
 	}
 	const stopped = checks.some((check) => !check.allowed);
+	const titled = stopped || !inChecksSection;
 
 	return (
 		<section className="min-w-0 rounded-lg border bg-card p-4 text-sm">
-			<h4 className="font-medium">{stopped ? "Why this was not sent" : "Feedback checks"}</h4>
-			<p className="mt-1 text-xs text-muted-foreground">
+			{titled && (
+				<h4 className="mb-1 font-medium">
+					{stopped ? "Why this was not sent" : "Feedback checks"}
+				</h4>
+			)}
+			<p className="text-xs text-muted-foreground">
 				Checks run in order. After a check stops the feedback, later checks do not run.
 			</p>
 			<Accordion multiple className="mt-3">
@@ -38,7 +48,11 @@ export function FeedbackChecks({ checks }: FeedbackChecksProps) {
 					const value = `${check.stage}-${check.checkedAt.toISOString()}-${index}`;
 					return (
 						<AccordionItem key={value} value={value}>
-							<AccordionTrigger className="gap-3 no-underline hover:no-underline">
+							{/* A step below the box's own heading where it has one, else below the sheet's section. */}
+							<AccordionTrigger
+								headingLevel={titled ? 5 : 4}
+								className="gap-3 no-underline hover:no-underline"
+							>
 								<span className="min-w-0 flex-1">
 									<span className="block break-words">
 										{FEEDBACK_CHECK_STAGE_LABELS[check.stage]}

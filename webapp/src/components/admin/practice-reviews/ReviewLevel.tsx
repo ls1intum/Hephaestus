@@ -21,6 +21,7 @@ import { type StatusDef, statusToneClass } from "@/components/common/status-def"
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { Section } from "@/components/layout/Section";
+import { SectionStack } from "@/components/layout/SectionStack";
 import { FeedbackChecks } from "@/components/practice-trace/FeedbackChecks";
 import { PracticeScriptTraceLine } from "@/components/practice-trace/PracticeScriptTraceLine";
 import { FOUND_BY_DESCRIPTIONS, FOUND_BY_LABELS } from "@/components/practice-trace/trace-format";
@@ -44,6 +45,7 @@ import { formatCostUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
 import { firstStartedAt, jobPhases } from "./job-utils";
+import { levelFoldKey } from "./level-folds";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
 import {
 	type SheetEvent,
@@ -175,39 +177,49 @@ export function ReviewLevel({
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
 				{requestOutcome}
-				<SheetSection part="what">
-					<ReviewWhat workspaceSlug={workspaceSlug} review={review} eventLabel={eventLabel} />
-				</SheetSection>
-				<SheetSection part="state">
-					<ReviewHistory review={review} />
-				</SheetSection>
-				<SheetSection part="details" title="Every practice">
-					<ReviewPracticeList workspaceSlug={workspaceSlug} review={review} />
-				</SheetSection>
-				{feedbackChecks !== undefined && <ReviewFeedbackChecks state={feedbackChecks} />}
-				{scripted.length > 0 && (
+				<SectionStack>
+					<SheetSection part="what" foldKey={levelFoldKey("review", "what")}>
+						<ReviewWhat workspaceSlug={workspaceSlug} review={review} eventLabel={eventLabel} />
+					</SheetSection>
+					<SheetSection part="state" foldKey={levelFoldKey("review", "state")}>
+						<ReviewHistory review={review} />
+					</SheetSection>
 					<SheetSection
 						part="details"
-						title="Practice scripts"
-						description="How each practice script ran in this review."
+						title="Every practice"
+						foldKey={levelFoldKey("review", "practices")}
 					>
-						<ReviewPracticeScriptTable workspaceSlug={workspaceSlug} practices={scripted} />
-						<p className="text-xs text-muted-foreground">
-							Spend is on{" "}
-							<InlineLink
-								render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
-							>
-								AI usage
-							</InlineLink>
-							.
-						</p>
+						<ReviewPracticeList workspaceSlug={workspaceSlug} review={review} />
 					</SheetSection>
-				)}
-				<SheetTechnical facts={technicalFacts(review)}>
-					{review.usage.attempts.length > 1 && <UsageAttempts attempts={review.usage.attempts} />}
-					<ReviewJobs jobs={review.runtime?.jobs} />
-					<GeneratedPaths review={review} />
-				</SheetTechnical>
+					{feedbackChecks !== undefined && <ReviewFeedbackChecks state={feedbackChecks} />}
+					{scripted.length > 0 && (
+						<SheetSection
+							part="details"
+							title="Practice scripts"
+							description="How each practice script ran in this review."
+							foldKey={levelFoldKey("review", "practice-scripts")}
+						>
+							<ReviewPracticeScriptTable workspaceSlug={workspaceSlug} practices={scripted} />
+							<p className="text-xs text-muted-foreground">
+								Spend is on{" "}
+								<InlineLink
+									render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
+								>
+									AI usage
+								</InlineLink>
+								.
+							</p>
+						</SheetSection>
+					)}
+					<SheetTechnical
+						facts={technicalFacts(review)}
+						foldKey={levelFoldKey("review", "technical")}
+					>
+						{review.usage.attempts.length > 1 && <UsageAttempts attempts={review.usage.attempts} />}
+						<ReviewJobs jobs={review.runtime?.jobs} />
+						<GeneratedPaths review={review} />
+					</SheetTechnical>
+				</SectionStack>
 			</DrawerBody>
 			{(cancellable || onRequestReview !== undefined) && (
 				<DrawerFooter>
@@ -828,7 +840,13 @@ function ReviewFeedbackChecks({ state }: { state: PanelState<{ checks: FeedbackC
 		return null;
 	}
 	return (
-		<Section level={3} title="Feedback checks of the review" className="min-w-0">
+		<Section
+			level={3}
+			size="lg"
+			title="Feedback checks of the review"
+			foldKey={levelFoldKey("review", "feedback-checks")}
+			className="min-w-0"
+		>
 			{state.status === "loading" && <LevelBodySkeleton />}
 			{state.status === "error" && (
 				<QueryErrorAlert

@@ -14,9 +14,15 @@ import { hasText } from "@/lib/text";
 export interface ResultEvidenceProps {
 	citations: EvidenceCitation[];
 	hidden?: boolean;
+	/** One step below the heading the evidence stands under: `h4` under a section, `h5` under a subsection. */
+	headingLevel?: 4 | 5;
 }
 
-export function ResultEvidence({ citations, hidden = false }: ResultEvidenceProps) {
+export function ResultEvidence({
+	citations,
+	hidden = false,
+	headingLevel = 4,
+}: ResultEvidenceProps) {
 	if (hidden) {
 		return (
 			<p className="text-sm text-muted-foreground">
@@ -39,7 +45,7 @@ export function ResultEvidence({ citations, hidden = false }: ResultEvidenceProp
 				{summaryLine(citations.length, groups.length)}
 			</p>
 			{groups.map((group) => (
-				<EvidenceSourceSection key={group.sourceKind} group={group} />
+				<EvidenceSourceSection key={group.sourceKind} group={group} headingLevel={headingLevel} />
 			))}
 		</div>
 	);
@@ -53,9 +59,16 @@ function summaryLine(citations: number, sources: number): string {
 	return `${passages} from ${sources} sources.`;
 }
 
-function EvidenceSourceSection({ group }: { group: EvidenceSourceGroup }) {
+function EvidenceSourceSection({
+	group,
+	headingLevel,
+}: {
+	group: EvidenceSourceGroup;
+	headingLevel: 4 | 5;
+}) {
 	const { def, citations } = group;
 	const Icon = def.icon;
+	const Heading = headingLevel === 4 ? "h4" : "h5";
 	return (
 		<section className="space-y-3">
 			<div className="flex min-w-0 items-start gap-3">
@@ -63,7 +76,7 @@ function EvidenceSourceSection({ group }: { group: EvidenceSourceGroup }) {
 					<Icon className="size-4 text-muted-foreground" aria-hidden />
 				</span>
 				<div className="min-w-0 flex-1">
-					<h4 className="text-sm font-medium break-words">{def.label}</h4>
+					<Heading className="text-sm font-medium break-words">{def.label}</Heading>
 					<p className="text-xs break-words text-muted-foreground">{def.description}</p>
 				</div>
 				<span className="shrink-0 text-xs text-muted-foreground">

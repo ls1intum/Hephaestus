@@ -16,6 +16,7 @@ import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
+import { SectionStack } from "@/components/layout/SectionStack";
 import { ProblemList } from "@/components/practice-problems/ProblemList";
 import { NON_CURRENT } from "@/components/practice-vocabulary/claim-currentness";
 import {
@@ -36,6 +37,7 @@ import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
 
 import { type CorrectionReasonCopy, CorrectionReasonPopover } from "./CorrectionReason";
+import { levelFoldKey } from "./level-folds";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
 import {
 	ERASED_ACCOUNT,
@@ -154,111 +156,120 @@ export function ResultLevel({
 	return (
 		<>
 			{header}
-			<DrawerBody className="flex flex-col gap-8 pt-2">
-				<SheetSection part="what">
-					<ReviewFactGrid>
-						<ReviewFact label="Practice">
-							<span className="break-words">{record.practiceName}</span>
-						</ReviewFact>
-						<ReviewFact label="Developer">
-							<ReviewPerson person={record.developer} />
-						</ReviewFact>
-						{hasText(record.item.title) && (
-							<ReviewFact label="Reviewed work">
-								<span className="break-words">{record.item.title}</span>
+			<DrawerBody className="pt-2">
+				<SectionStack>
+					<SheetSection part="what" foldKey={levelFoldKey("result", "what")}>
+						<ReviewFactGrid>
+							<ReviewFact label="Practice">
+								<span className="break-words">{record.practiceName}</span>
 							</ReviewFact>
-						)}
-						<ReviewFact label="Started by">
-							<span className="space-y-0.5">
-								<span className="block">{REVIEW_ORIGIN_DEFS[record.origin].label}</span>
-								<span className="block text-muted-foreground">
-									{REVIEW_ORIGIN_DEFS[record.origin].description}
+							<ReviewFact label="Developer">
+								<ReviewPerson person={record.developer} />
+							</ReviewFact>
+							{hasText(record.item.title) && (
+								<ReviewFact label="Reviewed work">
+									<span className="break-words">{record.item.title}</span>
+								</ReviewFact>
+							)}
+							<ReviewFact label="Started by">
+								<span className="space-y-0.5">
+									<span className="block">{REVIEW_ORIGIN_DEFS[record.origin].label}</span>
+									<span className="block text-muted-foreground">
+										{REVIEW_ORIGIN_DEFS[record.origin].description}
+									</span>
 								</span>
-							</span>
-						</ReviewFact>
-					</ReviewFactGrid>
-				</SheetSection>
+							</ReviewFact>
+						</ReviewFactGrid>
+					</SheetSection>
 
-				<SheetSection part="state">
-					<SheetHistory events={resultHistory(record)} now={resultNow(record)} />
-				</SheetSection>
+					<SheetSection part="state" foldKey={levelFoldKey("result", "state")}>
+						<SheetHistory events={resultHistory(record)} now={resultNow(record)} />
+					</SheetSection>
 
-				<SheetSection part="details">
-					<div className="space-y-6">
-						{hasText(record.explanation) && (
-							// Every outcome carries an explanation, so its heading names none: a met or
-							// inapplicable result raised nothing.
-							<Section level={4} size="sm" title="Why this result">
-								{/* The review writes its explanation in Markdown, as the developer's own row shows it. */}
-								<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
-									<UntrustedMarkdown>{record.explanation}</UntrustedMarkdown>
-								</div>
-							</Section>
-						)}
-						{problems.length > 0 && (
-							<Section level={4} size="sm" title="Problems">
-								<ProblemList
-									problems={problems}
-									open={problemLevel}
-									evidence={(problem) => (
-										<ResultEvidence citations={problem.citations} hidden={record.evidenceHidden} />
-									)}
-								/>
-							</Section>
-						)}
-						{openQuestions.length > 0 && (
-							<Section level={4} size="sm" title="Open questions">
-								<ul aria-label="Open questions" className="space-y-4 text-sm">
-									{openQuestions.map((question, index) => (
-										<OpenQuestionItem
-											key={`${question.openQuestion}:${index}`}
-											question={question}
-										/>
-									))}
-								</ul>
-							</Section>
-						)}
-						{/* A not met result's passages are its problems'. Its own section stands only when it
+					<SheetSection part="details" foldKey={levelFoldKey("result", "details")}>
+						<div className="space-y-6">
+							{hasText(record.explanation) && (
+								// Every outcome carries an explanation, so its heading names none: a met or
+								// inapplicable result raised nothing.
+								<Section level={4} size="sm" title="Why this result">
+									{/* The review writes its explanation in Markdown, as the developer's own row shows it. */}
+									<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
+										<UntrustedMarkdown>{record.explanation}</UntrustedMarkdown>
+									</div>
+								</Section>
+							)}
+							{problems.length > 0 && (
+								<Section level={4} size="sm" title="Problems">
+									<ProblemList
+										problems={problems}
+										open={problemLevel}
+										evidence={(problem) => (
+											<ResultEvidence
+												citations={problem.citations}
+												hidden={record.evidenceHidden}
+												headingLevel={5}
+											/>
+										)}
+									/>
+								</Section>
+							)}
+							{openQuestions.length > 0 && (
+								<Section level={4} size="sm" title="Open questions">
+									<ul aria-label="Open questions" className="space-y-4 text-sm">
+										{openQuestions.map((question, index) => (
+											<OpenQuestionItem
+												key={`${question.openQuestion}:${index}`}
+												question={question}
+											/>
+										))}
+									</ul>
+								</Section>
+							)}
+							{/* A not met result's passages are its problems'. Its own section stands only when it
 						    cites something of its own, or when nothing else on the sheet would say that
 						    nothing was quoted. Hidden evidence is neither: the server sends none of it. */}
-						{record.evidenceHidden ? (
-							<Section level={4} size="sm" title="Evidence">
-								<p className="text-sm text-muted-foreground">
-									{record.summary === null ? RESULT_WORDS_UNAVAILABLE : HIDDEN_EVIDENCE}
-								</p>
-							</Section>
-						) : (
-							(citations.length > 0 || problems.length === 0) && (
+							{record.evidenceHidden ? (
 								<Section level={4} size="sm" title="Evidence">
-									<ResultEvidence citations={citations} />
+									<p className="text-sm text-muted-foreground">
+										{record.summary === null ? RESULT_WORDS_UNAVAILABLE : HIDDEN_EVIDENCE}
+									</p>
 								</Section>
-							)
-						)}
-						{/* Only what the record holds: none listed is no claim that none was written. */}
-						{record.feedback.length > 0 && (
-							<Section level={4} size="sm" title="Feedback">
-								<ResultFeedback feedback={record.feedback} />
-							</Section>
-						)}
-					</div>
-				</SheetSection>
+							) : (
+								(citations.length > 0 || problems.length === 0) && (
+									<Section level={4} size="sm" title="Evidence">
+										<ResultEvidence citations={citations} headingLevel={5} />
+									</Section>
+								)
+							)}
+							{/* Only what the record holds: none listed is no claim that none was written. */}
+							{record.feedback.length > 0 && (
+								<Section level={4} size="sm" title="Feedback">
+									<ResultFeedback feedback={record.feedback} />
+								</Section>
+							)}
+						</div>
+					</SheetSection>
 
-				<SheetTechnical
-					facts={[
-						{ label: "Result ID", value: <code>{record.id}</code>, copy: record.id },
-						{ label: "Review ID", value: <code>{record.reviewId}</code>, copy: record.reviewId },
-						{
-							label: "Practice version",
-							value:
-								record.practiceVersionNumber === null ? "—" : String(record.practiceVersionNumber),
-						},
-						{
-							label: "Version",
-							value: record.itemVersion === null ? "—" : <code>{record.itemVersion}</code>,
-						},
-						{ label: "Currentness", value: <code>{record.currentness}</code> },
-					]}
-				/>
+					<SheetTechnical
+						foldKey={levelFoldKey("result", "technical")}
+						facts={[
+							{ label: "Result ID", value: <code>{record.id}</code>, copy: record.id },
+							{ label: "Review ID", value: <code>{record.reviewId}</code>, copy: record.reviewId },
+							{
+								label: "Practice version",
+								value:
+									record.practiceVersionNumber === null
+										? "—"
+										: String(record.practiceVersionNumber),
+							},
+							{
+								label: "Version",
+								value: record.itemVersion === null ? "—" : <code>{record.itemVersion}</code>,
+							},
+							{ label: "Currentness", value: <code>{record.currentness}</code> },
+						]}
+					/>
+				</SectionStack>
 			</DrawerBody>
 			<DrawerFooter>
 				{incorrect === undefined ? (

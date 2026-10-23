@@ -1,13 +1,19 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
+import {
+	expectSectionHeadings,
+	expectSectionLines,
+	expectSectionsFold,
+} from "@/stories/section-lines";
 
 import { practiceVersions, workspacePractices } from "./fixtures";
+import { forgetLevelFolds } from "./level-folds";
 import { PracticeLevel } from "./PracticeLevel";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { practiceLevel } from "./review-levels";
@@ -37,13 +43,18 @@ const meta = {
 			{(level) => <PracticeLevel {...args} {...level} />}
 		</InLevelStack>
 	),
+	// A fold is kept in this browser, so every story starts with all sections open.
+	beforeEach: () => {
+		forgetLevelFolds("practice");
+		return () => forgetLevelFolds("practice");
+	},
 } satisfies Meta<typeof PracticeLevel>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async () => {
+	play: async ({ userEvent }) => {
 		const panelElement = await settledDrawerPanel();
 		const panel = within(panelElement);
 		await expect(
@@ -51,6 +62,15 @@ export const Default: Story = {
 		).toEqual(
 			expect.arrayContaining([SHEET_SECTIONS.what, SHEET_SECTIONS.state, SHEET_SECTIONS.technical]),
 		);
+		// One line between each two sections, one section size, and every section folds.
+		await expectSectionLines(panelElement, 2);
+		// The definition is the one Practice setup shows; its labels and folds step down under the
+		// section, so only the sheet's title is an h2.
+		await expectSectionHeadings(panelElement);
+		await expect(panel.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+		panel.getByRole("heading", { level: 4, name: "What good looks like" });
+		panel.getByRole("heading", { level: 4, name: "How it decides" });
+		await expectSectionsFold(panelElement, userEvent);
 		// No counts: the Practices table's row has them.
 		await expect(panel.queryByText(/^Counts/u)).toBeNull();
 		await expect(panel.queryByText("Feedback delivered")).toBeNull();
@@ -59,6 +79,23 @@ export const Default: Story = {
 			"href",
 			expect.stringContaining("practice-edit"),
 		);
+	},
+};
+
+/** One section folds by its heading button and opens again; header and title stay. */
+export const FoldsASection: Story = {
+	play: async ({ userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		const button = panel.getByRole("button", { name: SHEET_SECTIONS.state });
+		const content = document.getElementById(String(button.getAttribute("aria-controls")));
+		await expect(button).toHaveAttribute("aria-expanded", "true");
+		await expect(content).not.toHaveAttribute("hidden");
+		await userEvent.click(button);
+		await expect(button).toHaveAttribute("aria-expanded", "false");
+		await expect(content).toHaveAttribute("hidden");
+		await userEvent.click(button);
+		await expect(button).toHaveAttribute("aria-expanded", "true");
+		await expect(content).not.toHaveAttribute("hidden");
 	},
 };
 
@@ -112,7 +149,7 @@ export const Loading: Story = {
 
 export const LoadFailed: Story = {
 	args: { practice: { status: "error", error: new Error("Network down"), onRetry: retryPractice } },
-	play: async () => {
+	play: async ({ userEvent }) => {
 		const panel = within(await settledDrawerPanel());
 		await userEvent.click(panel.getByRole("button", { name: "Retry" }));
 		await expect(retryPractice).toHaveBeenCalled();

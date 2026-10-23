@@ -62,6 +62,27 @@ export const Allowed: Story = {
 	},
 };
 
+/** Under a section already called "Checks", the box names itself only when a check stopped. */
+export const InChecksSection: Story = {
+	args: { checks: [allowedCheck], inChecksSection: true },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.queryByRole("heading", { name: "Feedback checks" }),
+		).not.toBeInTheDocument();
+		await expect(canvas.getByRole("heading", { level: 4, name: /Final send/u })).toBeVisible();
+		await openCheck(canvas, /Final send/u);
+		await expect(canvas.getByText("Allowed")).toBeVisible();
+	},
+};
+
+export const StoppedInChecksSection: Story = {
+	args: { checks: [deniedFeedbackCheck], inChecksSection: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "Why this was not sent" })).toBeVisible();
+		await expect(canvas.getByRole("heading", { level: 5, name: /Final send/u })).toBeVisible();
+	},
+};
+
 export const PassedThenStopped: Story = {
 	args: { checks: [{ ...allowedCheck, stage: "COMPOSITION" }, outOfScopeCheck] },
 	play: async ({ canvas }) => {

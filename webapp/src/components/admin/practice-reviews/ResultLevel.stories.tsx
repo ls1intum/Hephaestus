@@ -13,12 +13,18 @@ import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
+import {
+	expectSectionHeadings,
+	expectSectionLines,
+	expectSectionsFold,
+} from "@/stories/section-lines";
 import { daysBefore, hoursBefore } from "@/stories/story-clock";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { levelsOpenedBy } from "@/test/detail-stack";
 import { precedes } from "@/test/dom";
 
 import { resultDetail, reviewResultDetail } from "./fixtures";
+import { forgetLevelFolds } from "./level-folds";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { ResultLevel } from "./ResultLevel";
 import { resultLevel } from "./review-levels";
@@ -100,14 +106,20 @@ const meta = {
 			{(level) => <ResultLevel {...args} {...level} />}
 		</InLevelStack>
 	),
+	// A fold is kept in this browser, so every story starts with all sections open.
+	beforeEach: () => {
+		forgetLevelFolds("result");
+		return () => forgetLevelFolds("result");
+	},
 } satisfies Meta<typeof ResultLevel>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
+	play: async ({ userEvent }) => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
 		await expect(
 			panel.getByRole("heading", {
 				name: "A cache miss and a permission failure come back as the same 404",
@@ -134,6 +146,10 @@ export const Default: Story = {
 			SHEET_SECTIONS.technical,
 		]);
 		panel.getByRole("heading", { name: "Why this result", level: 4 });
+		// One line between each two sections, one section size, and every section folds.
+		await expectSectionLines(panelElement, 3);
+		await expectSectionHeadings(panelElement);
+		await expectSectionsFold(panelElement, userEvent);
 		await expect(panel.getByText("Not met · 3 problems")).toBeVisible();
 		await expect(panel.getAllByText("Major")).toHaveLength(2);
 		await expect(panel.queryByText(/citations/u)).not.toBeInTheDocument();

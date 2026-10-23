@@ -17,6 +17,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
+import { SectionStack } from "@/components/layout/SectionStack";
 import { FeedbackChecks } from "@/components/practice-trace/FeedbackChecks";
 import { UNVERIFIED_HISTORY_NOTE } from "@/components/practice-vocabulary/claim-currentness";
 import {
@@ -61,6 +62,7 @@ import { hasText } from "@/lib/text";
 import { CorrectionReasonPopover, type CorrectionReasonCopy } from "./CorrectionReason";
 import { FeedbackBody } from "./FeedbackBody";
 import { FeedbackLocationLabel } from "./FeedbackLocationLabel";
+import { levelFoldKey } from "./level-folds";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
 import { type ApprovalQueue, ProposalDecision, ProposalPackage } from "./ProposalDecision";
 import {
@@ -213,34 +215,55 @@ export function FeedbackLevel({
 				{record.unverifiedHistory && (
 					<p className="text-sm text-muted-foreground">{UNVERIFIED_HISTORY_NOTE}</p>
 				)}
-				<SheetSection part="what">
-					<FeedbackWhat feedback={record} />
-				</SheetSection>
-				<SheetSection part="state">
-					<SheetHistory events={feedbackHistory(record)} now={feedbackNow(record)} />
-				</SheetSection>
-				{awaitingApproval ? (
-					<ProposalPackage feedback={record} />
-				) : (
-					<SheetSection part="details" title="What it says">
-						{record.copies.length > 0 ? (
-							<ReviewPackage feedback={record} />
-						) : (
-							<FeedbackBody feedback={record} />
-						)}
+				<SectionStack>
+					<SheetSection part="what" foldKey={levelFoldKey("feedback", "what")}>
+						<FeedbackWhat feedback={record} />
 					</SheetSection>
-				)}
-				{record.basis.length > 0 && (
-					<Section level={3} title="Based on" className="min-w-0">
-						<FeedbackBasisList basis={record.basis} />
-					</Section>
-				)}
-				{record.checks.length > 0 && (
-					<Section level={3} title="Checks" className="min-w-0">
-						<FeedbackChecks checks={record.checks} />
-					</Section>
-				)}
-				<SheetTechnical facts={feedbackTechnical(record)} />
+					<SheetSection part="state" foldKey={levelFoldKey("feedback", "state")}>
+						<SheetHistory events={feedbackHistory(record)} now={feedbackNow(record)} />
+					</SheetSection>
+					{awaitingApproval ? (
+						<ProposalPackage feedback={record} />
+					) : (
+						<SheetSection
+							part="details"
+							title="What it says"
+							foldKey={levelFoldKey("feedback", "says")}
+						>
+							{record.copies.length > 0 ? (
+								<ReviewPackage feedback={record} />
+							) : (
+								<FeedbackBody feedback={record} />
+							)}
+						</SheetSection>
+					)}
+					{record.basis.length > 0 && (
+						<Section
+							level={3}
+							size="lg"
+							title="Based on"
+							foldKey={levelFoldKey("feedback", "based-on")}
+							className="min-w-0"
+						>
+							<FeedbackBasisList basis={record.basis} />
+						</Section>
+					)}
+					{record.checks.length > 0 && (
+						<Section
+							level={3}
+							size="lg"
+							title="Checks"
+							foldKey={levelFoldKey("feedback", "checks")}
+							className="min-w-0"
+						>
+							<FeedbackChecks checks={record.checks} inChecksSection />
+						</Section>
+					)}
+					<SheetTechnical
+						facts={feedbackTechnical(record)}
+						foldKey={levelFoldKey("feedback", "technical")}
+					/>
+				</SectionStack>
 			</DrawerBody>
 			{awaitingApproval ? (
 				// The decision is the footer like every sheet's actions, so it stays in reach while the

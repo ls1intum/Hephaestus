@@ -32,6 +32,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
 import { FeedbackBody } from "./FeedbackBody";
+import { levelFoldKey } from "./level-folds";
 import { feedbackLevel } from "./review-levels";
 import { ReviewPackage } from "./ReviewPackage";
 
@@ -41,7 +42,12 @@ export function ProposalPackage({ feedback }: { feedback: ReviewFeedbackDetail }
 	// stand in.
 	if (ADMIN_WITHHELD_TEXT[feedback.destination] !== undefined) {
 		return (
-			<Section level={3} title="What will be sent">
+			<Section
+				level={3}
+				size="lg"
+				title="What will be sent"
+				foldKey={levelFoldKey("feedback", "will-send")}
+			>
 				<FeedbackBody feedback={{ ...feedback, body: null }} />
 			</Section>
 		);
@@ -50,7 +56,9 @@ export function ProposalPackage({ feedback }: { feedback: ReviewFeedbackDetail }
 	return (
 		<Section
 			level={3}
+			size="lg"
 			title="What will be sent"
+			foldKey={levelFoldKey("feedback", "will-send")}
 			description={phrase === "" ? undefined : phrase.charAt(0).toUpperCase() + phrase.slice(1)}
 		>
 			{feedback.copies.length === 0 ? (

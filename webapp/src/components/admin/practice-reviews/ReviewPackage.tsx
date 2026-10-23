@@ -50,7 +50,8 @@ export function ReviewPackage({ feedback, defaultExpanded = false }: ReviewPacka
 				>
 					{notes.map((note) => (
 						<AccordionItem key={note.id} value={note.id}>
-							<AccordionTrigger className="gap-3 no-underline hover:no-underline">
+							{/* One step below the sheet section the package stands in. */}
+							<AccordionTrigger headingLevel={4} className="gap-3 no-underline hover:no-underline">
 								<span className="flex min-w-0 items-start gap-2">
 									<FileCode2Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 									<span className="min-w-0">

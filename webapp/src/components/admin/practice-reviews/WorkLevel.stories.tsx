@@ -9,6 +9,11 @@ import { ReviewRequestedNotice } from "@/components/practice-trace/ReviewRequest
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
+import {
+	expectSectionHeadings,
+	expectSectionLines,
+	expectSectionsFold,
+} from "@/stories/section-lines";
 
 import { levelsOpenedBy } from "@/test/detail-stack";
 import {
@@ -20,6 +25,7 @@ import {
 	reviewItem,
 	trackerIssue,
 } from "./fixtures";
+import { forgetLevelFolds } from "./level-folds";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { itemLevel, reviewLevel } from "./review-levels";
 
@@ -67,6 +73,11 @@ const meta = {
 			{(level) => <WorkLevel {...args} {...level} />}
 		</InLevelStack>
 	),
+	// A fold is kept in this browser, so every story starts with all sections open.
+	beforeEach: () => {
+		forgetLevelFolds("work");
+		return () => forgetLevelFolds("work");
+	},
 } satisfies Meta<typeof WorkLevel>;
 
 export default meta;
@@ -79,6 +90,10 @@ export const WithEvents: Story = {
 		await expect(
 			panel.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),
 		).toStrictEqual([SHEET_SECTIONS.what, SHEET_SECTIONS.state, SHEET_SECTIONS.technical]);
+		// One line between each two sections, one section size, and every section folds.
+		await expectSectionLines(panelElement, 2);
+		await expectSectionHeadings(panelElement);
+		await expectSectionsFold(panelElement, userEvent);
 		const history = within(panel.getByRole("list", { name: "History" }));
 		await expect(history.getAllByRole("listitem")).toHaveLength(reviewItemEvents.length);
 		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
@@ -99,6 +114,23 @@ export const WithEvents: Story = {
 		const confirm = await screen.findByRole("alertdialog");
 		await userEvent.click(within(confirm).getByRole("button", { name: "Request review" }));
 		await expect(args.onRequestReview).toHaveBeenCalledOnce();
+	},
+};
+
+/** One section folds by its heading button and opens again; header and title stay. */
+export const FoldsASection: Story = {
+	play: async ({ userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		const button = panel.getByRole("button", { name: SHEET_SECTIONS.what });
+		const content = document.getElementById(String(button.getAttribute("aria-controls")));
+		await expect(button).toHaveAttribute("aria-expanded", "true");
+		await expect(content).not.toHaveAttribute("hidden");
+		await userEvent.click(button);
+		await expect(button).toHaveAttribute("aria-expanded", "false");
+		await expect(content).toHaveAttribute("hidden");
+		await userEvent.click(button);
+		await expect(button).toHaveAttribute("aria-expanded", "true");
+		await expect(content).not.toHaveAttribute("hidden");
 	},
 };
 
