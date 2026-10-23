@@ -194,7 +194,7 @@ export function ResultLevel({
 								<Section level={4} size="sm" title="Why this result">
 									{/* The review writes its explanation in Markdown, as the developer's own row shows it. */}
 									<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
-										<UntrustedMarkdown>{record.explanation}</UntrustedMarkdown>
+										<UntrustedMarkdown headingLevel={5}>{record.explanation}</UntrustedMarkdown>
 									</div>
 								</Section>
 							)}

@@ -174,11 +174,13 @@ export const MarkdownExplanation: Story = {
 		result: ready({
 			...reviewResultDetail,
 			explanation:
-				"`CacheService.find` returns 404 for a cache miss and for a caller who may not read the entry. The second case is a `403`.",
+				"### Access check\n\n`CacheService.find` returns 404 for a cache miss and for a caller who may not read the entry. The second case is a `403`.",
 		}),
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
+		panel.getByRole("heading", { name: "Why this result", level: 4 });
+		await expect(panel.getByRole("heading", { name: "Access check", level: 5 })).toBeVisible();
 		const code = panel.getByText("CacheService.find", { selector: "code" });
 		await expect(code).toBeVisible();
 		// The typography plugin draws a backtick on each side of inline code unless told not to.
