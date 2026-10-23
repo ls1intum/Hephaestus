@@ -189,7 +189,7 @@ void describe("webapp container entrypoint", () => {
 			assert.equal(result.status, 0, result.stderr);
 			assert.deepEqual(result.runtimeFiles, [
 				".well-known",
-				".well-known/hephaestus.json",
+				path.join(".well-known", "hephaestus.json"),
 				...result.envConfigs,
 				"index.html",
 			]);
