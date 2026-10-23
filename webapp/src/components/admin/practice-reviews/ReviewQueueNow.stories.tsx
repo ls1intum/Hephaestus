@@ -93,15 +93,19 @@ export const Busy: Story = {
 		await expect(opens("2 reviews running").get("queueState")).toBe("RUNNING");
 		await expect(opens("2 reviews running").getAll("status")).toStrictEqual([]);
 		await expect(opens("2 reviews running").get("from")).toBeNull();
-		// The whole figure is the link; its number is black and bold, its label muted.
+		// Number and word are one link, as the outcome counts are; the number is black, the word muted.
 		const running = canvas.getByRole("link", { name: "2 reviews running" });
-		await expect(running).toHaveTextContent("2 running");
-		const number = running.querySelector("[data-figure-value]") ?? now;
+		await expect(running.textContent).toBe("2 running");
+		const number = figureValue(canvas, "running") ?? now;
 		await expect(getComputedStyle(number).color).toBe(getComputedStyle(now).color);
 		await expect(getComputedStyle(number).fontWeight).toBe("600");
 		await expect(getComputedStyle(running).color).not.toBe(getComputedStyle(number).color);
 		// Nothing on hold: a quiet zero opens nothing.
 		await expect(canvas.queryByRole("link", { name: /on hold/u })).toBeNull();
+		// The oldest wait opens the review that waits, number and word as one link too.
+		const oldest = canvas.getByRole("link", { name: "Oldest wait 4 min: open that review" });
+		await expect(oldest.textContent).toBe("4 min oldest wait");
+		await expect(levelsOpenedBy(oldest)).toEqual(["review:0c0c0c0c-0000-4000-8000-000000000003"]);
 		const rows = rowsOf(canvas);
 		await expect(rows).toHaveLength(3);
 		// A small table: work, developer, state and how long, each column lined up down the rows.
@@ -121,7 +125,8 @@ export const Busy: Story = {
 		await expect(levelsOpenedBy(canvas.getByRole("link", { name: "#1423" }))).toEqual([
 			"review:0c0c0c0c-0000-4000-8000-000000000001",
 		]);
-		const all = canvas.getByRole("link", { name: "See all 7" });
+		// The link names no count: it opens reviews by status, which need not add up to the figures.
+		const all = canvas.getByRole("link", { name: "See all" });
 		const search = new URL(all.getAttribute("href") ?? "", "http://x").searchParams;
 		await expect(search.getAll("status")).toStrictEqual(["RUNNING", "QUEUED"]);
 		await expect(now.querySelector(".lucide-triangle-alert")).toBeNull();
@@ -183,6 +188,10 @@ export const LongWait: Story = {
 		await expect(wait).toHaveTextContent("Needs a look: 45 min");
 		await expect(wait?.querySelector(".lucide-triangle-alert")).not.toBeNull();
 		await expect(wait?.querySelector(".text-warning, .text-destructive")).toBeNull();
+		// The link's name keeps the mark its own name would hide.
+		await expect(
+			canvas.getByRole("link", { name: "Oldest wait 45 min, needs a look: open that review" }),
+		).toHaveTextContent("Needs a look: 45 min oldest wait");
 		await expect(canvas.queryByRole("link", { name: /^See all/u })).toBeNull();
 	},
 };
@@ -206,6 +215,8 @@ export const WaitBelowMark: Story = {
 	play: async ({ canvas }) => {
 		const now = canvas.getByRole("region", { name: "The queue" });
 		await expect(figuresOf(canvas)).toContain("oldest wait: 15 min");
+		// That review is not among the first in line, so the wait opens nothing.
+		await expect(canvas.queryByRole("link", { name: /^Oldest wait/u })).toBeNull();
 		await expect(now.querySelector(".lucide-triangle-alert")).toBeNull();
 	},
 };
@@ -245,7 +256,7 @@ export const OnHold: Story = {
 	},
 };
 
-/** Many in line: still three rows, and the count opens them all. */
+/** Many in line: still three rows, and "See all" opens the rest. */
 export const ManyItems: Story = {
 	args: {
 		state: {
@@ -265,12 +276,14 @@ export const ManyItems: Story = {
 	},
 	play: async ({ canvas, userEvent }) => {
 		await expect(rowsOf(canvas)).toHaveLength(3);
-		canvas.getByRole("link", { name: "See all 43" });
-		// How fast the queue empties now is in the card's (i), not under the figures.
+		canvas.getByRole("link", { name: "See all" });
+		// The (i) names no figure that no list opens: neither the pace nor the number of workers.
 		await userEvent.click(canvas.getByRole("button", { name: "About the queue" }));
-		await expect(await screen.findByRole("dialog", { name: "About the queue" })).toHaveTextContent(
-			"Right now, 25 finish an hour, over the last 24 hours.",
+		const about = await screen.findByRole("dialog", { name: "About the queue" });
+		await expect(about).toHaveTextContent(
+			"counts reviews a worker runs now. The count opens them.",
 		);
+		await expect(about).not.toHaveTextContent(/Pace|an hour|4 workers/u);
 	},
 };
 
@@ -309,6 +322,6 @@ export const Dark: Story = {
 	},
 	globals: { theme: "dark" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("link", { name: "See all 7" })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: "See all" })).toBeVisible();
 	},
 };

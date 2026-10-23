@@ -44,9 +44,7 @@ describe("the overview's figures open the lists filtered to them", () => {
 		serveAttention();
 		const { router } = renderRouteAtWithRouter(`${OVERVIEW}?range=30d`);
 
-		await userEvent.click(
-			await screen.findByRole("link", { name: "See all 14" }, ROUTE_RENDER_WAIT),
-		);
+		await userEvent.click(await screen.findByRole("link", { name: "See all" }, ROUTE_RENDER_WAIT));
 		await waitFor(() =>
 			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews"),
 		);

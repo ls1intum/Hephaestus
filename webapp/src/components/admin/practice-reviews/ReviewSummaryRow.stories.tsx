@@ -69,10 +69,37 @@ export const Complete: Story = {
 	},
 };
 
+/** A requested review names its requester as the result tables name a developer: face and name. */
 export const Requested: Story = {
 	args: { review: requested },
 	play: async ({ canvas }) => {
-		canvas.getByText("Grace Hopper");
+		const name = canvas.getByText("Grace Hopper");
+		// The face sits in the same cell as the name, as in the Developer column of Results.
+		await expect(name.closest("td")?.querySelector('[data-slot="avatar"]')).not.toBeNull();
+		await expect(canvas.queryByText("Request")).toBeNull();
+	},
+};
+
+/** A requester the account does not name keeps the placeholder face and the developer fallback. */
+export const RequestedByAnUnnamedAccount: Story = {
+	args: {
+		review: {
+			...requested,
+			requestedBy: { ...reviewAccounts.grace, displayName: null, avatarUrl: null, identities: [] },
+		},
+	},
+	play: async ({ canvas }) => {
+		const name = canvas.getByText("Unnamed developer");
+		await expect(name.closest("td")?.querySelector('[data-slot="avatar"]')).not.toBeNull();
+	},
+};
+
+/** A scheduled review names its origin, not a person. */
+export const Scheduled: Story = {
+	args: { review: { ...completed, origin: "SCHEDULE", requestedBy: null } },
+	play: async ({ canvas }) => {
+		canvas.getByText("Scheduled");
+		await expect(canvas.queryByText("Grace Hopper")).toBeNull();
 	},
 };
 

@@ -126,11 +126,8 @@ export const TestWorkspace: Story = {
 		await expect(
 			canvas.getByRole("table", { name: "First in the queue" }).querySelectorAll("tbody tr")[2],
 		).toHaveTextContent("On hold1 d 18 h");
-		await expect(figuresIn(canvas, "Review time figures")).toEqual([
-			"272 finished",
-			"3 lost to merge",
-			"12 finished after merge",
-		]);
+		// Only what opens its reviews is a figure; the merge's share is said in the (i).
+		await expect(figuresIn(canvas, "Review time figures")).toEqual(["272 finished"]);
 		// Running and finished counts open their reviews.
 		for (const name of ["2 reviews running", "272 reviews finished"]) {
 			canvas.getByRole("link", { name });

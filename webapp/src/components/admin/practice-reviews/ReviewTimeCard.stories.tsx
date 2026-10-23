@@ -12,11 +12,11 @@ type Canvas = StoryContext["canvas"];
 
 const EMPTY_STAGE = { count: 0, medianSeconds: null, p90Seconds: null };
 
-/** A figure's number, by its key: "finished", "lost", "late". */
+/** A figure's number, by its key: "finished". */
 function figureOf(canvas: Canvas, key: string) {
 	return canvas
 		.getByLabelText("Review time figures")
-		.querySelector(`[data-figure="${key}"] > span`);
+		.querySelector(`[data-figure="${key}"] [data-figure-value]`);
 }
 
 /** The typical review's stages as "label value", in their order. */
@@ -88,8 +88,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The local data: the median, then its split into the four stages, which add up to it. Nine reviews
- * finished after the merge, a link away, in the row of figures under it.
+ * The local data: the median, then its split into the four stages, which add up to it. The row under
+ * it holds only what opens its reviews, the finished ones. Counts the Reviews list cannot open, such as
+ * the reviews finished after the merge, are shown nowhere, not even in the (i).
  */
 export const Default: Story = {
 	play: async ({ canvas, canvasElement }) => {
@@ -126,13 +127,12 @@ export const Default: Story = {
 			"Execution",
 			"To developer",
 			"Finished",
-			"Lost to merge",
-			"Finished after merge",
 		]);
-		// No comment was withheld as merged, so only the reviews are said, in the size of every
-		// other figure of the page.
-		await expect(canvas.queryByText(/lost to merge/u)).toBeNull();
-		await expect(figureOf(canvas, "late")).toHaveClass("text-sm");
+		// Nothing about the merge: the Reviews list cannot open those reviews, so they are not shown.
+		await expect(info).not.toContain("merge");
+		await expect(info).toContain(
+			"Finished counts the reviews created in the range that completed, failed or timed out.",
+		);
 		// The stages are one bar, each part as wide as its share of the median.
 		const parts = [...canvasElement.querySelectorAll<HTMLElement>("[data-stage]")];
 		await expect(parts.map((part) => part.dataset.stage)).toEqual([
@@ -147,7 +147,10 @@ export const Default: Story = {
 		await expect(widths[3]).toBeGreaterThan((widths[1] ?? 0) * 10);
 		// Every review recorded its execution start, so no unsplit run is drawn or explained.
 		await expect(canvas.queryByText(/not split/u)).toBeNull();
-		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
+		// The finished figure is the only one, the size of every other figure of the page, and opens
+		// its reviews; the reviews after the merge are no figure.
+		await expect(figureOf(canvas, "finished")).toHaveClass("text-sm");
+		await expect(canvas.queryByText(/after merge/u)).toBeNull();
 		await expect(canvas.getAllByRole("link")).toHaveLength(1);
 	},
 };
@@ -165,7 +168,11 @@ export const FinishedInTheRange: Story = {
 			[...canvas.getByLabelText("Review time figures").querySelectorAll("li")].map(
 				(figure) => figure.textContent,
 			),
-		).toEqual(["34 finished", "9 finished after merge"]);
+		).toEqual(["34 finished"]);
+		// The whole figure is the link, number and word, as the outcome counts are.
+		await expect(canvas.getByRole("link", { name: "34 reviews finished" }).textContent).toBe(
+			"34 finished",
+		);
 		const link = new URL(
 			canvas.getByRole<HTMLAnchorElement>("link", { name: "34 reviews finished" }).href,
 		);
@@ -230,16 +237,15 @@ export const FinishedAfterMerge: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.queryByRole("link", { name: /finished after the merge/u })).toBeNull();
-		await expect(figureOf(canvas, "late")).toHaveTextContent("5");
-		// Said in the (i), for every reader rather than a screen reader alone.
-		await expect(await infoOf(canvas)).toContain("2 of them were started by the merge.");
+		// Neither a figure nor a sentence in the (i): the Reviews list cannot open exactly these.
+		await expect(canvas.queryByText(/after merge/u)).toBeNull();
+		await expect(await infoOf(canvas)).not.toContain("merge");
 	},
 };
 
 /**
- * Twenty-one comments were ready only after the work merged: the card says what the merge cost in
- * comments, not in reviews, as a short label and its number, without a colour.
+ * Twenty-one comments were ready only after the work merged. No list opens exactly those, so they are
+ * neither a figure nor a sentence in the (i).
  */
 export const CommentsLostToMerge: Story = {
 	args: {
@@ -250,11 +256,13 @@ export const CommentsLostToMerge: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		const lost = figureOf(canvas, "lost");
-		await expect(lost).toHaveTextContent("21");
-		await expect(lost).not.toHaveClass("text-warning");
-		await expect(lost).not.toHaveClass("text-destructive");
-		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
+		await expect(canvas.queryByText(/lost to merge/u)).toBeNull();
+		await expect(
+			[...canvas.getByLabelText("Review time figures").querySelectorAll("li")].map(
+				(figure) => figure.textContent,
+			),
+		).toEqual(["34 finished"]);
+		await expect(await infoOf(canvas)).not.toContain("merge");
 	},
 };
 
@@ -433,6 +441,6 @@ export const Narrow: Story = {
 export const Dark: Story = {
 	globals: { theme: "dark" },
 	play: async ({ canvas }) => {
-		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
+		await expect(figureOf(canvas, "finished")).toHaveTextContent("34");
 	},
 };

@@ -73,17 +73,3 @@ export function queueItemState(item: ReviewQueueItem): QueueItemState {
 	}
 	return item.heldForBudget ? "held" : "waiting";
 }
-
-/**
- * A rate as a person says it: whole from ten up, one decimal below, no trailing zero, and "less
- * than 0.1" where rounding would say a review that finished never did.
- */
-export function perHourText(perHour: number): string {
-	if (perHour >= 10) {
-		return String(Math.round(perHour));
-	}
-	if (perHour > 0 && perHour < 0.05) {
-		return "less than 0.1";
-	}
-	return String(Math.round(perHour * 10) / 10);
-}
