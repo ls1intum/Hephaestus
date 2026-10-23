@@ -24,6 +24,7 @@ import { ITEM_KIND_VALUES } from "@/lib/item-kinds";
 import { multiValue, narrowToEnum, nonEmpty } from "@/lib/search-params";
 import { hasText } from "@/lib/text";
 
+import { QUEUE_STATES } from "./review-queue";
 import { type ReviewScope, type ScopeSource, readScope, TIME_ORDERS } from "./review-scope";
 import { positiveIdParam, uuidParam } from "./review-selection";
 
@@ -153,6 +154,8 @@ export const reviewsSearchSchema = z
 		...scope,
 		status: enumValues(statusValues(REVIEW_STATUS_DEFS)),
 		kind: z.enum(["ITEM", "SCAN"]).optional().catch(undefined),
+		// Set by a figure of the queue card; the list shows it as a pill to remove.
+		queueState: z.enum(QUEUE_STATES).optional().catch(undefined),
 	})
 	.transform(canonicalDateRange);
 
@@ -226,6 +229,7 @@ export function reviewsQuery(
 		size,
 		status: nonEmpty(search.status ?? []),
 		kind: search.kind,
+		queueState: search.queueState,
 		itemId: search.itemId,
 		developerId: numericId(search.developerId),
 		sort: search.order,

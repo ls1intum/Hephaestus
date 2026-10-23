@@ -71,6 +71,14 @@ describe("practice review search", () => {
 		]);
 	});
 
+	it("sends the queue state a figure of the queue set, and drops one the queue does not count", () => {
+		expect(reviewsQuery(reviewsSearchSchema.parse({ queueState: "HELD" }), 25).queueState).toBe(
+			"HELD",
+		);
+		expect(reviewsSearchSchema.parse({ queueState: "QUEUED" }).queueState).toBeUndefined();
+		expect(reviewsQuery(reviewsSearchSchema.parse({}), 25).queueState).toBeUndefined();
+	});
+
 	it("drops a reviews window that ends before it starts, rather than querying an empty range", () => {
 		expect(reviewsSearchSchema.parse({ from: "2026-08-10", to: "2026-08-01" }).to).toBeUndefined();
 		// A bare upper bound is not a window at all, and the endpoint would read it as "everything

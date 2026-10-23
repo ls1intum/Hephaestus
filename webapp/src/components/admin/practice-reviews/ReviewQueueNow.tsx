@@ -10,7 +10,6 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { type StatusDef, statusToneClass } from "@/components/common/status-def";
 import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
-import type { ReviewStatus } from "@/components/practice-vocabulary/review-status-defs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { durationText } from "@/lib/dates";
 import { firstNonBlank } from "@/lib/text";
@@ -23,6 +22,7 @@ import {
 	perHourText,
 	QUEUE_ROWS,
 	type QueueItemState,
+	type QueueState,
 	queueItemState,
 	queueTotal,
 	secondsUntilRead,
@@ -109,7 +109,7 @@ function queueInfo(queue: ReviewQueue | undefined) {
 	return [
 		{
 			term: "Waiting",
-			text: "counts reviews that wait for a worker now, not those on hold or waiting before a retry.",
+			text: "counts reviews that wait for a worker now, a retry included, but not those on hold. The count opens them.",
 		},
 		{
 			term: "Running",
@@ -120,7 +120,7 @@ function queueInfo(queue: ReviewQueue | undefined) {
 		},
 		{
 			term: "On hold for budget",
-			text: "counts reviews that wait now because the monthly AI budget is used up. A hold is red.",
+			text: "counts reviews that wait now because the monthly AI budget is used up. A hold is red. The count opens them.",
 		},
 		{
 			term: "Oldest wait",
@@ -148,23 +148,16 @@ function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: 
 		{
 			key: "waiting",
 			term: "waiting",
-			value: <span>{queue.waiting}</span>,
+			value: queue.waiting,
 			none: queue.waiting === 0,
+			link: queueLink(workspaceSlug, "WAITING", queue.waiting, "waiting"),
 		},
 		{
 			key: "running",
 			term: "running",
-			value: (
-				<QueueCount
-					workspaceSlug={workspaceSlug}
-					count={queue.running}
-					status="RUNNING"
-					noun="running"
-				>
-					{queue.running}
-				</QueueCount>
-			),
+			value: queue.running,
 			none: queue.running === 0,
+			link: queueLink(workspaceSlug, "RUNNING", queue.running, "running"),
 		},
 		{
 			key: "held",
@@ -175,6 +168,13 @@ function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: 
 				</QueueHold>
 			),
 			none: queue.heldForBudget === 0,
+			// The link's name hides the hold's "Needs a look", so it says it too.
+			link: queueLink(
+				workspaceSlug,
+				"HELD",
+				queue.heldForBudget,
+				"on hold for budget, needs a look",
+			),
 		},
 	];
 	// While nothing waits there is no oldest wait to tell: "0 waiting" says it already.
@@ -215,39 +215,28 @@ function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: 
 }
 
 /**
- * A count of the queue as the link to the Reviews table filtered to its status, with no days: the
- * queue is now. None of it is plain text.
+ * A figure of the queue as the link to the Reviews table filtered to the same queue state, with no
+ * days: the queue is now. The list keeps the reviews whose job the figure counts, so it shows as
+ * many rows as the figure says. Nothing of it opens nothing.
  */
-function QueueCount({
-	workspaceSlug,
-	count,
-	status,
-	noun,
-	children,
-}: {
-	workspaceSlug: string;
-	count: number;
-	status: ReviewStatus;
-	noun: string;
-	children: ReactNode;
-}) {
+function queueLink(
+	workspaceSlug: string,
+	queueState: QueueState,
+	count: number,
+	noun: string,
+): CardFigure["link"] {
 	if (count === 0) {
-		return <span>{children}</span>;
+		return undefined;
 	}
-	return (
-		<InlineLink
-			tone="count"
-			aria-label={`${count} ${count === 1 ? "review" : "reviews"} ${noun}`}
-			render={
-				<ReviewListLink
-					workspaceSlug={workspaceSlug}
-					destination={{ list: "reviews", search: { status: [status] } }}
-				/>
-			}
-		>
-			{children}
-		</InlineLink>
-	);
+	return {
+		render: (
+			<ReviewListLink
+				workspaceSlug={workspaceSlug}
+				destination={{ list: "reviews", search: { queueState } }}
+			/>
+		),
+		label: `${count} ${count === 1 ? "review" : "reviews"} ${noun}`,
+	};
 }
 
 /**

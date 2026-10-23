@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewListSort;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueueState;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.LinkedHashMap;
@@ -43,6 +44,9 @@ public class ReviewQueriesImpl implements ReviewQueries {
                     "q.status IN (:statuses)",
                     "statuses",
                     filter.status().stream().map(Enum::name).toList());
+        if (filter.queueState() != null)
+            where.append(" AND EXISTS(SELECT 1 FROM review_job j WHERE j.workspace_id=q.workspace_id AND"
+                    + " j.review_id=q.id AND " + queueStatePredicate(filter.queueState()) + ")");
         if (filter.developerId() != null || filter.practiceSlug() != null || filter.groupSlug() != null) {
             var basis = new StringBuilder("EXISTS(SELECT 1 FROM result r JOIN practice p ON p.id=r.practice_id AND"
                     + " p.workspace_id=r.workspace_id LEFT JOIN practice_group g ON g.id=p.group_id AND"
@@ -71,6 +75,18 @@ public class ReviewQueriesImpl implements ReviewQueries {
                 .setParameter("offset", page.getOffset())
                 .getResultList();
         return new PageImpl<>(rows, page, total);
+    }
+
+    /**
+     * The queue's own split of a job, as {@code ReviewRuntimeRepository#queueCountsAt} counts it, so a
+     * figure of the queue and the list it opens agree.
+     */
+    static String queueStatePredicate(ReviewQueueState state) {
+        return switch (state) {
+            case WAITING -> "j.status='QUEUED' AND j.hold_reason IS NULL";
+            case HELD -> "j.status='QUEUED' AND j.hold_reason='BUDGET'";
+            case RUNNING -> "j.status='RUNNING'";
+        };
     }
 
     private static void add(
