@@ -83,6 +83,9 @@ const args = [
 const dockerfile = await readFile(path.join(root, "webapp/Dockerfile"), "utf8");
 const runtime = dockerfile.slice(dockerfile.indexOf("FROM nginx:"));
 assert.ok(runtime.startsWith("FROM nginx:"));
+const fixtureIndex = '<html><script src="/env-config.js"></script>tenant-spa</html>';
+/** The one writable directory of every service that runs the webapp image. */
+const RUNTIME_DIR = "/tmp/hephaestus-webapp";
 
 function selectRelease(release: string) {
 	for (const file of productionFiles) {
@@ -173,6 +176,75 @@ async function waitForBody(port: number, host: string, url: string, expected: st
 		await setTimeout(500);
 	}
 	assert.fail(`The edge did not serve ${expected} at ${host}${url}`);
+}
+
+/**
+ * A service that runs the webapp image serves under the production Compose hardening: the image's
+ * non-root user, a read-only root file system with the runtime directory as its only writable
+ * mount, no capabilities and no privilege gain. Returns the container id.
+ */
+async function assertRestricted(service: string) {
+	const listing = await output("docker", [...args, "ps", "--quiet", service], { env });
+	const id = listing.trim();
+	const container = asRecord(
+		asArray(parseJson(await output("docker", ["inspect", id])), `${service} inspect`)[0],
+		`${service} container`,
+	);
+	const config = asRecord(container.Config, `${service} config`);
+	assert.equal(config.User, "101:101", service);
+	const host = asRecord(container.HostConfig, `${service} host config`);
+	assert.equal(host.ReadonlyRootfs, true, service);
+	assert.deepEqual(host.CapDrop, ["ALL"], service);
+	assert.deepEqual(asArray(host.CapAdd ?? [], `${service} added capabilities`), [], service);
+	assert.ok(
+		asArray(host.SecurityOpt, `${service} security options`).includes("no-new-privileges:true"),
+		service,
+	);
+	assert.deepEqual(Object.keys(asRecord(host.Tmpfs, `${service} tmpfs`)), [RUNTIME_DIR], service);
+	const exec = async (...argv: string[]) => {
+		const stdout = await output("docker", ["exec", id, ...argv]);
+		return stdout.trim();
+	};
+	assert.equal(await exec("id", "-u"), "101", service);
+	assert.equal(await exec("stat", "-c", "%u:%g:%a", RUNTIME_DIR), "101:101:700", service);
+	// nginx wrote its PID into the mount; nothing outside it can be written.
+	assert.equal(
+		await succeeds("docker", ["exec", id, "test", "-s", `${RUNTIME_DIR}/nginx.pid`]),
+		true,
+		service,
+	);
+	for (const target of ["/usr/share/nginx/html/probe", "/tmp/probe", "/etc/nginx/probe"]) {
+		assert.equal(
+			await succeeds("docker", ["exec", id, "touch", target]),
+			false,
+			`${service} ${target}`,
+		);
+	}
+	// The configured health probe passes now, without waiting for Docker's interval.
+	const probe = asRecord(config.Healthcheck ?? {}, `${service} health check`).Test;
+	if (Array.isArray(probe) && probe[0] === "CMD") {
+		const probeArgv = asArray(probe, `${service} probe`)
+			.slice(1)
+			.map((part) => asString(part, `${service} probe part`));
+		assert.equal(await succeeds("docker", ["exec", id, ...probeArgv]), true, `${service} probe`);
+	}
+	return id;
+}
+
+async function assertRestrictedImageServices() {
+	const webapp = await assertRestricted("webapp");
+	// The entrypoint generated the served index in the runtime directory and left the build output
+	// as built.
+	assert.equal(
+		await output("docker", ["exec", webapp, "cat", "/usr/share/nginx/html/index.html"]),
+		fixtureIndex,
+	);
+	assert.match(
+		await output("docker", ["exec", webapp, "cat", `${RUNTIME_DIR}/index.html`]),
+		/src="\/env-config\.[a-f0-9]{8}\.js"/u,
+	);
+	await assertRestricted("maintenance");
+	await assertRestricted("application-server");
 }
 
 async function waitForApiWithdrawal(port: number) {
@@ -276,10 +348,7 @@ try {
 	const credential = `smoke-token-${randomUUID()}`;
 	await writeFile(path.join(directory, "dns/token"), credential, { mode: 0o600 });
 	await mkdir(path.join(directory, "fixture"));
-	await writeFile(
-		path.join(directory, "fixture/index.html"),
-		'<html><script src="/env-config.js"></script>tenant-spa</html>',
-	);
+	await writeFile(path.join(directory, "fixture/index.html"), fixtureIndex);
 	await mkdir(path.join(directory, "fixture/assets"));
 	await writeFile(
 		path.join(directory, "fixture/assets/smoke.svg"),
@@ -312,10 +381,16 @@ try {
 				],
 			},
 			webapp: { ports: [], depends_on: {} },
+			// The mock API runs the webapp image's nginx without its entrypoint, as maintenance does,
+			// so it gets the same read-only root and runtime directory.
 			"application-server": {
 				ports: [],
 				entrypoint: ["nginx", "-g", "daemon off;"],
 				healthcheck: { disable: true },
+				read_only: true,
+				tmpfs: [`${RUNTIME_DIR}:uid=101,gid=101,mode=0700,size=16m`],
+				cap_drop: ["ALL"],
+				security_opt: ["no-new-privileges:true"],
 				volumes: [`${directory}/api.conf:/etc/nginx/conf.d/default.conf:ro`],
 				depends_on: {},
 			},
@@ -441,6 +516,7 @@ try {
 		);
 		let port = await publishedPort(443);
 		await waitForBody(port, base, "/", "tenant-spa");
+		await assertRestrictedImageServices();
 		await assert.rejects(
 			get(port, "untrusted.example.invalid", "/"),
 			(error: unknown) =>
@@ -655,6 +731,18 @@ try {
 		const apexConfig = await get(port, base, apexConfigPath);
 		assert.equal(apexConfig.status, 200);
 		assert.ok(apexConfig.body.includes(`APPLICATION_SERVER_URL: "https://${base}/api"`));
+		assert.equal(apexConfig.cache, "public, max-age=31536000, immutable");
+		if (apexConfigPath !== "/env-config.00000000.js") {
+			await expectStatus(port, base, "/env-config.00000000.js", 404);
+		}
+		const discovery = await get(port, base, "/.well-known/hephaestus.json");
+		assert.equal(discovery.status, 200);
+		assert.equal(discovery.cache, "no-store");
+		assert.deepEqual(parseJson(discovery.body), {
+			apexOrigin: `https://${base}`,
+			baseDomain: base,
+			workspaceSubdomainsEnabled: enabled === "true",
+		});
 		if (enabled === "true") {
 			const page = await get(port, `acme.${base}`, "/");
 			const configPath = /src="(?<path>\/env-config[^"]+)"/u.exec(page.body)?.groups?.path;

@@ -193,16 +193,22 @@ services:
 
   maintenance:
     image: ${HEPHAESTUS_IMAGE_WEBAPP:?verified release lock required}
-    entrypoint: ["nginx", "-g", "daemon off;"]
+    # The image's maintenance mode: its own nginx config and page, baked into the image, without the
+    # webapp entrypoint or its runtime configuration.
+    entrypoint: ["nginx", "-c", "/etc/nginx/hephaestus/maintenance.conf", "-g", "daemon off;"]
     restart: unless-stopped
-    configs:
-      - source: maintenance-page
-        target: /usr/share/nginx/maintenance/index.html
-      - source: nginx-default-config
-        target: /etc/nginx/conf.d/default.conf
+    # Same runtime contract as the webapp service: UID 101, port 8080, and nginx's PID and temp
+    # files in the one writable directory. The entrypoint is bypassed, so nothing else is written.
+    read_only: true
+    tmpfs:
+      - /tmp/hephaestus-webapp:uid=101,gid=101,mode=0700,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     labels:
       - "traefik.enable=true"
-      - "traefik.http.services.maintenance.loadbalancer.server.port=80"
+      - "traefik.http.services.maintenance.loadbalancer.server.port=8080"
       - "traefik.http.middlewares.gzip.compress=true"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-maintenance.entryPoints=http"
@@ -217,12 +223,12 @@ services:
     networks:
       - shared-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 3s
-    # Access logging is off (see the nginx-default-config below), so this is nginx startup and error
+    # Access logging is off (webapp/docker/nginx-maintenance.conf), so this is nginx startup and error
     # output only — but the page auto-refreshes every 5s, so a long outage with browsers left open is
     # exactly when a repeating error would grow unattended.
     logging:
@@ -241,52 +247,6 @@ configs:
     content: *traefik-dynamic
   traefik-start:
     content: *traefik-start
-  nginx-default-config:
-    content: |
-      server {
-        listen 80;
-        server_name _;
-
-        root /usr/share/nginx/maintenance;
-
-        # No per-request access line. This server answers on a catch-all Host rule
-        # whenever the webapp router is down, so the URL it would log is the deep
-        # link the contributor was trying to reach — and those name people
-        # (/w/<slug>/user/<username>). Keeps the "no layer writes a per-request
-        # IP/URL record" posture whole; error_log is untouched.
-        access_log off;
-
-        location / {
-            rewrite ^ /index.html break;
-        }
-      }
-
-  maintenance-page:
-    content: |
-      <!DOCTYPE html>
-      <html lang="en">
-      <title>Hephaestus Maintenance</title>
-      <meta http-equiv="refresh" content="5"/>
-      <style>
-          html, body { padding: 0; margin: 0; width: 100%; height: 100%; }
-          * {box-sizing: border-box;}
-          body { text-align: center; padding: 0; background: #353d47; color: #fff; font-family: sans-serif; }
-          h1 { font-size: 50px; font-weight: 100; text-align: center;}
-          body { font-weight: 100; font-size: 20px; color: #fff; text-align: center; display: -webkit-box; display: -ms-flexbox; display: flex; -webkit-box-pack: center; -ms-flex-pack: center; justify-content: center; -webkit-box-align: center; -ms-flex-align: center; align-items: center;}
-          article { display: block; width: 700px; padding: 50px; margin: 0 auto; }
-          a { color: #fff; font-weight: bold;}
-          a:hover { text-decoration: none; }
-          svg.brand { width: 96px; }
-      </style>
-      <article>
-          <svg class="brand" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Hephaestus"><circle cx="64" cy="64" r="64" fill="#315FDC"/><g transform="translate(24 20) scale(3.3333)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7.2V3.6"/><circle cx="12" cy="2.8" r="1" fill="#fff"/><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M2 14h2M20 14h2M8.6 13.5h.8M14.6 13.5h.8M9.7 16.8c1.1 1.1 3.5 1.1 4.6 0"/></g></svg>
-          <h1>We&rsquo;ll be back soon!</h1>
-          <div>
-              <p>We&rsquo;re performing some maintenance at the moment. Sorry for the inconvenience.</p>
-              <p>&mdash; Your Hephaestus Administrators</p>
-          </div>
-      </article>
-      </html>
 
 volumes:
   letsencrypt:

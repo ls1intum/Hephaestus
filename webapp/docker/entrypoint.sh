@@ -1,8 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+# The build output is read-only and stays byte-for-byte as built. Everything this script writes
+# goes under RUNTIME_DIR, which nginx.conf serves for the index, the env config and the discovery file.
 readonly HTML_DIR="/usr/share/nginx/html"
-readonly INDEX_HTML="${HTML_DIR}/index.html"
+readonly INDEX_TEMPLATE="${HTML_DIR}/index.html"
+readonly RUNTIME_DIR="/tmp/hephaestus-webapp"
 readonly ENV_TS="/app/src/environment/index.ts"
 
 # Must match LEGAL_PROFILE_PATTERN_SOURCE in webapp/src/lib/legal.ts. A unit
@@ -17,7 +20,7 @@ escape_for_js() {
     char="${input:i:1}"
     case "$char" in
       $'\n') output+="\\n" ;; $'\r') output+="\\r" ;; $'\t') output+="\\t" ;;
-      '"') output+="\\\"" ;; '\\') output+="\\\\" ;; *) output+="$char" ;;
+      '"') output+="\\\"" ;; '\') output+="\\\\" ;; *) output+="$char" ;;
     esac
   done
   printf '%s' "$output"
@@ -91,11 +94,15 @@ main() {
     log "ERROR: APPLICATION_CLIENT_URL is required when workspace subdomains are enabled."
     exit 1
   fi
-  mkdir -p "${HTML_DIR}/.well-known"
+  if [[ ! -f "$INDEX_TEMPLATE" ]]; then
+    log "ERROR: index.html not found: $INDEX_TEMPLATE"
+    exit 1
+  fi
+  mkdir -p "${RUNTIME_DIR}/.well-known"
   printf '{"apexOrigin":"%s","baseDomain":"%s","workspaceSubdomainsEnabled":%s}\n' \
     "$(escape_for_js "${APPLICATION_CLIENT_URL:-}")" \
     "$(escape_for_js "${HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN:-}")" \
-    "$subdomains" > "${HTML_DIR}/.well-known/hephaestus.json"
+    "$subdomains" > "${RUNTIME_DIR}/.well-known/hephaestus.json"
 
 
   # Extract all env var names from TypeScript (single source of truth)
@@ -171,17 +178,16 @@ main() {
       printf '  %s: "%s"' "$var" "$(escape_for_js "${!var:-}")"
     done
     echo -e "\n};"
-  } > "${HTML_DIR}/${filename}"
+  } > "${RUNTIME_DIR}/${filename}"
 
-  # Remove old config files and update index.html
-  find "${HTML_DIR}" -maxdepth 1 -name 'env-config.*.js' ! -name "$filename" -delete 2>/dev/null || true
+  # A restart can keep RUNTIME_DIR (a Kubernetes emptyDir does), so remove the previous config.
+  find "${RUNTIME_DIR}" -maxdepth 1 -name 'env-config.*.js' ! -name "$filename" -delete 2>/dev/null || true
   log "Created ${filename}"
 
-  if [[ -f "$INDEX_HTML" ]]; then
-    sed -Ei "s|/env-config(\.[a-f0-9]{8})?\.js|/${filename}|g" "$INDEX_HTML"
-    grep -q "$filename" "$INDEX_HTML" || { log "ERROR: Failed to update index.html"; exit 1; }
-    log "Updated index.html"
-  fi
+  # Generate the served index from the immutable build output on every start.
+  sed -E "s|/env-config(\.[a-f0-9]{8})?\.js|/${filename}|g" "$INDEX_TEMPLATE" > "${RUNTIME_DIR}/index.html"
+  grep -q "$filename" "${RUNTIME_DIR}/index.html" || { log "ERROR: Failed to update index.html"; exit 1; }
+  log "Generated index.html"
 
   log "Done (hash: ${hash})"
 }

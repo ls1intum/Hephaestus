@@ -7,8 +7,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
@@ -32,8 +35,20 @@ import org.springframework.core.io.FileSystemResource;
  */
 class NoPerRequestAccessLogTest extends BaseUnitTest {
 
-    private static final Path WEBAPP_NGINX_CONF = Path.of("..", "..", "webapp", "docker", "nginx.conf");
-    private static final Path PROXY_COMPOSE = Path.of("..", "..", "docker", "compose.proxy.yaml");
+    /** The webapp image ships every nginx config it runs from this directory. */
+    private static final Path WEBAPP_NGINX_DIRECTORY = Path.of("..", "..", "webapp", "docker");
+
+    /** The webapp's server block, and the maintenance page's server mode of the same image. */
+    private static final Path WEBAPP_SERVER_CONF = WEBAPP_NGINX_DIRECTORY.resolve("nginx.conf");
+
+    private static final Path MAINTENANCE_CONF = WEBAPP_NGINX_DIRECTORY.resolve("nginx-maintenance.conf");
+
+    /** Files the two server modes include. None may turn the access log back on for every server. */
+    private static final List<Path> SHARED_CONFS = List.of(
+            WEBAPP_NGINX_DIRECTORY.resolve("nginx-main.conf"),
+            WEBAPP_NGINX_DIRECTORY.resolve("nginx-globals.conf"),
+            WEBAPP_NGINX_DIRECTORY.resolve("nginx-http.conf"));
+
     private static final Path PROD_PROFILE = Path.of("src", "main", "resources", "application-prod.yml");
 
     @Test
@@ -45,36 +60,47 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
 
     @Test
     void webappNginxDisablesTheAccessLogForTheWholeServerBlock() throws Exception {
-        List<String> serverLevel = directivesAtServerLevel(Files.readString(WEBAPP_NGINX_CONF, StandardCharsets.UTF_8));
-
-        assertThat(serverLevel)
+        assertThat(directivesAtServerLevel(read(WEBAPP_SERVER_CONF)))
                 .as("webapp/docker/nginx.conf must carry `access_log off;` in the server block: "
-                        + "nginx:stable-alpine turns the access log ON at http level, so anything the server "
+                        + "nginx's built-in default turns the access log ON, so anything the server "
                         + "block does not override logs the request URL — and SPA deep links name contributors")
                 .contains("access_log off");
     }
 
     @Test
     void maintenancePageNginxDisablesTheAccessLogForTheWholeServerBlock() throws Exception {
-        assertThat(directivesAtServerLevel(maintenancePageConf()))
+        assertThat(directivesAtServerLevel(read(MAINTENANCE_CONF)))
                 .as("the maintenance page answers on a catch-all Host rule whenever the webapp router is "
                         + "down, so the URL it would log is the deep link the contributor was reaching for")
                 .contains("access_log off");
     }
 
     /**
-     * A location that sets its own {@code access_log} to a destination would opt that path back in
-     * underneath the server-level {@code off}, which is the failure the server-level directive exists
-     * to prevent — and it would not show up in the two tests above.
+     * A location, a shared include or a new config that sets {@code access_log} to a destination would
+     * opt requests back in underneath the server-level {@code off}, which is the failure the
+     * server-level directive exists to prevent — and it would not show up in the two tests above.
+     * Every {@code .conf} the image ships is read, so a new file cannot slip past this list.
      */
     @Test
-    void noNginxLocationReEnablesTheAccessLog() throws Exception {
+    void noShippedNginxConfigReEnablesTheAccessLog() throws Exception {
+        List<Path> shipped;
+        try (Stream<Path> files = Files.list(WEBAPP_NGINX_DIRECTORY)) {
+            shipped = files.filter(file -> file.toString().endsWith(".conf"))
+                    .sorted()
+                    .toList();
+        }
+        assertThat(shipped)
+                .as("the server modes and the files they include are all shipped from webapp/docker")
+                .contains(WEBAPP_SERVER_CONF, MAINTENANCE_CONF)
+                .containsAll(SHARED_CONFS);
+
         List<String> reEnabling = new ArrayList<>();
-        for (String conf :
-                List.of(Files.readString(WEBAPP_NGINX_CONF, StandardCharsets.UTF_8), maintenancePageConf())) {
-            conf.lines()
+        for (Path file : shipped) {
+            read(file)
+                    .lines()
                     .map(NoPerRequestAccessLogTest::directive)
                     .filter(line -> line.startsWith("access_log") && !line.equals("access_log off"))
+                    .map(line -> file + ": " + line)
                     .forEach(reEnabling::add);
         }
 
@@ -83,33 +109,26 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
                 .isEmpty();
     }
 
-    /**
-     * The maintenance page's nginx config is inlined into the compose file rather than shipped as a
-     * file, so a key that stops resolving would silently narrow both tests that read it to the webapp
-     * config alone. Asserting here names that as the failure instead.
-     */
-    private static String maintenancePageConf() throws IOException {
-        String conf = propertyIn(PROXY_COMPOSE, "configs.nginx-default-config.content");
-
-        assertThat(conf)
-                .as("docker/compose.proxy.yaml no longer inlines an nginx server config under that key")
-                .isNotNull();
-        return conf;
+    private static String read(Path file) throws IOException {
+        return Files.readString(file, StandardCharsets.UTF_8);
     }
 
     /**
-     * Directives written directly inside the single {@code server { … }} block — brace depth 1, so a
-     * {@code location} nested inside it does not count.
+     * Directives written directly inside a {@code server { … }} block, at whatever depth the block
+     * sits: a {@code location} nested inside it does not count.
      */
     private static List<String> directivesAtServerLevel(String conf) {
         List<String> directives = new ArrayList<>();
-        int depth = 0;
+        Deque<Boolean> blocks = new ArrayDeque<>();
         for (String raw : conf.lines().toList()) {
             String line = directive(raw);
-            if (depth == 1 && !line.isEmpty() && !line.endsWith("{") && !line.startsWith("}")) {
+            if (line.endsWith("{")) {
+                blocks.push(line.replace(" ", "").equals("server{"));
+            } else if (line.startsWith("}")) {
+                blocks.pop();
+            } else if (!line.isEmpty() && Boolean.TRUE.equals(blocks.peek())) {
                 directives.add(line);
             }
-            depth += count(raw, '{') - count(raw, '}');
         }
         return directives;
     }
@@ -124,10 +143,6 @@ class NoPerRequestAccessLogTest extends BaseUnitTest {
         return stripped.endsWith(";")
                 ? stripped.substring(0, stripped.length() - 1).strip()
                 : stripped;
-    }
-
-    private static int count(String line, char c) {
-        return (int) line.chars().filter(ch -> ch == c).count();
     }
 
     private static @Nullable String propertyIn(Path yaml, String key) throws IOException {

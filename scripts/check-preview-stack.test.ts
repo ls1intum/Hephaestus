@@ -206,6 +206,19 @@ void describe("preview stack sandbox", () => {
 				},
 				/not recorded here/u,
 			],
+			[
+				"a capability the non-root webapp image no longer needs",
+				(stack: Stack) => {
+					stack.services.webapp = {
+						environment: {},
+						security_opt: ["no-new-privileges:true"],
+						cap_drop: ["ALL"],
+						cap_add: ["CHOWN"],
+						deploy: { resources: { limits: { memory: "1" } } },
+					};
+				},
+				/webapp adds capability CHOWN, which is not recorded here/u,
+			],
 		] as [string, (stack: Stack) => void, RegExp][]) {
 			const violations = findViolations(mutated(escape));
 			assert.ok(

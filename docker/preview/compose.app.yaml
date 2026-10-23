@@ -534,7 +534,7 @@ services:
     # `expose` is how Coolify learns which port to route ${SERVICE_FQDN_WEBAPP} to; the image's own
     # EXPOSE is not read for that.
     expose:
-      - "80"
+      - "8080"
     restart: unless-stopped
     environment:
       APPLICATION_VERSION: preview
@@ -551,19 +551,17 @@ services:
     depends_on:
       appserver:
         condition: service_healthy
+    # The image runs as UID 101 and writes only to /tmp/hephaestus-webapp, so it needs no
+    # capability back.
+    read_only: true
+    tmpfs:
+      - /tmp/hephaestus-webapp:uid=101,gid=101,mode=0700,size=16m
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    # nginx's master chowns its cache directories and then runs its workers as the nginx user. With
-    # CHOWN alone the master survives and every worker exits "fatal code 2 and cannot be respawned",
-    # which leaves a container that looks up and serves nothing.
-    cap_add:
-      - CHOWN
-      - SETGID
-      - SETUID
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/"]
       interval: 10s
       timeout: 5s
       retries: 10

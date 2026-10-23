@@ -80,6 +80,15 @@ services:
       application-server:
         condition: service_healthy
     restart: unless-stopped
+    # The image runs as UID 101 and writes only to /tmp/hephaestus-webapp: the runtime index, env
+    # config and nginx's PID and temp files, all a few kilobytes.
+    read_only: true
+    tmpfs:
+      - /tmp/hephaestus-webapp:uid=101,gid=101,mode=0700,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     networks:
       - shared-network
     labels:
@@ -105,8 +114,8 @@ services:
       - "traefik.http.routers.https-webapp.service=https-webapp"
       - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-webapp.tls=true"
-      - "traefik.http.services.http-webapp.loadbalancer.server.port=80"
-      - "traefik.http.services.https-webapp.loadbalancer.server.port=80"
+      - "traefik.http.services.http-webapp.loadbalancer.server.port=8080"
+      - "traefik.http.services.https-webapp.loadbalancer.server.port=8080"
       - "traefik.http.routers.http-webapp.priority=2"
       - "traefik.http.routers.https-webapp.priority=3"
       # Everything the instance serves is loaded from one origin. This router takes the served hosts
@@ -128,7 +137,7 @@ services:
       - "traefik.http.routers.https-canonical.tls=true"
       - "traefik.http.routers.https-canonical.priority=4"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/"]
       interval: 5s
       timeout: 10s
       retries: 10
