@@ -42,19 +42,6 @@ public interface FeedbackBasisRepository extends JpaRepository<FeedbackBasis, UU
         """, nativeQuery = true)
     boolean hasIncorrectResults(@Param("workspaceId") long workspaceId, @Param("resultIds") Collection<UUID> resultIds);
 
-    @Query(value = """
-        SELECT EXISTS(SELECT 1 FROM feedback_basis b JOIN feedback f
-          ON f.id=b.feedback_id AND f.workspace_id=b.workspace_id
-          JOIN feedback_copy c ON c.feedback_id=f.id AND c.workspace_id=f.workspace_id
-          WHERE b.workspace_id=:workspaceId AND b.result_id=:resultId
-            AND f.developer_id=:developerId AND f.destination='ON_WORK'
-            AND c.kind IN ('SUMMARY','LINE_NOTE','FILE_NOTE') AND c.posted_at IS NOT NULL)
-        """, nativeQuery = true)
-    boolean hasConfirmedOnWork(
-            @Param("workspaceId") long workspaceId,
-            @Param("developerId") long developerId,
-            @Param("resultId") UUID resultId);
-
     // The immutable trace keeps delivery intent after a later withholding. Missing traces conservatively use an
     // allowance.
     @Query(value = """

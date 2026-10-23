@@ -11,17 +11,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousPracticePageFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -40,7 +35,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticePageSupport;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewInlineAnchorQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
@@ -52,7 +46,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -69,8 +62,6 @@ class FeedbackCompositionContextServiceTest {
     final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);
     final PracticePageSupportReader support = mock(PracticePageSupportReader.class);
     final FeedbackGate gate = mock(FeedbackGate.class);
-    final ItemDescriptorRegistry catalog = mock(ItemDescriptorRegistry.class);
-    final FeedbackBasisRepository basis = mock(FeedbackBasisRepository.class);
     final ResultHistoryQuery history = mock(ResultHistoryQuery.class);
     final MentorReadinessQuery mentor = mock(MentorReadinessQuery.class);
     final Instant now = Instant.parse("2026-10-14T00:00:00Z");
@@ -79,10 +70,8 @@ class FeedbackCompositionContextServiceTest {
     final ReviewSnapshot snapshot = mock(ReviewSnapshot.class);
     final ItemRef item = new ItemRef(1, 3, new ItemKind("scm.pull_request"), 42L, null, null);
     final PinnedPractice pin = mock(PinnedPractice.class);
-    final PracticeDefinition definition = mock(PracticeDefinition.class);
     final PracticeVersion version = TestEntities.practiceVersion(
             8, 1, new JsonMapper().valueToTree(DefinitionTestFixtures.definition()), "v6:" + "a".repeat(64));
-    final ReviewInlineAnchorQuery inlineAnchors = mock(ReviewInlineAnchorQuery.class);
     final FeedbackCompositionContextService service = new FeedbackCompositionContextService(
             reviews,
             results,
@@ -91,8 +80,6 @@ class FeedbackCompositionContextServiceTest {
             support,
             new PracticePageFeedbackRouter(),
             gate,
-            basis,
-            new FeedbackAnchorEligibility(catalog, inlineAnchors),
             history,
             mentor,
             Clock.fixed(now, ZoneOffset.UTC));
@@ -105,7 +92,6 @@ class FeedbackCompositionContextServiceTest {
         when(snapshot.origin()).thenReturn(ReviewOrigin.EVENT);
         when(snapshot.item()).thenReturn(item);
         when(pin.practiceId()).thenReturn(5L);
-        when(pin.definition()).thenReturn(definition);
         when(snapshot.practices()).thenReturn(List.of(pin));
         when(reviews.find(1, reviewId)).thenReturn(Optional.of(snapshot));
         when(reviews.find(1, historical.getReviewId())).thenReturn(Optional.of(snapshot));
@@ -227,16 +213,15 @@ class FeedbackCompositionContextServiceTest {
     }
 
     @Test
-    void shouldDistinguishUnavailableMentorConfirmedOnWorkAndBackfill() {
+    void shouldReportTheMentorUnavailableWhenTheMentorIsNotReady() {
         when(mentor.isReady(1)).thenReturn(false);
         assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
                         ConversationDecision.MENTOR_UNAVAILABLE, FeedbackStopReason.RECIPIENT_UNAVAILABLE));
-        when(mentor.isReady(1)).thenReturn(true);
-        when(basis.hasConfirmedOnWork(1, 7, current.getId())).thenReturn(true);
-        assertThat(service.conversationDecision(snapshot, current))
-                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
-                        ConversationDecision.ALREADY_DELIVERED_ON_WORK, FeedbackStopReason.NOTHING_NEW));
+    }
+
+    @Test
+    void shouldKeepABackfillQuietWhenTheReviewIsABackfill() {
         when(snapshot.origin()).thenReturn(ReviewOrigin.BACKFILL);
         assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
@@ -244,12 +229,15 @@ class FeedbackCompositionContextServiceTest {
     }
 
     @Test
-    void shouldKeepFeedbackOffReviewerAndNaturalAnchorReasonsDistinct() {
+    void shouldReportFeedbackOffWhenTheResultsFeedbackModeIsOff() {
         when(gate.mode(current)).thenReturn(FeedbackMode.OFF);
         assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
                         ConversationDecision.FEEDBACK_OFF, FeedbackStopReason.FEEDBACK_OFF));
-        when(gate.mode(current)).thenReturn(FeedbackMode.AUTOMATIC);
+    }
+
+    @Test
+    void shouldDeferReviewerFeedbackWhenThePracticeIsAboutTheReviewer() {
         var reviewerVersion = TestEntities.practiceVersion(
                 8,
                 1,
@@ -261,19 +249,28 @@ class FeedbackCompositionContextServiceTest {
         assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
                         ConversationDecision.REVIEWER_DEFERRED, FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE));
-        when(versions.findByIdAndWorkspaceId(8L, 1L)).thenReturn(Optional.of(version));
-        when(definition.lineNotes()).thenReturn(true);
-        var descriptor = mock(ItemDescriptor.class);
-        when(descriptor.copyCapabilities()).thenReturn(Set.of(CopyCapability.LINE_NOTE));
-        when(catalog.descriptorFor(item.kind())).thenReturn(Optional.of(descriptor));
-        // Verified evidence and examples alone do not establish provider placement.
+    }
+
+    @Test
+    void shouldAdmitConversationWhenItsOwnRoutePermitsIt() {
+        // The decision reads no anchor or delivery on the work; the persisted case proves a posted summary.
         assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(
                         new FeedbackCompositionContextService.ConversationAdmission(ConversationDecision.ADMIT, null));
-        when(inlineAnchors.hasInlineAnchor(1, reviewId, current.getId())).thenReturn(true);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = FeedbackStopReason.class,
+            names = {"DELIVERY_OFF", "NO_AI", "PERSON_SUPPRESSED", "WORKSPACE_DELIVERY_PAUSED"})
+    void shouldKeepTheConversationGateRefusalWhenTheGateRefuses(FeedbackStopReason reason) {
+        var refusal = mock(FeedbackCheck.class);
+        when(refusal.reason()).thenReturn(reason);
+        when(gate.evaluateComposition(snapshot, 7, List.of(current), FeedbackDestination.CONVERSATION))
+                .thenReturn(refusal);
         assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
-                        ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
+                        ConversationDecision.GATE_REFUSED, reason));
     }
 
     @Test
