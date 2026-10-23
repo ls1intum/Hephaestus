@@ -113,7 +113,7 @@ export const NarrowedToNothingSoFar: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByText("No reviews yet")).toBeNull();
-		await expect(canvas.getByText("The latest reviews have no results here.")).toBeVisible();
+		await expect(canvas.getByText("The latest reviews have no observations here.")).toBeVisible();
 		await expect(
 			canvas.getByRole("button", { name: "Show every review in this group" }),
 		).toBeVisible();
@@ -129,7 +129,7 @@ export const NarrowedToNothingLoadingMore: Story = {
 		reviews: [],
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("The latest reviews have no results here.")).toBeVisible();
+		await expect(canvas.getByText("The latest reviews have no observations here.")).toBeVisible();
 		const list = canvas.getByRole("list", { name: "Reviews" });
 		await expectListPlaceholders(list, { bars: 6 });
 		const frame = list.parentElement;

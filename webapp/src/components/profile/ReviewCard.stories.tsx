@@ -255,7 +255,7 @@ export const ManyResults: Story = {
 
 		const held = "The description states the goal";
 		await expect(canvas.queryByText(held)).toBeNull();
-		await userEvent.click(canvas.getByRole("button", { name: "Show 1 more result" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Show 1 more observation" }));
 		await expect(canvas.getByText(held)).toBeVisible();
 		for (const result of denseReview.results) {
 			await expect(canvas.getByText(result.summary ?? result.practiceName)).toBeVisible();
