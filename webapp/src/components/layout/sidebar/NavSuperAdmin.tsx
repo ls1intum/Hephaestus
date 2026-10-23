@@ -15,6 +15,8 @@ import {
 	Users,
 } from "lucide-react";
 
+import { hasText } from "@/lib/text";
+
 import { ADMIN_NAV_LABELS } from "@/components/layout/sidebar/admin-nav-labels";
 import {
 	SidebarGroup,
@@ -116,15 +118,29 @@ const ADMIN_NAV_GROUPS = [
 	},
 ] as const;
 
+interface NavSuperAdminProps {
+	/** Eligible member workspace to return to; instance administration itself remains global. */
+	workspaceSlug?: string;
+}
+
 /**
  * The instance-admin (APP_ADMIN) sidebar. Workspace-independent — no workspace switcher — so an
  * admin with zero workspaces can still reach it, and never interleaved with the per-workspace
  * admin nav.
  */
-export function NavSuperAdmin() {
+export function NavSuperAdmin({ workspaceSlug }: NavSuperAdminProps) {
 	const matchRoute = useMatchRoute();
 	return (
-		<NavContextHeader title="Back to app" backLink={<Link to="/" className="font-semibold" />}>
+		<NavContextHeader
+			title="Back to app"
+			backLink={
+				hasText(workspaceSlug) ? (
+					<Link to="/w/$workspaceSlug" params={{ workspaceSlug }} className="font-semibold" />
+				) : (
+					<Link to="/" className="font-semibold" />
+				)
+			}
+		>
 			<SidebarGroup>
 				<SidebarGroupLabel>Instance administration</SidebarGroupLabel>
 				<SidebarMenu>

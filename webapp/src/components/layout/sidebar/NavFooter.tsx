@@ -23,7 +23,10 @@ export function NavFooter({ isAppAdmin = false, workspaceSlug }: NavFooterProps)
 				<>
 					<SidebarMenu>
 						<SidebarMenuItem>
-							<SidebarMenuButton tooltip="Instance admin" render={<Link to="/admin" />}>
+							<SidebarMenuButton
+								tooltip="Instance admin"
+								render={<Link to="/admin" search={{ chromeWorkspace: workspaceSlug }} />}
+							>
 								<ShieldCheck />
 								<span>Instance admin</span>
 							</SidebarMenuButton>
@@ -51,7 +54,10 @@ export function NavFooter({ isAppAdmin = false, workspaceSlug }: NavFooterProps)
 					</SidebarMenuItem>
 				)}
 				<SidebarMenuItem>
-					<SidebarMenuButton tooltip="User settings" render={<Link to="/settings" />}>
+					<SidebarMenuButton
+						tooltip="User settings"
+						render={<Link to="/settings" search={{ chromeWorkspace: workspaceSlug }} />}
+					>
 						<UserRoundCog />
 						<span>User settings</span>
 					</SidebarMenuButton>

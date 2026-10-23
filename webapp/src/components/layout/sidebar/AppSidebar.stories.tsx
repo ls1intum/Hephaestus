@@ -155,6 +155,10 @@ export const AdminContext: Story = {
 	},
 	play: async ({ canvas, canvasElement }) => {
 		canvas.getByText("Practice catalog");
+		await expect(canvas.getByRole("link", { name: "Back to app" })).toHaveAttribute(
+			"href",
+			"/w/aet",
+		);
 		const content = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-content"]');
 		if (!content) {
 			throw new Error("sidebar content not found");
@@ -172,7 +176,7 @@ export const AdminContextNoWorkspace: Story = {
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("Instance administration");
-		canvas.getByText("Back to app");
+		await expect(canvas.getByRole("link", { name: "Back to app" })).toHaveAttribute("href", "/");
 		await expect(canvas.queryByText(/no workspace/iu)).not.toBeInTheDocument();
 	},
 };
