@@ -10,6 +10,8 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import ch.qos.logback.classic.spi.ThrowableProxy;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -18,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import javax.net.ssl.SSLHandshakeException;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.KeyValuePair;
+import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.boot.logging.logback.StructuredLogEncoder;
 import org.springframework.core.env.Environment;
@@ -106,8 +110,13 @@ class RedactionContractTest {
         assertEquals(DataIntegrityViolationException.class.getName(), text(json, "error.type"));
         assertNull(node(json, "error.message"), line);
         String trace = text(json, "error.stack_trace");
-        assertTrue(trace.contains("Caused by: "), trace);
+        // The root cause comes first; each exception that wraps it follows.
+        assertTrue(trace.contains("Wrapped by: "), trace);
         assertTrue(trace.contains(driver.getClass().getName()), trace);
+        assertTrue(
+                trace.indexOf(driver.getClass().getName())
+                        < trace.indexOf(DataIntegrityViolationException.class.getName()),
+                trace);
         assertTrue(trace.contains("Suppressed: "), trace);
         assertTrue(trace.contains(WebClientResponseException.class.getName()), trace);
         assertTrue(trace.contains("at " + RedactionContractTest.class.getName()), trace);
@@ -149,6 +158,67 @@ class RedactionContractTest {
         }
         failure.addSuppressed(new IllegalArgumentException("suppressed"));
         return failure;
+    }
+
+    /**
+     * Spring wraps a failure at startup in one bean creation exception per bean that depended on the failed one. With
+     * the outermost exception first, the bound cut the failure that started it; the root cause must survive the bound.
+     */
+    @Test
+    void shouldKeepTheRootCauseWhenWrappersFillTheBoundedTrace() throws IOException {
+        Throwable failure = new SSLHandshakeException("synthetic-root-secret PKIX path building failed");
+        failure.setStackTrace(frames("sun.security.ssl.TransportContext", "fatal", 8, 0));
+        for (int layer = 0; layer < 8; layer++) {
+            failure = new BeanCreationException(
+                    "synthetic-bean-" + layer, "synthetic-wrapper-secret Bearer synthetic-wrapper-token", failure);
+            failure.setStackTrace(
+                    layer < 7
+                            ? frames(
+                                    "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory",
+                                    "doCreateBean",
+                                    40,
+                                    1000 * (layer + 1))
+                            : frames(
+                                    "org.springframework.context.support.AbstractApplicationContext",
+                                    "refresh",
+                                    40,
+                                    0));
+        }
+        StringWriter unbounded = new StringWriter();
+        failure.printStackTrace(new PrintWriter(unbounded));
+        assertTrue(unbounded.toString().length() > 2 * 8192, "the chain must overflow the bound");
+
+        Throwable startup = failure;
+        String line = encode(event -> {
+            event.setMDCPropertyMap(Map.of("traceId", "0123456789abcdef0123456789abcdef"));
+            event.setMessage("Application run failed");
+            event.setThrowableProxy(new ThrowableProxy(startup));
+        });
+
+        JsonNode json = new ObjectMapper().readTree(line);
+        assertEquals(BeanCreationException.class.getName(), text(json, "error.type"));
+        assertNull(node(json, "error.message"), line);
+        assertEquals("0123456789abcdef0123456789abcdef", text(json, "context.traceId"));
+        String trace = text(json, "error.stack_trace");
+        assertTrue(trace.length() <= 8192, "stack trace is " + trace.length());
+        int root = trace.indexOf(SSLHandshakeException.class.getName());
+        assertTrue(root >= 0, "the root cause survives the bound: " + trace);
+        assertTrue(root < trace.indexOf(BeanCreationException.class.getName()), trace);
+        assertTrue(trace.contains("Wrapped by: "), trace);
+        assertFalse(trace.contains("AbstractApplicationContext.refresh"), "the outermost frames are the ones cut");
+        for (String privateText : List.of("synthetic-root-secret", "synthetic-wrapper", "synthetic-bean-", "PKIX")) {
+            assertFalse(line.contains(privateText), privateText + " leaked: " + line);
+        }
+    }
+
+    /** {@code count} distinct frames of one method, so no wrapper shares a frame with the one it wraps. */
+    private static StackTraceElement[] frames(String className, String method, int count, int firstLine) {
+        StackTraceElement[] frames = new StackTraceElement[count];
+        String file = className.substring(className.lastIndexOf('.') + 1) + ".java";
+        for (int frame = 0; frame < count; frame++) {
+            frames[frame] = new StackTraceElement(className, method, file, firstLine + frame + 1);
+        }
+        return frames;
     }
 
     /** Before the context prefix, either pair beside these members made the encoder throw and drop the event. */

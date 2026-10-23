@@ -206,6 +206,10 @@ Read logs as JSON, not as extra records from their rendered text.
 
 A stack trace is at most 8192 characters and at most 32 frames for each exception.
 Docker splits a log line at 16 KiB, and the pieces are not JSON, so one record must stay below that.
+The trace starts with the root cause, and each exception that wraps it follows on a `Wrapped by:` line.
+When a long chain of wrappers reaches the limit, the outermost frames are cut, not the root cause.
+`error.type` is still the class of the outermost exception.
+
 JSON escaping makes the written trace slightly longer than its limit.
 A message that a call site writes has no limit of its own.
 Each exception line carries a hash, so you can count repeated failures of one kind.
