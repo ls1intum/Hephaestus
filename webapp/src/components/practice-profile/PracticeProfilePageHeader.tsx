@@ -3,6 +3,7 @@ import { ArrowRightIcon, ChevronRightIcon, HistoryIcon } from "lucide-react";
 import { cn } from "cn";
 
 import type { ProfileReviewRef } from "@/api/types.gen";
+import { DotSeparator } from "@/components/common/DotSeparator";
 import { InlineLink } from "@/components/common/InlineLink";
 import { statusToneClass } from "@/components/common/status-def";
 import { useNow } from "@/components/common/use-now";
@@ -159,11 +160,7 @@ function LatestReviewChip({ review }: LatestReviewChipProps) {
 }
 
 function ClauseDot() {
-	return (
-		<span className="text-border" aria-hidden>
-			·
-		</span>
-	);
+	return <DotSeparator className="text-border" />;
 }
 
 /** "16 practices in 5 groups": one clause, so both counts are digits as soon as either is. */
