@@ -196,12 +196,18 @@ public class GitLabMergeRequestSyncService {
                     }
                 }
 
-                @SuppressWarnings({"unchecked", "rawtypes"})
-                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                        .field("project.mergeRequests.nodes")
-                        .toEntityList(Map.class);
+                // The nodes as GitLab sent them: decoding them into maps again would drop an explicit
+                // "headPipeline": null. A listing that is not a list of objects applies none of its nodes.
+                var nodesField = Objects.requireNonNull(response).field("project.mergeRequests.nodes");
+                Object listed = nodesField.getValue();
+                if (listed == null && nodesField.getErrors().isEmpty()) break;
+                if (!(listed instanceof List<?> mergeRequests)
+                        || !mergeRequests.stream().allMatch(node -> node instanceof Map<?, ?>)) {
+                    throw new GitLabSyncException("Unreadable merge request nodes");
+                }
+                List<Map<String, Object>> nodes = Objects.requireNonNull(nodesField.getValue());
 
-                if (nodes == null || nodes.isEmpty()) break;
+                if (nodes.isEmpty()) break;
 
                 for (int index = 0; index < nodes.size(); index++) {
                     Map<String, Object> mrNode = nodes.get(index);
@@ -409,12 +415,18 @@ public class GitLabMergeRequestSyncService {
                 }
                 graphQlClientProvider.recordSuccess();
 
-                @SuppressWarnings({"unchecked", "rawtypes"})
-                List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                        .field("project.mergeRequests.nodes")
-                        .toEntityList(Map.class);
+                // The nodes as GitLab sent them: decoding them into maps again would drop an explicit
+                // "headPipeline": null. A listing that is not a list of objects applies none of its nodes.
+                var nodesField = Objects.requireNonNull(response).field("project.mergeRequests.nodes");
+                Object listed = nodesField.getValue();
+                if (listed == null && nodesField.getErrors().isEmpty()) break;
+                if (!(listed instanceof List<?> mergeRequests)
+                        || !mergeRequests.stream().allMatch(node -> node instanceof Map<?, ?>)) {
+                    throw new GitLabSyncException("Unreadable historical merge request nodes");
+                }
+                List<Map<String, Object>> nodes = Objects.requireNonNull(nodesField.getValue());
 
-                if (nodes == null || nodes.isEmpty()) break;
+                if (nodes.isEmpty()) break;
 
                 for (int index = 0; index < nodes.size(); index++) {
                     Map<String, Object> mrNode = nodes.get(index);

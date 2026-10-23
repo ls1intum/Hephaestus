@@ -18,21 +18,32 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlInterceptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGraphQlConfig;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.credentials.GitLabCredentialHealth;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.credentials.GitLabCredentialHealthFilter;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.BackfillBatchResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.GraphQlResponses;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -50,11 +61,17 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.GraphQlClient;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.json.JsonMapper;
 
 class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
 
@@ -312,6 +329,48 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
                         GitLabHeadPipeline.NOT_CAPTURED,
                         GitLabHeadPipeline.NO_PIPELINE,
                         GitLabHeadPipeline.reported("SKIPPED", "c".repeat(40)));
+    }
+
+    @ParameterizedTest(name = "{0}: headPipeline {1}")
+    @CsvSource({
+        "GetProjectMergeRequests, answered as null, NO_PIPELINE, NO_PIPELINE",
+        "GetProjectMergeRequests, left out, NOT_CAPTURED, SUCCESS",
+        "GetProjectMergeRequests, failed to load, NOT_CAPTURED, SUCCESS",
+        "GetProjectMergeRequestsHistorical, answered as null, NO_PIPELINE, NO_PIPELINE",
+        "GetProjectMergeRequestsHistorical, left out, NOT_CAPTURED, SUCCESS",
+        "GetProjectMergeRequestsHistorical, failed to load, NOT_CAPTURED, SUCCESS"
+    })
+    void shouldReplaceTheStoredPipelineOnlyWhenTheProductionCodecsReadThatTheHeadHasNone(
+            String document, String headPipeline, GitLabHeadPipeline.Kind read, CheckState stored) {
+        String head = "b".repeat(40);
+        Map<String, @Nullable Object> node = mergeRequest(3);
+        if (!headPipeline.equals("left out")) {
+            node.put("headPipeline", null);
+        }
+        List<Map<String, Object>> nodes = nullable(List.of(node));
+        assertVendorCouldReturn(GITLAB, document, "project.mergeRequests.nodes", nodes);
+        List<Map<String, ?>> errors = headPipeline.equals("failed to load")
+                ? List.of(GraphQlResponses.error(
+                        "Internal server error", "project", "mergeRequests", "nodes", 0, "headPipeline"))
+                : List.of();
+        when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(productionCodecClient(body(nodes, errors)));
+        PullRequest pr = new PullRequest();
+        pr.setHeadRefOid(head);
+        pr.observeHeadChecks(head, CheckState.SUCCESS, true, Instant.EPOCH);
+
+        if (document.equals(LISTING)) {
+            service.syncMergeRequests(SCOPE_ID, repository(), null);
+        } else {
+            service.backfillMergeRequests(SCOPE_ID, repository(), null, 10);
+        }
+
+        List<GitLabMergeRequestProcessor.SyncMergeRequestData> synced = synced();
+        assertThat(synced).hasSize(1);
+        GitLabHeadPipeline observed = synced.getFirst().headPipeline();
+        assertThat(observed.kind()).isEqualTo(read);
+        observed.observeOn(pr, Instant.EPOCH.plusSeconds(60));
+        assertThat(pr.getHeadCheckSha()).isEqualTo(head);
+        assertThat(pr.getHeadCheckState()).isEqualTo(stored);
     }
 
     @Test
@@ -683,5 +742,56 @@ class GitLabMergeRequestSyncServiceTest extends BaseUnitTest {
         pageInfo.put("endCursor", hasNextPage ? "next-page" : null);
         return GraphQlResponses.of(
                 Map.of("project", Map.of("mergeRequests", Map.of("nodes", nodes, "pageInfo", pageInfo))), errors);
+    }
+
+    /**
+     * The JSON body of a page holding {@code nodes}, with {@code errors} beside the data and no further page. It keeps
+     * every explicit null, whatever the codecs under test do with one.
+     */
+    private static String body(List<Map<String, Object>> nodes, List<Map<String, ?>> errors) {
+        Map<String, @Nullable Object> pageInfo = new HashMap<>();
+        pageInfo.put("hasNextPage", false);
+        pageInfo.put("endCursor", null);
+        Map<String, Object> body = new HashMap<>();
+        body.put("data", Map.of("project", Map.of("mergeRequests", Map.of("nodes", nodes, "pageInfo", pageInfo))));
+        if (!errors.isEmpty()) {
+            body.put("errors", errors);
+        }
+        return JsonMapper.builder()
+                .changeDefaultPropertyInclusion(inclusion -> inclusion
+                        .withValueInclusion(JsonInclude.Include.ALWAYS)
+                        .withContentInclusion(JsonInclude.Include.ALWAYS))
+                .build()
+                .writeValueAsString(body);
+    }
+
+    /**
+     * The GitLab GraphQL client that {@link GitLabGraphQlConfig} builds, answered with {@code body}. Its mapper omits
+     * null values and null map entries, as the application's mapper is configured to; this unit setup builds it here
+     * and does not load the application context. A last filter returns the body in place of the connector, so nothing
+     * leaves the test.
+     */
+    private static HttpGraphQlClient productionCodecClient(String body) {
+        JsonMapper omittingNulls = JsonMapper.builder()
+                .changeDefaultPropertyInclusion(inclusion -> inclusion
+                        .withValueInclusion(JsonInclude.Include.NON_NULL)
+                        .withContentInclusion(JsonInclude.Include.NON_NULL))
+                .build();
+        var config = new GitLabGraphQlConfig(new GitLabRateLimitTracker(new SimpleMeterRegistry()));
+        var webClient = config.gitLabGraphQlWebClient(
+                omittingNulls,
+                new GitLabCredentialHealthFilter(
+                        new StaticListableBeanFactory().getBeanProvider(GitLabCredentialHealth.class)));
+        return config.gitLabGraphQlClient(
+                        webClient,
+                        new SilentModeGraphQlClientFactory(
+                                new SilentModeGraphQlInterceptor(mock(OutboundEgressGuard.class))))
+                .mutate()
+                .url("https://gitlab.example.test/api/graphql")
+                .webClient(builder -> builder.filter((request, next) -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .body(body)
+                        .build())))
+                .build();
     }
 }
