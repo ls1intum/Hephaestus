@@ -30,7 +30,9 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.graphql.client.ClientGraphQlRequest;
@@ -54,6 +57,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Exercises the real hierarchy walk and committed parent links through native GraphQL JSON decoding. */
 @Tag("integration")
@@ -92,8 +96,20 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
     @PersistenceContext
     private @Nullable EntityManager entityManager;
 
+    /** The application's GitLab GraphQL client, with the codecs and filters production builds. */
+    @Autowired
+    @Qualifier("gitLabGraphQlClient")
+    private HttpGraphQlClient productionGraphQlClient;
+
+    @Autowired
+    private JsonMapper applicationJsonMapper;
+
     private final Deque<String> answers = new ArrayDeque<>();
     private final List<String> requestedCursors = new ArrayList<>();
+    /** Each page's work item nodes as GitLab sent them, before the service converts them. */
+    private final List<String> rawNodes = new ArrayList<>();
+
+    private GitLabGraphQlClientProvider clients;
 
     private Repository repository;
     private Issue parent;
@@ -132,7 +148,7 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
         assertThat(parentId(newChild)).isEmpty();
         assertUnrelatedLink();
 
-        var clients = mock(GitLabGraphQlClientProvider.class);
+        clients = mock(GitLabGraphQlClientProvider.class);
         when(clients.forScope(scopeId)).thenReturn(gitLabClient());
         service = new GitLabSubIssueSyncService(
                 issues,
@@ -462,6 +478,61 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
         });
     }
 
+    @Test
+    void shouldRemoveStoredParentAndCompleteWhenProductionGraphQlCodecsReadExplicitlyAbsentParents() {
+        when(clients.forScope(scopeId)).thenReturn(productionCodecClient());
+        answers.add(page(3, false, null, node(1, null, true), node(2, null), node(3, null)));
+
+        var result = sync();
+
+        assertSoftly(softly -> {
+            softly.assertThat(rawNodes)
+                    .as("GitLab sent each parent as an explicit null")
+                    .singleElement()
+                    .asString()
+                    .contains("parent=null");
+            softly.assertThat(parentId(existingChild)).isEmpty();
+            softly.assertThat(parentId(newChild)).isEmpty();
+            softly.assertThat(result).isEqualTo(SyncResult.completed(0));
+            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
+        });
+    }
+
+    @ParameterizedTest(name = "{index}: {0}")
+    @ValueSource(
+            strings = {
+                "{\"type\":\"HIERARCHY\",\"hasParent\":false,\"hasChildren\":false}",
+                "{\"type\":\"HIERARCHY\",\"hasParent\":true,\"parent\":null,\"hasChildren\":false}",
+                "{\"type\":\"HIERARCHY\",\"parent\":null,\"hasChildren\":false}",
+                "{\"type\":\"HIERARCHY\",\"hasParent\":false,"
+                        + "\"parent\":{\"iid\":\"1\",\"namespace\":{\"fullPath\":\"team/hierarchy\"}},"
+                        + "\"hasChildren\":false}"
+            })
+    void shouldPreserveStoredParentAndAbortWhenProductionGraphQlCodecsReadAnUnconfirmedAbsence(String hierarchy) {
+        when(clients.forScope(scopeId)).thenReturn(productionCodecClient());
+        answers.add(page(3, false, null, node(1, null, true), """
+                {"iid":"2","widgets":[%s]}
+                """.formatted(hierarchy), node(3, null)));
+
+        var result = sync();
+
+        assertSoftly(softly -> {
+            softly.assertThat(parentId(existingChild)).contains(parent.getId());
+            softly.assertThat(parentId(newChild)).isEmpty();
+            softly.assertThat(result).isEqualTo(SyncResult.abortedError(0));
+            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
+        });
+    }
+
+    @Test
+    void shouldKeepTheApplicationJsonMapperOmittingNullValuesInsideMaps() {
+        // API responses keep leaving absent values out. GitLab's explicit nulls are read from the decoded response.
+        Map<String, @Nullable Object> absent = new HashMap<>();
+        absent.put("parent", null);
+
+        assertThat(applicationJsonMapper.writeValueAsString(absent)).isEqualTo("{}");
+    }
+
     private SyncResult sync() {
         var currentEntityManager = Objects.requireNonNull(entityManager);
         var result = transactions.execute(status -> {
@@ -545,12 +616,41 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
     }
 
     private HttpGraphQlClient gitLabClient() {
-        var webClient = WebClient.builder()
-                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
-                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .body(answers.removeFirst())
-                        .build()));
-        GraphQlClientInterceptor recordRequest = new GraphQlClientInterceptor() {
+        var webClient = WebClient.builder().exchangeFunction(request -> Mono.just(answer()));
+        return HttpGraphQlClient.builder(webClient)
+                .url("https://gitlab.example.test/api/graphql")
+                .documentSource(new FragmentMergingDocumentSource(
+                        List.of(
+                                new ClassPathResource("graphql/gitlab/operations/"),
+                                new ClassPathResource("graphql/gitlab/fragments/")),
+                        List.of(".graphql", ".gql"),
+                        List.of(new ClassPathResource("graphql/gitlab/fragments/GitLabUserFields.graphql"))))
+                .interceptor(recordRequest())
+                .build();
+    }
+
+    /**
+     * The application's GitLab GraphQL client, answered by the supplied pages. A last filter returns the page in place
+     * of the connector, so nothing leaves the test, and the exchange strategies keep the codecs the application builds.
+     */
+    private HttpGraphQlClient productionCodecClient() {
+        return productionGraphQlClient
+                .mutate()
+                .url("https://gitlab.example.test/api/graphql")
+                .webClient(builder -> builder.filter((request, next) -> Mono.just(answer())))
+                .interceptor(recordRequest())
+                .build();
+    }
+
+    private ClientResponse answer() {
+        return ClientResponse.create(HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .body(answers.removeFirst())
+                .build();
+    }
+
+    private GraphQlClientInterceptor recordRequest() {
+        return new GraphQlClientInterceptor() {
             @Override
             public Mono<ClientGraphQlResponse> intercept(ClientGraphQlRequest request, Chain chain) {
                 requestedCursors.add(Objects.toString(request.getVariables().get("after"), "<start>"));
@@ -561,19 +661,11 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
                                 "GetProjectWorkItemHierarchy",
                                 "project",
                                 response.field("project").getValue());
+                        rawNodes.add(Objects.toString(
+                                response.field("project.workItems.nodes").getValue()));
                     }
                 });
             }
         };
-        return HttpGraphQlClient.builder(webClient)
-                .url("https://gitlab.example.test/api/graphql")
-                .documentSource(new FragmentMergingDocumentSource(
-                        List.of(
-                                new ClassPathResource("graphql/gitlab/operations/"),
-                                new ClassPathResource("graphql/gitlab/fragments/")),
-                        List.of(".graphql", ".gql"),
-                        List.of(new ClassPathResource("graphql/gitlab/fragments/GitLabUserFields.graphql"))))
-                .interceptor(recordRequest)
-                .build();
     }
 }

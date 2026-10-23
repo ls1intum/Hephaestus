@@ -265,7 +265,7 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
                 .thenReturn(true);
 
         ClientResponseField nodesField = mock(ClientResponseField.class);
-        lenient().doReturn(nodeList).when(nodesField).toEntityList(Map.class);
+        lenient().doReturn(nodeList).when(nodesField).getValue();
         lenient().when(response.field("project.workItems.nodes")).thenReturn(nodesField);
 
         ClientResponseField pageInfoField = mock(ClientResponseField.class);

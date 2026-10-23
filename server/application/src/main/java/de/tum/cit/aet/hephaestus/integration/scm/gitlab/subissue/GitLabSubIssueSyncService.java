@@ -150,9 +150,14 @@ public class GitLabSubIssueSyncService {
                     break;
                 }
 
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> nodes = (List<Map<String, Object>>)
-                        (List<?>) response.field("project.workItems.nodes").toEntityList(Map.class);
+                // The nodes as GitLab sent them: decoding them into maps again would drop an explicit
+                // "parent": null. A page with an unreadable node applies none of its nodes.
+                var nodesField = response.field("project.workItems.nodes");
+                if (!(nodesField.getValue() instanceof List<?> workItems)
+                        || !workItems.stream().allMatch(node -> node instanceof Map<?, ?>)) {
+                    break;
+                }
+                List<Map<String, Object>> nodes = Objects.requireNonNull(nodesField.getValue());
 
                 Integer linked = admission
                         .write(read, () -> {

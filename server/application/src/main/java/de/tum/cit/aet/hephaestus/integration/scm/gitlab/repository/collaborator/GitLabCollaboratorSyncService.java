@@ -231,8 +231,13 @@ public class GitLabCollaboratorSyncService {
                     return Optional.empty();
                 }
 
-                for (Object node :
-                        response.field("project.projectMembers.nodes").toEntityList(Map.class)) {
+                // The nodes as GitLab sent them: decoding them into maps again would drop a pending invitation's
+                // "user": null.
+                if (!(response.field("project.projectMembers.nodes").getValue() instanceof List<?> nodes)) {
+                    log.warn("Stopped collaborator sync: reason=pageNotWhole, projectPath={}", safeProjectPath);
+                    return Optional.empty();
+                }
+                for (Object node : nodes) {
                     // A pending e-mail invitation is listed with no user and grants nobody access
                     // (GitLabGroupMemberResponse#isPendingInvitation).
                     if (node instanceof Map<?, ?> member && member.containsKey("user") && member.get("user") == null) {
