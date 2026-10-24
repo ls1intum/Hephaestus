@@ -422,6 +422,7 @@ export default defineConfig({
 			"schema:nats": run("node scripts/nats-extract-examples.ts"),
 			"report:ci-latency": run("node scripts/report-ci-latency.ts"),
 			"report:ci-timings": run("node scripts/report-ci-timings.ts"),
+			"report:flakes": run("node scripts/report-flakes.ts"),
 			"report:test-results": run("node scripts/summarize-test-results.ts"),
 			"release:version": run("changeset version && node scripts/sync-release-version.ts"),
 

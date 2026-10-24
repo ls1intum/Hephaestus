@@ -158,6 +158,18 @@ Those discovery reports are not evidence that tests passed.
 Execution tasks do not accept the removed `-PtestSelection` property.
 Use the selection command for discovery.
 
+## Flaky tests
+
+A flaky test fails and then passes on the same commit.
+CI does not retry Gradle or Vitest tests.
+Playwright retries a failed test once to record a trace, and then it fails the run as flaky.
+
+`GITHUB_REPOSITORY=owner/repository vp run report:flakes` lists the jobs and tests that failed and then passed on a rerun of the same commit in the last 14 days.
+It reads run attempts and the retained JUnit reports.
+
+Find the cause of a flaky test and fix it, or delete a test that asserts nothing new.
+Do not add a retry, a longer timeout, or a sleep to hide it.
+
 ## Live external-service tests
 
 Live tests use real provider APIs, LLM endpoints or sandbox containers. They carry `@Tag("live")`
