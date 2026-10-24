@@ -7,10 +7,12 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -236,7 +238,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
         assertThat(job.getCompletedAt()).isNull();
         assertThat(job.getExitCode()).isNull();
-        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any());
+        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), anyInt());
         verify(practiceScriptRuns, never()).record(any(), any(), any(), any());
         verify(usageRecorder, never()).project(any(), any());
         verify(kept, never()).forget(any());
@@ -253,7 +255,12 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         when(jobs.lockById(job.getId())).thenReturn(Optional.of(job));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
         when(jobs.transitionStatusOwnedBy(
-                        eq(job.getId()), eq(ReviewJobStatus.COMPLETED), any(), eq(null), any(), eq("worker-1")))
+                        eq(job.getId()),
+                        eq(ReviewJobStatus.COMPLETED),
+                        any(),
+                        eq(null),
+                        eq("worker-1"),
+                        eq(job.getAttempt())))
                 .thenReturn(1);
         var executor = owedExecutor(kept);
 
@@ -284,7 +291,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
         assertThat(job.getCompletedAt()).isNull();
         assertThat(job.getExitCode()).isNull();
-        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any());
+        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), anyInt());
         verify(usageRecorder, never()).project(any(), any());
         verify(kept, never()).forget(any());
     }
@@ -309,8 +316,8 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         eq(ReviewJobStatus.TIMED_OUT),
                         any(),
                         eq("The container timed out."),
-                        any(),
-                        eq("worker-1"));
+                        eq("worker-1"),
+                        eq(job.getAttempt()));
         verify(usageRecorder).project(eq(job.getWorkspaceId()), any());
         verify(practiceScriptRuns).record(eq(job), aryEq(scriptReport()), any(), any());
         verify(kept).forget(job);
@@ -349,7 +356,8 @@ class ReviewJobExecutorTest extends BaseUnitTest {
     private void terminalWriteOf(ReviewJob job, ReviewJobStatus status) {
         when(jobs.lockById(job.getId())).thenReturn(Optional.of(job));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
-        when(jobs.transitionStatusOwnedBy(eq(job.getId()), eq(status), any(), any(), any(), eq("worker-1")))
+        when(jobs.transitionStatusOwnedBy(
+                        eq(job.getId()), eq(status), any(), any(), eq("worker-1"), eq(job.getAttempt())))
                 .thenReturn(1);
     }
 
@@ -518,6 +526,61 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         assertThat(executor(pool).computeCapacity()).isEqualTo(2);
     }
 
+    /** A job this worker claimed as attempt 2, whose execution the pool has not run yet. */
+    private ReviewJobExecutor claimedOnWorker(ReviewJob job) {
+        job.setAttempt(2);
+        var properties = mock(WorkerProperties.class);
+        when(properties.resolvedWorkerId()).thenReturn("worker-1");
+        worker = Optional.of(properties);
+        when(jobs.findByIdQueuedForUpdateSkipLocked(any(), any())).thenReturn(Optional.of(job));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        when(policy.permitsReview(job)).thenReturn(true);
+        var binding = mock(WorkspaceAgentBinding.class);
+        when(binding.getDataHandlingTier()).thenReturn(DataHandlingTier.UNDECLARED);
+        when(binding.getMaxConcurrentJobs()).thenReturn(1);
+        when(policy.binding(job)).thenReturn(Optional.of(binding));
+        when(budgets.decide(job.getWorkspaceId())).thenReturn(LlmBudgetDecision.ALLOWED);
+        when(assignments.load(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(null, null)));
+        var executor = executor(mock(AsyncTaskExecutor.class));
+        assertThat(executor.processJob(job.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.STARTED);
+        return executor;
+    }
+
+    private record Running(UUID getId, int getAttempt) implements ReviewJobRepository.RunningAttempt {}
+
+    @Test
+    void shouldStopTheSandboxWhenTheLedgerNoLongerRunsTheJobOnThisWorker() {
+        var job = configuredJob();
+        var executor = claimedOnWorker(job);
+        when(jobs.findRunningAttemptsOwnedBy(any(), eq("worker-1"))).thenReturn(List.of());
+
+        executor.stopAttemptsNoLongerOwned();
+
+        verify(sandbox, timeout(5_000)).cancel(job.getId());
+    }
+
+    @Test
+    void shouldStopTheSandboxWhenTheLedgerRunsALaterAttemptOfTheJob() {
+        var job = configuredJob();
+        var executor = claimedOnWorker(job);
+        when(jobs.findRunningAttemptsOwnedBy(any(), eq("worker-1"))).thenReturn(List.of(new Running(job.getId(), 3)));
+
+        executor.stopAttemptsNoLongerOwned();
+
+        verify(sandbox, timeout(5_000)).cancel(job.getId());
+    }
+
+    @Test
+    void shouldKeepTheSandboxWhileTheLedgerRunsTheSameAttemptOnThisWorker() {
+        var job = configuredJob();
+        var executor = claimedOnWorker(job);
+        when(jobs.findRunningAttemptsOwnedBy(any(), eq("worker-1"))).thenReturn(List.of(new Running(job.getId(), 2)));
+
+        executor.stopAttemptsNoLongerOwned();
+
+        verify(sandbox, after(500).never()).cancel(any());
+    }
+
     @Test
     void shouldNotCancelAJobThisWorkerDoesNotOwn() {
         assertThat(executor(mock(AsyncTaskExecutor.class)).cancelLocalJob(UUID.randomUUID(), "cancelled"))
@@ -603,7 +666,8 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         capacity = Optional.of(workerCapacity);
         when(jobs.findByIdQueuedForUpdateSkipLocked(any(), any())).thenReturn(Optional.of(job));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
-        when(jobs.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
+        when(jobs.transitionStatusOwnedBy(any(), any(), any(), any(), isNull(), anyInt()))
+                .thenReturn(1);
         when(policy.permitsReview(job)).thenReturn(true);
         var binding = mock(WorkspaceAgentBinding.class);
         when(binding.getDataHandlingTier()).thenReturn(DataHandlingTier.UNDECLARED);
@@ -658,7 +722,8 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         capacity = Optional.of(workerCapacity);
         when(jobs.findByIdQueuedForUpdateSkipLocked(any(), any())).thenReturn(Optional.of(job));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
-        when(jobs.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
+        when(jobs.transitionStatusOwnedBy(any(), any(), any(), any(), isNull(), anyInt()))
+                .thenReturn(1);
         when(policy.permitsReview(job)).thenReturn(true);
         var binding = mock(WorkspaceAgentBinding.class);
         when(binding.getDataHandlingTier()).thenReturn(DataHandlingTier.UNDECLARED);
@@ -725,7 +790,14 @@ class ReviewJobExecutorTest extends BaseUnitTest {
 
         assertThat(executor.computeCapacity()).isEqualTo(1);
         assertThat(job.getProcessingStatus()).isEqualTo(ProcessingStatus.PENDING);
-        verify(jobs).transitionStatus(eq(job.getId()), eq(ReviewJobStatus.COMPLETED), any(), eq(null), any());
+        verify(jobs)
+                .transitionStatusOwnedBy(
+                        eq(job.getId()),
+                        eq(ReviewJobStatus.COMPLETED),
+                        any(),
+                        eq(null),
+                        isNull(),
+                        eq(job.getAttempt()));
         verify(handler).completeWithoutExecution(job);
         verify(workerCapacity).releaseReview();
         assertThat(MDC.get("job.id")).isNull();

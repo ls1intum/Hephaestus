@@ -32,6 +32,7 @@ public class WorkerLivenessReporter {
     private static final Logger log = LoggerFactory.getLogger(WorkerLivenessReporter.class);
 
     private final WorkerRegistryRepository repository;
+    private final ReviewJobExecutor executor;
     private final TransactionTemplate transactionTemplate;
     private final Duration interval;
     private final String workerId;
@@ -44,11 +45,13 @@ public class WorkerLivenessReporter {
 
     public WorkerLivenessReporter(
             WorkerRegistryRepository repository,
+            ReviewJobExecutor executor,
             TransactionTemplate transactionTemplate,
             AgentProperties agentProperties,
             WorkerProperties workerProperties,
             MeterRegistry meterRegistry) {
         this.repository = repository;
+        this.executor = executor;
         this.transactionTemplate = transactionTemplate;
         this.interval = agentProperties.heartbeatInterval();
         this.workerId = workerProperties.resolvedWorkerId();
@@ -91,6 +94,15 @@ public class WorkerLivenessReporter {
             log.warn(
                     "Worker liveness heartbeat failed (consecutive={}): workerId={}, error={}",
                     consecutiveFailures,
+                    workerId,
+                    e.getClass().getSimpleName());
+        }
+        // The ledger, not the control channel, says which jobs this worker still runs.
+        try {
+            executor.stopAttemptsNoLongerOwned();
+        } catch (Exception e) {
+            log.warn(
+                    "Could not check which local jobs this worker still owns: workerId={}, error={}",
                     workerId,
                     e.getClass().getSimpleName());
         }
