@@ -896,11 +896,14 @@ If no such default-branch commit exists, the run builds every image itself. `det
   In a called workflow, `github.workflow` is the caller's name, so a group there would join the caller's lane.
   The caller's lane covers the jobs that it calls.
 
-  A workflow that deploys, tears down, or writes to a pull request does not cancel, because a run cancelled halfway leaves partial state.
-  `UNCANCELLED_PULL_REQUEST_RUNS` in `scripts/ci-contract.test.ts` lists those workflows with their reasons.
-  The test fails if a listed workflow cancels a run in progress at the workflow or job level.
+  Some workflows do not cancel, because a run cancelled halfway leaves state that no later run replaces.
+  That state is a deploy, a teardown, a commit, or an approval.
+  A sticky comment that the next run rewrites is not such state, so `pull-request.yml` cancels.
+  `UNCANCELLED_PULL_REQUEST_RUNS` in `scripts/ci-contract.test.ts` lists the workflows that do not cancel, with their reasons.
+
   The test evaluates each group. It fails when a workflow lacks the rule or when one pull request cancels another.
   It also fails when a run can cancel a run on `main` or in the merge queue.
+  It also fails when a workflow-level or job-level lane of a listed workflow cancels a pull-request run.
 - `release.yml` never cancels. The same-repository
   Version PR shares a concurrency lane with a dispatch on its branch. A racing trigger replaces redundant validation. Either survivor must pass release preflight. The merge queue separately validates
   the final merge tree. Ordinary PRs, forks, main pushes and merge groups retain separate lanes.
