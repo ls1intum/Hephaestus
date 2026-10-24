@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus;
 
+import de.tum.cit.aet.hephaestus.core.database.DatabaseMigration;
 import java.util.TimeZone;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -20,6 +21,9 @@ import org.springframework.resilience.annotation.EnableResilientMethods;
  * {@code @Scheduled} methods, otherwise sync schedulers, zombie sweepers, and rate-limit eviction
  * would double-run alongside the {@code application-server} container. See ADR 0008.
  *
+ * <p>With the {@value DatabaseMigration#PROFILE} profile active, the process migrates the database and exits
+ * instead ({@link DatabaseMigration}).
+ *
  * <p>{@link de.tum.cit.aet.hephaestus.notification.email.EmailTransportConfiguration} gates the
  * excluded mail auto-configuration on a configured SMTP host and the server runtime role.
  */
@@ -31,6 +35,9 @@ public class Application {
 
     public static void main(String[] args) {
         TimeZone.setDefault(TimeZone.getTimeZone("Europe/Berlin"));
+        if (DatabaseMigration.requested(args)) {
+            System.exit(DatabaseMigration.run(args));
+        }
         SpringApplication application = new SpringApplication(Application.class);
         application.setApplicationStartup(new BufferingApplicationStartup(2048));
         application.run(args);

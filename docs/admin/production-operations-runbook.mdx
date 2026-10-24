@@ -122,7 +122,7 @@ Turning silent mode off affects all workspaces and never flushes suppressed feed
 ### Validate the actual production data
 
 Use a restricted staging copy of production with the backup's access and retention rules.
-Starting the target release's application server with the production profile runs Spring Boot's Liquibase update against staging.
+Running the target release's [migrate run mode](./runtime-roles#database-migrations) with the production profile runs the Liquibase update against staging.
 The update must use that exact release's changelog, contexts, PostgreSQL image/extensions, secrets, and role configuration.
 
 1. Apply pre-boot isolation below **before** restoring secrets or starting application code.
@@ -323,11 +323,11 @@ The self-host broker publishes no host port.
 
 8. For a dedicated self-host broker, remove only that instance's `nats-server` container and confirmed `nats-data` volume.
 9. For a dedicated self-host broker, recreate NATS with an empty store.
-10. Start the isolated application server first so Liquibase completes.
+10. Run the isolated database migration first, then start the application server.
 11. Turn on silent mode and read it back.
 12. Start the isolated webhook role to recreate streams.
 
-    Its Compose dependency requires the migrated application server.
+    Its Compose dependency requires the completed database migration.
 
 13. Keep public ingress blocked.
 14. Verify that server consumers attach after streams exist.
