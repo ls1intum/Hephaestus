@@ -986,8 +986,11 @@ or mixed attempts. Keep raw API evidence under `tmp/`, not in committed performa
 `Flaky test report` runs every Monday and on dispatch.
 It covers the CI/CD runs of the last 14 days.
 It lists the jobs and tests that failed in one attempt of a run and then passed in a later attempt.
+
 A test that fails again in the run's last attempt is a real failure, so the report leaves it out.
-It reads run attempts and the retained JUnit reports, and it retains `flakes.json` for 90 days.
+If a job that never passed does not fail again in the last attempt's own rerun, the run's tests stay unknown.
+
+The report reads run attempts and the retained JUnit reports, and it retains `flakes.json` for 90 days.
 Reproduce it with an authenticated GitHub CLI:
 
 ```bash

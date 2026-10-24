@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
 	type AttemptJob,
+	attributable,
 	failedTestCases,
 	flakyJobs,
 	flakyTests,
@@ -11,9 +12,15 @@ import {
 	rerunsOf,
 } from "./report-flakes.ts";
 
-const job = (name: string, conclusion: string | null, failedSteps: string[] = []): AttemptJob => ({
+const job = (
+	name: string,
+	conclusion: string | null,
+	failedSteps: string[] = [],
+	startedAt = "2026-10-24T10:00:00Z",
+): AttemptJob => ({
 	name,
 	conclusion,
+	startedAt,
 	url: `https://github.com/example/project/actions/runs/1/job/${name}`,
 	failedSteps,
 });
@@ -64,6 +71,44 @@ void test("a test that fails again in the last attempt is a real failure, not a 
 });
 
 const page = (...runs: object[]) => ({ workflow_runs: runs });
+
+const at = (hour: number) => `2026-10-24T${String(hour).padStart(2, "0")}:00:00Z`;
+
+void test("tests stay unknown unless every never-passing job ran again in the last attempt", () => {
+	const flaky = [{ attempt: 1, job: job("A", "failure", [], at(10)) }];
+	const first = [job("A", "failure", [], at(10)), job("B", "failure", [], at(10))];
+	// "Re-run failed jobs": B ran again and failed again, so its tests can be subtracted.
+	const rerunBoth = new Map([
+		[1, first],
+		[2, [job("A", "success", [], at(11)), job("B", "failure", [], at(11))]],
+	]);
+	assert.equal(attributable(rerunBoth, flaky, 2), true);
+	// Only A was rerun: the attempt lists B again with its earlier start.
+	const rerunOne = new Map([
+		[1, first],
+		[2, [job("A", "success", [], at(11)), job("B", "failure", [], at(10))]],
+	]);
+	assert.equal(attributable(rerunOne, flaky, 2), false);
+	// B ran again in attempt 2, but attempt 3 reran only A and lists B with its attempt-2 start.
+	const threeAttempts = new Map([
+		[1, first],
+		[2, [job("A", "failure", [], at(10)), job("B", "failure", [], at(11))]],
+		[3, [job("A", "success", [], at(12)), job("B", "failure", [], at(11))]],
+	]);
+	assert.equal(attributable(threeAttempts, flaky, 3), false);
+	// A cancelled rerun of B leaves no report to subtract.
+	const cancelled = new Map([
+		[1, first],
+		[2, [job("A", "success", [], at(11)), job("B", "cancelled", [], at(11))]],
+	]);
+	assert.equal(attributable(cancelled, flaky, 2), false);
+	// No job failed for real, so the flaky attempt's reports alone are enough.
+	const onlyFlaky = new Map([
+		[1, [job("A", "failure", [], at(10))]],
+		[2, [job("A", "success", [], at(11))]],
+	]);
+	assert.equal(attributable(onlyFlaky, flaky, 2), true);
+});
 
 void test("reruns are listed once, even where two day windows share a bound", () => {
 	const runs = rerunsOf([

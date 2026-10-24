@@ -16,6 +16,8 @@ const AGGREGATE_JOBS = new Set(["CI Status Gate"]);
 export interface AttemptJob {
 	name: string;
 	conclusion: string | null;
+	/** An attempt lists every job; one it did not rerun keeps its earlier start. */
+	startedAt: string | null;
 	url: string;
 	failedSteps: string[];
 }
@@ -71,6 +73,7 @@ export function attemptJobs(value: unknown): AttemptJob[] {
 		return {
 			name: asString(job.name, "job.name"),
 			conclusion: job.conclusion === null ? null : asString(job.conclusion, "job.conclusion"),
+			startedAt: job.started_at === null ? null : asString(job.started_at, "job.started_at"),
 			url: asString(job.html_url, "job.html_url"),
 			failedSteps: steps
 				.map((step) => asRecord(step, "step"))
@@ -117,6 +120,36 @@ export function flakyTests(
 ): string[] {
 	const real = new Set(failedLast);
 	return [...new Set(failedEarlier)].filter((name) => !real.has(name));
+}
+
+/**
+ * Whether the failed tests of the flaky attempts can be told apart from those of jobs that never
+ * passed. Each such job must have run again in the last attempt and failed there, so that its
+ * tests can be subtracted. A job that the last attempt did not rerun keeps the start it had in the
+ * attempt before. A cancelled rerun leaves no report and does not conclude `failure`.
+ */
+export function attributable(
+	attempts: ReadonlyMap<number, readonly AttemptJob[]>,
+	flaky: readonly FlakyJob[],
+	lastAttempt: number,
+): boolean {
+	const flakyNames = new Set(flaky.map(({ job }) => job.name));
+	const last = attempts.get(lastAttempt) ?? [];
+	const previous = attempts.get(lastAttempt - 1) ?? [];
+	return [...new Set(flaky.map(({ attempt }) => attempt))].every((attempt) =>
+		(attempts.get(attempt) ?? [])
+			.filter(
+				(job) =>
+					job.conclusion === "failure" &&
+					!AGGREGATE_JOBS.has(job.name) &&
+					!flakyNames.has(job.name),
+			)
+			.every(({ name }) => {
+				const rerun = last.find((job) => job.name === name);
+				const before = previous.find((job) => job.name === name);
+				return rerun?.conclusion === "failure" && rerun.startedAt !== before?.startedAt;
+			}),
+	);
 }
 
 /** Completed runs that needed another attempt, once each: adjacent day windows share their bound. */
@@ -243,22 +276,26 @@ async function failedTestsIn(
 async function failedTestsOf(
 	repository: string,
 	runId: number,
-	attempts: readonly number[],
+	attempts: ReadonlyMap<number, readonly AttemptJob[]>,
+	flaky: readonly FlakyJob[],
 	lastAttempt: number,
 ): Promise<string[] | null> {
 	const pages = await api(`repos/${repository}/actions/runs/${runId}/artifacts?per_page=100`);
 	const artifacts = pages.flatMap((page) =>
 		asArray(asRecord(page, "artifact page").artifacts, "artifacts"),
 	);
-	const earlier = attempts.flatMap((attempt) => reportArtifacts(artifacts, attempt));
-	if (earlier.length === 0) {
+	const earlier = [...new Set(flaky.map(({ attempt }) => attempt))].flatMap((attempt) =>
+		reportArtifacts(artifacts, attempt),
+	);
+	const later = reportArtifacts(artifacts, lastAttempt);
+	if (earlier.length === 0 || !attributable(attempts, flaky, lastAttempt)) {
 		return null;
 	}
 	const directory = await mkdtemp(path.join(tmpdir(), "report-flakes-"));
 	try {
 		return flakyTests(
 			await failedTestsIn(repository, runId, earlier, directory),
-			await failedTestsIn(repository, runId, reportArtifacts(artifacts, lastAttempt), directory),
+			await failedTestsIn(repository, runId, later, directory),
 		);
 	} catch (error) {
 		// An expired or deleted report leaves this run's tests unknown, not the whole report.
@@ -313,12 +350,7 @@ if (import.meta.main) {
 			event: asString(run.event, "event"),
 			createdAt: asString(run.created_at, "created_at"),
 			jobs,
-			failedTests: await failedTestsOf(
-				repository,
-				runId,
-				[...new Set(jobs.map((job) => job.attempt))],
-				lastAttempt,
-			),
+			failedTests: await failedTestsOf(repository, runId, attempts, jobs, lastAttempt),
 		});
 	}
 	await mkdir("tmp/ci-metrics", { recursive: true });

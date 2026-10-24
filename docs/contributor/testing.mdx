@@ -173,12 +173,12 @@ When a test flakes:
 2. The owner finds the cause and fixes it, or deletes a test that asserts nothing new.
    Do not add a retry, a longer timeout, or a sleep to hide it.
 3. Quarantine the test only while the flake blocks merges and the cause is not fixed yet.
-   The skip names the issue and an end date at most 14 days ahead.
-   In Java, write `@Disabled("quarantine #123 until 2026-11-07: free-port race")`.
-   In TypeScript, put `// quarantine #123 until 2026-11-07: free-port race` above `it.skip(`.
+   The skip names the issue, the owner's GitHub login and an end date at most 14 days ahead.
+   In Java, write `@Disabled("quarantine #123 @owner until 2026-11-07: free-port race")`.
+   In TypeScript, put `// quarantine #123 @owner until 2026-11-07: free-port race` on the line directly above `it.skip(`.
 4. On the end date, the owner fixes or deletes the test.
 
-`vp run check` fails on a skip that names no issue and end date, and on an expired quarantine.
+`vp run check` fails on a skip that names no issue, owner and end date, and on an expired quarantine.
 A skip that depends on the environment, such as missing live credentials, is not a quarantine.
 
 ## Live external-service tests
