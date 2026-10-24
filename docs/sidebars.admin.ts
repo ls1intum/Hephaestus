@@ -9,6 +9,7 @@ const sidebars: SidebarsConfig = {
 			collapsed: false,
 			items: [
 				"install",
+				"kubernetes",
 				"configuration-readiness",
 				"passkeys",
 				"production-setup",

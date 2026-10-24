@@ -1,0 +1,217 @@
+# Hephaestus chart values. docs/admin/kubernetes.mdx describes each group.
+# values.schema.json owns the shape of every key. The templates own the cross-field rules.
+
+# Written by scripts/kubernetes-chart.ts from a verified release lock. Never set these by hand:
+# the chart has no default image, tag or registry.
+release:
+  version: ""
+  commit: ""
+images: {}
+
+# The public hostname. The SPA, the API, the auth issuer and the OAuth callbacks all use it.
+host: ""
+# Lowercase letters, digits, ".", "_" or "-". The server refuses to start with another value.
+deploymentEnvironment: local
+# Tomcat internal-proxies regular expression (not a CIDR) that matches only the addresses of the
+# Gateway data plane. The server refuses to start in production when it is blank.
+trustedProxies: ""
+
+# One existing Secret in the release namespace. The chart reads the fixed key names that
+# docs/admin/kubernetes.mdx lists and never writes a secret value.
+secret:
+  name: ""
+
+# Gateway API routing. The platform owns the Gateway API resources, the controller, the Gateway, its
+# TLS certificate and the HTTP to HTTPS redirect. The chart attaches one HTTPRoute to that Gateway.
+route:
+  parentRefs: []
+
+# Network policy is always on. No value turns it off.
+networkPolicy:
+  dns:
+    namespace: kube-system
+    podLabels:
+      k8s-app: kube-dns
+  # The pods of the Gateway data plane that forward traffic to the release. Required, with at least
+  # one label: a namespace alone would admit every pod in it.
+  gateway:
+    namespace: ""
+    podLabels: {}
+  # The metrics scraper that may read the management port. An empty namespace admits no scraper.
+  # A namespace needs at least one pod label.
+  metrics:
+    namespace: ""
+    podLabels: {}
+  # Internet egress for the server and the worker: Git providers, OAuth, AI providers.
+  externalEgress:
+    cidr: 0.0.0.0/0
+    except:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 169.254.0.0/16
+      - 100.64.0.0/10
+  # The Kubernetes API endpoint that the worker calls, as the network plugin sees it after any
+  # address translation. The operator states it for the qualified plugin. There is no default.
+  kubernetesApi:
+    cidr: ""
+    port: 0
+
+postgresql:
+  # true runs the release's PostgreSQL image as one StatefulSet. false uses `external`.
+  bundled: true
+  database: hephaestus
+  # Every role connects with sslmode=verify-full. Required: an existing Secret in the release
+  # namespace with ca.crt, the CA that signed the server certificate. The bundled server also reads
+  # its certificate and key from the same Secret (tls.crt, tls.key). That certificate must name
+  # <release>-postgresql.<release namespace>.svc. The chart creates no certificate and no key.
+  tls:
+    existingSecret: ""
+  persistence:
+    size: 20Gi
+    storageClassName: ""
+  resources:
+    requests: { cpu: 250m, memory: 512Mi, ephemeral-storage: 256Mi }
+    limits: { cpu: "2", memory: 2Gi, ephemeral-storage: 1Gi }
+  external:
+    # The name that the server certificate holds: verify-full checks it.
+    host: ""
+    port: 5432
+    # The CIDR that holds the database, for the egress rule.
+    cidr: ""
+
+nats:
+  # true runs the release's NATS image as one JetStream server. false uses `external`.
+  bundled: true
+  # NATS defaults max_payload to 1 MB. The webhook receiver admits 25 MiB.
+  maxPayloadBytes: 26214400
+  jetstream:
+    maxMemory: 1G
+    # The broker's max_file and the webhook role's stream storage budget. The bundled volume is
+    # sized from it, so the two cannot drift. For an external broker, state that broker's max_file.
+    maxFileBytes: 17179869184
+  persistence:
+    storageClassName: ""
+  resources:
+    requests: { cpu: 100m, memory: 256Mi, ephemeral-storage: 64Mi }
+    limits: { cpu: "1", memory: 2Gi, ephemeral-storage: 256Mi }
+  external:
+    url: ""
+    cidr: ""
+    port: 4222
+
+# server.replicas, webhook.replicas and worker.replicas set 0 only to stop the database roles for
+# maintenance. docs/admin/kubernetes.mdx § Upgrades and database maintenance.
+server:
+  # 1, or 0 to stop it. Never more: the server is the one migration owner.
+  replicas: 1
+  # Commit ingestion mirrors under the fabric root. A cache: the server rebuilds it.
+  gitCache:
+    size: 20Gi
+    storageClassName: ""
+  resources:
+    requests: { cpu: "1", memory: 2Gi, ephemeral-storage: 512Mi }
+    limits: { cpu: "4", memory: 5Gi, ephemeral-storage: 2Gi }
+
+webhook:
+  # 1 to 3, or 0 to stop it. While it is 0 the release receives no provider deliveries.
+  replicas: 1
+  stream:
+    maxAge: 180d
+    maxBytes: 1GB
+    maxBytesGithub: 10GB
+  resources:
+    requests: { cpu: 250m, memory: 1Gi, ephemeral-storage: 256Mi }
+    limits: { cpu: "2", memory: 2Gi, ephemeral-storage: 1Gi }
+
+webapp:
+  replicas: 1
+  # docs/admin/legal-pages.mdx. Empty serves the built-in disclaimer.
+  legalProfile: ""
+  resources:
+    requests: { cpu: 50m, memory: 64Mi, ephemeral-storage: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi, ephemeral-storage: 256Mi }
+
+# The worker role runs practice reviews and Heph turns in sandboxes. One worker. worker.enabled=true
+# needs worker.runtime.podPidsLimit and networkPolicy.kubernetesApi. At its start the worker proves
+# that the cluster enforces the sandbox boundary, and stops if it does not.
+# docs/admin/kubernetes.mdx § Sandbox prerequisites.
+worker:
+  enabled: false
+  # 1, or 0 to stop the enabled worker and keep its objects and volume.
+  replicas: 1
+  drainTimeout: 5m
+  # The prerequisites of the nodes that run sandboxes. The chart passes each to the worker as it is.
+  runtime:
+    # Optional. The RuntimeClass of every sandbox pod, for example gVisor's. Empty uses the
+    # cluster's default runtime.
+    runtimeClassName: ""
+    # Optional. The shipped seccomp profile as a Localhost profile, relative to the kubelet's
+    # seccomp directory. Empty uses RuntimeDefault.
+    seccompProfile: ""
+    # Required. The per-pod process limit (podPidsLimit) that the kubelet of those nodes enforces.
+    podPidsLimit: 0
+  gitCache:
+    size: 50Gi
+    storageClassName: ""
+  resources:
+    requests: { cpu: "1", memory: 2Gi, ephemeral-storage: 512Mi }
+    limits: { cpu: "4", memory: 3Gi, ephemeral-storage: 2Gi }
+  # The chart names the sandbox namespace from the release; this quota bounds it. It holds review
+  # sandboxes, the Heph host and Heph turn sandboxes.
+  sandbox:
+    quota:
+      pods: 20
+      cpu: "28"
+      memory: 46Gi
+      ephemeralStorage: 52Gi
+
+# Application settings. Each key maps to one setting of docs/admin/production-setup.mdx.
+config:
+  releaseCheckEnabled: true
+  gitCheckoutEnabled: false
+  durableConsumerName: hephaestus
+  consumerInactiveThreshold: 30d
+  llmUsageRetention: P400D
+  credentialKey:
+    version: 1
+    priorVersion: ""
+    rotationEnabled: false
+  auth:
+    # Step-up and passkey assurance for administration. The application default is true. Set false
+    # only as a deliberate operator decision; the chart never derives it from the environment name.
+    assuranceEnforced: true
+    bootstrapAdmins: ""
+    browserExtensionIds: ""
+  github:
+    oauthClientId: ""
+    appId: 0
+    appClientId: ""
+    appInstallationUrl: ""
+  gitlab:
+    enabled: false
+    oauthClientId: ""
+    oauthBaseUrl: https://gitlab.com
+    oauthDisplayName: GitLab
+    workspaceCreation: false
+  slack:
+    enabled: false
+    clientId: ""
+    redirectUri: ""
+  outline:
+    enabled: false
+    allowedOrigins: ""
+    oauthBaseUrl: ""
+    oauthClientId: ""
+    oauthDisplayName: Outline
+  email:
+    host: ""
+    port: 587
+    username: ""
+    from: ""
+    fromName: Hephaestus
+    replyTo: ""
+  tracing:
+    otlpEnabled: false
+    otlpEndpoint: http://localhost:4318/v1/traces
+    samplingProbability: "0.0"

@@ -1,0 +1,14 @@
+# A multi-node cluster. PostgreSQL and NATS JetStream are operator-run services outside the chart;
+# set postgresql.external and nats.external in your own values file. Two webhook receivers and two
+# webapp pods spread a node drain.
+postgresql:
+  bundled: false
+nats:
+  bundled: false
+webhook:
+  replicas: 2
+webapp:
+  replicas: 2
+server:
+  gitCache:
+    size: 50Gi

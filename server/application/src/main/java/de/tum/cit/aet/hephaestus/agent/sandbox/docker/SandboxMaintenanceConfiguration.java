@@ -2,10 +2,12 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import com.github.dockerjava.api.DockerClient;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxRuntime;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +21,7 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 @Profile("!specs & !cds-training")
 @ConditionalOnClass(DockerClient.class)
 @ConditionalOnWorkerRole
+@ConditionalOnProperty(name = SandboxRuntime.PROPERTY, havingValue = "docker", matchIfMissing = true)
 public class SandboxMaintenanceConfiguration {
 
     @Bean

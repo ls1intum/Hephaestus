@@ -1,6 +1,6 @@
 # ADR 0041: Compose for 1.x; Kubernetes only for 2.0
 
-**Status:** Accepted (amended 2026-10-09 — debug transcripts; 2026-10-09 — Heph host, [ADR 0057](0057-one-heph-conversation-per-developer.md))
+**Status:** Accepted (amended 2026-10-09 — debug transcripts; 2026-10-09 — Heph host, [ADR 0057](0057-one-heph-conversation-per-developer.md); 2026-10-24 — [the Kubernetes runtime](#update--2026-10-24-the-kubernetes-runtime))
 **Date:** 2026-09-03
 **Authors:** Hephaestus maintainers
 **Amends:** [ADR 0005](0005-two-role-runtime-via-conditional-on-property.md),
@@ -382,3 +382,55 @@ session from PostgreSQL. Gateway capability 4 is now the Heph host's command cha
 (`/internal/llm/runtime/{hostId}/commands`) and its turn endpoints (`/internal/llm/turn/{id}/…`), not
 interactive frames. WSS carries no mentor frames. Heph no longer needs the Agent Sandbox CRD or its
 warm pools.
+
+## Update — 2026-10-24: the Kubernetes runtime
+
+The maintainers decided that 1.0 ships the Kubernetes runtime and the Helm chart, so that no platform migration follows 1.0.
+The chart must carry development, preview, staging and production installations.
+Compose stays the supported installation until the Kubernetes path is qualified.
+A later amendment changes § Releases and support. It needs these items:
+
+- one conformance suite that binds both runtimes (§ Verification gates);
+- a qualification on a multi-node cluster with a named network plugin;
+- the Compose-to-Kubernetes migration guide and its rehearsal;
+- a backup and restore procedure for the chart's volumes.
+
+This update replaces the parts of § Kubernetes batch and interactive execution that it names.
+
+- **Selection.** `hephaestus.sandbox.runtime` selects `docker` (the default) or `kubernetes` for each worker.
+  A worker never falls back from one runtime to the other.
+  Both runtimes implement the same three contracts: `SandboxManager`, `HostSandbox` and `ExecSandboxes`.
+- **Batch.** Each review attempt is one Job with one Pod, `restartPolicy: Never`, `backoffLimit: 0` and `podReplacementPolicy: Failed`.
+  The active deadline is the attempt's upload deadline plus two minutes, and the TTL is 15 minutes.
+  The Job has no `podFailurePolicy`: with `backoffLimit: 0`, the first failed Pod ends the Job.
+  A Job is deleted by name with background propagation, so its Pod goes with it.
+- **Heph.** The Heph host and the turn sandboxes are Pods that their worker owns.
+  [ADR 0057](0057-one-heph-conversation-per-developer.md) removed the need for warm pools, so Agent Sandbox is not a dependency.
+  A turn command runs through `pods/exec`. No batch work uses exec.
+- **Namespace.** Each installation owns one sandbox namespace.
+  The namespace enforces the Restricted Pod Security Standard and denies all ingress and egress.
+  One policy lets review and host Pods reach the gateway port of their worker Pod.
+  Turn Pods get no other policy.
+  A sandbox reaches the gateway at the worker's Pod IP, never through a Service.
+- **One worker.** The worker StatefulSet has at most one replica, and 1.0 has no workspace-to-ordinal lease.
+  Thus, a sandbox that the current worker process did not create belongs to no running worker, and the worker removes it.
+  More workers need the lease and a policy for each worker Pod.
+- **Isolation, proved at the worker's start.** A Pod spec cannot show what a cluster enforces.
+  So the worker runs an isolation probe before it starts a sandbox, as § Verification gates requires.
+  The probe proves the Restricted Pod Security Standard, egress to the gateway only, and the kubelet's per-Pod process limit.
+  When the probe fails, the worker stops.
+  A gVisor RuntimeClass and the shipped seccomp profile as a Localhost profile are optional; without them, sandbox Pods use the cluster's runtime and `RuntimeDefault`.
+- **No `noexec` and no IPC mode `none`.** An `emptyDir` has no mount options, and a Pod always has a private IPC namespace with `/dev/shm`.
+  A custom AppArmor profile could deny execution on the scratch paths.
+  The maintainers rejected that: AppArmor does not exist on SELinux and Bottlerocket nodes, gVisor does not apply it, and many managed clusters cannot load a custom profile.
+  A profile name that the worker reads proves nothing about a node.
+  `noexec` also blocks only the direct execution or executable mapping of a file on that mount.
+  The sandbox runs Bash and Node, which run any file that they can read, so `noexec` is not a boundary for it.
+  The `/dev/shm` of a Pod is shared only with the containers of that Pod: the stager of a turn sandbox runs only the worker's `tar`.
+  Revisit when Kubernetes gets mount options for `emptyDir`, or when an attack on an interpreter-equipped sandbox needs an executable scratch mount.
+- **NATS.** The bundled broker uses plain text inside the release namespace, and network policy admits only the server and the webhook role.
+  The released NATS Java client does not verify the host name of a TLS broker.
+  An external broker therefore needs a private network that only the release reaches.
+  Revisit when the client verifies host names.
+
+`docs/admin/kubernetes.mdx` owns the chart, the prerequisites and the probe's checks.

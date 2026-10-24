@@ -484,6 +484,36 @@ The app pod signs worker tokens from a key *ring*, not a single value:
 configure it through a mounted YAML/config-tree rather than a flat variable. Unset, the app logs a
 warning and generates an ephemeral key that invalidates every worker token on restart.
 
+### Sandbox runtime
+
+A worker runs its sandboxes on one runtime.
+`HEPHAESTUS_SANDBOX_RUNTIME` selects it: `docker`, the default, or `kubernetes`.
+A worker with any other value does not start.
+A worker never falls back from one runtime to the other.
+
+The `kubernetes` runtime runs each practice review as a Job, and the Heph host and turn sandboxes as Pods.
+It uses the worker Pod's own service account.
+The [Helm chart](kubernetes.mdx) sets these values:
+
+| Variable | Value |
+| --- | --- |
+| `HEPHAESTUS_SANDBOX_KUBERNETES_NAMESPACE` | Required. The sandbox namespace. The installation owns it alone. |
+| `HEPHAESTUS_SANDBOX_KUBERNETES_POD_NAME` | Required. The worker Pod's `metadata.name` (Downward API). |
+| `HEPHAESTUS_SANDBOX_KUBERNETES_POD_IP` | Required. The worker Pod's `status.podIP`. Sandboxes reach the gateway (`SANDBOX_API_PORT`) at this address. |
+| `HEPHAESTUS_SANDBOX_KUBERNETES_POD_PIDS_LIMIT` | Required. The kubelet `podPidsLimit` of the sandbox nodes. A sandbox that asks for fewer processes does not start. |
+| `HEPHAESTUS_SANDBOX_KUBERNETES_RUNTIME_CLASS_NAME` | Optional. The RuntimeClass of sandbox Pods, for example gVisor's. Empty uses the cluster's default runtime. |
+| `HEPHAESTUS_SANDBOX_KUBERNETES_SECCOMP_PROFILE` | Optional. The bundled `sandbox/agent-seccomp-profile.json` as a Localhost profile, relative to the kubelet's seccomp directory. Empty uses `RuntimeDefault`. |
+
+A missing or malformed required value stops the worker's start.
+At its start, the worker also runs the isolation probe.
+It starts no sandbox until the probe passes, and it stops when the probe fails.
+[Kubernetes § Sandbox prerequisites](kubernetes.mdx#sandbox-prerequisites) tells what the probe proves and what the worker's service account may do.
+
+The Kubernetes client writes the arguments of an exec into the URL of its WebSocket.
+When the upgrade fails, the client logs that URL.
+The shipped `logging.level` turns that one logger off.
+The worker logs the failure with its class and HTTP status only.
+
 ### Database connections
 
 Preparing code evidence can hold two database connections.

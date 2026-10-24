@@ -264,6 +264,8 @@ jobs:
               - 'scripts/**'
               - 'security/semgrep/**'
               - 'docker/agents/**'
+              # test:tooling renders this chart with the real Helm CLI on this leg and on Windows.
+              - 'deploy/chart/**'
               # format:load:check and test:load:syntax run on this leg.
               - 'load-tests/**'
               # The catalog and guidance tests in scripts/ judge these bundled server resources.
@@ -419,6 +421,7 @@ jobs:
               - '.github/actions/setup-toolchain/**'
               - '.github/actions/setup-caches/**'
               - '.github/actions/setup-browsers/**'
+              - '.github/actions/setup-helm/**'
             build-config:
               - '.github/workflows/cicd.yml'
               - '.java-version'

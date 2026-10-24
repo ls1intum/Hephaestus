@@ -1,0 +1,14 @@
+Hephaestus {{ .Values.release.version }} ({{ .Values.release.commit }}) is installed as "{{ .Release.Name }}" in "{{ .Release.Namespace }}".
+
+The server runs the database migrations before it reports ready. Follow it with:
+
+  kubectl --namespace {{ .Release.Namespace }} logs --follow deployment/{{ include "hephaestus.name" (dict "root" . "component" "server") }}
+
+Then open https://{{ .Values.host }}.
+
+{{ if .Values.worker.enabled -}}
+The worker uses the Kubernetes sandbox runtime. Its node prerequisites need operator qualification.
+{{ else -}}
+No worker is enabled, so practice reviews and Heph turns do not run.
+{{ end -}}
+docs/admin/kubernetes.mdx gives the status of the Kubernetes installation.

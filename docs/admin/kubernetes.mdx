@@ -1,0 +1,493 @@
+---
+id: kubernetes
+title: Kubernetes chart (preview)
+description: The status, contents, and configuration of the Hephaestus Helm chart source. It is not a supported install path.
+---
+
+# Kubernetes chart (preview)
+
+:::caution CAUTION: Not a supported install path
+The chart is prepared source for the 1.x Kubernetes milestone of [ADR 0041](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md).
+No release has qualified it on a Kubernetes version, a Helm version, a network plugin, or a Gateway controller.
+The worker is disabled by default, so practice reviews and Heph turns do not run until you enable it.
+For a production instance, use the [Compose install](./install).
+:::
+
+The chart is in `deploy/chart/hephaestus/` of the release checkout.
+It uses the standard Helm chart format: `Chart.yaml`, `values.yaml`, `values.schema.json`, and `templates/`.
+It uses only stable Kubernetes APIs and the Gateway API `HTTPRoute` resource of version `v1`.
+
+## What the chart runs
+
+| Component | Kind | Role or image |
+| --- | --- | --- |
+| `server` | Deployment, 1 replica, or 0 while stopped | Server role. It is the only migration owner. |
+| `webhook` | Deployment, 1 to 3 replicas, or 0 while stopped | Webhook role, as in [Runtime roles](./runtime-roles). |
+| `webapp` | Deployment | The SPA, from the non-root webapp image. |
+| `postgresql` | StatefulSet, optional | The release PostgreSQL image, with `pg_partman`. |
+| `nats` | StatefulSet, optional | One NATS JetStream server. |
+| `route` | HTTPRoute | `/`, `/api`, `/webhooks`, and Slack interactivity. |
+
+The server runs Liquibase at startup, as in Compose.
+The chart adds no migration Job and no Helm hook.
+The webhook role and the worker role do not run migrations.
+
+The server has one replica and the `Recreate` update strategy.
+Each server replica without a configured token key ring signs worker tokens with its own key.
+Two server versions never serve the same schema at the same time.
+
+The `Recreate` strategy applies only to the server.
+The webhook role and the worker also connect to the database, and their rollouts do not wait for the server.
+[Upgrades and database maintenance](#upgrades-and-database-maintenance) gives the order of the roles for a change of the database or the schema.
+
+## Prepare the chart from the release lock
+
+The chart has no default image, tag, or registry.
+A release that includes the chart publishes a second signed lock, `release-vX.Y.Z.chart.json`, of schema version 2.
+That joint lock names the images and the OCI chart of the release by digest.
+The schema 1 lock `release-vX.Y.Z.json` that Compose reads does not change.
+The chart version and its `appVersion` are the release version without the leading `v`.
+No release has published such a lock yet.
+
+You need Node.js, [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/), and the Helm CLI.
+Use the Helm version that [`.github/actions/setup-helm`](https://github.com/hephaestus-build/Hephaestus/blob/main/.github/actions/setup-helm/action.yml) pins.
+CI and the release workflow install that version.
+Contributors also need it: see the [local development prerequisites](/contributor/local-development#prerequisites).
+The pin is a build tool, not a qualified Helm version for an installation.
+No Helm plugin is necessary.
+
+1. Check out the release tag, as step 1 of the [Compose install](./install#1-get-the-files) shows.
+2. Prepare the release:
+
+   ```bash
+   node scripts/prepare-release-lock.ts "v$VERSION" release-lock.env --chart release-chart
+   ```
+
+The script does these checks in this order. If one check fails, it stops and writes nothing:
+
+1. It verifies the joint lock signature with the identity of the release workflow.
+2. It checks the lock against the evidence manifest of the release.
+3. It pulls the chart by the digest in the lock, never by a tag.
+4. It verifies the package signature of the chart with the same identity.
+5. It checks that the chart name, version, and `appVersion` belong to this release.
+6. It checks that the lock and the release image inventory of the checkout name the same images and upstream pins.
+
+Then it writes the Compose environment file and a new `release-chart` directory.
+That directory contains the verified chart package and `release-values.yaml`.
+The values file contains only the release version, the source commit, and five image references.
+The script refuses a `release-chart` path that already exists.
+With `--chart`, the script reads only the joint lock.
+If the release has no joint lock, the script stops: it never falls back to the schema 1 lock.
+It runs with Node alone and needs no installed packages.
+
+## Create the Secret
+
+The chart reads secret values only from one Secret in the release namespace.
+It never writes a secret value.
+Set `secret.name` to the name of that Secret.
+
+| Key | Required | Read by |
+| --- | --- | --- |
+| `DATABASE_USERNAME`, `DATABASE_PASSWORD` | Yes | Server, webhook, bundled PostgreSQL |
+| `NATS_USERNAME`, `NATS_PASSWORD` | Yes | Server, webhook, bundled NATS |
+| `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | Yes | Server, webhook |
+| `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` | Yes | Server, webhook |
+| `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` | Yes | Server |
+| `WEBHOOK_SECRET`, `WEBHOOK_ROUTING_SECRET` | Yes | Server, webhook |
+| `WEBHOOK_ROUTING_PREVIOUS_SECRET` | No | Server, webhook |
+| `HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY` | No | Server, webhook |
+| `HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET` | No | Server, webhook |
+| `HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN` | No | Server |
+| `GITHUB_OAUTH_CLIENT_SECRET`, `GITLAB_OAUTH_CLIENT_SECRET` | No | Server |
+| `GH_APP_CLIENT_SECRET`, `GH_APP_PRIVATE_KEY`, `GH_AUTH_TOKEN` | No | Server |
+| `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET`, `OUTLINE_OAUTH_CLIENT_SECRET` | No | Server |
+| `SPRING_MAIL_PASSWORD` | No | Server |
+| `HEPHAESTUS_WORKER_REGISTRATION_TOKEN` | No | Server |
+
+[Production setup](./production-setup) describes each value.
+The same rules as in Compose apply to the two encryption keys.
+Back up the Secret with the database.
+
+### PostgreSQL TLS Secret
+
+Each role connects to PostgreSQL with `sslmode=verify-full`.
+The role verifies the server certificate against a CA, and it checks that the certificate names the host that the role connects to.
+Set `postgresql.tls.existingSecret` to an existing Secret in the release namespace.
+The chart refuses to render without it.
+The chart creates no certificate, no key, and no CA.
+
+| Key | Bundled PostgreSQL | External PostgreSQL | Mounted in |
+| --- | --- | --- | --- |
+| `ca.crt` | Yes | Yes | Server, webhook, worker |
+| `tls.crt`, `tls.key` | Yes | No | Bundled PostgreSQL only |
+
+The server, the webhook role, and the worker receive only `ca.crt`, read-only, at `/etc/hephaestus/postgresql-ca`.
+No application role receives a private key.
+Do not put the private key of the CA in this Secret.
+
+For the bundled PostgreSQL, the certificate in `tls.crt` must name `<release>-postgresql.<release namespace>.svc`.
+`<release>-postgresql` follows the object name rule in [Install](#install).
+The roles connect to exactly this name, without a cluster domain.
+The chart mounts `tls.crt` and `tls.key` into the PostgreSQL pod with the mode `0440`.
+The files belong to root and to the group 999, and PostgreSQL accepts a key with these permissions.
+
+When you renew the certificate, update the Secret.
+The kubelet updates the mounted files after a delay.
+PostgreSQL reads its certificate and key again only on a configuration reload or a restart.
+Restart the PostgreSQL pod after a renewal.
+A new CA needs a restart of each application role too.
+
+## Gateway routes
+
+The Gateway API is a platform prerequisite of the chart.
+The platform operator installs and operates these items:
+
+- The Gateway API resource definitions and a Gateway controller.
+- The Gateway, its TLS certificate, and its HTTP to HTTPS redirect.
+
+The chart installs none of them.
+It attaches one `HTTPRoute` to the Gateways in `route.parentRefs`.
+`route.parentRefs` must name at least one Gateway.
+
+| Request path | Backend | Path change |
+| --- | --- | --- |
+| `/webhooks/slack/interactivity` | `server` | None |
+| `/webhooks` and below | `webhook` | None |
+| `/api` and below | `server` | `/api` is removed |
+| All other paths | `webapp` | None. The webapp serves the SPA for an unknown path. |
+
+The server serves the API without the `/api` prefix, as behind Traefik in Compose.
+A standard `Ingress` cannot remove a path prefix, so the chart does not use one.
+
+The Gateway controller must support these `HTTPRoute` features:
+
+- `URLRewrite` with `ReplacePrefixMatch`, for `/api`.
+- `ResponseHeaderModifier`, for `Strict-Transport-Security` on each rule.
+- `HTTPRouteRequestTimeout`, for `timeouts.request` on `/api`.
+- `HTTPRouteBackendTimeout`, for `timeouts.backendRequest` on `/api`.
+
+If the controller does not support a feature, the route does not work as described.
+The chart cannot detect this. Confirm all four features for the controller that you select.
+
+The `/api` rule sets both `timeouts.request` and `timeouts.backendRequest` to `0s`.
+The Heph live stream stays open for much longer than one request.
+The two timeouts are separate: the request timeout covers the client request, and the backend timeout covers the full backend response.
+If a rule omits one of them, the controller selects that behavior.
+A zero value asks the controller to disable the timeout.
+A controller that cannot disable it can use its longest possible value instead.
+Thus, the `0s` values do not guarantee a stream without a time limit.
+The other three rules set no timeout and no retry.
+
+Set `trustedProxies` to a Tomcat regular expression that matches only the Gateway data plane addresses.
+The server does not start in production with a blank value.
+
+The Gateway API has no portable request body limit or idle timeout.
+Configure these values on the Gateway:
+
+- A request body limit of 25 MiB on `/webhooks` and `/api`.
+- An idle timeout of more than 20 seconds for the Heph live stream.
+
+An idle timeout of more than 20 seconds does not replace the request and backend timeouts.
+No Gateway controller or version is qualified yet.
+A qualification must include these tests on the selected controller and its idle settings:
+
+- A long Heph live stream.
+- A long WebSocket connection through the Gateway.
+- A cancellation by the client during a stream.
+
+## Network policy
+
+Network policy is always on. No value turns it off.
+Each pod of the release starts with no ingress and no egress.
+The chart then opens only these paths:
+
+| From | To | Port |
+| --- | --- | --- |
+| `networkPolicy.gateway` pods | `server`, `webhook`, `webapp` | 8080 |
+| `server`, `webhook` | PostgreSQL | 5432, or the external port |
+| `server`, `webhook` | NATS | 4222, or the external port |
+| `server` | `networkPolicy.externalEgress` | 443 |
+| `server`, if `config.email.host` is set | `networkPolicy.externalEgress` | `config.email.port` |
+| All pods | `networkPolicy.dns` pods | 53 |
+| `networkPolicy.metrics` pods | All application roles | 9090 |
+
+`networkPolicy.gateway` must name the namespace and at least one pod label of the Gateway data plane.
+A namespace without labels would admit every pod in it, so the chart refuses it.
+The same rule applies to `networkPolicy.metrics` when you set its namespace.
+
+The management listener binds to the pod address.
+The kubelet probes it, and the metrics scraper can read it.
+No Service and no route expose it.
+
+The external egress rule excludes private, link-local, and shared address ranges by default.
+An external database or broker in a private range needs `postgresql.external.cidr` or `nats.external.cidr`.
+
+A rendered policy does not show enforcement.
+Each network plugin needs its own positive and negative traffic tests before the chart is supported.
+
+Network policy controls which pods can connect. It does not encrypt traffic.
+The connections to PostgreSQL use TLS ([PostgreSQL TLS Secret](#postgresql-tls-secret)).
+These internal channels send plain text:
+
+- The connections from the server and the webhook role to the bundled NATS.
+- The connection from the worker to the server.
+- The connections from sandboxes to the worker gateway.
+
+The bundled PostgreSQL still accepts a connection without TLS.
+The roles never use one, and network policy admits only the roles.
+
+The first qualification is for one worker on one node.
+Before any claim for several nodes, each plain text channel needs a qualified encrypted pod network or qualified TLS.
+TLS to PostgreSQL alone does not qualify the chart for production or for several nodes.
+
+## Storage and retention
+
+| Data | Bound | Setting |
+| --- | --- | --- |
+| PostgreSQL | Volume size | `postgresql.persistence.size` |
+| JetStream | Broker `max_file` and stream storage budget | `nats.jetstream.maxFileBytes` |
+| JetStream volume | `max_file` plus 25 % | Derived from `nats.jetstream.maxFileBytes` |
+| Webhook streams | Age and size for each stream | `webhook.stream.*` |
+| Server Git mirrors | Volume size | `server.gitCache.size` |
+| AI spend ledger | Retention | `config.llmUsageRetention` |
+| Temporary files | `emptyDir` size limit | Fixed in the templates |
+
+One value sets both the broker `max_file` and the webhook role's stream storage budget.
+The webhook role refuses to start when the stream bounds add up to more than that budget.
+[Webhook ingestion operations](./webhook-ingestion-operations) gives the durability guarantee.
+
+The chart does not back up PostgreSQL.
+[Backup and restore](./backup-restore) describes the Compose procedure.
+It does not yet cover a Kubernetes volume.
+
+## Pod security
+
+Each pod meets the Kubernetes Restricted Pod Security Standard:
+
+- A non-root user, `RuntimeDefault` seccomp, and no privilege escalation.
+- All capabilities dropped and a read-only root filesystem.
+- No host path, host network, or container runtime socket.
+- No service account token.
+
+The webapp runs as user and group 101 and listens on port 8080.
+Its only writable path is a 16 MiB volume at `/tmp/hephaestus-webapp`.
+The image writes its generated files, its nginx PID file, and its temporary directories there.
+`/tmp` itself and the assets stay read-only.
+
+The bundled PostgreSQL runs as the image user 999 and owns its volume through `fsGroup`.
+The volume is at `/var/lib/postgresql`, as [ADR 0038](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0038-postgresql-18-release-baseline.md) decides.
+The image keeps its versioned data directory below it, and the chart does not set `PGDATA`.
+The image's entrypoint starts PostgreSQL with `ssl=on` and the certificate and key from the TLS Secret, read-only at `/etc/postgresql/tls`.
+No real volume driver has shown this configuration yet.
+First initialization, restart, and restore need a start of the release image on a volume before this path counts as working.
+
+Every container has CPU, memory, and ephemeral storage requests and limits.
+The schema refuses a zero value.
+
+## Profiles
+
+Four values files in `profiles/` set capacity for one use.
+All four use the same templates.
+
+| Profile | Use | PostgreSQL and NATS |
+| --- | --- | --- |
+| `dev.yaml` | One workstation cluster | Bundled, small volumes |
+| `preview.yaml` | One pull request preview | Bundled, small volumes |
+| `small.yaml` | One small cluster, for example one k3s node | Bundled, Compose limits |
+| `cluster.yaml` | A cluster with several nodes | External |
+
+[ADR 0035](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0035-pull-request-previews-are-label-gated.md) owns what a preview can run.
+The preview profile sets only capacity.
+
+## External PostgreSQL and NATS
+
+Set `postgresql.bundled=false` to use your PostgreSQL server.
+That server must have the `pg_partman` extension.
+The chart connects to `postgresql.external.host` and `postgresql.external.port` with `sslmode=verify-full`.
+The server certificate must name that host.
+The Secret in `postgresql.tls.existingSecret` needs only `ca.crt`, the CA that signed the server certificate.
+The chart has no setting for a connection without certificate verification or without TLS.
+
+Set `nats.bundled=false` to use your NATS JetStream broker.
+Put the broker on a private network that only this release can reach.
+The released NATS client verifies the certificate chain of a `tls://` broker, but not the host name in the certificate.
+Thus, TLS alone does not prevent a connection to another broker that has a certificate from the same CA.
+The bundled broker stays inside the release namespace, and network policy admits only the server and the webhook role.
+The application has no setting for the stream replica count.
+A three-server JetStream cluster therefore keeps one replica of each stream.
+
+## Install
+
+1. Create the release namespace.
+2. Label the namespace with `pod-security.kubernetes.io/enforce=restricted`.
+3. Create the Secret and the PostgreSQL TLS Secret.
+4. Write your values file with `host`, `trustedProxies`, `secret.name`, `postgresql.tls.existingSecret`, `route.parentRefs`, and `networkPolicy.gateway` with its pod labels.
+5. Install the chart:
+
+   ```bash
+   helm install hephaestus "release-chart/hephaestus-$VERSION.tgz" \
+     --namespace hephaestus \
+     --values deploy/chart/hephaestus/profiles/small.yaml \
+     --values release-chart/release-values.yaml \
+     --values my-values.yaml
+   ```
+
+6. Follow the server log until the migrations are complete.
+
+The schema refuses an unknown key, an image tag, and a value outside its bounds.
+Each object name is `<release>-<component>`, with at most 52 characters.
+A StatefulSet revision label adds up to 11 characters to its name, and a label value has at most 63.
+If a name is longer, the chart keeps its start and adds 8 characters of a hash of the full name.
+The same release always gets the same names.
+The `app.kubernetes.io/instance` label always holds the full release name.
+
+`config.auth.assuranceEnforced` controls the passkey and recent sign-in checks for administration.
+Its default is `true`, as in the application.
+The chart never changes it from the environment name.
+To turn it off, for example on a staging instance, set it to `false` yourself.
+
+## Worker
+
+The worker role runs every review sandbox, the Heph host, and every turn sandbox.
+The worker is disabled by default.
+Before you set `worker.enabled=true`, prepare the [sandbox prerequisites](#sandbox-prerequisites).
+Set `worker.runtime.podPidsLimit` and `networkPolicy.kubernetesApi`.
+The chart refuses a worker without them.
+
+The chart binds the runtime to these resources:
+
+- One worker StatefulSet with one replica. Its pod is `<release>-worker-0`, where `<release>-worker` follows the object name rule above.
+- The settings `HEPHAESTUS_SANDBOX_RUNTIME=kubernetes`, the sandbox namespace, and the pod name and address from the Downward API ([Runtime roles § Sandbox runtime](./runtime-roles#sandbox-runtime)).
+- The existing gateway setting `SANDBOX_API_PORT`, with the value 8081.
+- One sandbox namespace, `<release namespace>-<release>-sandboxes`.
+  A name longer than 63 characters gets the same hash ending as an object name.
+
+The sandbox namespace holds review sandboxes, the Heph host and turn sandboxes.
+It has the Restricted Pod Security admission label, a quota, no Secret, and no service account token.
+It has an unconditional deny-all policy for ingress and egress.
+One more policy lets review and host sandboxes reach port 8081 of `<release>-worker-0`.
+Those sandboxes carry the labels `hephaestus.build/sandbox-kind` and `hephaestus.build/worker-pod` from the runtime.
+Turn sandboxes get no other policy, so they have no network.
+The worker policy admits the same sandboxes on the same port.
+No policy admits traffic to all worker pods.
+
+The worker reaches the Kubernetes API only at `networkPolicy.kubernetesApi`.
+Set the address and port that the selected network plugin sees after address translation.
+The chart has no default for them.
+
+The worker's service account has these permissions in the sandbox namespace, and none elsewhere:
+
+- Pods: `get`, `list`, `watch`, `create`, `delete`, and `patch`. A review's timeout patches the deadline of its Pod.
+- `pods/log`: `get`.
+- `pods/exec`: `get` and `create`. The client opens an exec as a WebSocket `GET`, and the API server also authorizes it as `create`.
+- Jobs: `get`, `list`, `watch`, `create`, and `delete`.
+
+The chart supports one worker.
+A sandbox that the current worker process did not create belongs to no running worker, and the worker removes it.
+More workers need a workspace lease that 1.0 does not have ([ADR 0041](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md)).
+The review-ledger worker identity stays per process.
+The chart does not set `HEPHAESTUS_WORKER_ID`.
+
+### Sandbox prerequisites
+
+The sandbox nodes need these items:
+
+1. A network plugin that enforces NetworkPolicy, for egress as well as ingress.
+2. A kubelet `podPidsLimit`. Set `worker.runtime.podPidsLimit` to the same value. The shipped sandboxes ask for 256 processes, so the limit must be 256 or less.
+3. Pod Security admission. The chart labels the sandbox namespace `restricted`.
+
+These items are optional:
+
+- `worker.runtime.runtimeClassName`: a RuntimeClass for sandbox Pods. gVisor (`runsc`) is recommended for workloads from people that you do not trust.
+- `worker.runtime.seccompProfile`: the bundled `sandbox/agent-seccomp-profile.json` as a Localhost profile. Put the file below the kubelet's seccomp directory on every sandbox node, and set its relative path. Without it, sandbox Pods use `RuntimeDefault`.
+
+At its start, the worker runs the isolation probe in the sandbox namespace.
+The probe proves the three required items on the running cluster:
+
+- The API server refuses, in a dry run, a Pod that the Baseline standard admits and the Restricted standard refuses.
+- A Pod with the labels of a review sandbox reaches the worker's gateway port.
+  It does not reach the worker's other port, the Kubernetes API, or the cluster DNS server.
+- A Pod of no sandbox kind does not reach the gateway port. Turn sandboxes have the same policy.
+- The review probe Pod cannot start `podPidsLimit` processes.
+
+The worker starts no sandbox before the probe passes.
+When the probe fails, the worker logs each failed item and stops, and Kubernetes starts it again.
+The probe Pods use the agent image and the sandbox configuration, and the worker deletes them when the probe ends.
+
+Kubernetes has no field for two Docker sandbox settings.
+`/tmp`, `/run` and a turn sandbox's `/workspace` are not `noexec`, and a sandbox Pod keeps `/dev/shm` in its private IPC namespace.
+[ADR 0041](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md#update--2026-10-24-the-kubernetes-runtime) records why.
+
+Every container command and every exec starts through `prlimit` from the agent image.
+`prlimit` sets the `nofile` limit to 1024 and the `core` limit to 0, both soft and hard.
+A sandbox process cannot raise them.
+
+## Upgrades and database maintenance
+
+No upgrade procedure is qualified yet.
+The chart cannot order the rollouts of its roles.
+When PostgreSQL and the database roles change in one upgrade, a role can start before the database accepts its connections.
+The role then exits and restarts until the database is ready.
+A role that recovers after such restarts does not show a supported upgrade.
+
+Stop all database writers before you change PostgreSQL, its TLS Secret, or the schema.
+Start the other roles only after the server has completed its migrations.
+The server, the webhook role, and the worker are the database roles.
+For phase 1, use the chart, release lock, and values of the current release.
+Change only the three replica counts to 0.
+Do not apply the target release's images, database configuration, or TLS changes until the old database roles have stopped.
+
+For a preview install that predates these replica settings, first compare the rendered resources of a chart that has them with the installed release.
+All rendered resources must match except for the three replica counts, including the images, TLS configuration, security settings, and volume claims.
+Do not use a target dependency change to introduce the stop phase.
+
+Each phase is one `helm upgrade` with the replica counts of that phase:
+
+| Phase | `server.replicas` | `webhook.replicas` | `worker.replicas` | Before the next phase |
+| --- | --- | --- | --- | --- |
+| 1. Stop the writers | 0 | 0 | 0 | The old pods of the three roles are gone. The worker's sandbox pods are gone. |
+| 2. Change the database | 0 | 0 | 0 | PostgreSQL and NATS are ready and accept connections. |
+| 3. Migrate | 1 | 0 | 0 | The server log shows that the migrations are complete. The Liquibase lock is free. The server is ready. |
+| 4. Restore | 1 | The prior count | The prior count | The pods of the three roles are ready. |
+
+Phase 2 applies the change: new release values, a new PostgreSQL configuration, or a restart of PostgreSQL after you update its TLS Secret.
+Keep the three counts at 0 in it.
+Phase 3 starts the server of the new release alone.
+Do not set the webhook or worker count above 0 in the upgrade that starts a new server version.
+
+Before phase 1:
+
+- Record the current `webhook.replicas` and `worker.replicas`. Phase 4 restores exactly these values.
+- Back up the database and the NATS JetStream data.
+- Record the worker's volume claim and the sandbox Pod identities in the sandbox namespace. Preserve the volume claim and check that the sandbox Pods are gone in phase 1. Pods are not backup artifacts.
+
+A count of 0 is a desired state.
+It does not show that a pod has stopped, that a worker's sandbox pods are gone, or that a migration is complete.
+Check each item on the cluster before the next phase.
+
+Set `worker.replicas=0` to stop the worker.
+The worker StatefulSet, its volume claim, its policies, and its API authority stay.
+Do not set `worker.enabled=false` to stop the worker: that removes the worker objects and the sandbox namespace.
+
+While `webhook.replicas` is 0, provider deliveries reach no receiver.
+Each provider decides whether it retries a failed delivery, and its own limits apply.
+An automatic retry or a manual redelivery is not a guaranteed recovery.
+Plan the maintenance window for this outage.
+
+If an upgrade fails after a role wrote data, restore the database and the broker from the backups of phase 1.
+Restore them separately: a recovered database does not recover the broker, and a recovered broker does not recover the database.
+`helm upgrade --atomic`, `helm rollback`, and an image rollback restore neither of them.
+Keep the three counts at 0 until both are restored.
+
+## Not yet qualified
+
+A successful render or a ready pod does not show sandbox isolation.
+These items need a release qualification before the chart is supported:
+
+- A Kubernetes version range, a Helm version, a network plugin, and a Gateway controller.
+- A release lock that contains the non-root webapp image.
+- Pod start, upgrade, rollback, and recovery on a real cluster, including the bundled PostgreSQL volume.
+- PostgreSQL TLS on a real cluster: the key permissions, the certificate chain, and a refused connection for a wrong host name or CA.
+- Network policy enforcement for the selected network plugin.
+- Sandbox execution, worker API authority, restart custody, and isolation through the native adapters.
+- The migration from Compose that ADR 0041 requires.

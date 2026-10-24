@@ -10,6 +10,8 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxRuntime;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxRuntimeConfiguration;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.HostSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
@@ -22,30 +24,30 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * Spring configuration for the Docker sandbox subsystem.
  *
- * <p>The Docker sandbox <em>is</em> the worker capability (ADR 0005), so it is gated solely on the
- * worker role ({@link RuntimeRole#WORKER_PROPERTY}, {@code matchIfMissing=true} → present in the
- * single-JVM monolith). A non-worker pod (e.g. a webhook-only container) leaves the gate {@code
- * false} and these beans never wire. All sandbox beans are declared as {@code @Bean} methods so
- * they are only created when the role is active — no component-scanning surprises.
+ * <p>The sandbox is the worker capability (ADR 0005), so it is gated on the worker role
+ * ({@link RuntimeRole#WORKER_PROPERTY}, {@code matchIfMissing=true} → present in the single-JVM monolith), and on
+ * Docker as the selected {@link SandboxRuntime}, its default. A non-worker pod (e.g. a webhook-only container) leaves
+ * the gate {@code false} and these beans never wire. All sandbox beans are declared as {@code @Bean} methods so they
+ * are only created when the role is active — no component-scanning surprises. What every runtime shares is in
+ * {@link SandboxRuntimeConfiguration}.
  */
 @Configuration
 @ConditionalOnWorkerRole
+@ConditionalOnProperty(name = SandboxRuntime.PROPERTY, havingValue = "docker", matchIfMissing = true)
 @ConditionalOnClass(DockerClient.class)
 @EnableConfigurationProperties({SandboxProperties.class, DockerSandboxProperties.class})
 public class DockerSandboxConfiguration {
@@ -297,29 +299,6 @@ public class DockerSandboxConfiguration {
             SandboxProperties properties,
             DockerSandboxProperties dockerProperties) {
         return new DockerHealthIndicator(containerManager, properties, dockerProperties);
-    }
-
-    /**
-     * Bounded platform thread pool for sandbox Docker operations.
-     *
-     * <p>Uses direct handoff ({@code queueCapacity=0}) so that when all threads are occupied,
-     * submissions are rejected immediately. That rejection is the backpressure: the claim is undone
-     * and the row goes back to QUEUED for a later poll.
-     */
-    @Bean(name = "sandboxExecutor")
-    public AsyncTaskExecutor sandboxExecutor(SandboxProperties properties) {
-        var executor = new ThreadPoolTaskExecutor();
-        int maxPool = properties.maxConcurrentContainers();
-        executor.setCorePoolSize(Math.min(2, maxPool));
-        executor.setMaxPoolSize(maxPool);
-        executor.setQueueCapacity(0);
-        executor.setAllowCoreThreadTimeOut(true);
-        executor.setThreadNamePrefix("sandbox-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
-        executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(60);
-        log.info("Sandbox executor configured: maxConcurrent={}", properties.maxConcurrentContainers());
-        return executor;
     }
 
     /**

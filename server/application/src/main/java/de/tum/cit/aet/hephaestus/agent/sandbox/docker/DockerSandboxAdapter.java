@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
-import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -19,7 +18,6 @@ import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,32 +50,11 @@ public class DockerSandboxAdapter implements SandboxManager {
     /** The error path measures a bounded tail; only its size reaches the log. */
     private static final int ERROR_ECHO_TAIL_LINES = 500;
 
-    private static final String PROXY_URL_PLACEHOLDER = "{appServerIp}";
-
     private static final String MDC_JOB_ID = "sandbox.jobId";
     private static final String MDC_CONTAINER_ID = "sandbox.containerId";
 
-    /**
-     * Overrides repository, global and system Git config; explicit {@code git -c} options take precedence.
-     *
-     * <p>Each entry pairs a git config key that can execute code with a value that neutralises it: an
-     * empty string disables the feature, {@code /nonexistent} points it at a path that cannot exist, and
-     * {@code cat} is the canonical no-op pager.
-     *
-     * @see <a href="https://git-scm.com/docs/git-config#_environment">git-config environment</a>
-     */
-    static final List<Map.Entry<String, String>> GIT_SECURITY_CONFIGS = List.of(
-            Map.entry("core.hooksPath", "/nonexistent"),
-            Map.entry("core.fsmonitor", "false"),
-            Map.entry("core.sshCommand", ""),
-            Map.entry("core.askPass", ""),
-            Map.entry("core.editor", ""),
-            Map.entry("core.pager", "cat"),
-            Map.entry("core.gitProxy", ""),
-            Map.entry("sequence.editor", ""),
-            Map.entry("credential.helper", ""),
-            Map.entry("diff.external", ""),
-            Map.entry("protocol.ext.allow", "never"));
+    /** {@link SandboxEnvironment} owns these. */
+    static final List<Map.Entry<String, String>> GIT_SECURITY_CONFIGS = SandboxEnvironment.GIT_SECURITY_CONFIGS;
 
     private final SandboxNetworkManager networkManager;
     private final SandboxWorkspaceManager workspaceManager;
@@ -374,65 +351,7 @@ public class DockerSandboxAdapter implements SandboxManager {
     }
 
     private Map<String, String> buildEnvironment(SandboxSpec spec, String appServerIp) {
-        Map<String, String> env = new HashMap<>();
-
-        // Enforced values must overwrite caller-supplied variables: SandboxEnvBlocklist already drops the
-        // dangerous ones, and this ordering keeps a value added below winning even if it is not listed there.
-        for (var entry : spec.environment().entrySet()) {
-            if (SandboxEnvBlocklist.isBlocked(entry.getKey())) {
-                log.warn("Blocked dangerous environment variable: {}", entry.getKey());
-            } else {
-                env.put(entry.getKey(), entry.getValue());
-            }
-        }
-        addTraceEnvironment(env);
-
-        // The agent can clone a repository at runtime and carry a hostile .git/config in with it.
-        int idx = 0;
-        for (var gitConfig : GIT_SECURITY_CONFIGS) {
-            env.put("GIT_CONFIG_KEY_" + idx, gitConfig.getKey());
-            env.put("GIT_CONFIG_VALUE_" + idx, gitConfig.getValue());
-            idx++;
-        }
-        env.put("GIT_CONFIG_COUNT", String.valueOf(idx));
-
-        // Prevent git from prompting interactively (would hang the agent)
-        env.put("GIT_TERMINAL_PROMPT", "0");
-        // Prevent system-wide gitattributes from being loaded
-        env.put("GIT_ATTR_NOSYSTEM", "1");
-
-        if (spec.networkPolicy() != null) {
-            String gatewayUrl = "http://" + appServerIp + ":" + gatewayPort;
-            if (spec.networkPolicy().llmProxyUrl() != null) {
-                String proxyUrl = spec.networkPolicy().llmProxyUrl();
-                if (proxyUrl.contains(PROXY_URL_PLACEHOLDER)) {
-                    proxyUrl = proxyUrl.replace(PROXY_URL_PLACEHOLDER, appServerIp);
-                }
-                env.put("LLM_PROXY_URL", proxyUrl);
-            } else {
-                // One route for every provider: the proxy identifies the connection from the
-                // authenticated job token, not the URL.
-                env.put("LLM_PROXY_URL", gatewayUrl + "/internal/llm");
-            }
-
-            if (spec.networkPolicy().llmProxyToken() != null) {
-                env.put("LLM_PROXY_TOKEN", spec.networkPolicy().llmProxyToken());
-            }
-        }
-
-        return env;
-    }
-
-    private static void addTraceEnvironment(Map<String, String> env) {
-        String traceId = MDC.get(StructuredLogKeys.TRACE_ID);
-        String spanId = MDC.get(StructuredLogKeys.SPAN_ID);
-        if (traceId != null && spanId != null) {
-            env.put("TRACE_ID", traceId);
-            env.put(
-                    "TRACEPARENT",
-                    "00-" + traceId + "-" + spanId + "-"
-                            + ("01".equals(MDC.get(StructuredLogKeys.TRACE_FLAGS)) ? "01" : "00"));
-        }
+        return SandboxEnvironment.build(spec, appServerIp, gatewayPort);
     }
 
     /** Capture diagnostics before cleanup removes the container. */

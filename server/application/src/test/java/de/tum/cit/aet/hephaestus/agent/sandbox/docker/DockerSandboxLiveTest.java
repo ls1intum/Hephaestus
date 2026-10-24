@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,6 +31,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Integration tests for the Docker sandbox manager using a real Docker daemon.
@@ -45,6 +48,15 @@ class DockerSandboxLiveTest {
 
     private static final String AGENT_IMAGE =
             System.getenv().getOrDefault("HEPHAESTUS_AGENT_IMAGE_REFERENCE", "ghcr.io/hephaestus-build/agent-pi:dev");
+
+    /** The transcript manifest that the agent image's gateway runner adds to every result it uploads. */
+    private static final String TRACE_MANIFEST = "traces/manifest.json";
+
+    /** The runner's cap on a result's transcripts: {@code TRACE_BYTES} in {@code docker/agents/pi/gateway-run.ts}. */
+    private static final long TRACE_BYTES = 7L * 1024 * 1024;
+
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+
     private final String owner = "live-" + UUID.randomUUID();
     private LiveSandboxGateway gateway;
     private DockerSandboxAdapter sandboxAdapter;
@@ -130,6 +142,39 @@ class DockerSandboxLiveTest {
         return new SecurityProfile(null, "private", List.of("ALL"), Map.of());
     }
 
+    /**
+     * The runner's manifest of a result whose command started no model: its four fields exactly, a complete scan and no
+     * session. The budget is what the result had left, up to the runner's cap, so only its bounds are fixed.
+     */
+    private static void requireEmptyTraceManifest(Map<String, byte[]> outputFiles) {
+        JsonNode manifest = MAPPER.readTree(Objects.requireNonNull(outputFiles.get(TRACE_MANIFEST), TRACE_MANIFEST));
+        assertThat(manifest.isObject()).as("the manifest is a JSON object").isTrue();
+        assertThat(manifest.propertyNames())
+                .containsExactlyInAnyOrder("schemaVersion", "budgetBytes", "sessionScanTruncated", "sessions");
+        JsonNode version = manifest.path("schemaVersion");
+        assertThat(version.isIntegralNumber() && version.canConvertToLong())
+                .as("schemaVersion is an integer")
+                .isTrue();
+        assertThat(version.longValue()).isEqualTo(1);
+        JsonNode budget = manifest.path("budgetBytes");
+        assertThat(budget.isIntegralNumber() && budget.canConvertToLong())
+                .as("budgetBytes is an integer")
+                .isTrue();
+        assertThat(budget.longValue()).isPositive().isLessThanOrEqualTo(TRACE_BYTES);
+        JsonNode truncated = manifest.path("sessionScanTruncated");
+        assertThat(truncated.isBoolean())
+                .as("sessionScanTruncated is a boolean")
+                .isTrue();
+        assertThat(truncated.booleanValue())
+                .as("the scan of the sessions was complete")
+                .isFalse();
+        JsonNode sessions = manifest.path("sessions");
+        assertThat(sessions.isArray()).as("sessions is an array").isTrue();
+        assertThat(sessions.size())
+                .as("no session: the command started no model")
+                .isZero();
+    }
+
     @Nested
     class EndToEnd {
 
@@ -166,8 +211,9 @@ class DockerSandboxLiveTest {
 
             assertThat(result.timedOut()).isFalse();
             assertThat(result.duration()).isPositive();
-            assertThat(result.outputFiles()).containsOnlyKeys("result.json");
+            assertThat(result.outputFiles()).containsOnlyKeys("result.json", TRACE_MANIFEST);
             assertThat(result.outputFiles().get("result.json")).isEqualTo(written.getBytes(StandardCharsets.UTF_8));
+            requireEmptyTraceManifest(result.outputFiles());
         }
 
         private SandboxResult run(String script) {

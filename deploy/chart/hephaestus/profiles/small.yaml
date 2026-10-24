@@ -1,0 +1,7 @@
+# One small cluster, for example a single k3s node. Bundled PostgreSQL and NATS with the Compose
+# stack's limits and stream bounds. values.yaml already holds these values; this file names the
+# profile so that an operator can pass one of four files in the same way.
+postgresql:
+  bundled: true
+nats:
+  bundled: true
