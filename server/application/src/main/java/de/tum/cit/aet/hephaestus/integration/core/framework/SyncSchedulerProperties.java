@@ -54,12 +54,12 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param runOnStartup whether to trigger a sync run immediately when the application starts
  * @param timeframeDays number of days to look back when synchronizing pull requests
- * @param cron cron expression for scheduled sync execution. Default: daily at 3 AM
+ * @param cron cron expression for scheduled sync execution
  * @param cooldownMinutes minimum minutes between consecutive sync operations
  * @param backfill configuration for historical data backfill operations
  * @param filters configuration for filtering which organizations and repositories to sync
- * @param discussions configuration for GitHub Discussions sync (disabled by default)
- * @param projects configuration for GitHub Projects V2 sync (disabled by default)
+ * @param discussions configuration for GitHub Discussions sync
+ * @param projects configuration for GitHub Projects V2 sync
  * @see BackfillProperties
  * @see FilterProperties
  */
@@ -87,7 +87,7 @@ public record SyncSchedulerProperties(
      * @param enabled Whether backfill processing is enabled
      * @param batchSize Maximum pages to process per repository per cycle
      * @param rateLimitThreshold Remaining API rate limit below which backfill pauses
-     * @param intervalSeconds Seconds between backfill cycles (default: 60s)
+     * @param intervalSeconds Seconds between backfill cycles
      */
     public record BackfillProperties(
             @DefaultValue("false") boolean enabled,
@@ -150,7 +150,7 @@ public record SyncSchedulerProperties(
      * levels of GraphQL pagination), which is slow and currently unused. Disabled by default;
      * enable per-environment when discussion data is actually needed.
      *
-     * @param enabled whether discussion sync runs (default {@code false})
+     * @param enabled whether discussion sync runs
      */
     public record DiscussionsProperties(
             @DefaultValue("false") boolean enabled) {}
@@ -162,7 +162,7 @@ public record SyncSchedulerProperties(
      * which is the slowest part of a sync and currently unused. Disabled by default; enable
      * per-environment when project data is actually needed.
      *
-     * @param enabled whether project sync runs (default {@code false})
+     * @param enabled whether project sync runs
      */
     public record ProjectsProperties(@DefaultValue("false") boolean enabled) {}
 
