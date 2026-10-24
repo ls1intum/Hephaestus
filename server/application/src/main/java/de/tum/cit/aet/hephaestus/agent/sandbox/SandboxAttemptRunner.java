@@ -44,9 +44,6 @@ public class SandboxAttemptRunner implements SandboxManager {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxAttemptRunner.class);
 
-    /** The exit a process reports when SIGKILL ended it, as Docker's wait reports it. */
-    private static final int SIGKILL_EXIT_CODE = 137;
-
     private static final String MDC_JOB_ID = "sandbox.jobId";
     private static final String MDC_SANDBOX = "sandbox.id";
 
@@ -59,7 +56,7 @@ public class SandboxAttemptRunner implements SandboxManager {
      *
      * @see <a href="https://git-scm.com/docs/git-config#_environment">git-config environment</a>
      */
-    public static final List<Map.Entry<String, String>> GIT_SECURITY_CONFIGS = List.of(
+    static final List<Map.Entry<String, String>> GIT_SECURITY_CONFIGS = List.of(
             Map.entry("core.hooksPath", "/nonexistent"),
             Map.entry("core.fsmonitor", "false"),
             Map.entry("core.sshCommand", ""),
@@ -143,8 +140,7 @@ public class SandboxAttemptRunner implements SandboxManager {
             if (!Instant.now().isBefore(workDeadline)) {
                 throw new SandboxException("Sandbox execution deadline exceeded before initialization");
             }
-            // The wrapper holds the gateway token: a process of the sandbox must not open its inspector with SIGUSR1.
-            List<String> command = new ArrayList<>(List.of("node", "--disable-sigusr1", "/opt/pi-sdk/gateway-run.ts"));
+            List<String> command = new ArrayList<>(SandboxLayout.RUNTIME_COMMAND);
             command.addAll(spec.command());
             UUID sessionId = session.id();
             Instant work = workDeadline;
@@ -155,6 +151,7 @@ public class SandboxAttemptRunner implements SandboxManager {
                     spec.image(),
                     command,
                     spec.resourceLimits(),
+                    uploadDeadline,
                     gateway -> environment(spec, gateway, sessionId, work, uploadDeadline)));
             activeSandboxes.put(jobId, handle);
             MDC.put(MDC_SANDBOX, handle.id());
@@ -377,7 +374,7 @@ public class SandboxAttemptRunner implements SandboxManager {
     /** The exit that a stop left, or SIGKILL's when the backend saw none. */
     private static int exitOrKilled(SandboxBackend.Observation observation) {
         Integer exit = observation.exitCode();
-        return exit == null ? SIGKILL_EXIT_CODE : exit;
+        return exit == null ? SandboxLayout.EXIT_KILLED : exit;
     }
 
     /** Capture diagnostics before cleanup removes the sandbox. */

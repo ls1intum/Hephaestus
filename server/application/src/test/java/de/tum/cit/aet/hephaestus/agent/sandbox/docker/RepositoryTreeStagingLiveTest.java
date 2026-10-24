@@ -102,7 +102,6 @@ class RepositoryTreeStagingLiveTest {
                         new SandboxCreator(dockerOps),
                         owner,
                         gateway.port(),
-                        meters,
                         true),
                 new SandboxWorkspaceManager(),
                 gateway.sessions(),
@@ -127,7 +126,7 @@ class RepositoryTreeStagingLiveTest {
             // The sweep is a safety net; Docker failing here must not mask the test's own result.
         }
         try {
-            networkManager.listOrphanedNetworks().forEach(n -> {
+            networkManager.listNetworks().forEach(n -> {
                 try {
                     networkManager.removeNetwork(n.id());
                 } catch (Exception ignored) {

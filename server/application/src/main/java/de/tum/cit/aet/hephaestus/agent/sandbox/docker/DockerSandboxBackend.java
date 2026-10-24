@@ -1,14 +1,18 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
-import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ExecSandboxes;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxBackend;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
@@ -22,24 +26,20 @@ import org.slf4j.LoggerFactory;
  * read-only, once the initializer succeeded and the sandbox is next observed. {@link ContainerSecurityPolicy} owns
  * the hardening of both.
  *
+ * <p>A sandbox's name is its kind, its id and its attempt ({@link Name}), which every container, network and volume of
+ * it records in its labels. {@link #list}, {@link #kill} and {@link #remove} read the labels, so they reach a sandbox
+ * that an earlier process of this worker launched.
+ *
  * <p>A worker outside any container joins no network. Its Heph host then reaches it through the host gateway, which
- * only a network with a route out reaches; a review never runs on such a network.
+ * only a network with a route out reaches; a review never runs on such a network. The Docker live tests are the one
+ * exception: their gateway runs in the test process on the machine itself, so they construct the backend with
+ * {@code reviewsOnTheMachine} and give a review that route too.
  */
 public class DockerSandboxBackend implements SandboxBackend {
 
     private static final Logger log = LoggerFactory.getLogger(DockerSandboxBackend.class);
 
-    private static final String CONTAINER_USER = "1000:1000";
-    private static final List<String> INITIALIZER_COMMAND = List.of("node", "/opt/pi-sdk/gateway-init.ts");
-
-    /** The exit a container reports when SIGKILL ended it, as Docker's wait reports it. */
-    private static final int SIGKILL_EXIT_CODE = 137;
-
-    /**
-     * Docker's tail is applied by the daemon, before anything here sees a line, so a transcript asks for every line: a
-     * tail would drop the beginning — what the run was asked and what it read. The collector bounds it instead.
-     */
-    private static final int WHOLE_TRANSCRIPT = 0;
+    private static final String CONTAINER_USER = ExecSandboxes.SANDBOX_USER + ":" + ExecSandboxes.SANDBOX_USER;
 
     private static final String UNIDENTIFIED_CONTAINER =
             "This worker runs in a container that it cannot identify, so it cannot join the internal network of its"
@@ -52,7 +52,6 @@ public class DockerSandboxBackend implements SandboxBackend {
     private final SandboxCreator creator;
     private final String owner;
     private final int gatewayPort;
-    private final MeterRegistry meterRegistry;
     private final boolean reviewsOnTheMachine;
     private final Map<String, Sandbox> sandboxes = new ConcurrentHashMap<>();
 
@@ -63,24 +62,10 @@ public class DockerSandboxBackend implements SandboxBackend {
             DockerVolumeOperations volumeOperations,
             SandboxCreator creator,
             String owner,
-            int gatewayPort,
-            MeterRegistry meterRegistry) {
-        this(
-                networkManager,
-                containerManager,
-                securityPolicy,
-                volumeOperations,
-                creator,
-                owner,
-                gatewayPort,
-                meterRegistry,
-                false);
+            int gatewayPort) {
+        this(networkManager, containerManager, securityPolicy, volumeOperations, creator, owner, gatewayPort, false);
     }
 
-    /**
-     * @param reviewsOnTheMachine whether a review also gets the Heph host's route out when this process runs outside any
-     *     container. Only the Docker live tests set it: their gateway runs in the test process on the machine itself.
-     */
     DockerSandboxBackend(
             SandboxNetworkManager networkManager,
             SandboxContainerManager containerManager,
@@ -89,7 +74,6 @@ public class DockerSandboxBackend implements SandboxBackend {
             SandboxCreator creator,
             String owner,
             int gatewayPort,
-            MeterRegistry meterRegistry,
             boolean reviewsOnTheMachine) {
         this.reviewsOnTheMachine = reviewsOnTheMachine;
         this.networkManager = networkManager;
@@ -99,15 +83,80 @@ public class DockerSandboxBackend implements SandboxBackend {
         this.creator = creator;
         this.owner = owner;
         this.gatewayPort = gatewayPort;
-        this.meterRegistry = meterRegistry;
     }
 
-    /** A launched sandbox: what it runs on, and its two containers. */
+    /**
+     * A sandbox's name: {@code hephaestus-review-<job>-<attempt>}, {@code hephaestus-review-<job>} for a review without
+     * a claim, or {@code hephaestus-host-<host>}. A review's resources record the job and the attempt, a host's its id
+     * ({@link SandboxLabels}).
+     */
+    record Name(Kind kind, UUID id, @Nullable Integer attempt) {
+
+        private static final String REVIEW = "hephaestus-review-";
+        private static final String HOST = "hephaestus-host-";
+        private static final int UUID_LENGTH = 36;
+
+        Handle handle() {
+            return new Handle(kind == Kind.HOST ? HOST + id : REVIEW + id + (attempt == null ? "" : "-" + attempt));
+        }
+
+        /** The name in a handle, or empty for a handle that this backend did not give. */
+        static Optional<Name> of(Handle handle) {
+            String value = handle.id();
+            try {
+                if (value.startsWith(HOST) && value.length() == HOST.length() + UUID_LENGTH) {
+                    return Optional.of(new Name(Kind.HOST, UUID.fromString(value.substring(HOST.length())), null));
+                }
+                if (value.startsWith(REVIEW) && value.length() >= REVIEW.length() + UUID_LENGTH) {
+                    UUID id = UUID.fromString(value.substring(REVIEW.length(), REVIEW.length() + UUID_LENGTH));
+                    String rest = value.substring(REVIEW.length() + UUID_LENGTH);
+                    if (rest.isEmpty()) {
+                        return Optional.of(new Name(Kind.REVIEW, id, null));
+                    }
+                    Integer attempt = rest.startsWith("-") ? attempt(rest.substring(1)) : null;
+                    return attempt == null ? Optional.empty() : Optional.of(new Name(Kind.REVIEW, id, attempt));
+                }
+            } catch (IllegalArgumentException e) {
+                return Optional.empty();
+            }
+            return Optional.empty();
+        }
+
+        /** The name that a resource's labels record, or empty for a resource of no sandbox. */
+        static Optional<Name> of(Map<String, String> labels) {
+            try {
+                String host = labels.get(SandboxLabels.SESSION_ID);
+                if (host != null) {
+                    return Optional.of(new Name(Kind.HOST, UUID.fromString(host), null));
+                }
+                String job = labels.get(SandboxLabels.JOB_ID);
+                if (job == null) {
+                    return Optional.empty();
+                }
+                String recorded = labels.get(SandboxLabels.JOB_ATTEMPT);
+                Integer attempt = recorded == null ? null : attempt(recorded);
+                if (recorded != null && attempt == null) {
+                    return Optional.empty();
+                }
+                return Optional.of(new Name(Kind.REVIEW, UUID.fromString(job), attempt));
+            } catch (IllegalArgumentException e) {
+                return Optional.empty();
+            }
+        }
+
+        private static @Nullable Integer attempt(String value) {
+            if (!value.matches("[0-9]{1,10}")) {
+                return null;
+            }
+            long parsed = Long.parseLong(value);
+            return parsed > Integer.MAX_VALUE ? null : (int) parsed;
+        }
+    }
+
+    /** A sandbox that this process launched: what it runs on, and its two containers. */
     private static final class Sandbox {
-        private final String id;
-        private final UUID owner;
+        private final Name name;
         private final List<String> command;
-        private @Nullable String networkId;
         private @Nullable DockerAttemptWorkspace workspace;
         private DockerOperations.@Nullable ContainerSpec template;
         private @Nullable String initializerId;
@@ -116,16 +165,16 @@ public class DockerSandboxBackend implements SandboxBackend {
         private @Nullable String runtimeId;
         private boolean killed;
 
-        private Sandbox(String id, UUID owner, List<String> command) {
-            this.id = id;
-            this.owner = owner;
+        private Sandbox(Name name, List<String> command) {
+            this.name = name;
             this.command = command;
         }
     }
 
     @Override
     public Handle launch(Launch launch) {
-        Sandbox sandbox = new Sandbox(UUID.randomUUID().toString(), launch.id(), launch.command());
+        Sandbox sandbox = new Sandbox(new Name(launch.kind(), launch.id(), launch.attempt()), launch.command());
+        Handle handle = sandbox.name.handle();
         try {
             boolean host = launch.kind() == Kind.HOST;
             Map<String, String> labels = host ? hostLabels(launch.id()) : reviewLabels(launch);
@@ -133,8 +182,11 @@ public class DockerSandboxBackend implements SandboxBackend {
             boolean outsideDocker = host
                     ? !labels.containsKey(SandboxLabels.CREATOR_CONTAINER)
                     : reviewsOnTheMachine && creator.outsideContainer();
-            sandbox.networkId = networkManager.createJobNetwork(launch.id(), outsideDocker, labels);
-            String workerAddress = networkManager.connectAppServer(sandbox.networkId);
+            if (sandboxes.putIfAbsent(handle.id(), sandbox) != null) {
+                throw new SandboxException("The sandbox " + handle.id() + " runs already");
+            }
+            String networkId = networkManager.createJobNetwork(launch.id(), outsideDocker, labels);
+            String workerAddress = networkManager.connectAppServer(networkId);
             List<String> extraHosts = List.of();
             if (workerAddress == null) {
                 // host.docker.internal is reachable only from a non-internal network.
@@ -149,26 +201,32 @@ public class DockerSandboxBackend implements SandboxBackend {
                 workerAddress = "host.docker.internal";
                 extraHosts = List.of("host.docker.internal:host-gateway");
             }
-            sandbox.workspace = new DockerAttemptWorkspace(volumeOperations, UUID.fromString(sandbox.id), labels);
+            sandbox.workspace = new DockerAttemptWorkspace(volumeOperations, UUID.randomUUID(), labels);
             Map<String, String> environment = launch.environment().at("http://" + workerAddress + ":" + gatewayPort);
             sandbox.template = new DockerOperations.ContainerSpec(
                     launch.image(),
                     List.of(),
                     environment,
-                    sandbox.networkId,
+                    networkId,
                     host ? "host" : "agent",
                     CONTAINER_USER,
                     labels,
                     securityPolicy.buildHostConfig(SecurityProfile.DEFAULT, launch.limits(), outsideDocker),
                     extraHosts);
-            sandboxes.put(sandbox.id, sandbox);
             synchronized (sandbox) {
-                sandbox.initializerId = containerManager.createContainer(container(sandbox, INITIALIZER_COMMAND, true));
+                sandbox.initializerId =
+                        containerManager.createContainer(container(sandbox, SandboxLayout.INITIALIZER_COMMAND, true));
                 containerManager.startContainer(sandbox.initializerId);
             }
-            return new Handle(sandbox.id);
+            return handle;
         } catch (RuntimeException e) {
-            remove(sandbox);
+            if (sandboxes.get(handle.id()) == sandbox) {
+                try {
+                    remove(handle);
+                } catch (RuntimeException cleanup) {
+                    e.addSuppressed(cleanup);
+                }
+            }
             throw e;
         }
     }
@@ -179,7 +237,9 @@ public class DockerSandboxBackend implements SandboxBackend {
         return switch (stage) {
             case INITIALIZED -> initialized(sandbox, deadline);
             case STARTED ->
-                startRuntime(sandbox) ? new Observation(false, null) : new Observation(false, SIGKILL_EXIT_CODE);
+                startRuntime(sandbox)
+                        ? new Observation(false, null)
+                        : new Observation(false, SandboxLayout.EXIT_KILLED);
             case ENDED -> {
                 if (!startRuntime(sandbox)) {
                     yield new Observation(false, null);
@@ -199,7 +259,7 @@ public class DockerSandboxBackend implements SandboxBackend {
         try {
             var outcome = containerManager.waitForCompletion(initializerId, until(deadline));
             if (outcome.timedOut() || outcome.exitCode() != 0) {
-                sandbox.initializerTranscript = containerManager.getLogs(initializerId, WHOLE_TRANSCRIPT);
+                sandbox.initializerTranscript = containerManager.getLogs(initializerId);
             }
             return new Observation(outcome.timedOut(), outcome.exitCode());
         } finally {
@@ -251,14 +311,22 @@ public class DockerSandboxBackend implements SandboxBackend {
             return sandbox.initializerTranscript;
         }
         String runtimeId = sandbox.runtimeId;
-        return runtimeId == null ? "" : containerManager.getLogs(runtimeId, WHOLE_TRANSCRIPT);
+        return runtimeId == null ? "" : containerManager.getLogs(runtimeId);
     }
 
-    /** Stops the container that runs, and keeps the runtime from starting. A failed stop throws; a retry stops again. */
+    /**
+     * Stops the sandbox's containers that run, and keeps the runtime of a sandbox that this process launched from
+     * starting. A failed stop throws; a retry stops again.
+     */
     @Override
     public void kill(Handle handle) {
+        Optional<Name> name = Name.of(handle);
+        if (name.isEmpty()) {
+            return;
+        }
         Sandbox sandbox = sandboxes.get(handle.id());
         if (sandbox == null) {
+            stopContainers(name.get());
             return;
         }
         synchronized (sandbox) {
@@ -271,35 +339,136 @@ public class DockerSandboxBackend implements SandboxBackend {
         }
     }
 
-    @Override
-    public void remove(Handle handle) {
-        Sandbox sandbox = sandboxes.get(handle.id());
-        if (sandbox != null) {
-            remove(sandbox);
+    private void stopContainers(Name name) {
+        for (DockerOperations.ContainerInfo container : containerManager.listManagedContainers()) {
+            if ("running".equals(container.state()) && owns(name, container.labels())) {
+                containerManager.stopContainer(container.id());
+            }
         }
     }
 
-    /** Each step is independent, so one that fails still leaves the others to run. */
-    private void remove(Sandbox sandbox) {
-        sandboxes.remove(sandbox.id);
-        String runtimeId = sandbox.runtimeId;
-        if (runtimeId != null) {
-            suppressAndLog("remove container", sandbox, () -> containerManager.forceRemove(runtimeId));
+    /**
+     * Removes the sandbox's containers, then its network unless a container stays on it, then its volumes. Each step
+     * runs even when an earlier one failed; the removal fails after all of them when a part stays.
+     */
+    @Override
+    public void remove(Handle handle) {
+        Optional<Name> parsed = Name.of(handle);
+        if (parsed.isEmpty()) {
+            return;
         }
-        String initializerId = sandbox.initializerId;
-        if (initializerId != null && !sandbox.initializerEnded) {
-            suppressAndLog("remove container", sandbox, () -> containerManager.forceRemove(initializerId));
+        Name name = parsed.get();
+        List<String> failed = new ArrayList<>();
+        step(failed, "remove container", handle, () -> {
+            for (DockerOperations.ContainerInfo container : containerManager.listManagedContainers()) {
+                if (owns(name, container.labels())) {
+                    containerManager.forceRemove(container.id());
+                }
+            }
+        });
+        step(failed, "remove network", handle, () -> {
+            String networkName = networkManager.networkPrefix() + name.id();
+            for (DockerOperations.NetworkInfo network : networkManager.listNetworks()) {
+                if (network.name().equals(networkName)
+                        && owns(name, network.labels())
+                        && !networkManager.removeUnlessInUse(network.id(), networkName)) {
+                    throw new SandboxException("A container is still attached to network " + networkName);
+                }
+            }
+        });
+        step(failed, "remove attempt volumes", handle, () -> {
+            for (DockerOperations.VolumeInfo volume : attemptVolumes()) {
+                if (owns(name, volume.labels())) {
+                    volumeOperations.removeVolume(volume.name());
+                }
+            }
+        });
+        sandboxes.remove(handle.id());
+        if (!failed.isEmpty()) {
+            throw new SandboxException("Could not " + String.join(", ", failed) + " of sandbox " + handle.id());
         }
-        String networkId = sandbox.networkId;
-        if (networkId != null) {
-            suppressAndLog("disconnect app-server", sandbox, () -> networkManager.disconnectAppServer(networkId));
-            suppressAndLog("remove network", sandbox, () -> networkManager.removeNetwork(networkId));
+        log.debug("Cleanup complete: sandbox={}", handle.id());
+    }
+
+    /**
+     * The sandboxes whose containers, networks or volumes this installation's labels record on this daemon. A Heph
+     * host's creator is gone when its recorded worker container is ({@link SandboxCreator#liveness}).
+     */
+    @Override
+    public List<Listed> list() {
+        Map<Name, Found> found = new LinkedHashMap<>();
+        try {
+            for (DockerOperations.ContainerInfo container : containerManager.listManagedContainers()) {
+                found(found, container.labels(), container.createdAt());
+            }
+            for (DockerOperations.NetworkInfo network : networkManager.listNetworks()) {
+                found(found, network.labels(), network.createdAt());
+            }
+            for (DockerOperations.VolumeInfo volume : attemptVolumes()) {
+                found(found, volume.labels(), createdAt(volume.labels()));
+            }
+        } catch (SandboxException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new SandboxException("Could not list the sandboxes on the Docker daemon", e);
         }
-        DockerAttemptWorkspace workspace = sandbox.workspace;
-        if (workspace != null) {
-            suppressAndLog("remove attempt volumes", sandbox, workspace::close);
+        List<Listed> listed = new ArrayList<>();
+        found.forEach((name, parts) -> listed.add(new Listed(
+                name.handle(),
+                name.kind(),
+                name.id(),
+                name.attempt(),
+                parts.unknownAge ? null : parts.newest,
+                name.kind() == Kind.HOST && creator.liveness(parts.labels) == SandboxCreator.Liveness.GONE)));
+        return listed;
+    }
+
+    /** What {@link #list} found of one sandbox: its newest part, and the labels of its first. */
+    private static final class Found {
+        private final Map<String, String> labels;
+        private @Nullable Instant newest;
+        private boolean unknownAge;
+
+        private Found(Map<String, String> labels) {
+            this.labels = labels;
         }
-        log.debug("Cleanup complete: sandbox={}", sandbox.id);
+    }
+
+    private void found(Map<Name, Found> found, Map<String, String> labels, @Nullable Instant created) {
+        if (!owner.equals(labels.get(SandboxLabels.OWNER))) {
+            return;
+        }
+        Name.of(labels).ifPresent(name -> {
+            Found parts = found.computeIfAbsent(name, key -> new Found(labels));
+            if (created == null) {
+                parts.unknownAge = true;
+            } else if (parts.newest == null || created.isAfter(parts.newest)) {
+                parts.newest = created;
+            }
+        });
+    }
+
+    private List<DockerOperations.VolumeInfo> attemptVolumes() {
+        return volumeOperations.listVolumes(
+                Map.of(SandboxLabels.OWNER, owner, SandboxLabels.KIND, SandboxLabels.KIND_ATTEMPT_WORKSPACE));
+    }
+
+    private static @Nullable Instant createdAt(Map<String, String> labels) {
+        String created = labels.get(SandboxLabels.CREATED_AT);
+        if (created == null) {
+            return null;
+        }
+        try {
+            return Instant.parse(created);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    /** Whether a resource with these labels belongs to the named sandbox of this installation. */
+    private boolean owns(Name name, Map<String, String> labels) {
+        return owner.equals(labels.get(SandboxLabels.OWNER))
+                && Name.of(labels).map(name::equals).orElse(false);
     }
 
     private Map<String, String> reviewLabels(Launch launch) {
@@ -393,17 +562,15 @@ public class DockerSandboxBackend implements SandboxBackend {
         return left.isNegative() ? Duration.ZERO : left;
     }
 
-    private void suppressAndLog(String operation, Sandbox sandbox, Runnable action) {
+    private static void step(List<String> failed, String operation, Handle handle, Runnable action) {
         try {
             action.run();
         } catch (RuntimeException e) {
-            meterRegistry
-                    .counter(AgentMetrics.SANDBOX_CLEANUP_FAILURES, "step", operation)
-                    .increment();
+            failed.add(operation);
             log.warn(
-                    "Cleanup failed ({}): jobId={}, errorType={}",
+                    "Cleanup failed ({}): sandbox={}, errorType={}",
                     operation,
-                    sandbox.owner,
+                    handle.id(),
                     e.getClass().getName());
         }
     }

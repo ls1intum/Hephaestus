@@ -15,8 +15,13 @@ import org.jspecify.annotations.Nullable;
  * gateway and may write it. The runtime then runs with {@code /workspace} read-only. Each backend guarantees, for both:
  * the user {@link ExecSandboxes#SANDBOX_USER}, a read-only root file system, no capability, no privilege escalation,
  * the memory, CPU and process limits of the launch, no credential and no environment but the launch's, and no network
- * destination but the worker's gateway. Only a Heph host whose worker runs outside any container may get a route out
- * ({@code DockerSandboxBackend}).
+ * destination but the worker's gateway. Only a Heph host whose worker runs outside any container may get a route out,
+ * where a backend has no other way to its gateway.
+ *
+ * <p>A sandbox is known by the name that its runtime records ({@link Handle}), not by the memory of the process that
+ * launched it: {@link #list}, {@link #kill} and {@link #remove} reach it from any worker of the installation that
+ * shares its runtime, also after a restart. Only {@link #observe}, {@link #running} and {@link #transcript} need the
+ * process that launched it.
  *
  * <p>Every method may be called from any thread; {@link #kill} in particular while another thread observes.
  */
@@ -58,12 +63,24 @@ public interface SandboxBackend {
 
     /**
      * Ends the sandbox's processes, with their grace period; the sandbox keeps its transcripts until it is removed. A
-     * sandbox that already ended is no error.
+     * sandbox that already ended, or is gone, is no error.
      */
     void kill(Handle handle);
 
-    /** Removes the sandbox and everything it holds. A sandbox that is gone is no error. */
+    /**
+     * Removes the sandbox and everything it holds. A sandbox that is gone is no error.
+     *
+     * @throws SandboxException when a part of it stays; a later removal tries again
+     */
     void remove(Handle handle);
+
+    /**
+     * The sandboxes of this installation that the runtime holds, whichever worker launched them, for the removal of
+     * those that no attempt or worker uses any more.
+     *
+     * @throws SandboxException when the runtime cannot list them; nothing may then count as abandoned
+     */
+    List<Listed> list();
 
     enum Kind {
         /** A practice review attempt: it runs to its own end within its deadlines. */
@@ -86,7 +103,9 @@ public interface SandboxBackend {
     /**
      * @param id the review job, or the Heph host, the sandbox serves
      * @param attempt the claimed job's attempt; null for a host, or a caller that holds no claim
-     * @param command the runtime's command; the initializer's is the image's
+     * @param command the runtime's command; the initializer's is {@code SandboxLayout.INITIALIZER_COMMAND}
+     * @param deadline when a review attempt's upload window closes: the runtime ends the sandbox then, also when its
+     *     worker is gone. Null for a Heph host, which runs until it is removed
      * @param environment the environment of both processes, built for the gateway address the backend gives the sandbox
      */
     record Launch(
@@ -96,6 +115,7 @@ public interface SandboxBackend {
             String image,
             List<String> command,
             ResourceLimits limits,
+            @Nullable Instant deadline,
             Environment environment) {
         public Launch {
             command = List.copyOf(command);
@@ -108,8 +128,27 @@ public interface SandboxBackend {
         Map<String, String> at(String gateway);
     }
 
-    /** A launched sandbox, as its backend names it. */
+    /**
+     * A sandbox, by the name that its runtime records for it: a Kubernetes Job or Pod name, or the name that every
+     * Docker resource of the sandbox carries.
+     */
     record Handle(String id) {}
+
+    /**
+     * A sandbox as {@link #list} finds it.
+     *
+     * @param id the review job, or the Heph host, it serves
+     * @param attempt the claimed attempt it runs, when it recorded one
+     * @param created when its newest part was created; null when the runtime does not say, which counts as now
+     * @param creatorGone whether the worker that launched it is positively gone: a Heph host is useless without it
+     */
+    record Listed(
+            Handle handle,
+            Kind kind,
+            UUID id,
+            @Nullable Integer attempt,
+            @Nullable Instant created,
+            boolean creatorGone) {}
 
     /**
      * @param timedOut whether the deadline passed before the stage

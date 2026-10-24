@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxAttemptRunner;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxHosts;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxReconciler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxWorkspaceManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.HostSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
@@ -217,8 +218,7 @@ public class DockerSandboxConfiguration {
             DockerClientOperations volumeOperations,
             SandboxCreator creator,
             DockerSandboxProperties dockerProperties,
-            SandboxGatewayProperties gatewayProperties,
-            MeterRegistry meterRegistry) {
+            SandboxGatewayProperties gatewayProperties) {
         return new DockerSandboxBackend(
                 networkManager,
                 containerManager,
@@ -226,8 +226,7 @@ public class DockerSandboxConfiguration {
                 volumeOperations,
                 creator,
                 dockerProperties.owner(),
-                gatewayProperties.port(),
-                meterRegistry);
+                gatewayProperties.port());
     }
 
     @Bean
@@ -272,20 +271,9 @@ public class DockerSandboxConfiguration {
     }
 
     @Bean
-    public SandboxVolumeManager sandboxVolumeManager(DockerClientOperations ops, DockerSandboxProperties properties) {
-        return new SandboxVolumeManager(ops, properties);
-    }
-
-    @Bean
     public SandboxReconciler sandboxReconciler(
-            ReviewJobRepository jobRepository,
-            SandboxContainerManager containerManager,
-            SandboxNetworkManager networkManager,
-            SandboxVolumeManager volumeManager,
-            SandboxCreator creator,
-            MeterRegistry meterRegistry) {
-        return new SandboxReconciler(
-                jobRepository, containerManager, networkManager, volumeManager, creator, meterRegistry, clock);
+            ReviewJobRepository jobRepository, SandboxBackend backend, MeterRegistry meterRegistry) {
+        return new SandboxReconciler(jobRepository, backend, meterRegistry, clock);
     }
 
     @Bean

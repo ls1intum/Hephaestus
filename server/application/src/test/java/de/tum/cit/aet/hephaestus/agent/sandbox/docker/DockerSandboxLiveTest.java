@@ -105,7 +105,6 @@ class DockerSandboxLiveTest {
                         new SandboxCreator(dockerOps),
                         owner,
                         gateway.port(),
-                        meters,
                         true),
                 workspaceManager,
                 gateway.sessions(),
@@ -132,7 +131,7 @@ class DockerSandboxLiveTest {
         }
 
         try {
-            networkManager.listOrphanedNetworks().forEach(n -> {
+            networkManager.listNetworks().forEach(n -> {
                 try {
                     networkManager.removeNetwork(n.id());
                 } catch (Exception ignored) {
@@ -307,7 +306,7 @@ class DockerSandboxLiveTest {
                             .toList())
                     .isEmpty();
 
-            assertThat(networkManager.listOrphanedNetworks().stream()
+            assertThat(networkManager.listNetworks().stream()
                             .filter(n -> n.name().contains(jobId.toString()))
                             .toList())
                     .isEmpty();

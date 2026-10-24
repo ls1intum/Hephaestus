@@ -56,7 +56,7 @@ public class SandboxHosts implements HostSandbox {
             session = openSession(id, token, spec);
             UUID sessionId = session.id();
             handle = backend.launch(new SandboxBackend.Launch(
-                    SandboxBackend.Kind.HOST, id, null, image, spec.command(), spec.limits(), gateway -> {
+                    SandboxBackend.Kind.HOST, id, null, image, spec.command(), spec.limits(), null, gateway -> {
                         Map<String, String> environment = new LinkedHashMap<>(spec.environment());
                         environment.put("LLM_PROXY_URL", gateway + "/internal/llm");
                         environment.put("SANDBOX_RUNTIME_URL", gateway + "/internal/llm/runtime/" + sessionId);

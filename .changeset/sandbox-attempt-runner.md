@@ -1,4 +1,5 @@
 ---
+"hephaestus": patch
 ---
 
-Internal refactor with no change for operators or users: practice reviews and the Heph host now run through one backend-neutral attempt runner over a narrow sandbox backend. Docker behaves as before.
+The worker metric for orphaned sandboxes now counts each removed sandbox once, with `resource="sandbox"`, instead of its containers and networks separately. A practice review whose sandbox cleanup fails now counts once, under the step `remove sandbox`, instead of once for each Docker step that failed.

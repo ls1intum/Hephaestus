@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * {@link ExecSandboxes#SANDBOX_USER}. The init process and its sleep run as root, out of that user's reach.
  *
  * <p>Labels record this installation ({@link SandboxLabels#OWNER}), the sandbox id and the worker that created it
- * ({@link SandboxCreator}). {@link SandboxReconciler} ignores these containers: they have no job id and no session id.
+ * ({@link SandboxCreator}). {@code SandboxReconciler} ignores these containers: they have no job id and no session id.
  * The worker that uses them removes them ({@code TurnSandboxes}).
  */
 public class DockerExecSandboxes implements ExecSandboxes, AutoCloseable {
