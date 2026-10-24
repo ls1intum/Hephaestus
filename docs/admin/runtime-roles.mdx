@@ -64,6 +64,7 @@ Each role has a Spring profile YAML that turns off the other two flags and remov
   Its HTTP connector also serves management endpoints.
   It binds to loopback for in-container health checks.
   A separate sandbox gateway listens on `SANDBOX_API_PORT` (default `8081`).
+  If you set it to `0`, the gateway binds a free port at start, and sandboxes dial that port.
 - `application-webhook.yml`: `runtime.server=false` and `runtime.worker=false`.
   It enables sync NATS and disables the agent job queue.
   Webhook pods never claim jobs.
