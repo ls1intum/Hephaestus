@@ -57,12 +57,12 @@ A version that no job runs is not in the table.
 | Docker Engine | 28 or newer | Release qualification refuses an older engine on both matrix cells. It records the engine that it ran in the release assets `host-smoke-amd64.json` and `host-smoke-arm64.json`. No job runs version 28.0.0 itself. |
 | Docker Compose | 2.24.4 or newer | Release qualification refuses an older Compose and records the version that it ran in the same assets. Every pull request checks that the Compose files render. No job runs version 2.24.4 itself. |
 | PostgreSQL | 18, the release image with `pg_partman` | Every pull request runs the integration tests against an image built from the same Dockerfile. |
-| NATS server | The version in the release lock (2.14) | Release qualification boots it. The integration tests use NATS 2.10. |
-| Traefik | The version in the release lock (v3.7) | Release qualification sends a request through it. |
+| NATS server | The version that `security/release-images.json` pins | Release qualification boots it. The integration tests use NATS 2.10. |
+| Traefik | The version that `security/release-images.json` pins | Release qualification sends a request through it. |
 | Java | 21 | CI builds and tests with Java 21. The server image runs the Java 21 runtime of its buildpack. |
 | Browsers | Chromium, the build that Playwright 1.63 bundles | The end-to-end, component, and Chrome extension suites run Chromium only. No job runs Firefox or Safari. |
 | Chrome extension | Chrome 130 or newer | The extension manifest requires it. No job runs Chrome 130 itself. |
-| Node.js, for release-lock verification | The version pinned in `package.json#devEngines.runtime` | Every CI job uses this version. |
+| Node.js, for release-lock verification | The version pinned in `package.json#devEngines.runtime` | CI installs this version through the setup-toolchain action. |
 | Cosign, for release-lock verification | 3.1.4 | Release, promotion, and image signing jobs verify with this version. |
 
 To see which Docker Engine and Docker Compose a release ran, download the `host-smoke-*.json` assets of that release from the [releases page](https://github.com/hephaestus-build/Hephaestus/releases).
