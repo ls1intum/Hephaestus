@@ -12,11 +12,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Activates Spring {@link EnableScheduling @EnableScheduling} only on the server-role pod.
  *
- * <p>This single switch silences every {@code @Scheduled} method on the {@code webhook-server}
- * container (which sets {@code hephaestus.runtime.server.enabled=false}) — preventing double-run
- * pathologies for sync schedulers (GitHub/GitLab data sync, historical backfill), agent zombie
- * sweepers, mentor in-flight reaper, contributor cache eviction, rate-limit eviction, and the
- * GitLab webhook health check.
+ * <p>This single switch silences every {@code @Scheduled} method on the worker and webhook
+ * containers (which set {@code hephaestus.runtime.server.enabled=false}). It does nothing between
+ * two server replicas: a job with a cluster-wide effect holds a {@code @SchedulerLock}
+ * ({@link ShedLockConfig}), claims its rows, or acts only on this process's memory.
  *
  * <p>{@code matchIfMissing=true} preserves ADR 0005's DX invariant: zero env vars → full monolith
  * boots with scheduling enabled.
