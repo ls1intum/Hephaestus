@@ -67,6 +67,8 @@ sequenceDiagram
    It can capture evidence only for images published by its own run.
 
 3. **The merge is checked again.** The merge commit's push runs CI/CD in full.
+   It reuses the verified images that its merge group built for the same commit, and builds any that are missing.
+   See [Merge-queue image reuse](./ci-cd.mdx#merge-queue-image-reuse).
    A `main` push repeats source-validation legs only when it changes the version.
    CI compares the version with the tip that the push replaced.
    Later commits in the same push cannot hide the bump.

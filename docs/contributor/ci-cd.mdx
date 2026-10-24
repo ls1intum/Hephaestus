@@ -34,12 +34,14 @@ flowchart TD
 
 ## Release flow
 
-Every push to `main` builds and attests multi-architecture images for that commit and maintains the
+Every push to `main` publishes signed multi-architecture images for that commit and maintains the
 Version PR. Merging the Version PR cuts a release that promotes those images by digest —
 [Release management](./release-management.mdx). A pull request builds `linux/amd64` only, so a
 push to it does not pay for a second architecture. A merge group builds `linux/amd64` and
 `linux/arm64`, so an arm64 build failure or finding is found once per merge, before `main`.
-A merge group has its own SHA, so its images are never the ones a release promotes.
+The merge queue squashes, so a merge group's SHA is the commit its push to `main` carries.
+That push reuses the images the merge group built and tested instead of building them again —
+[Merge-queue image reuse](#merge-queue-image-reuse).
 
 The Version PR's branch is the exception.
 Every run builds every release image itself on both architectures, regardless of its start event.
@@ -581,7 +583,7 @@ Why the label is the authority, and which alternatives were priced and declined,
 
 | Workflow                              | Trigger                                                                       | Purpose                                                                                                                                                                                                                          |
 | ------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cicd.yml`                            | PR, merge group, push to main, manual                                         | Validates changes before merge and builds final-SHA images after merge. The release evidence gate runs over the images the run built on the Version PR's branch, and wherever the `release-preflight` dispatch input asks for it |
+| `cicd.yml`                            | PR, merge group, push to main, manual                                         | Validates changes before merge and publishes final-SHA images after merge. The release evidence gate runs over the images the run built on the Version PR's branch, and wherever the `release-preflight` dispatch input asks for it |
 | `review-policy.yml`                   | PR opened, reopened, synchronized, ready for review, edited                   | Approves a listed maintainer's pull request so the ruleset's required approval is met. Does nothing for anyone else                                                                                                              |
 | `pull-request.yml`                    | PR opened, edited, synchronized, reopened, ready for review                   | Validates the title against the exported policy in `commitlint.config.ts`, without installing the workspace. Applies the commit identity policy in the checks table above. Assigns the author when the pull request opens        |
 | `ci-quality-gates.yml`                | Called by cicd.yml                                                            | Selects quality legs, clean-install verification and story tests                                                                                                                                                                 |
@@ -759,9 +761,11 @@ previews need every image at the head SHA. No other event has a preview.
 
 ## Docker layer caching
 
-Dockerfile builds import `<image>:cache-main-<platform>` from `ghcr.io` and write it, with every
-intermediate layer, only on pushes to `main`, so a pull request reuses `main`'s layers and writes
-nothing. amd64 builds on `ubuntu-24.04`, arm64 on `ubuntu-24.04-arm`. No emulation. The buildpacks
+Dockerfile builds import `<image>:cache-main-<platform>` from `ghcr.io`.
+Only pushes to `main` and merge groups write it, with every intermediate layer.
+A pull request reuses those layers and writes nothing.
+
+amd64 builds on `ubuntu-24.04`, arm64 on `ubuntu-24.04-arm`. No emulation. The buildpacks
 path (`App Server image`) does not use this cache. Dockerfile builds always bypass the cache for
 the `os-packages` and exported `runtime` stages. [OS package updates](vulnerability-remediation.mdx#os-package-updates-in-first-party-images)
 owns that contract and the local build commands.
@@ -796,6 +800,7 @@ that same immutable reference.
 Every consumer resolves an image through its build commit.
 `reusable-docker-build.yml` publishes exactly that tag for the run's start event.
 Pushes, dispatches, and merge groups use `github.sha`.
+A push that reuses its merge group's image publishes the same digest under that tag.
 Pull requests use their head SHA because `github.sha` is a merge commit with no image tag.
 
 Within a run, the vulnerability scan ignores tags.
@@ -836,10 +841,38 @@ artifact gates, tests, security checks, both server image builds and final gate.
 does not change the packaged Java artifact, so its absence in ordinary merge groups does not force
 a rebuild. Release candidates still require release preflight.
 
+The latest attempt of each job counts, so an arm64 server image build that flaked and passed on a
+re-run does not block reuse. A queue run whose arm64 build stays failed fails its gate, so its
+commit does not merge. `main` packages the server again when the merge group did not rebuild the
+server image, because that queue run has no server image builds.
+
 The immutable artifact ID and its SHA-256 digest bind the download to that run. Missing, expired or
 unavailable source evidence falls back to packaging. A corrupt download fails rather than being used.
-Main still runs its own validation and publishes its images, including main-only tags and source maps.
+Main still runs its own validation and publishes its images under main-only tags.
 Release publication still generates fresh vulnerability evidence and signatures.
+
+### Merge-queue image reuse
+
+A default-branch push reuses each image that its successful merge group published for the same commit.
+`detect-changes` resolves that run with `scripts/resolve-queue-run.ts`.
+The run must have a successful `CI Status Gate`, which covers its image builds and per-platform scans.
+The `reuse` job in `reusable-docker-build.yml` accepts the image at `<image>:<commit>` only when all these checks pass:
+
+- Its platform leaves are exactly the platforms that the push requests.
+- Its cosign signature comes from `reusable-docker-build.yml` on the queue branch, with the `merge_group` trigger, at this commit.
+- Its build provenance attestation names this commit and was made by that queue run.
+
+The push then signs the index and each leaf again, verifies them, and moves the `main` tags.
+It does not rebuild, re-attest, or rescan the image.
+The release verifier accepts only the default-branch signing identity, so the push signs the image again.
+The provenance stays the queue run's, because that run built the image.
+A missing or unverifiable image is built and scanned as before.
+Examples are a direct push, an image that the merge group did not rebuild, and a lookup that failed.
+
+A merge group adds one arm64 build job per image that it rebuilds, which is four when it rebuilds all images.
+A push no longer rebuilds those images on either architecture, which more than offsets that cost.
+The webapp records its branch at build time, so a merge group builds it with the default branch's name.
+Merge groups also write the Dockerfile layer cache, because the push no longer refreshes it for reused images.
 
 An unchanged pull-request image is not rebuilt.
 `Tag unchanged images` verifies an earlier run's published digest and retags it to this run's head SHA. It aliases from the nearest default-branch commit found through the chain of bases.

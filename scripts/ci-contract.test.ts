@@ -486,6 +486,11 @@ void describe("CI contract", () => {
 		assert.equal(build.getIn(["with", "no-cache-filters"]), "os-packages,runtime");
 		assert.match(String(build.getIn(["with", "cache-from"])), /cache-main-/u);
 		assert.match(String(build.getIn(["with", "cache-to"])), /mode=max/u);
+		// Only trusted runs write the shared cache: main, and the merge group whose images main reuses.
+		assert.match(
+			String(build.getIn(["with", "cache-to"])),
+			/^\$\{\{ \(github\.ref == 'refs\/heads\/main' \|\| github\.event_name == 'merge_group'\) && format\(/u,
+		);
 
 		const caller = parseDocument(await readFile(".github/workflows/ci-docker-build.yml", "utf8"));
 		const jobs = caller.get("jobs");
@@ -1930,12 +1935,16 @@ void describe("CI contract", () => {
 		for (const event of ["merge_group", "workflow_dispatch"]) {
 			assert.deepEqual(publishedOn(event), ["github.sha"]);
 		}
-		// Only the merge job tags: a platform build pushes by digest alone.
+		// Only the merge job tags: a platform build pushes by digest alone, and its metadata reads the
+		// commit only for the version label, which a merge group and the push that reuses it share.
 		assert.equal(
 			step(reusable, ["jobs", "merge"], "docker/metadata-action").get("tags"),
 			`\${{ env.STANDARD_IMAGE_TAGS }}`,
 		);
-		assert.equal(step(reusable, ["jobs", "build"], "docker/metadata-action").has("tags"), false);
+		assert.equal(
+			step(reusable, ["jobs", "build"], "docker/metadata-action").get("tags"),
+			`type=raw,value=\${{ github.event.pull_request.head.sha || github.sha }}`,
+		);
 		assert.doesNotMatch(String(reusable), /steps\.tags\.outputs|Prepare tag configuration/u);
 
 		const source = await readFile(".github/workflows/cicd.yml", "utf8");
