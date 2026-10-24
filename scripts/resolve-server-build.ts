@@ -12,6 +12,7 @@ const requiredJobs = [
 	"Build / App Server: PostgreSQL drill (pitr)",
 	"Build / Webapp: E2E",
 	"App Server image / Build linux/amd64 Docker Image",
+	"App Server image / Build linux/arm64 Docker Image",
 	"Test / App Server: Unit and architecture",
 	"Test / App Server: Integration (application)",
 	"Test / App Server: Integration (providers)",

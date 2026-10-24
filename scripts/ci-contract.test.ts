@@ -1557,32 +1557,22 @@ void describe("CI contract", () => {
 		assert.doesNotMatch(build, /github\.event\.pull_request\.base\.sha/u);
 	});
 
-	void test("decides an image's architectures once, for every image the run builds", async () => {
+	void test("builds every image on both published architectures in every run", async () => {
 		const source = await readFile(".github/workflows/cicd.yml", "utf8");
 
 		const docker = await readFile(".github/workflows/ci-docker-build.yml", "utf8");
-		// The architecture set is one decision, taken in cicd.yml and handed to every image build, so
-		// a run cannot evidence one image on both platforms and its sibling on one. The test below
-		// owns what that decision is; this owns that nothing decides it locally.
+		// The architecture set is fixed in the reusable build, so no caller can publish an image on
+		// one platform where a release, or a cluster of the other architecture, needs both.
 		for (const image of [
 			job(docker, "webapp-build"),
 			job(docker, "agent-pi-build"),
 			job(docker, "postgres-build"),
 		]) {
-			assert.match(image, /single-arch: \$\{\{ inputs\.single_arch == 'true' \}\}/u);
 			assert.doesNotMatch(image, /^\s+tags:/mu);
 		}
-		// Required, and with no default: a caller that forgets it fails to start, rather than
-		// silently publishing one architecture where a release needs two.
-		assert.match(docker, /^ {6}single_arch:\n(?: {8}.*\n)*? {8}required: true$/mu);
-		assert.match(
-			job(source, "application-server-image"),
-			/single-arch: \$\{\{ needs\.detect-changes\.outputs\.single-arch == 'true' \}\}/u,
-		);
-		assert.match(
-			job(source, "Docker"),
-			/single_arch: \$\{\{ needs\.detect-changes\.outputs\.single-arch \}\}/u,
-		);
+		for (const text of [source, docker]) {
+			assert.doesNotMatch(text, /single[-_]arch/u);
+		}
 		const inherited = job(docker, "tag-unchanged-images");
 		assert.match(inherited, /HEAD_SHA/u);
 		assert.match(inherited, /pr-\$PR_NUMBER/u);
@@ -1593,10 +1583,16 @@ void describe("CI contract", () => {
 		for (const text of [source, docker, reusable, webappImage]) {
 			assert.doesNotMatch(text, /sentry/iu);
 		}
-		assert.match(
-			reusable,
-			/inputs\.single-arch.*linux\/amd64.*ubuntu-24\.04.*linux\/arm64.*ubuntu-24\.04-arm/u,
-		);
+		assert.doesNotMatch(reusable, /single[-_]arch/u);
+		// Each platform builds natively on its own runner; no emulation.
+		const matrix = parseDocument(reusable).getIn(["jobs", "build", "strategy", "matrix"]);
+		assert.ok(isMap(matrix));
+		assert.deepEqual(matrix.toJSON(), {
+			include: [
+				{ platform: "linux/amd64", runner: "ubuntu-24.04" },
+				{ platform: "linux/arm64", runner: "ubuntu-24.04-arm" },
+			],
+		});
 	});
 
 	void test("a pull request based on an unmerged branch still reaches a Docker verdict", async () => {
@@ -1685,16 +1681,7 @@ void describe("CI contract", () => {
 		assert.equal(declaration.get("default"), undefined);
 
 		const build = ["jobs", "build"];
-		for (const name of [
-			"Log in to Container Registry",
-			"Prepare single-architecture buildpack index",
-			"Publish verified image tags",
-			"Capture single-architecture digest",
-			"Generate build provenance attestation",
-			"Install Cosign",
-			"Sign and verify image",
-			"Upload digest",
-		]) {
+		for (const name of ["Log in to Container Registry", "Export digest", "Upload digest"]) {
 			assert.match(
 				String(namedStep(reusable, build, name).get("if")),
 				/inputs\.publish/u,
@@ -1713,11 +1700,9 @@ void describe("CI contract", () => {
 		const inputs = buildx.get("with");
 		assert.ok(isMap(inputs));
 		assert.match(String(inputs.get("push")), /^\$\{\{ inputs\.publish \}\}$/u);
-		// An untagged local image is one nothing can name, so a fork only loads what it also tags.
-		assert.match(
-			String(inputs.get("load")),
-			/^\$\{\{ !inputs\.publish && inputs\.single-arch \}\}$/u,
-		);
+		// An untagged local image is one nothing can name, so a fork loads nothing into the daemon.
+		assert.equal(inputs.has("load"), false);
+		assert.equal(inputs.has("tags"), false);
 		assert.match(String(inputs.get("outputs")), /inputs\.publish &&/u);
 		for (const gated of ["merge", "scan"]) {
 			assert.match(String(reusable.getIn(["jobs", gated, "if"])), /inputs\.publish/u);
@@ -1761,11 +1746,11 @@ void describe("CI contract", () => {
 
 			const local = await runStep(shell, { ...environment, PUBLISH: "false" });
 			assert.equal(local.failed, false, local.diagnosis);
-			// The digest is the daemon's image ID: a local build has no registry to read a manifest back
-			// from, and the step must still tell its caller what it produced.
-			assert.match(local.outputs.digest ?? "", /^sha256:/u);
+			// Nothing downstream of a build without registry writes reads a digest, so it reports none.
+			assert.equal(local.outputs.digest, undefined);
 			const invoked = await readFile(calls, "utf8");
 			assert.doesNotMatch(invoked, /--publish/u);
+			assert.doesNotMatch(invoked, /^docker /mu);
 			assert.match(invoked, /^pack build .*--trust-builder/mu);
 			// A reporting pipe must never turn a failed archive build into a successful image.
 			await writeFile(
@@ -1921,15 +1906,12 @@ void describe("CI contract", () => {
 		for (const event of ["merge_group", "workflow_dispatch"]) {
 			assert.deepEqual(publishedOn(event), ["github.sha"]);
 		}
-		for (const name of ["build", "merge"]) {
-			const metadata = step(reusable, ["jobs", name], "docker/metadata-action");
-			assert.equal(
-				metadata.get("tags"),
-				name === "build"
-					? `\${{ inputs.single-arch && env.STANDARD_IMAGE_TAGS || '' }}`
-					: `\${{ env.STANDARD_IMAGE_TAGS }}`,
-			);
-		}
+		// Only the merge job tags: a platform build pushes by digest alone.
+		assert.equal(
+			step(reusable, ["jobs", "merge"], "docker/metadata-action").get("tags"),
+			`\${{ env.STANDARD_IMAGE_TAGS }}`,
+		);
+		assert.equal(step(reusable, ["jobs", "build"], "docker/metadata-action").has("tags"), false);
 		assert.doesNotMatch(String(reusable), /steps\.tags\.outputs|Prepare tag configuration/u);
 
 		const source = await readFile(".github/workflows/cicd.yml", "utf8");
@@ -1989,19 +1971,17 @@ void describe("CI contract", () => {
 			scan,
 			/node scripts\/check-release-vulnerabilities\.ts[\s\S]*security\/vulnerability-policy\.json/u,
 		);
-		assert.match(scan, /needs\.build\.outputs\.manifest-digest/u);
 		assert.doesNotMatch(scan, /needs\.merge/u);
 		assert.match(scan, /DIGEST_DIRECTORY:/u);
-		assert.match(scan, /IMAGE_REF:.*format/u);
+		assert.doesNotMatch(scan, /IMAGE_REF:/u);
 		assert.doesNotMatch(scan, /github\.(?:run_id|run_attempt)/u);
 		assert.match(scan, /linux\/amd64/u);
 		assert.match(scan, /linux\/arm64/u);
 		const workflow = parseDocument(reusable);
 		assert.equal(workflow.getIn(["jobs", "scan", "strategy", "fail-fast"]), false);
-		assert.equal(
-			workflow.getIn(["jobs", "scan", "strategy", "matrix", "platform"]),
-			`\${{ fromJSON(inputs.single-arch && '["linux/amd64"]' || '["linux/amd64","linux/arm64"]') }}`,
-		);
+		const platforms = workflow.getIn(["jobs", "scan", "strategy", "matrix", "platform"]);
+		assert.ok(isSeq(platforms));
+		assert.deepEqual(platforms.toJSON(), ["linux/amd64", "linux/arm64"]);
 		const enforce = namedStep(
 			workflow,
 			["jobs", "scan"],
@@ -2663,44 +2643,17 @@ void describe("CI contract", () => {
 		}
 
 		// A demand the run cannot satisfy is not a gate, it is a wall. The preflight evidences every
-		// image on both published platforms — the vulnerability policy's match key includes the
-		// platform, so an arm64-only finding must not reach a release undiscovered — and it can only
-		// do that for manifests that exist. So wherever the gate demands a preflight, the same run's
-		// image builds have to publish both.
-		const architectures = String(workflow.getIn([...detection, "outputs", "single-arch"]));
-		const shape =
-			/^\$\{\{ \(github\.event_name == '(?<first>\w+)' \|\| github\.event_name == '(?<second>\w+)'\) && steps\.release_candidate\.outputs\.release-candidate != 'true' \}\}$/u.exec(
-				architectures,
-			);
-		assert.ok(shape, `this test cannot evaluate \`${architectures}\``);
-		const preMerge = new Set([shape.groups?.first, shape.groups?.second]);
-		const bothPlatforms = (event: string, onVersionBranch: boolean): boolean =>
-			!preMerge.has(event) || onVersionBranch;
+		// image on both published platforms, and it can only do that for manifests that exist. Every
+		// run publishes both, so no event or branch decides the architectures.
+		assert.equal(workflow.hasIn([...detection, "outputs", "single-arch"]), false);
 		const events = ["pull_request", "merge_group", "workflow_dispatch", "push"];
-		for (const onVersionBranch of [true, false]) {
-			const result = await verdict({ "Release-preflight": "skipped" }, onVersionBranch);
-			const demanded = result.failed;
-			for (const event of events) {
-				assert.ok(
-					!demanded || bothPlatforms(event, onVersionBranch),
-					`a ${event} run that the gate demands a preflight from must publish both platforms`,
-				);
-			}
-		}
-		// And the cost stays where it was: everything else pre-merge is still one architecture, since
-		// a candidate image is only ever run on amd64 before it merges.
-		assert.deepEqual(
-			events.map((event) => bothPlatforms(event, false)),
-			[false, false, true, true],
-		);
 
 		// Nor can the gate demand evidence for images the run never published. Off that branch a pull
 		// request builds what its diff touched and aliases the rest from `main`, which is right for a
-		// preview and cannot serve the preflight: the alias falls back to the candidate the merged
-		// pull request built — `linux/amd64` and an `unknown/unknown` attestation manifest, no arm64 —
-		// and it falls back every time, because `main`'s push run was started by the same push that
-		// wrote this head and has published nothing yet when the alias runs. So the version branch
-		// publishes every release image itself, under every event, exactly as its dispatch run did.
+		// preview and cannot serve the preflight: an alias is an image another commit's run built,
+		// and the evidence must describe the artefacts this commit would release. So the version
+		// branch publishes every release image itself, under every event, exactly as its dispatch run
+		// did.
 		const complete = String(workflow.getIn([...detection, "outputs", "all-images"]));
 		assert.match(
 			complete,

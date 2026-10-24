@@ -16,15 +16,11 @@ on:
         required: false
         type: string
         default: "false"
-      # publish and single_arch have no default; reusable-docker-build.yml says why.
+      # publish has no default; reusable-docker-build.yml says why.
       publish:
         description: "Whether image jobs may write to the registry"
         required: true
         type: boolean
-      single_arch:
-        description: "Whether to build linux/amd64 alone instead of the supported multi-architecture set"
-        required: true
-        type: string
       webapp_changed:
         description: "Whether webapp files changed (or should build for other reasons)"
         required: false
@@ -75,7 +71,6 @@ jobs:
         SOURCE_COMMIT=${{ github.sha }}
         COOLIFY_BRANCH=${{ github.head_ref || github.ref_name }}
       publish: ${{ inputs.publish }}
-      single-arch: ${{ inputs.single_arch == 'true' }}
       scan-images: ${{ inputs.scan-images }}
       labels: |
         org.opencontainers.image.title=Hephaestus Webapp
@@ -101,7 +96,6 @@ jobs:
       docker-context: "./docker/agents"
       registry: "ghcr.io"
       publish: ${{ inputs.publish }}
-      single-arch: ${{ inputs.single_arch == 'true' }}
       scan-images: ${{ inputs.scan-images }}
       labels: |
         org.opencontainers.image.title=Hephaestus Agent - Pi
@@ -127,7 +121,6 @@ jobs:
       docker-context: "./docker/postgres"
       registry: "ghcr.io"
       publish: ${{ inputs.publish }}
-      single-arch: ${{ inputs.single_arch == 'true' }}
       scan-images: ${{ inputs.scan-images }}
       labels: |
         org.opencontainers.image.title=Hephaestus Postgres

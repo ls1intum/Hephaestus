@@ -61,9 +61,6 @@ jobs:
       release-candidate: ${{ steps.release_candidate.outputs.release-candidate }}
       release-preflight: ${{ (github.event_name == 'workflow_dispatch' && inputs.release-preflight) || steps.release_candidate.outputs.release-candidate == 'true' }}
       any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.extension == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.tooling == 'true' || steps.filter.outputs.agent-images == 'true' || steps.filter.outputs.postgres-image == 'true' }}
-      # The vulnerability policy's match key includes the platform, so an arm64-only finding has to
-      # be found before the release rather than by it, and only a manifest that exists can carry it.
-      single-arch: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && steps.release_candidate.outputs.release-candidate != 'true' }}
       # The commit an unchanged image is aliased from; scripts/resolve-alias-base.ts says how it is
       # found and docs/contributor/ci-cd.mdx the rule.
       alias-base: ${{ steps.alias_base.outputs.commit }}
@@ -744,7 +741,6 @@ jobs:
       run-image: "paketobuildpacks/ubuntu-noble-run-tiny@sha256:dc90cbdbbff35916ff5a26409f29f0525cbc7fa76cc317adca856c4127ebf2ba"
       registry: "ghcr.io"
       publish: ${{ needs.detect-changes.outputs.publishable == 'true' }}
-      single-arch: ${{ needs.detect-changes.outputs.single-arch == 'true' }}
       scan-images: ${{ needs.detect-changes.outputs.release-preflight != 'true' }}
 
   Build:
@@ -882,7 +878,6 @@ jobs:
       database-artifact: ${{ needs.vulnerability-database.outputs.artifact-id }}
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       publish: ${{ needs.detect-changes.outputs.publishable == 'true' }}
-      single_arch: ${{ needs.detect-changes.outputs.single-arch }}
       scan-images: ${{ needs.detect-changes.outputs.release-preflight != 'true' }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.supported-host-smoke == 'true' || needs.detect-changes.outputs.all-images == 'true') && 'true' || 'false' }}

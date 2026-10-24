@@ -62,15 +62,10 @@ on:
         type: boolean
         required: true
         description: "Publish, attest, sign, and scan the image; false builds it locally without registry writes"
-      single-arch:
-        type: boolean
-        required: false
-        default: false
-        description: "Build only linux/amd64 instead of the supported multi-architecture set."
     outputs:
       manifest-digest:
-        description: "Published image digest; an index digest for multi-architecture builds."
-        value: ${{ inputs.single-arch && jobs.build.outputs.manifest-digest || jobs.merge.outputs.manifest-digest }}
+        description: "Published image index digest"
+        value: ${{ jobs.merge.outputs.manifest-digest }}
 
 permissions: {}
 
@@ -89,19 +84,19 @@ env:
 jobs:
   build:
     name: Build ${{ matrix.platform }} Docker Image
-    outputs:
-      manifest-digest: ${{ steps.single-digest.outputs.manifest-digest }}
     strategy:
       fail-fast: true
-      matrix: ${{ fromJSON(inputs.single-arch && '{"include":[{"platform":"linux/amd64","runner":"ubuntu-24.04"}]}' || '{"include":[{"platform":"linux/amd64","runner":"ubuntu-24.04"},{"platform":"linux/arm64","runner":"ubuntu-24.04-arm"}]}') }}
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
     timeout-minutes: 45
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
-      id-token: write
-      attestations: write
-      artifact-metadata: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -128,7 +123,6 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ inputs.registry }}/${{ inputs.image-name }}
-          tags: ${{ inputs.single-arch && env.STANDARD_IMAGE_TAGS || '' }}
           labels: ${{ inputs.labels }}
 
       - name: Prepare platform pair
@@ -154,11 +148,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build-args }}
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ !inputs.publish && inputs.single-arch && steps.meta.outputs.tags || '' }}
           push: ${{ inputs.publish }}
-          # A local build is only tagged on the single-architecture path, and loading an untagged
-          # image into the daemon leaves something nothing can name.
-          load: ${{ !inputs.publish && inputs.single-arch }}
           outputs: ${{ inputs.publish && format('type=image,"name={0}/{1}",push-by-digest=true,name-canonical=true,push=true', inputs.registry, inputs.image-name) || '' }}
           # A refreshed package stage does not invalidate cached descendants in BuildKit.
           no-cache-filters: os-packages,runtime
@@ -206,11 +196,9 @@ jobs:
           (( ${#jars[@]} == 1 ))
           PER_ARCH_TAG="$INPUT_REGISTRY/$INPUT_IMAGE_NAME:ci-$GITHUB_RUN_ID-$PLATFORM_PAIR"
           if [ "$PUBLISH" != true ]; then
-            # A local build has no registry to read a manifest back from, and nothing downstream of
-            # a fork build consumes the digest, so the daemon's image ID is what it can report.
+            # Nothing downstream of a build without registry writes reads a digest.
             pack build "$PER_ARCH_TAG" --path "${jars[0]}" --descriptor "$PROJECT_DESCRIPTOR" \
               --run-image "$RUN_IMAGE" --platform "$MATRIX_PLATFORM" --trust-builder 2>&1 | node scripts/summarize-buildpack-log.ts "$RUNNER_TEMP/buildpacks.log"
-            echo "digest=$(docker image inspect --format '{{.Id}}' "$PER_ARCH_TAG")" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           pack build "$PER_ARCH_TAG" --path "${jars[0]}" --descriptor "$PROJECT_DESCRIPTOR" \
@@ -241,6 +229,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Export digest
+        if: inputs.publish
         env:
           DOCKERFILE_DIGEST: ${{ steps.build.outputs.digest }}
           BUILDPACKS_DIGEST: ${{ steps.build-buildpacks.outputs.digest }}
@@ -251,86 +240,10 @@ jobs:
             echo "::error::No digest produced by either build path"
             exit 1
           fi
-          if [ "${{ inputs.single-arch }}" = "true" ]; then
-            echo "manifest-digest=$digest" >> "$GITHUB_OUTPUT"
-          else
-            touch "${{ runner.temp }}/digests/${digest#sha256:}"
-          fi
-
-      - name: Prepare single-architecture buildpack index
-        if: inputs.publish && inputs.single-arch && inputs.use-buildpacks
-        env:
-          SOURCE_IMAGE: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.build-buildpacks.outputs.digest }}
-          STAGING_IMAGE: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ github.run_attempt }}-single
-        run: |
-          docker buildx imagetools create --tag "$STAGING_IMAGE" \
-            --metadata-file "$RUNNER_TEMP/single-image.json" "$SOURCE_IMAGE"
-
-      - name: Capture single-architecture digest
-        id: single-digest
-        if: inputs.publish && inputs.single-arch
-        env:
-          DOCKERFILE_DIGEST: ${{ steps.build.outputs.digest }}
-          USE_BUILDPACKS: ${{ inputs.use-buildpacks }}
-        run: |
-          set -euo pipefail
-          DIGEST="$DOCKERFILE_DIGEST"
-          if [ "$USE_BUILDPACKS" = true ]; then
-            DIGEST=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/single-image.json")
-          fi
-          if [[ ! "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            echo "::error::Refusing to publish: image digest is invalid (got: ${DIGEST:-<empty>})"
-            exit 1
-          fi
-          echo "manifest-digest=$DIGEST" >> "$GITHUB_OUTPUT"
-
-      - name: Generate build provenance attestation
-        if: inputs.publish && inputs.single-arch
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        env:
-          NODE_OPTIONS: "--max-http-header-size=32768"
-        with:
-          subject-name: ${{ inputs.registry }}/${{ inputs.image-name }}
-          subject-digest: ${{ steps.single-digest.outputs.manifest-digest }}
-          push-to-registry: true
-
-      - name: Install Cosign
-        if: inputs.publish && inputs.single-arch
-        uses: sigstore/cosign-installer@af595e623eec1ede52d6322f53b635d5def0a95a
-        with:
-          cosign-release: v3.1.4
-
-      # Signing stays in this workflow; ci-cd.mdx § Shared setup actions owns its identity boundary.
-      - name: Sign and verify image
-        if: inputs.publish && inputs.single-arch
-        env:
-          IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.single-digest.outputs.manifest-digest }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cosign sign --yes "$IMAGE_REF"
-          cosign verify "$IMAGE_REF" \
-            --certificate-identity-regexp '^https://github\.com/${{ github.repository }}/\.github/workflows/reusable-docker-build\.yml@' \
-            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-            --certificate-github-workflow-repository "${{ github.repository }}" \
-            > /dev/null
-          gh attestation verify "oci://$IMAGE_REF" --bundle-from-oci --owner "${{ github.repository_owner }}"
-
-      - name: Publish verified image tags
-        if: inputs.publish && inputs.single-arch
-        env:
-          IMAGE_REF: ${{ inputs.registry }}/${{ inputs.image-name }}@${{ steps.single-digest.outputs.manifest-digest }}
-        run: |
-          set -euo pipefail
-          tags=$(jq -er '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
-          args=()
-          while IFS= read -r tag; do args+=(--tag "$tag"); done <<< "$tags"
-          docker buildx imagetools create --prefer-index=false "${args[@]}" \
-            --metadata-file "$RUNNER_TEMP/published-image.json" "$IMAGE_REF"
-          PUBLISHED_DIGEST=$(jq -er '."containerimage.descriptor".digest' "$RUNNER_TEMP/published-image.json")
-          [[ "$PUBLISHED_DIGEST" = "${IMAGE_REF##*@}" ]]
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
-        if: ${{ inputs.publish && !inputs.single-arch }}
+        if: inputs.publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: digests-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
@@ -343,7 +256,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: build
-    if: ${{ inputs.publish && !inputs.single-arch }}
+    if: inputs.publish
     permissions:
       packages: write
       id-token: write
@@ -495,7 +408,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: ${{ fromJSON(inputs.single-arch && '["linux/amd64"]' || '["linux/amd64","linux/arm64"]') }}
+        platform: [linux/amd64, linux/arm64]
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     env:
@@ -528,7 +441,6 @@ jobs:
 
       - name: Prepare digest artifact name
         id: prep
-        if: ${{ !inputs.single-arch }}
         env:
           INPUT_IMAGE_NAME: ${{ inputs.image-name }}
         run: |
@@ -536,7 +448,6 @@ jobs:
           echo "platform_pair=${SCAN_PLATFORM//\//-}" >> "$GITHUB_OUTPUT"
 
       - name: Download platform digest
-        if: ${{ !inputs.single-arch }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: digests-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
@@ -545,8 +456,7 @@ jobs:
       - name: Resolve the platform subject
         id: subject
         env:
-          IMAGE_REF: ${{ inputs.single-arch && format('{0}/{1}@{2}', inputs.registry, inputs.image-name, needs.build.outputs.manifest-digest) || '' }}
-          DIGEST_DIRECTORY: ${{ !inputs.single-arch && format('{0}/scan-digest', runner.temp) || '' }}
+          DIGEST_DIRECTORY: ${{ runner.temp }}/scan-digest
           IMAGE_REPOSITORY: ${{ inputs.registry }}/${{ inputs.image-name }}
           INPUT_IMAGE_NAME: ${{ inputs.image-name }}
         run: node scripts/resolve-image-scan-subject.ts

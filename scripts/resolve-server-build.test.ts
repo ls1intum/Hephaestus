@@ -16,6 +16,7 @@ const requiredJobs = [
 	"Build / App Server: PostgreSQL drill (pitr)",
 	"Build / Webapp: E2E",
 	"App Server image / Build linux/amd64 Docker Image",
+	"App Server image / Build linux/arm64 Docker Image",
 	"Test / App Server: Unit and architecture",
 	"Test / App Server: Integration (application)",
 	"Test / App Server: Integration (providers)",
@@ -37,11 +38,10 @@ function fixture() {
 			repository: { id: 7, full_name: repository },
 			head_repository: { id: 7, full_name: repository },
 		},
-		jobs: [
-			...requiredJobs,
-			"App Server image / Build linux/arm64 Docker Image",
-			"Release evidence preflight",
-		].map((name) => ({ name, conclusion: "success" })),
+		jobs: [...requiredJobs, "Release evidence preflight"].map((name) => ({
+			name,
+			conclusion: "success",
+		})),
 		artifact: {
 			id: 202,
 			name: "server-build-101",
@@ -68,13 +68,11 @@ await test("selects the immutable artifact of an exact-commit successful release
 	assert.deepEqual(await resolve(), { runId: 101, artifactId: 202 });
 });
 
-await test("reuses an ordinary merge group without release-only image and evidence jobs", async () => {
+await test("reuses an ordinary merge group without the release-only evidence job", async () => {
 	const data = fixture();
-	data.jobs = data.jobs
-		.filter((job) => job.name !== "App Server image / Build linux/arm64 Docker Image")
-		.map((job) =>
-			job.name === "Release evidence preflight" ? { ...job, conclusion: "skipped" } : job,
-		);
+	data.jobs = data.jobs.map((job) =>
+		job.name === "Release evidence preflight" ? { ...job, conclusion: "skipped" } : job,
+	);
 	assert.deepEqual(await resolve(data), { runId: 101, artifactId: 202 });
 });
 
