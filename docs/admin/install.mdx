@@ -47,8 +47,7 @@ Before publication, each release passes qualification on both matrix cells.
 
 Only the listed native hosts and the unmodified self-hosted Compose topology are supported. Other hosts, runtimes, and topologies are outside release qualification.
 
-- **4 vCPUs, 24 GB RAM, 40 GB SSD** is a conservative initial budget for one concurrent review sandbox.
-  [Sizing](./sizing) explains the budget, the container limits, and when to raise them.
+- The CPU, memory, and disk that [Sizing](./sizing) gives.
 - A host in the supported matrix, plus `git` and `openssl`.
 - An NTP-synchronized clock. [Clocks](#clocks) explains why.
 - A **DNS A record** that points your hostname at the host.
@@ -365,5 +364,9 @@ The procedure runs one review and lets you read its feedback before anyone else 
 
 ## Upgrades
 
-[Upgrade](./upgrade) owns the upgrade procedure, failed-migration recovery, rollback, and update checks.
+<a id="update-checks"></a>
+<a id="rollback"></a>
+<a id="deployment-environment-and-release-history"></a>
+
+[Upgrade](./upgrade) owns the upgrade procedure, failed-migration recovery, rollback, update checks, and the release history.
 [Troubleshooting](./troubleshooting) lists the common failures of an installation and their fixes.

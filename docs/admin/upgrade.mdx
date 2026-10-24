@@ -67,9 +67,6 @@ The commands below do not prepare existing databases for the PostgreSQL 18/Liqui
 7. Before startup, compare `.env` with the release's `.env.example`.
 8. Complete manual steps in [`MIGRATION.md`](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md), especially PostgreSQL major-version changes.
 9. Return to **Validate then deploy** in the runbook for guarded startup.
-10. Before you resume reconciliation, make sure the channel matches the recovered release or is frozen.
-
-    Otherwise, the next tick can reapply the failed upgrade.
 
 ## If migration fails
 
@@ -81,18 +78,22 @@ Removal of a stale lock does not repair a failed migration.
 :::
 
 1. Keep ingress and all application writers stopped.
-2. Preserve the error and failed changeset identity.
-3. Preserve `databasechangelog`/lock diagnostics and the target image lock.
-4. If feasible, preserve a forensic snapshot.
-5. Follow [Backup & restore](./backup-restore) to restore the pre-upgrade backup into a fresh database.
-6. Use matching PostgreSQL version/extensions, encryption keys, and the **previous signed release lock**.
-7. Before consumers boot, reset/quarantine divergent JetStream state with the [broker recovery strategy](./production-operations-runbook#choose-the-broker-recovery-strategy-before-starting-consumers).
-8. Boot only under pre-boot isolation.
-9. Read back silent mode, and turn it on if it is off.
-10. Verify the restored schema, representative data, and readiness.
-11. Complete **Prove silence**, **Inspect and decide**, and **Turn off silent mode deliberately** in the [silent checklist](./production-operations-runbook#silent-deployment-checklist).
-12. Report actual recovery point/time and any lost writes.
-13. Preserve the failed database until investigation/retention permits removal.
+2. If the host uses [pull-based deployment](./pull-based-deployment#operating-it), pause reconciliation.
+3. Preserve the error and failed changeset identity.
+4. Preserve `databasechangelog`/lock diagnostics and the target image lock.
+5. If feasible, preserve a forensic snapshot.
+6. Follow [Backup & restore](./backup-restore) to restore the pre-upgrade backup into a fresh database.
+7. Use matching PostgreSQL version/extensions, encryption keys, and the **previous signed release lock**.
+8. Before consumers boot, reset/quarantine divergent JetStream state with the [broker recovery strategy](./production-operations-runbook#choose-the-broker-recovery-strategy-before-starting-consumers).
+9. Boot only under pre-boot isolation.
+10. Read back silent mode, and turn it on if it is off.
+11. Verify the restored schema, representative data, and readiness.
+12. Complete **Prove silence**, **Inspect and decide**, and **Turn off silent mode deliberately** in the [silent checklist](./production-operations-runbook#silent-deployment-checklist).
+13. Report actual recovery point/time and any lost writes.
+14. Preserve the failed database until investigation/retention permits removal.
+15. Before you resume reconciliation, make sure the channel matches the recovered release or is frozen.
+
+    Otherwise, the next tick can reapply the failed upgrade.
 
 **Drill**
 
@@ -108,7 +109,7 @@ Never run an older release against a newer schema.
 Never reconstruct an old lock or resolve mutable image tags.
 :::
 
-1. Follow [If migration fails](#if-migration-fails) to restore the previous release's database, secrets, and signed lock.
+To roll back, follow [If migration fails](#if-migration-fails) to restore the previous release's database, secrets, and signed lock.
 
 ## Update checks
 
