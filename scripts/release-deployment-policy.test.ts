@@ -268,19 +268,30 @@ await test("the release smoke reaches the installation by the name the installer
 	);
 });
 
-await test("automatic promotion gates the environment job under one workflow lock", () => {
+await test("an automatic promotion decides under the workflow lock, in the job that publishes", () => {
 	const workflow = parseDocument(promotion);
 	assert.equal(workflow.getIn(["concurrency", "group"]), `promote-\${{ inputs.environment }}`);
 	assert.equal(workflow.getIn(["concurrency", "cancel-in-progress"]), false);
-	assert.equal(workflow.getIn(["jobs", "automatic", "environment"]), undefined);
-	assert.equal(workflow.getIn(["jobs", "automatic", "permissions", "contents"]), "read");
-	assert.equal(
-		workflow.getIn(["jobs", "automatic", "outputs", "apply"]),
-		`\${{ steps.policy.outputs.apply }}`,
-	);
-	assert.equal(workflow.getIn(["jobs", "promote", "needs"]), "automatic");
-	assert.equal(
-		workflow.getIn(["jobs", "promote", "if"]),
-		`\${{ !cancelled() && !failure() && (!inputs.automatic || needs.automatic.outputs.apply == 'true') }}`,
-	);
+	// A second job would wait for a second runner before the promotion could start.
+	assert.deepEqual(Object.keys(asRecord(at(promotionWorkflow, ["jobs"], "promote.yml"), "jobs")), [
+		"promote",
+	]);
+	assert.equal(promoteStep("Check automatic promotion", ["if"]), `\${{ inputs.automatic }}`);
+	const order = promoteSteps.map(({ name }) => name);
+	const policy = order.indexOf("Check automatic promotion");
+	// Every step that resolves, records, signs, publishes or observes a channel follows the decision
+	// and runs only when the decision did not skip it.
+	for (const [index, step] of promoteSteps.entries()) {
+		if (index <= policy) {
+			continue;
+		}
+		const condition = step.if;
+		if (typeof condition === "string" && condition.startsWith("${{ always()")) {
+			continue;
+		}
+		assert.ok(
+			typeof condition === "string" && condition.includes("steps.policy.outputs.apply != 'false'"),
+			`promote step ${String(step.name ?? step.uses)} must follow the automatic decision`,
+		);
+	}
 });
