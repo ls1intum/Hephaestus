@@ -36,12 +36,13 @@ flowchart TD
 
 Every push to `main` builds and attests multi-architecture images for that commit and maintains the
 Version PR. Merging the Version PR cuts a release that promotes those images by digest —
-[Release management](./release-management.mdx). Pull requests and merge groups also build their
-images for `linux/amd64` and `linux/arm64`, so a candidate can run on either architecture before it merges.
+[Release management](./release-management.mdx). A pull request builds `linux/amd64` only, so a
+push to it does not pay for a second architecture. A merge group builds `linux/amd64` and
+`linux/arm64`, so an arm64 build failure or finding is found once per merge, before `main`.
 A merge group has its own SHA, so its images are never the ones a release promotes.
 
 The Version PR's branch is the exception.
-Every run builds every release image itself, regardless of its start event.
+Every run builds every release image itself on both architectures, regardless of its start event.
 The branch's release evidence preflight requires each image on both published platforms.
 It can capture evidence only for images that its run published.
 
@@ -477,7 +478,7 @@ Its `Tag unchanged images` job aliases the base commit's verified digests for th
 Thus, every image exists at the head SHA.
 
 An alias serves a preview, never release evidence.
-If the base commit's image is still publishing, it uses the merged pull request's candidate.
+If the base commit's image is still publishing, it uses the merged pull request's candidate, which carries only `linux/amd64`.
 Either way, the alias is an image that another commit's run built.
 That is why the Version PR's branch builds every image itself instead.
 
@@ -589,7 +590,7 @@ Why the label is the authority, and which alternatives were priced and declined,
 | `ci-build.yml`                        | Called by cicd.yml                                                            | Runs the OpenAPI, schema, database and browser E2E gates against the server artifact packaged by cicd.yml                                                                                                                        |
 | `ci-tests.yml`                        | Called by cicd.yml                                                            | The server unit, architecture and integration suites, compiled from source                                                                                                                                                       |
 | `ci-docker-build.yml`                 | Called by cicd.yml                                                            | Dockerfile image builds (webapp, agent, PostgreSQL) and aliases for unchanged images                                                                                                                                             |
-| `reusable-docker-build.yml`           | Called by cicd.yml and ci-docker-build.yml                                    | Builds each platform natively, merges the index, signs, attests, and blocks on the release vulnerability policy for each platform                                                                                                 |
+| `reusable-docker-build.yml`           | Called by cicd.yml and ci-docker-build.yml                                    | Builds each requested platform natively, merges the index, signs, attests, and blocks on the release vulnerability policy for each platform                                                                                       |
 | `ci-security-scan.yml`                | Called by cicd.yml                                                            | Trivy dependency scan, secret detection and repository policy checks                                                                                                                                                             |
 | `dependency-review.yml`               | Pull requests except documentation and release-note prose                     | Reports introduced dependency advisories independently of the required CI verdict                                                                                                                                                |
 | `dependency-graph.yml`                | PR, push to main                                                              | Resolves and uploads the verified Gradle dependency graph with read-only permissions                                                                                                                                             |
@@ -863,9 +864,11 @@ If no such default-branch commit exists, the run builds every image itself. `det
   unit/architecture verification. Discovery reports stay separate from execution results.
   All shards use `fail-fast: false`. `CI Status Gate` requires their aggregate result. Locally
   the tier runs whole.
-- Every run builds each image on `linux/amd64` and `linux/arm64`. Pull requests and merge groups
-  build only changed images and alias the rest. The Version PR's branch builds them all.
-  `detect-changes` decides that once, as `all-images`, and hands it to every image build in the run.
+- Pull requests build `linux/amd64`. Merge groups, pushes to `main`, dispatches, and every run on
+  the Version PR's branch build `linux/amd64` and `linux/arm64`. Both lists take the same build,
+  merge, signing, attestation and per-platform scan path. Pull requests and merge groups build only
+  changed images and alias the rest. The Version PR's branch builds them all. `detect-changes`
+  decides both once, as `platforms` and `all-images`, and hands them to every image build in the run.
 - Action and composite setup steps run sequentially within each job. The runner writes the shared
   event file before each action. The action SDK reads that file. Concurrent action starts can expose
   incomplete event data. Jobs and matrix entries still run independently. Standalone shell work

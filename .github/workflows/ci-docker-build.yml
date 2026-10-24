@@ -16,11 +16,15 @@ on:
         required: false
         type: string
         default: "false"
-      # publish has no default; reusable-docker-build.yml says why.
+      # publish and platforms have no default; reusable-docker-build.yml says why.
       publish:
         description: "Whether image jobs may write to the registry"
         required: true
         type: boolean
+      platforms:
+        description: "JSON list of the platforms every image build in the run publishes"
+        required: true
+        type: string
       webapp_changed:
         description: "Whether webapp files changed (or should build for other reasons)"
         required: false
@@ -71,6 +75,7 @@ jobs:
         SOURCE_COMMIT=${{ github.sha }}
         COOLIFY_BRANCH=${{ github.head_ref || github.ref_name }}
       publish: ${{ inputs.publish }}
+      platforms: ${{ inputs.platforms }}
       scan-images: ${{ inputs.scan-images }}
       labels: |
         org.opencontainers.image.title=Hephaestus Webapp
@@ -96,6 +101,7 @@ jobs:
       docker-context: "./docker/agents"
       registry: "ghcr.io"
       publish: ${{ inputs.publish }}
+      platforms: ${{ inputs.platforms }}
       scan-images: ${{ inputs.scan-images }}
       labels: |
         org.opencontainers.image.title=Hephaestus Agent - Pi
@@ -121,6 +127,7 @@ jobs:
       docker-context: "./docker/postgres"
       registry: "ghcr.io"
       publish: ${{ inputs.publish }}
+      platforms: ${{ inputs.platforms }}
       scan-images: ${{ inputs.scan-images }}
       labels: |
         org.opencontainers.image.title=Hephaestus Postgres

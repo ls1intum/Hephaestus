@@ -421,7 +421,49 @@ for (const scenario of [
 		refused: true,
 		beforeCreate: true,
 	},
+	{
+		name: "a pull request's amd64-only index",
+		platforms: ["linux/amd64"],
+		artifactArchitectures: ["amd64"],
+		final: [platformLeaf("amd64", digest)],
+	},
+	{
+		name: "an arm64 build the run did not request",
+		platforms: ["linux/amd64"],
+		final: [platformLeaf("amd64", digest)],
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "an amd64-only index where both platforms were requested",
+		artifactArchitectures: ["amd64"],
+		final: [platformLeaf("amd64", digest)],
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "an unsupported requested platform",
+		platforms: ["linux/386"],
+		artifactArchitectures: ["386"],
+		final: [platformLeaf("386", digest)],
+		refused: true,
+		beforeCreate: true,
+	},
+	{
+		name: "an empty platform list",
+		platforms: [],
+		artifactArchitectures: [],
+		final: [],
+		refused: true,
+		beforeCreate: true,
+	},
 ] as const) {
+	const platforms: readonly string[] = ("platforms" in scenario
+		? scenario.platforms
+		: undefined) ?? ["linux/amd64", "linux/arm64"];
+	const architectures: readonly string[] = ("artifactArchitectures" in scenario
+		? scenario.artifactArchitectures
+		: undefined) ?? ["amd64", "arm64"];
 	void test(
 		`manifest leaf custody: ${scenario.name}`,
 		{ skip: process.platform === "win32" },
@@ -439,10 +481,8 @@ for (const scenario of [
 			t.after(async () => rm(directory, { recursive: true, force: true }));
 			const artifactRoot = path.join(directory, "digests");
 			await mkdir(artifactRoot);
-			for (const [arch, sourceDigest] of [
-				["amd64", buildIndex],
-				["arm64", armLeaf],
-			] as const) {
+			for (const arch of architectures) {
+				const sourceDigest = arch === "arm64" ? armLeaf : buildIndex;
 				const artifactDirectory = path.join(
 					artifactRoot,
 					`digests-hephaestus-build-webapp-linux-${arch}`,
@@ -491,6 +531,7 @@ process.stdout.write(ref.endsWith(process.env.MERGED_DIGEST) ? process.env.FINAL
 					RUNNER_TEMP: directory,
 					INPUTS_REGISTRY: "ghcr.io",
 					INPUTS_IMAGE_NAME: "hephaestus-build/webapp",
+					PLATFORMS: JSON.stringify(platforms),
 					STAGING_IMAGE: `${image}:ci-test-index`,
 					CALL_LOG: callLog,
 					BUILD_INDEX: buildIndex,
@@ -519,7 +560,11 @@ process.stdout.write(ref.endsWith(process.env.MERGED_DIGEST) ? process.env.FINAL
 			const created = calls.find((args) => args[2] === "create");
 			assert.equal(created === undefined, "beforeCreate" in scenario);
 			if (created !== undefined) {
-				assert.deepEqual(created.slice(-2), [`${image}@${buildIndex}`, `${image}@${armLeaf}`]);
+				const sources = architectures.map(
+					(arch) => `${image}@${arch === "arm64" ? armLeaf : buildIndex}`,
+				);
+				assert.deepEqual(created.slice(-sources.length), sources);
+				assert.notEqual(created.at(-sources.length - 1), `${image}@${armLeaf}`);
 				assert.deepEqual(calls.at(-1), [
 					"buildx",
 					"imagetools",

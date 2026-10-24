@@ -62,6 +62,11 @@ on:
         type: boolean
         required: true
         description: "Publish, attest, sign, and scan the image; false builds it locally without registry writes"
+      platforms:
+        # No default, for the same reason as publish: cicd.yml decides it once for every image build.
+        type: string
+        required: true
+        description: 'JSON list of the platforms to build, merge into the index, and scan, such as ["linux/amd64"]'
     outputs:
       manifest-digest:
         description: "Published image index digest"
@@ -87,13 +92,10 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
+        platform: ${{ fromJSON(inputs.platforms) }}
     timeout-minutes: 45
-    runs-on: ${{ matrix.runner }}
+    # Each platform builds natively on its own runner; no emulation.
+    runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     permissions:
       contents: read
       packages: write
@@ -304,12 +306,15 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         run: |
           set -euo pipefail
+          mapfile -t platforms < <(jq -er '.[]' <<< "$PLATFORMS")
           entries=(*)
-          (( ${#entries[@]} == 2 )) || exit 1
+          (( ${#platforms[@]} > 0 && ${#entries[@]} == ${#platforms[@]} )) || exit 1
           args=(--tag "$STAGING_IMAGE" --metadata-file "$RUNNER_TEMP/merged-image.json")
           expected='[]'
           image_pair="${INPUTS_IMAGE_NAME//\//-}"
-          for arch in amd64 arm64; do
+          for platform in "${platforms[@]}"; do
+            [[ "$platform" =~ ^linux/(amd64|arm64)$ ]] || exit 1
+            arch="${platform#linux/}"
             files=("digests-$image_pair-linux-$arch"/*)
             (( ${#files[@]} == 1 )) || exit 1
             [[ -f "${files[0]}" && ! -L "${files[0]}" ]] || exit 1
@@ -340,6 +345,7 @@ jobs:
         env:
           INPUTS_REGISTRY: ${{ inputs.registry }}
           INPUTS_IMAGE_NAME: ${{ inputs.image-name }}
+          PLATFORMS: ${{ inputs.platforms }}
           STAGING_IMAGE: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ github.run_attempt }}-index
 
       - name: Capture manifest digest
@@ -408,7 +414,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [linux/amd64, linux/arm64]
+        platform: ${{ fromJSON(inputs.platforms) }}
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     env:
