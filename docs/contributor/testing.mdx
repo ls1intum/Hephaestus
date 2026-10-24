@@ -145,11 +145,11 @@ Compilation remains incremental and cacheable. `--no-build-cache` prevents outpu
 Combine it with `clean` when measuring a cold build.
 
 The shared integration PostgreSQL container runs the `docker/postgres` image.
-Each test JVM builds that image from its Dockerfile.
-CI integration jobs instead use the image published for the base commit.
+Locally, each test JVM builds that image from its Dockerfile.
+CI integration jobs instead pull the image that CI published for the commit their images alias from.
 They name it in `HEPHAESTUS_TEST_POSTGRES_IMAGE`.
-When a change edits the image, CI builds it once per job before the tests start.
-Thus, the tests use the image that ships, and they need no package downloads.
+When a change edits the image, or no published image exists, CI builds the Dockerfile once per job before the tests start.
+That build downloads packages, as a local build does.
 
 The shared integration PostgreSQL container keeps its ephemeral data directory on tmpfs. Database
 cleanup still truncates every application table transactionally. SQL constraints and isolation checks
