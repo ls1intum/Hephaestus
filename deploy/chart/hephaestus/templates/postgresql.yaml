@@ -1,0 +1,132 @@
+{{- if .Values.postgresql.bundled }}
+{{- $name := include "hephaestus.name" (dict "root" . "component" "postgresql") }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "postgresql") | nindent 4 }}
+spec:
+  selector:
+    {{- include "hephaestus.selectorLabels" (dict "root" . "component" "postgresql") | nindent 4 }}
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: postgresql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "postgresql") | nindent 4 }}
+spec:
+  replicas: 1
+  serviceName: {{ $name }}
+  selector:
+    matchLabels:
+      {{- include "hephaestus.selectorLabels" (dict "root" . "component" "postgresql") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hephaestus.labels" (dict "root" . "component" "postgresql") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # The image's postgres user. Started as that user, the entrypoint skips its root-only
+      # ownership fix and initializes the volume directly. Not yet shown on a real volume driver:
+      # fsGroup ownership, first initialization, restart and restore need a start of the release
+      # image on a PVC before this path counts as working.
+      securityContext:
+        {{- include "hephaestus.podSecurityContext" (dict "user" 999 "group" 999) | nindent 8 }}
+      containers:
+        - name: postgresql
+          image: {{ include "hephaestus.image" (dict "root" . "name" "postgres") | quote }}
+          imagePullPolicy: IfNotPresent
+          # Arguments only: the image's entrypoint still runs and starts postgres with them.
+          args:
+            - -c
+            - ssl=on
+            - -c
+            - ssl_cert_file=/etc/postgresql/tls/tls.crt
+            - -c
+            - ssl_key_file=/etc/postgresql/tls/tls.key
+          env:
+            {{- include "hephaestus.secretEnv" (dict "root" . "env" "POSTGRES_USER" "key" "DATABASE_USERNAME") | nindent 12 }}
+            {{- include "hephaestus.secretEnv" (dict "root" . "env" "POSTGRES_PASSWORD" "key" "DATABASE_PASSWORD") | nindent 12 }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.database | quote }}
+          ports:
+            - name: postgresql
+              containerPort: 5432
+          startupProbe:
+            exec:
+              command: ["sh", "-c", 'pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
+            periodSeconds: 5
+            failureThreshold: 120
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", 'pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", 'pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
+            periodSeconds: 5
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          securityContext:
+            {{- include "hephaestus.containerSecurityContext" . | nindent 12 }}
+          # ADR 0038 mounts persistence at /var/lib/postgresql. The image keeps its own versioned
+          # PGDATA below it (/var/lib/postgresql/18/docker, as docker/self-host/pgbackrest.conf
+          # names it), so the chart sets no PGDATA.
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+            # A directory mount, not subPath, so that the kubelet updates the files when the Secret
+            # changes. PostgreSQL reads them again only on a reload or a restart.
+            - name: tls
+              mountPath: /etc/postgresql/tls
+              readOnly: true
+      # Fast shutdown checkpoints before exit. Kubernetes' 30 s default can cut a large checkpoint.
+      terminationGracePeriodSeconds: 120
+      volumes:
+        - name: run
+          emptyDir:
+            sizeLimit: 16Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        # The certificate and key only: clients sign in with a password, not a certificate. The files
+        # belong to root and the fsGroup 999. PostgreSQL accepts a root-owned key that its group can
+        # read and no other user can.
+        - name: tls
+          secret:
+            secretName: {{ include "hephaestus.postgresqlTlsSecret" . }}
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+            defaultMode: 288 # 0440
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "hephaestus.selectorLabels" (dict "root" . "component" "postgresql") | nindent 10 }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.postgresql.persistence.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.persistence.size }}
+{{- end }}

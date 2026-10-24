@@ -100,6 +100,13 @@ No other service or external route attaches to that network.
 A sandbox with internet access uses an ordinary bridge (SB-3).
 The [sandbox isolation probe](https://github.com/hephaestus-build/Hephaestus/blob/main/scripts/sandbox-isolation-probe.ts) checks this on the supported install in CI and before each release.
 
+On Kubernetes, the worker runs each sandbox as a Pod in one sandbox namespace that the release owns ([Kubernetes § Worker](./kubernetes#worker)).
+The namespace enforces the Restricted Pod Security Standard.
+Its default-deny policy gives a review or host sandbox one destination, the gateway port of its worker Pod, and gives a turn sandbox none.
+The worker proves Pod Security, this egress and the per-Pod process limit at its start, and starts no sandbox when the proof fails.
+A Kubernetes sandbox has no `noexec` scratch mounts and keeps `/dev/shm` in its private IPC namespace.
+[ADR 0041 § Update — 2026-10-24](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md#update--2026-10-24-the-kubernetes-runtime) owns that decision.
+
 Sandbox inputs arrive and results leave through the worker's sandbox gateway, which also hosts the LLM proxy.
 No worker disk paths mount into a sandbox.
 Runtime-role separation reduces reachable surface but is not authorization.

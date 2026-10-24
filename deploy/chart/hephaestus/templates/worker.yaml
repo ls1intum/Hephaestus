@@ -1,0 +1,313 @@
+{{- /*
+The worker role runs every sandbox as a Pod or Job that its runtime creates in the sandbox namespace.
+The chart owns that namespace, its Pod Security level, its static policies and the worker's API
+authority in it. The worker proves at its start that the cluster enforces them (the isolation probe,
+docs/admin/kubernetes.mdx § Sandbox prerequisites).
+*/}}
+{{- if .Values.worker.enabled }}
+{{- $name := include "hephaestus.name" (dict "root" . "component" "worker") }}
+{{- $pod := include "hephaestus.workerPod" (dict "root" .) }}
+{{- $port := include "hephaestus.gatewayPort" . | int }}
+{{- $sandboxes := include "hephaestus.sandboxNamespace" (dict "root" .) }}
+{{- $api := .Values.networkPolicy.kubernetesApi }}
+{{- $_ := required "networkPolicy.kubernetesApi.cidr is required: state the API endpoint that the network plugin sees" $api.cidr }}
+{{- if eq (int $api.port) 0 }}
+{{- fail "networkPolicy.kubernetesApi.port is required: state the API endpoint port that the network plugin sees" }}
+{{- end }}
+{{- /* values.schema.json owns each value's shape; the worker refuses the same values at start. */}}
+{{- $runtime := .Values.worker.runtime }}
+{{- if lt (int $runtime.podPidsLimit) 1 }}
+{{- fail "worker.runtime.podPidsLimit is required: state the per-pod process limit that the kubelet of the sandbox nodes enforces" }}
+{{- end }}
+{{- if regexMatch "(^|/)\\.\\.(/|$)" $runtime.seccompProfile }}
+{{- fail "worker.runtime.seccompProfile must stay inside the kubelet's seccomp directory" }}
+{{- end }}
+{{- $quota := .Values.worker.sandbox.quota }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $sandboxes }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "sandbox") | nindent 4 }}
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+# The identity that sandbox pods run as. It holds no API token, and the namespace holds no
+# application Secret.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox
+  namespace: {{ $sandboxes }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "sandbox") | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sandboxes
+  namespace: {{ $sandboxes }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "sandbox") | nindent 4 }}
+spec:
+  hard:
+    pods: {{ $quota.pods | int | quote }}
+    requests.cpu: {{ $quota.cpu | quote }}
+    limits.cpu: {{ $quota.cpu | quote }}
+    requests.memory: {{ $quota.memory | quote }}
+    limits.memory: {{ $quota.memory | quote }}
+    requests.ephemeral-storage: {{ $quota.ephemeralStorage | quote }}
+    limits.ephemeral-storage: {{ $quota.ephemeralStorage | quote }}
+    persistentvolumeclaims: "0"
+    services: "0"
+    secrets: "0"
+---
+# Unconditional: no ingress and no egress for any pod in the namespace. Turn sandboxes get no
+# other policy, so they have no network at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ $sandboxes }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "sandbox") | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+# The worker's authority over the sandboxes of this namespace, and over nothing else in it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  namespace: {{ $sandboxes }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "sandbox") | nindent 4 }}
+rules:
+  # A review's timeout stops its Pod by a patch of its deadline.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # The client opens an exec as a WebSocket GET; Kubernetes 1.35 and later also authorize that
+  # upgrade as create on pods/exec, so the worker needs both verbs.
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]
+  # One Job per practice-review attempt.
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  namespace: {{ $sandboxes }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "sandbox") | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+---
+# Review sandboxes and the Heph host that the runtime stamped with this worker's pod name may reach
+# that one pod on the gateway port, and nothing else: no DNS, no API, no database, no broker.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ printf "gateway-%s" $pod }}
+  namespace: {{ $sandboxes }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "sandbox") | nindent 4 }}
+spec:
+  podSelector:
+    {{- include "hephaestus.policy.gatewaySources" (dict "root" .) | nindent 4 }}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          podSelector:
+            matchLabels:
+              statefulset.kubernetes.io/pod-name: {{ $pod }}
+      ports:
+        - port: {{ $port }}
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "network") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      statefulset.kubernetes.io/pod-name: {{ $pod }}
+      {{- include "hephaestus.selectorLabels" (dict "root" . "component" "worker") | nindent 6 }}
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    # The Sandbox Gateway is the worker's only non-loopback application listener (ADR 0041). It
+    # admits the same sandbox pods, from the same namespace, on the same port as the rule above.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $sandboxes }}
+          podSelector:
+            {{- include "hephaestus.policy.gatewaySources" (dict "root" .) | nindent 12 }}
+      ports:
+        - port: {{ $port }}
+          protocol: TCP
+    {{- include "hephaestus.policy.metricsIngress" . | nindent 4 }}
+  egress:
+    - to:
+        {{- include "hephaestus.componentPeer" (dict "root" . "component" "server") | nindent 8 }}
+      ports:
+        - port: 8080
+          protocol: TCP
+    {{- include "hephaestus.policy.databaseEgress" . | nindent 4 }}
+    {{- include "hephaestus.policy.externalEgress" . | nindent 4 }}
+    # The Kubernetes API, at the address and port that the operator qualified for the network plugin.
+    - to:
+        - ipBlock:
+            cidr: {{ $api.cidr }}
+      ports:
+        - port: {{ $api.port }}
+          protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "worker") | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  # Headless, for the StatefulSet's pod identity only. A sandbox reaches its worker at the pod
+  # address that the runtime reads below, never through a load-balanced address.
+  clusterIP: None
+  selector:
+    {{- include "hephaestus.selectorLabels" (dict "root" . "component" "worker") | nindent 4 }}
+  ports:
+    - name: sandbox-gateway
+      port: {{ $port }}
+      targetPort: sandbox-gateway
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "hephaestus.labels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  # One worker. The gateway policies above name its one pod. 0 stops it and keeps this
+  # StatefulSet, its claim and the policies; it does not show that its sandboxes are gone.
+  replicas: {{ .Values.worker.replicas }}
+  serviceName: {{ $name }}
+  selector:
+    matchLabels:
+      {{- include "hephaestus.selectorLabels" (dict "root" . "component" "worker") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hephaestus.labels" (dict "root" . "component" "worker") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $name }}
+      # The one role that calls the Kubernetes API, with the Roles above.
+      automountServiceAccountToken: true
+      enableServiceLinks: false
+      securityContext:
+        {{- include "hephaestus.podSecurityContext" (dict "user" 1002 "group" 1001) | nindent 8 }}
+      # The drain budget plus one minute; matches spring.lifecycle.timeout-per-shutdown-phase.
+      terminationGracePeriodSeconds: 360
+      containers:
+        - name: worker
+          image: {{ include "hephaestus.image" (dict "root" . "name" "application-server") | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            {{- include "hephaestus.env.pod" . | nindent 12 }}
+            {{- include "hephaestus.env.release" . | nindent 12 }}
+            {{- include "hephaestus.env.shared" . | nindent 12 }}
+            {{- include "hephaestus.env.scm" . | nindent 12 }}
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod,worker
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxDirectMemorySize=128M
+            - name: HEPHAESTUS_HUB_URL
+              value: {{ printf "ws://%s:8080/api/workers/connect" (include "hephaestus.name" (dict "root" . "component" "server")) | quote }}
+            {{- include "hephaestus.secretEnv" (dict "root" . "env" "HEPHAESTUS_WORKER_REGISTRATION_TOKEN") | nindent 12 }}
+            - name: HEPHAESTUS_WORKER_DRAIN_TIMEOUT
+              value: {{ .Values.worker.drainTimeout | quote }}
+            # The review-ledger worker identity stays per process: no HEPHAESTUS_WORKER_ID here.
+            # The pod name is workload custody only.
+            - name: HEPHAESTUS_SANDBOX_RUNTIME
+              value: kubernetes
+            - name: HEPHAESTUS_SANDBOX_KUBERNETES_NAMESPACE
+              value: {{ $sandboxes | quote }}
+            - name: HEPHAESTUS_SANDBOX_KUBERNETES_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HEPHAESTUS_SANDBOX_KUBERNETES_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: HEPHAESTUS_SANDBOX_KUBERNETES_RUNTIME_CLASS_NAME
+              value: {{ $runtime.runtimeClassName | quote }}
+            - name: HEPHAESTUS_SANDBOX_KUBERNETES_SECCOMP_PROFILE
+              value: {{ $runtime.seccompProfile | quote }}
+            - name: HEPHAESTUS_SANDBOX_KUBERNETES_POD_PIDS_LIMIT
+              value: {{ $runtime.podPidsLimit | int | quote }}
+            - name: SANDBOX_API_PORT
+              value: {{ $port | quote }}
+          ports:
+            - name: sandbox-gateway
+              containerPort: {{ $port }}
+            - name: management
+              containerPort: 9090
+          {{- include "hephaestus.probes" (dict "startupFailures" 30) | nindent 10 }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext:
+            {{- include "hephaestus.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: git-cache
+              mountPath: /data/git-repos
+            - name: tmp
+              mountPath: /tmp
+            {{- include "hephaestus.postgresqlCaMount" . | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+        {{- include "hephaestus.postgresqlCaVolume" . | nindent 8 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: git-cache
+        labels:
+          {{- include "hephaestus.selectorLabels" (dict "root" . "component" "worker") | nindent 10 }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.worker.gitCache.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.worker.gitCache.size }}
+{{- end }}
