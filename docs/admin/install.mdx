@@ -56,10 +56,10 @@ Only the listed native hosts and the unmodified self-hosted Compose topology are
   | `application-server`           | 5 GiB        | `APPLICATION_SERVER_MEM_LIMIT`                                                              |
   | `application-worker`           | 3 GiB        | `APPLICATION_WORKER_MEM_LIMIT`                                                              |
   | `webhook-server`               | 2 GiB        | `WEBHOOK_SERVER_MEM_LIMIT`                                                                  |
-  | each concurrent review sandbox | 4 GiB        | `SANDBOX_MEMORY_BYTES`, `SANDBOX_MAX_CONCURRENT` (default 1)                                |
+  | each concurrent review sandbox | 2 GiB        | `SANDBOX_MEMORY_BYTES`, `SANDBOX_MAX_CONCURRENT` (default 1)                                |
   | the Heph host, one per worker  | 2 GiB        | Fixed. [Runtime roles](./runtime-roles.mdx#the-heph-host) gives the limits of the Heph host |
 
-  With the defaults, these limits add up to 16 GiB, about 17.2 GB.
+  With the defaults, these limits add up to 14 GiB, about 15 GB.
   PostgreSQL, NATS, Traefik, and the webapp have no limit.
   The rest of the 24 GB is for them and the operating system.
 
@@ -71,13 +71,22 @@ Only the listed native hosts and the unmodified self-hosted Compose topology are
 
   To use a smaller memory budget, lower the limits in `.env` before the first start.
 
+  Each review sandbox also has a limit of 1 CPU (`SANDBOX_CPUS`) and 256 processes (`SANDBOX_PIDS_LIMIT`).
+  These defaults come from a measured review of a small course repository.
+  At its peak, that review used 194 MiB of memory, 19 processes, and 0.2 CPU.
+
+  The 2 GiB memory limit also holds the files that a review writes to `/tmp`.
+  A larger repository or a review that runs heavy commands can need more.
+  If the kernel stops a review sandbox at its memory limit, the review fails with exit code 137.
+  Then increase `SANDBOX_MEMORY_BYTES`.
+
 - These are deployment limits, not a claim that all workloads fit. Before raising webhook volume,
   Heph turn capacity (`HEPHAESTUS_WORKER_MENTOR_MAX`), or `SANDBOX_MAX_CONCURRENT`, reproduce the release's
   [Compose capacity qualification](https://github.com/hephaestus-build/Hephaestus/tree/main/load-tests) on
   your host shape. A release baseline is valid only with the raw k6 and container-resource evidence described there.
   Without that evidence, keep the conservative defaults above.
 - **AI practice review adds memory demand**.
-  Each concurrent review sandbox may use up to 4 GiB.
+  Each concurrent review sandbox may use up to `SANDBOX_MEMORY_BYTES` (default 2 GiB).
   The default allows 1 concurrent sandbox.
   Raise `SANDBOX_MAX_CONCURRENT` only with sufficient RAM.
 - The application server and worker each default to 4 CPUs / 512 PIDs.

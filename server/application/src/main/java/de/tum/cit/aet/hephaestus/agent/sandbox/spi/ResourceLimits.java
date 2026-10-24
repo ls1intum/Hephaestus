@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
  * Resource constraints for a sandboxed container.
  *
  * <p>{@code memoryBytes} includes tmpfs allocations — set it high enough to accommodate both
- * process RSS and tmpfs mounts (default: 4 GB).
+ * process RSS and tmpfs mounts.
  *
  * @param memoryBytes maximum memory in bytes (container + tmpfs combined)
  * @param cpus CPU limit (e.g. 2.0 = two full cores)
@@ -61,8 +61,4 @@ public record ResourceLimits(
     public Duration maxRuntime() {
         return Objects.requireNonNull(maxRuntime);
     }
-
-    /** Sensible defaults: 4 GB RAM, 2 CPUs, 512 PIDs, 10 min timeout. */
-    public static final ResourceLimits DEFAULT =
-            new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 512, Duration.ofMinutes(10));
 }
