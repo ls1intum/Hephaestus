@@ -30,4 +30,5 @@ jobs:
           url=$(gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/promote.yml/dispatches" \
             -f ref=main -f 'inputs[environment]=Staging' -f "inputs[commit]=$COMMIT" \
             -f 'inputs[automatic]=true' -F return_run_details=true --jq '.html_url')
+          [[ "$url" == https://* ]] || { echo "::error::Dispatch returned no run URL"; exit 1; }
           echo "Promotion of $COMMIT: $url" | tee -a "$GITHUB_STEP_SUMMARY"

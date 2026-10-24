@@ -33,7 +33,7 @@ if (process.env.REFUSED === 'true') {
   console.error('gh: Forbidden (HTTP 403)');
   process.exit(1);
 }
-console.log('https://github.com/owner/repo/actions/runs/123');
+console.log(process.env.NO_URL === 'true' ? 'null' : 'https://github.com/owner/repo/actions/runs/123');
 `;
 
 async function follow(overrides: Record<string, string> = {}) {
@@ -107,4 +107,10 @@ void test("fails when GitHub refuses the dispatch", shellOnly, async () => {
 	assert.equal(result.status, 1, result.output);
 	assert.match(result.output, /HTTP 403/u);
 	assert.equal(result.calls.length, 1);
+});
+
+void test("fails when the dispatch returns no run URL", shellOnly, async () => {
+	const result = await follow({ NO_URL: "true" });
+	assert.equal(result.status, 1, result.output);
+	assert.match(result.output, /no run URL/u);
 });
