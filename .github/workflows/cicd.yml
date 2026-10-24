@@ -75,7 +75,12 @@ jobs:
       # being told.
       unfiltered: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
       publishable: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-      previews: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+      # Whether this run builds images. A pull request builds them only for its preview, the host boot
+      # smoke or release evidence; the merge group builds every other changed image before it lands.
+      # An unreadable `preview` label counts as present.
+      images: ${{ github.event_name != 'pull_request' || steps.release_candidate.outputs.release-candidate == 'true' || (github.event.pull_request.head.repo.full_name == github.repository && (steps.preview.outputs.opted-in != 'false' || steps.filter.outputs.supported-host-smoke == 'true')) }}
+      # A pull request whose preview or host boot smoke needs every image at its head tag.
+      head-images: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && (steps.preview.outputs.opted-in != 'false' || steps.filter.outputs.supported-host-smoke == 'true') }}
       # A skipped duplicate would skip the image builds the release evidence preflight needs, and
       # the gate refuses to pass the Version PR without one.
       should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && steps.release_candidate.outputs.release-candidate != 'true' }}
@@ -148,6 +153,19 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: node scripts/resolve-alias-base.ts
+
+      # Read from the pull request rather than the event, so a re-run after the label is added
+      # builds the preview's images. A failed read leaves the output empty, which builds them.
+      - name: Read the preview opt-in
+        id: preview
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          opted_in=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq 'any(.labels[]; .name == "preview")')
+          echo "opted-in=$opted_in" >> "$GITHUB_OUTPUT"
 
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
@@ -605,11 +623,11 @@ jobs:
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.unfiltered == 'true' ||
-        needs.detect-changes.outputs.previews == 'true' ||
+        needs.detect-changes.outputs.head-images == 'true' ||
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.build-config == 'true'
       ) && (
-        needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.extension-e2e == 'true' || needs.detect-changes.outputs.api-clients == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.supported-host-smoke == 'true' || needs.detect-changes.outputs.all-images == 'true'
+        needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.e2e == 'true' || needs.detect-changes.outputs.extension-e2e == 'true' || needs.detect-changes.outputs.api-clients == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.build-config == 'true' || (needs.detect-changes.outputs.images == 'true' && (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.supported-host-smoke == 'true' || needs.detect-changes.outputs.all-images == 'true'))
       )
     env:
       SERVER_BUILD_ARTIFACT: server-build-${{ github.run_id }}
@@ -689,7 +707,7 @@ jobs:
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.release-preflight == 'true' ||
         needs.detect-changes.outputs.release-images == 'true' ||
-        (needs.detect-changes.outputs.publishable == 'true' && (
+        (needs.detect-changes.outputs.publishable == 'true' && needs.detect-changes.outputs.images == 'true' && (
           needs.detect-changes.outputs.all-images == 'true' ||
           needs.detect-changes.outputs.application-server-image == 'true' ||
           needs.detect-changes.outputs.supported-host-smoke == 'true' ||
@@ -726,7 +744,7 @@ jobs:
   application-server-image:
     name: "App Server image"
     needs: [detect-changes, server-package, vulnerability-database]
-    if: ${{ !cancelled() && needs.detect-changes.result == 'success' && (needs.vulnerability-database.result == 'success' || needs.vulnerability-database.result == 'skipped') && needs.server-package.result == 'success' && (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.supported-host-smoke == 'true' || needs.detect-changes.outputs.all-images == 'true') }}
+    if: ${{ !cancelled() && needs.detect-changes.result == 'success' && (needs.vulnerability-database.result == 'success' || needs.vulnerability-database.result == 'skipped') && needs.server-package.result == 'success' && needs.detect-changes.outputs.images == 'true' && (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.supported-host-smoke == 'true' || needs.detect-changes.outputs.all-images == 'true') }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -861,14 +879,14 @@ jobs:
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
     needs: [detect-changes, vulnerability-database]
-    # Same-repository previews require every image at the PR head tag; unchanged images are aliased
-    # here and the application image is built by Build. A fork and a merge group have no preview, so
-    # their image builds stay path-filtered.
+    # A preview and the host boot smoke need every image at the head tag; unchanged images are
+    # aliased here and the application image is built by Build. Other runs' image builds stay
+    # path-filtered.
     if: |
       !cancelled() && needs.detect-changes.result == 'success' && (needs.vulnerability-database.result == 'success' || needs.vulnerability-database.result == 'skipped') &&
-      needs.detect-changes.outputs.should_skip != 'true' && (
+      needs.detect-changes.outputs.should_skip != 'true' && needs.detect-changes.outputs.images == 'true' && (
         needs.detect-changes.outputs.unfiltered == 'true' ||
-        needs.detect-changes.outputs.previews == 'true' ||
+        needs.detect-changes.outputs.head-images == 'true' ||
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.ci-config == 'true'
       )
@@ -898,7 +916,8 @@ jobs:
     # A fork pull request builds its images without publishing them, so there is nothing to pull
     # and no boot to check; the release path exercises a fork's install path once it is on `main`.
     if: >-
-      needs.detect-changes.outputs.previews == 'true' &&
+      github.event_name == 'pull_request' &&
+      needs.detect-changes.outputs.publishable == 'true' &&
       needs.detect-changes.outputs.should_skip != 'true' &&
       needs.detect-changes.outputs.supported-host-smoke == 'true'
     runs-on: ubuntu-24.04
