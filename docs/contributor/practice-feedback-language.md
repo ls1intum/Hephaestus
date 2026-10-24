@@ -82,15 +82,16 @@ This table records only their retired names.
 | **Example** | An optional place in the work that an observation cites to show the practice done well. |  |
 | **Open question** | A question about the work that the evidence cannot answer. It is never feedback. |  |
 | **Not reviewed** | A selected item/practice pair that a closed review did not judge or reuse. It is not an outcome. |  |
-| **Withheld result** | A candidate observation that [admission](./practice-review-pipeline.mdx#admit-results) did not accept. It records the reason. |  |
+| **Withheld candidate** | A candidate observation that [admission](./practice-review-pipeline.mdx#admit-results) did not accept. It records the reason. |  |
 | **Withheld feedback** | Feedback that the server did not deliver. Its state is `WITHHELD` and its stop reason records why. |  |
 | **Mark** | An admin record that an observation is incorrect or accepted. Removing the mark reverses it. | invalidation |
 | **Marked incorrect** | An observation that a workspace admin marked as wrong when made. It remains in history. | invalidated, deleted, retracted |
 | **Accepted** | An admin record that excludes an observation from open-problem lists. It does not change its outcome or cancel an incorrect mark. |  |
 | **Developer** | The person an observation concerns. Feedback based on that observation goes only to that person. | learner |
 
-Existing storage, API contracts and generated types name this record `Result`.
-The product calls it an observation.
+Storage, API contracts, generated types, routes, search params, and component and file names call this record `Result` or `result`.
+The product calls it an observation in UI text, user-facing responses and docs.
+Do not rename those identifiers without a change that starts at the API contract.
 
 ### Observation outcomes
 

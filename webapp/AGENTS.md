@@ -290,8 +290,7 @@ The record of reviewing one practice for one item is an **observation**.
 One located problem under a Not met observation is a **problem** in code and on screen.
 What a developer receives is **feedback**.
 Use only these three words for them.
-The wire contract, routes and component files still name an observation `result`.
-`docs/contributor/practice-feedback-language.md` § Observations records that exception.
+`docs/contributor/practice-feedback-language.md` § Observations records the exception for observation identifiers.
 
 Changing only the copy is not sufficient.
 The next component inherits a name that stays in the import list.
