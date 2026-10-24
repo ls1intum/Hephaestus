@@ -83,8 +83,10 @@ class PracticeRunnerLiveLlmTest {
 
     @BeforeAll
     static void installPiSdk() throws Exception {
-        // An invalid request limit fails here, before the SDK install, the credentials or any model request.
+        // An invalid request limit or model setting fails here, before the SDK install, the credentials or any model
+        // request.
         ProxyStandIn.requestLimit(System.getProperty(ProxyStandIn.REQUEST_LIMIT_PROPERTY));
+        LiveModelSettings.fromSystemProperties();
         PiSdkInstallation.ensureInstalled();
     }
 
@@ -256,8 +258,11 @@ class PracticeRunnerLiveLlmTest {
     }
 
     private Map<String, String> stageWorkspace(LiveLlmCredentials creds, @Nullable JsonNode scenario) throws Exception {
+        LiveModelSettings settings = LiveModelSettings.fromSystemProperties();
+        System.out.printf("[practice-live] model settings: %s%n", settings);
         PracticeSandboxSpec spec = LiveRunnerWorkspace.adapter()
-                .buildSandboxSpec(LiveRunnerWorkspace.request(creds.model(), "live-test-job-token", Map.of()));
+                .buildSandboxSpec(
+                        LiveRunnerWorkspace.request(creds.model(), "live-test-job-token", Map.of(), settings));
         LiveRunnerWorkspace.stageSpec(WORKSPACE, spec.inputFiles());
         String kind = "scm.pull_request";
         Map<String, JsonNode> definitions;

@@ -207,6 +207,10 @@ val packagedServer = providers.gradleProperty("packagedServer").map(String::toBo
 val criteriaCases = providers.gradleProperty("criteriaCases")
 // Optional ceiling on the upstream model requests that each selected live case sends.
 val criteriaRequestLimit = providers.gradleProperty("criteriaRequestLimit")
+// Optional model settings for selected live cases. The live test validates each value and keeps its
+// default when absent.
+val criteriaModelSettings =
+    listOf("criteriaContextWindow", "criteriaMaxOutputTokens", "criteriaReasoningEffort")
 val testTiers =
     mapOf(
         "test" to "unit",
@@ -359,6 +363,13 @@ for ((taskName, tag) in testTiers.filterKeys { it != "test" }) {
                 "criteriaRequestLimit must be a positive integer, not '$limit'"
             }
             systemProperty("hephaestus.live.criteriaRequestLimit", limit)
+        }
+        if (tag == "live") {
+            for (name in criteriaModelSettings) {
+                val value = providers.gradleProperty(name).orNull ?: continue
+                require(criteriaCases.isPresent) { "$name needs criteriaCases" }
+                systemProperty("hephaestus.live.$name", value)
+            }
         }
     }
 }
