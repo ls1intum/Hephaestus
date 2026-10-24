@@ -92,10 +92,16 @@ class LiquibaseBaselineIntegrationTest {
         TestDatabase database = emptyDatabase();
         execute(database, "CREATE TABLE workspace (id bigint PRIMARY KEY)");
 
-        assertThatThrownBy(() -> update(database, BASELINE, "prod"))
+        Throwable refusal = catchThrowable(() -> update(database, BASELINE, "prod"));
+        assertThat(refusal)
                 .isInstanceOf(LiquibaseException.class)
                 .hasStackTraceContaining(
                         "Existing databases must complete the baseline synchronization runbook before deployment.");
+        // The changeset's own precondition halts the update when it runs, after validation passed.
+        assertThat(new LiquibaseRefusalFailureAnalyzer().analyze(refusal))
+                .extracting(FailureAnalysis::getDescription)
+                .asString()
+                .contains("Existing databases must complete the baseline synchronization runbook before deployment.");
 
         assertThat(query(database, "SELECT count(*)::text FROM databasechangelog"))
                 .containsExactly("0");
@@ -247,7 +253,7 @@ class LiquibaseBaselineIntegrationTest {
                 .hasStackTraceContaining(
                         "install v0.77.4 and start it once, then follow the baseline synchronization runbook");
         // Logs drop exception messages, so the startup failure analysis is where an operator reads the refusal.
-        assertThat(new LiquibaseValidationFailureAnalyzer().analyze(refusal))
+        assertThat(new LiquibaseRefusalFailureAnalyzer().analyze(refusal))
                 .extracting(FailureAnalysis::getDescription)
                 .asString()
                 .contains("install v0.77.4 and start it once, then follow the baseline synchronization runbook");

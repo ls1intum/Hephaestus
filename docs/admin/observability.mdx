@@ -216,8 +216,6 @@ Each exception line carries a hash, so you can count repeated failures of one ki
 
 A record names each exception in a stack trace, including causes and suppressed exceptions, by its class only.
 It contains no `error.message`.
-When the database changelog fails validation at startup, the `APPLICATION FAILED TO START` record gives the reason in its message.
-An example is a database from before v0.77.4 that needs the [baseline synchronization runbook](./liquibase-baseline-runbook.md).
 A database driver quotes rejected row values in its messages, an HTTP client the request URL, and a parser the input that it rejected.
 These boundaries have their own guard:
 
@@ -228,6 +226,10 @@ These boundaries have their own guard:
   The application still logs the exception class and frames, and conflicts still record the SQLSTATE.
 - Tomcat's request parser, `org.apache.coyote.http11.Http11Processor`, logs at `WARN` and above only.
   At `INFO` and `DEBUG` it writes the raw target of a request that it cannot parse, query string included.
+
+When the database migration stops at startup because the changelog fails validation or a changeset precondition fails, the `APPLICATION FAILED TO START` record gives the reason in its message.
+An example is a database from before v0.77.4 that needs the [baseline synchronization runbook](./liquibase-baseline-runbook.md).
+A changeset precondition that cannot run, or a failed migration statement, quotes the driver message, so its record names the exception class only.
 
 The application writes an exception's class, not its message, into its own log messages.
 Sync, provider, webhook and NATS failures log the class with the operation, the status where known, and opaque identifiers.
