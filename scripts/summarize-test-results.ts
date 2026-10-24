@@ -222,7 +222,7 @@ async function main(): Promise<void> {
 	}
 	const files = await xmlFiles(path.resolve(input));
 	const documents = await Promise.all(files.map(async (file) => readFile(file, "utf8")));
-	// Gradle reads the same variable, so the summary names the shard that actually ran.
+	// Gradle selects its shard from this variable too. Set at job level, it names the shard that this job ran.
 	const shard = process.env.HEPHAESTUS_INTEGRATION_SHARD;
 	const summary = summarize(name, documents, shard === "" ? undefined : shard);
 	if ((logPath === undefined) !== (resourcePath === undefined)) {

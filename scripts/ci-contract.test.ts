@@ -704,7 +704,37 @@ void describe("CI contract", () => {
 				/^\$\{\{ matrix\.shard \}\}$/u,
 				`${file} selects the shard through the environment`,
 			);
+			assert.equal(matrix.has("exclude"), false, `${file} skips no shard`);
+			const condition = workflow.getIn([...jobPath, "if"]);
+			assert.ok(condition === undefined || typeof condition === "string");
+			assert.doesNotMatch(condition ?? "", /matrix\./u, `${file} skips no shard`);
+			assert.equal(
+				workflow.getIn([...jobPath, "strategy", "fail-fast"]),
+				false,
+				`${file} profiles every shard when one fails`,
+			);
+			// One heavy runner at a time keeps weekly diagnostics cheap.
+			assert.equal(
+				workflow.getIn([...jobPath, "strategy", "max-parallel"]),
+				1,
+				`${file} profiles one shard at a time`,
+			);
 		}
+		const profile = parseDocument(await readFile(".github/workflows/ci-profile.yml", "utf8"));
+		assert.match(
+			String(profile.getIn(["jobs", "server-integration", "env", "HISTORY_ARTIFACT"])),
+			/\$\{\{ matrix\.shard \}\}/u,
+			"each shard keeps its own history artifact",
+		);
+		const reference = parseDocument(
+			await readFile(".github/workflows/ci-server-clean-reference.yml", "utf8"),
+		);
+		assert.equal(reference.getIn(["jobs", "integration", "needs"]), "verify");
+		assert.match(
+			String(reference.getIn(["jobs", "integration", "if"])),
+			/^\$\{\{ !cancelled\(\) \}\}$/u,
+			"shards start after the cold phase job, even when it fails",
+		);
 	});
 
 	void test("the server package job is the only Gradle cache producer", async () => {

@@ -993,7 +993,7 @@ runners at once.
 The integration tier is profiled one shard at a time, with the shards that
 [Parallelism and concurrency](#parallelism-and-concurrency) defines.
 A run of the whole tier no longer fits in one test task's timeout.
-`scripts/ci-contract.test.ts` keeps the profile matrices equal to the CI matrix.
+The shard list is mirrored in both weekly workflows and pinned to the CI matrix by `scripts/ci-contract.test.ts`.
 
 Each tier retains its JFR recording, Gradle task profile, resource usage and JUnit
 results for 14 days. Verification profiles are diagnostic artifacts, not integration-history samples.
@@ -1043,7 +1043,9 @@ Compare a local shard only with the weekly history of the same shard.
 `SpringTestContextArchitectureTest` enforces the reviewed Spring context keys. The weekly
 **Server Phase Reference** workflow profiles generation, compilation, and unit and architecture execution
 in one job, with the build cache disabled. It compares two clean generated-client JARs.
-Each integration shard then runs in a separate job that compiles from source with the build cache disabled.
+When that job ends, each integration shard runs in a separate job, one at a time.
+Each shard job compiles from source with the build cache disabled.
+The Gradle profile (`--profile`) of each job is the phase breakdown: it lists the time of every task.
 
 ## Running CI locally
 

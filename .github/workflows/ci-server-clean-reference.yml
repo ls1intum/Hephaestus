@@ -65,13 +65,16 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  # The shards and their selectors are CI's (ci-tests.yml). Each job compiles cold before its shard.
+  # The shards mirror the ci-tests.yml matrix, pinned by scripts/ci-contract.test.ts. Each job compiles cold.
   integration:
     name: Profile clean integration (${{ matrix.shard }})
+    needs: verify
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - shard: providers
