@@ -24,8 +24,8 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxTestLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
@@ -145,7 +145,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 List.of("echo", "hello"),
                 Map.of("FOO", "bar"),
                 new NetworkPolicy(allowInternet, null, "test-token"),
-                ResourceLimits.DEFAULT,
+                SandboxTestLimits.ATTEMPT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test prompt".getBytes(UTF_8)),
                 "/workspace/out");
@@ -407,7 +407,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("echo"),
                     Map.of(),
                     new NetworkPolicy(false, null, "token-123"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(".prompt", "test".getBytes(UTF_8)),
                     "/workspace/out");
@@ -444,7 +444,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("echo"),
                     Map.of(),
                     new NetworkPolicy(false, null, "token-123"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(".prompt", "test".getBytes(UTF_8)),
                     "/workspace/out");
@@ -469,7 +469,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("echo"),
                     Map.of(),
                     new NetworkPolicy(false, "http://{appServerIp}:9090/v1", "tok"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(".prompt", "test".getBytes(UTF_8)),
                     "/workspace/out");
@@ -493,7 +493,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("echo"),
                     Map.of(),
                     new NetworkPolicy(false, "https://my-proxy.example.com/api", "test-token"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(".prompt", "test".getBytes(UTF_8)),
                     "/workspace/out");
@@ -543,7 +543,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                             "HOME",
                             "/home/agent"),
                     new NetworkPolicy(false, null, "tok"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(".prompt", "test".getBytes(UTF_8)),
                     "/workspace/out");
@@ -588,7 +588,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("echo"),
                     Map.of(),
                     new NetworkPolicy(false, null, "test-token"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(),
                     files,
@@ -609,7 +609,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("echo"),
                     Map.of(),
                     new NetworkPolicy(false, null, "test-token"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(),
                     "/workspace/out");
@@ -629,7 +629,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("run"),
                     Map.of(),
                     null,
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(),
                     "/workspace/out");
@@ -650,7 +650,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("run"),
                     Map.of(),
                     new NetworkPolicy(false, null, "test-token"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(),
                     "/custom/output");
@@ -861,7 +861,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("echo"),
                     Map.of(),
                     new NetworkPolicy(false, null, "test-token"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     null,
                     Map.of(),
                     "/workspace/out");
@@ -1257,7 +1257,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     List.of("echo"),
                     Map.of("GIT_TERMINAL_PROMPT", "1"),
                     new NetworkPolicy(false, null, "test-token"),
-                    ResourceLimits.DEFAULT,
+                    SandboxTestLimits.ATTEMPT,
                     SecurityProfile.DEFAULT,
                     Map.of(),
                     "/workspace/out");

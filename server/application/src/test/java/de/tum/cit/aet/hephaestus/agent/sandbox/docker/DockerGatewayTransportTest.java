@@ -9,8 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxTestLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
@@ -131,7 +131,7 @@ class DockerGatewayTransportTest extends BaseUnitTest {
                 List.of("sh", "-c", "run-review"),
                 Map.of(),
                 new NetworkPolicy(false, null, "token"),
-                ResourceLimits.DEFAULT,
+                SandboxTestLimits.ATTEMPT,
                 SecurityProfile.DEFAULT,
                 Map.of("task.json", "{}".getBytes(StandardCharsets.UTF_8)),
                 onDisk,
