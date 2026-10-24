@@ -421,6 +421,7 @@ export default defineConfig({
 			"schema:outline": run("node scripts/update-outline-spec.ts"),
 			"schema:nats": run("node scripts/nats-extract-examples.ts"),
 			"report:ci-latency": run("node scripts/report-ci-latency.ts"),
+			"report:delivery": run("node scripts/report-delivery-metrics.ts"),
 			"report:ci-timings": run("node scripts/report-ci-timings.ts"),
 			"report:test-results": run("node scripts/summarize-test-results.ts"),
 			"release:version": run("changeset version && node scripts/sync-release-version.ts"),
