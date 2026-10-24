@@ -1617,7 +1617,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 "The original capture no longer permits composition",
                 Set.of(ReviewJobStatus.RUNNING),
-                "next-worker"));
+                "next-worker",
+                claimed.getAttempt()));
         assertThat(failed).isEqualTo(1);
 
         completion.tick();

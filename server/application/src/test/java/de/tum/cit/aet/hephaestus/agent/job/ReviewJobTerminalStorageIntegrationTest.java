@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult.LlmUsage;
@@ -144,7 +145,8 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                         Instant.now(),
                         null,
                         Set.of(ReviewJobStatus.RUNNING),
-                        "owner")))
+                        "owner",
+                        job.getAttempt())))
                 .isEqualTo(1);
         var stored =
                 jobs.findByIdAndWorkspaceId(job.getId(), job.getWorkspaceId()).orElseThrow();
@@ -163,9 +165,60 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
                         Instant.now(),
                         "failed",
                         Set.of(ReviewJobStatus.RUNNING),
-                        "other")))
+                        "other",
+                        job.getAttempt())))
                 .isZero();
         assertThat(jobs.findById(job.getId()).orElseThrow().getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+    }
+
+    @Test
+    void shouldRefuseATerminalWriteFromAnEarlierAttemptOfTheSameWorker() {
+        var job = running("runtime-terminal-stale");
+        int stale = job.getAttempt();
+        // The sweeper requeued the attempt and the same worker claimed the job again.
+        jdbc.update("UPDATE review_job SET attempt = attempt + 1 WHERE id = ?", job.getId());
+
+        assertThat(transactions.<Integer>execute(status -> jobs.transitionStatusOwnedBy(
+                        job.getId(),
+                        ReviewJobStatus.FAILED,
+                        Instant.now(),
+                        "failed",
+                        Set.of(ReviewJobStatus.RUNNING),
+                        "owner",
+                        stale)))
+                .isZero();
+        assertThat(transactions.<Integer>execute(status -> jobs.transitionToCancelledOwnedBy(
+                        job.getId(),
+                        Instant.now(),
+                        "cancelled",
+                        ReviewJobCancellationReason.DRAIN_IMMEDIATE,
+                        Set.of(ReviewJobStatus.RUNNING),
+                        "owner",
+                        stale)))
+                .isZero();
+        var stored = jobs.findById(job.getId()).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(stored.getAttempt()).isEqualTo(stale + 1);
+    }
+
+    @Test
+    void shouldReportOnlyTheAttemptsThatStillRunOnTheWorker() {
+        var current = running("runtime-custody-current");
+        var requeued = running("runtime-custody-requeued");
+        var cancelled = running("runtime-custody-cancelled");
+        var foreign = running("runtime-custody-foreign");
+        jdbc.update("UPDATE review_job SET attempt = attempt + 1 WHERE id = ?", requeued.getId());
+        jdbc.update("UPDATE review_job SET status = 'CANCELLED' WHERE id = ?", cancelled.getId());
+        jdbc.update("UPDATE review_job SET worker_id = 'other' WHERE id = ?", foreign.getId());
+
+        var owned = jobs.findRunningAttemptsOwnedBy(
+                List.of(current.getId(), requeued.getId(), cancelled.getId(), foreign.getId()), "owner");
+
+        assertThat(owned)
+                .extracting(ReviewJobRepository.RunningAttempt::getId, ReviewJobRepository.RunningAttempt::getAttempt)
+                .containsExactlyInAnyOrder(
+                        tuple(current.getId(), current.getAttempt()),
+                        tuple(requeued.getId(), requeued.getAttempt() + 1));
     }
 
     @Test

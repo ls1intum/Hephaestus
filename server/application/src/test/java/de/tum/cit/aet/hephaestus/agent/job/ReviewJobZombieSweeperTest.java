@@ -319,7 +319,8 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
                             any(),
                             any(),
                             eq(Set.of(ReviewJobStatus.RUNNING)),
-                            eq(DEAD_WORKER_ID)))
+                            eq(DEAD_WORKER_ID),
+                            eq(5)))
                     .thenReturn(1);
 
             sweeper.recoverOrphanedJobs();
@@ -332,7 +333,8 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
                             any(),
                             any(),
                             eq(Set.of(ReviewJobStatus.RUNNING)),
-                            eq(DEAD_WORKER_ID));
+                            eq(DEAD_WORKER_ID),
+                            eq(5));
             verify(usageRecorder, never()).record(any(), any());
             verify(usageRecorder, never()).project(any(), any());
         }

@@ -137,22 +137,24 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses);
 
     /**
-     * Like {@link #transitionStatus}, but a worker whose job was orphan-requeued to a sibling cannot
-     * clobber the sibling's run with its own late terminal write.
+     * Like {@link #transitionStatus}, fenced on the worker and the attempt: a late terminal write of an attempt that was
+     * orphan-requeued cannot end the attempt that runs now, on a sibling or on this same worker.
      *
      * @return rows updated (0 or 1)
      */
     @WorkspaceAgnostic("ID-based fenced transition; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = :newStatus, j.completedAt = :now, j.errorMessage = :error "
-            + "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId")
+            + "WHERE j.id = :id AND j.status IN :fromStatuses AND j.attempt = :attempt "
+            + "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId)")
     int transitionStatusOwnedBy(
             @Param("id") UUID id,
             @Param("newStatus") ReviewJobStatus newStatus,
             @Param("now") Instant now,
             @Param("error") @Nullable String error,
             @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses,
-            @Param("workerId") String workerId);
+            @Param("workerId") @Nullable String workerId,
+            @Param("attempt") int attempt);
 
     /**
      * Unfenced by worker; callers that know the owning worker should prefer
@@ -171,6 +173,23 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             @Param("error") @Nullable String error,
             @Param("reason") ReviewJobCancellationReason reason,
             @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses);
+
+    /** A job's attempt that runs now. */
+    interface RunningAttempt {
+        UUID getId();
+
+        int getAttempt();
+    }
+
+    /**
+     * Of the given jobs, the attempts that still run on this worker. A job that is missing was cancelled, ended, or
+     * requeued; one with another attempt was requeued and claimed again.
+     */
+    @WorkspaceAgnostic("ID-based custody check; job IDs from worker-local execution state")
+    @Query("SELECT j.id AS id, j.attempt AS attempt FROM ReviewJob j "
+            + "WHERE j.id IN :ids AND j.status = 'RUNNING' AND j.workerId = :workerId")
+    List<RunningAttempt> findRunningAttemptsOwnedBy(
+            @Param("ids") Collection<UUID> ids, @Param("workerId") String workerId);
 
     /** The state of a job row that a usage settlement holds: whether the call's attempt is still the running one. */
     interface UsageOwner {
@@ -293,8 +312,8 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     Optional<ReviewJobLlmUsage> findLlmUsageById(@Param("id") UUID id);
 
     /**
-     * Like {@link #transitionToCancelled}, fenced to the owning worker: a draining worker must not
-     * cancel a sibling's run if the job was orphan-requeued out from under it.
+     * Like {@link #transitionToCancelled}, fenced on the owning worker and the attempt: a draining worker must not
+     * cancel a later attempt if the job was orphan-requeued out from under it.
      *
      * @return rows updated (0 or 1)
      */
@@ -302,14 +321,15 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus.CANCELLED, "
             + "j.completedAt = :now, j.errorMessage = :error, j.cancellationReason = :reason "
-            + "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId")
+            + "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId AND j.attempt = :attempt")
     int transitionToCancelledOwnedBy(
             @Param("id") UUID id,
             @Param("now") Instant now,
             @Param("error") @Nullable String error,
             @Param("reason") ReviewJobCancellationReason reason,
             @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses,
-            @Param("workerId") String workerId);
+            @Param("workerId") String workerId,
+            @Param("attempt") int attempt);
 
     @WorkspaceAgnostic("ID-based execution-start fence; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)

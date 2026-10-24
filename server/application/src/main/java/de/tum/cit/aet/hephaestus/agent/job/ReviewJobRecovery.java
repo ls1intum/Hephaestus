@@ -100,7 +100,8 @@ public class ReviewJobRecovery {
                     "The worker stopped this attempt.",
                     cancellation,
                     Set.of(ReviewJobStatus.RUNNING),
-                    workerId);
+                    workerId,
+                    attempt);
         } else {
             changed = jobs.transitionStatusOwnedBy(
                     jobId,
@@ -108,7 +109,8 @@ public class ReviewJobRecovery {
                     now,
                     "The worker that owned this job was lost. The retry limit is reached.",
                     Set.of(ReviewJobStatus.RUNNING),
-                    workerId);
+                    workerId,
+                    attempt);
         }
         if (changed == 0) return Outcome.NONE;
         bill(owned, null, counts);
