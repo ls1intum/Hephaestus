@@ -137,22 +137,21 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses);
 
     /**
-     * Like {@link #transitionStatus}, fenced on the worker and the attempt: a late terminal write of an attempt that was
-     * orphan-requeued cannot end the attempt that runs now, on a sibling or on this same worker.
+     * Ends the RUNNING attempt like {@link #transitionStatus}, fenced on the worker and the attempt: a late terminal write
+     * of an attempt that was orphan-requeued cannot end the attempt that runs now, on a sibling or on this same worker.
      *
      * @return rows updated (0 or 1)
      */
     @WorkspaceAgnostic("ID-based fenced transition; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = :newStatus, j.completedAt = :now, j.errorMessage = :error "
-            + "WHERE j.id = :id AND j.status IN :fromStatuses AND j.attempt = :attempt "
+            + "WHERE j.id = :id AND j.status = 'RUNNING' AND j.attempt = :attempt "
             + "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId)")
     int transitionStatusOwnedBy(
             @Param("id") UUID id,
             @Param("newStatus") ReviewJobStatus newStatus,
             @Param("now") Instant now,
             @Param("error") @Nullable String error,
-            @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses,
             @Param("workerId") @Nullable String workerId,
             @Param("attempt") int attempt);
 
@@ -312,8 +311,8 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     Optional<ReviewJobLlmUsage> findLlmUsageById(@Param("id") UUID id);
 
     /**
-     * Like {@link #transitionToCancelled}, fenced on the owning worker and the attempt: a draining worker must not
-     * cancel a later attempt if the job was orphan-requeued out from under it.
+     * Cancels the RUNNING attempt like {@link #transitionToCancelled}, fenced on the owning worker and the attempt: a
+     * draining worker must not cancel a later attempt if the job was orphan-requeued out from under it.
      *
      * @return rows updated (0 or 1)
      */
@@ -321,13 +320,12 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus.CANCELLED, "
             + "j.completedAt = :now, j.errorMessage = :error, j.cancellationReason = :reason "
-            + "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId AND j.attempt = :attempt")
+            + "WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND j.attempt = :attempt")
     int transitionToCancelledOwnedBy(
             @Param("id") UUID id,
             @Param("now") Instant now,
             @Param("error") @Nullable String error,
             @Param("reason") ReviewJobCancellationReason reason,
-            @Param("fromStatuses") Collection<ReviewJobStatus> fromStatuses,
             @Param("workerId") String workerId,
             @Param("attempt") int attempt);
 

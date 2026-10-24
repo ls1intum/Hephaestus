@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -140,13 +139,7 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         var job = running("runtime-terminal-owner");
         var input = job.getInput();
         assertThat(transactions.<Integer>execute(status -> jobs.transitionStatusOwnedBy(
-                        job.getId(),
-                        ReviewJobStatus.COMPLETED,
-                        Instant.now(),
-                        null,
-                        Set.of(ReviewJobStatus.RUNNING),
-                        "owner",
-                        job.getAttempt())))
+                        job.getId(), ReviewJobStatus.COMPLETED, Instant.now(), null, "owner", job.getAttempt())))
                 .isEqualTo(1);
         var stored =
                 jobs.findByIdAndWorkspaceId(job.getId(), job.getWorkspaceId()).orElseThrow();
@@ -160,13 +153,7 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     void shouldRefuseATerminalWriteFromAnotherWorker() {
         var job = running("runtime-terminal-foreign");
         assertThat(transactions.<Integer>execute(status -> jobs.transitionStatusOwnedBy(
-                        job.getId(),
-                        ReviewJobStatus.FAILED,
-                        Instant.now(),
-                        "failed",
-                        Set.of(ReviewJobStatus.RUNNING),
-                        "other",
-                        job.getAttempt())))
+                        job.getId(), ReviewJobStatus.FAILED, Instant.now(), "failed", "other", job.getAttempt())))
                 .isZero();
         assertThat(jobs.findById(job.getId()).orElseThrow().getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
     }
@@ -179,20 +166,13 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         jdbc.update("UPDATE review_job SET attempt = attempt + 1 WHERE id = ?", job.getId());
 
         assertThat(transactions.<Integer>execute(status -> jobs.transitionStatusOwnedBy(
-                        job.getId(),
-                        ReviewJobStatus.FAILED,
-                        Instant.now(),
-                        "failed",
-                        Set.of(ReviewJobStatus.RUNNING),
-                        "owner",
-                        stale)))
+                        job.getId(), ReviewJobStatus.FAILED, Instant.now(), "failed", "owner", stale)))
                 .isZero();
         assertThat(transactions.<Integer>execute(status -> jobs.transitionToCancelledOwnedBy(
                         job.getId(),
                         Instant.now(),
                         "cancelled",
                         ReviewJobCancellationReason.DRAIN_IMMEDIATE,
-                        Set.of(ReviewJobStatus.RUNNING),
                         "owner",
                         stale)))
                 .isZero();

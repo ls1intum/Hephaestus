@@ -1180,8 +1180,7 @@ public class ReviewJobExecutor {
     // Fence late terminal writes on worker and attempt so they cannot end an attempt that was requeued since.
     private int transitionTerminal(
             UUID jobId, int attempt, ReviewJobStatus status, Instant now, @Nullable String error) {
-        return jobRepository.transitionStatusOwnedBy(
-                jobId, status, now, error, Set.of(ReviewJobStatus.RUNNING), workerId, attempt);
+        return jobRepository.transitionStatusOwnedBy(jobId, status, now, error, workerId, attempt);
     }
 
     // A failed runner's draft can reach delivery only through results the server already admitted.

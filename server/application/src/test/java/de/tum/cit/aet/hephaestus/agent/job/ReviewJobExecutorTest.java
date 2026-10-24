@@ -238,7 +238,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
         assertThat(job.getCompletedAt()).isNull();
         assertThat(job.getExitCode()).isNull();
-        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any(), anyInt());
+        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), anyInt());
         verify(practiceScriptRuns, never()).record(any(), any(), any(), any());
         verify(usageRecorder, never()).project(any(), any());
         verify(kept, never()).forget(any());
@@ -259,7 +259,6 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         eq(ReviewJobStatus.COMPLETED),
                         any(),
                         eq(null),
-                        any(),
                         eq("worker-1"),
                         eq(job.getAttempt())))
                 .thenReturn(1);
@@ -292,7 +291,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
         assertThat(job.getCompletedAt()).isNull();
         assertThat(job.getExitCode()).isNull();
-        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any(), anyInt());
+        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), anyInt());
         verify(usageRecorder, never()).project(any(), any());
         verify(kept, never()).forget(any());
     }
@@ -317,7 +316,6 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         eq(ReviewJobStatus.TIMED_OUT),
                         any(),
                         eq("The container timed out."),
-                        any(),
                         eq("worker-1"),
                         eq(job.getAttempt()));
         verify(usageRecorder).project(eq(job.getWorkspaceId()), any());
@@ -359,7 +357,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         when(jobs.lockById(job.getId())).thenReturn(Optional.of(job));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
         when(jobs.transitionStatusOwnedBy(
-                        eq(job.getId()), eq(status), any(), any(), any(), eq("worker-1"), eq(job.getAttempt())))
+                        eq(job.getId()), eq(status), any(), any(), eq("worker-1"), eq(job.getAttempt())))
                 .thenReturn(1);
     }
 
@@ -668,7 +666,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         capacity = Optional.of(workerCapacity);
         when(jobs.findByIdQueuedForUpdateSkipLocked(any(), any())).thenReturn(Optional.of(job));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
-        when(jobs.transitionStatusOwnedBy(any(), any(), any(), any(), any(), isNull(), anyInt()))
+        when(jobs.transitionStatusOwnedBy(any(), any(), any(), any(), isNull(), anyInt()))
                 .thenReturn(1);
         when(policy.permitsReview(job)).thenReturn(true);
         var binding = mock(WorkspaceAgentBinding.class);
@@ -724,7 +722,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         capacity = Optional.of(workerCapacity);
         when(jobs.findByIdQueuedForUpdateSkipLocked(any(), any())).thenReturn(Optional.of(job));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
-        when(jobs.transitionStatusOwnedBy(any(), any(), any(), any(), any(), isNull(), anyInt()))
+        when(jobs.transitionStatusOwnedBy(any(), any(), any(), any(), isNull(), anyInt()))
                 .thenReturn(1);
         when(policy.permitsReview(job)).thenReturn(true);
         var binding = mock(WorkspaceAgentBinding.class);
@@ -798,7 +796,6 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         eq(ReviewJobStatus.COMPLETED),
                         any(),
                         eq(null),
-                        any(),
                         isNull(),
                         eq(job.getAttempt()));
         verify(handler).completeWithoutExecution(job);

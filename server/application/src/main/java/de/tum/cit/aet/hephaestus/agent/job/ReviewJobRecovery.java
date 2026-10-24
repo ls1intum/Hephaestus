@@ -95,20 +95,13 @@ public class ReviewJobRecovery {
                     jobId, workerId, attempt, now, ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
         } else if (cancellation != null) {
             changed = jobs.transitionToCancelledOwnedBy(
-                    jobId,
-                    now,
-                    "The worker stopped this attempt.",
-                    cancellation,
-                    Set.of(ReviewJobStatus.RUNNING),
-                    workerId,
-                    attempt);
+                    jobId, now, "The worker stopped this attempt.", cancellation, workerId, attempt);
         } else {
             changed = jobs.transitionStatusOwnedBy(
                     jobId,
                     ReviewJobStatus.FAILED,
                     now,
                     "The worker that owned this job was lost. The retry limit is reached.",
-                    Set.of(ReviewJobStatus.RUNNING),
                     workerId,
                     attempt);
         }
