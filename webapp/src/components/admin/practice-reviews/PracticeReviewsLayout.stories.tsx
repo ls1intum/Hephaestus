@@ -42,7 +42,7 @@ const SCOPED: ResultsSearch = {
 
 function ResultsTab({ search }: { search: ResultsSearch }) {
 	return (
-		<section aria-label="Practice results" className="space-y-4">
+		<section aria-label="Practice observations" className="space-y-4">
 			<ResultFilters
 				search={search}
 				onPatch={fn()}
@@ -53,7 +53,7 @@ function ResultsTab({ search }: { search: ResultsSearch }) {
 				people={STORY_PEOPLE}
 				total={7}
 			/>
-			<p className="text-sm text-muted-foreground">The results render here.</p>
+			<p className="text-sm text-muted-foreground">The observations render here.</p>
 		</section>
 	);
 }

@@ -166,7 +166,7 @@ export function reviewReasonSentence(code: string | null): string | undefined {
 		: undefined;
 }
 
-/** Where one practice stands inside one review. Withheld is a decision with a reason, not a result. */
+/** Where one practice stands inside one review. Withheld is a decision with a reason, not an observation. */
 export const REVIEW_PRACTICE_STATUS_DEFS: StatusDefs<ReviewPracticeStatus> = {
 	QUEUED: {
 		label: "Queued",

@@ -16,7 +16,7 @@ const thinControllers = countsOf("thin-controllers");
 const productLanguage = countsOf("product-language");
 
 /**
- * The Results tab narrowed to one practice: the practice's counts over the chosen days, above its
+ * The Observations tab narrowed to one practice: the practice's counts over the chosen days, above its
  * rows. A practice with no result in those days says so instead of showing zeros.
  */
 const meta = {

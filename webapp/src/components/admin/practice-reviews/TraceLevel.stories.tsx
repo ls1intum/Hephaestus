@@ -348,7 +348,7 @@ export const RichReviewOverview: Story = {
 		docs: {
 			description: {
 				story:
-					"Deterministic UI example with 24 results and 12 Problems. These records and the imported usage display are synthetic story data, not a live model review.",
+					"Deterministic UI example with 24 observations and 12 Problems. These records and the imported usage display are synthetic story data, not a live model review.",
 			},
 		},
 	},

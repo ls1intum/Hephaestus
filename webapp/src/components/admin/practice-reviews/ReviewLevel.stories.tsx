@@ -163,7 +163,7 @@ if (firstPractice === undefined || secondPractice === undefined) {
 }
 
 /**
- * Each finished practice's counts open the Results tab at exactly that practice's results of this
+ * Each finished practice's counts open the Observations tab at exactly that practice's observations of this
  * review and that outcome, and its problems where it has a Not met result. Each link is named for
  * its practice too, since the same count can stand on several rows.
  */
@@ -323,7 +323,7 @@ export const ActiveUsageNotRecordedYet: Story = {
 
 /**
  * The review's feedback counts open the Feedback tab at exactly this review's feedback in that
- * delivery family, as its result counts open the Results tab. Each count carries its family's mark.
+ * delivery family, as its observation counts open the Observations tab. Each count carries its family's mark.
  */
 export const FeedbackCountsOpenTheirFeedback: Story = {
 	args: {
@@ -783,7 +783,7 @@ export const ReadyAfterItsScriptRan: Story = {
 		await expect(row).not.toBeNull();
 		await expect(row).toHaveTextContent("Ready");
 		await expect(row).not.toHaveTextContent(/It runs next/u);
-		await expect(row).toHaveTextContent(/returned a result/u);
+		await expect(row).toHaveTextContent(/returned a candidate observation/u);
 	},
 };
 

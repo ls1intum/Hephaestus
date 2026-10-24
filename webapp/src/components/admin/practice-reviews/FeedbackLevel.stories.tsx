@@ -546,7 +546,7 @@ export const Restored: Story = {
 		const events = history(panelElement);
 		events.getByText("Withdrawn");
 		events.getByText("Restored");
-		events.getByText(/The result stands after all/u);
+		events.getByText(/The observation stands after all/u);
 		await expect(
 			within(panelElement).getByRole("button", { name: "Withdraw feedback" }),
 		).toBeEnabled();

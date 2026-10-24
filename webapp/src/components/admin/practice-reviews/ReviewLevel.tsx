@@ -309,7 +309,7 @@ function CountLink({
 }
 
 /**
- * Results by outcome, each opening the Results tab at exactly those results: the review's, or one
+ * Results by outcome, each opening the Observations tab at exactly those observations: the review's, or one
  * of its practices'. The words name only the outcome, since the fact or the row already says whose
  * results they are. Problems sit under Not met results and are not counted here: the link opens
  * them without a figure the sheet does not hold.

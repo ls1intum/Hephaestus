@@ -102,9 +102,9 @@ const COLUMN_INFO = {
 		"Every observation the reviews recorded about this practice in the range: met, not met, does not apply and could not determine.",
 	notMet:
 		"The observations of this practice whose outcome was not met, out of all its observations.",
-	doesNotApply: `The results where the practice did not apply to the work, out of all its results. From ${minimumResults} results, a practice where ${Math.round(neverAppliesShare * 100)}% or more do not apply is marked "${PRACTICE_MARKER_DEFS.NEVER_APPLIES.label}".`,
-	couldNotDetermine: `The results where the review could not decide, out of all its results. From ${minimumResults} results, a practice where ${Math.round(oftenUndecidedShare * 100)}% or more could not be determined is marked "${PRACTICE_MARKER_DEFS.OFTEN_UNDECIDED.label}".`,
-	markedIncorrect: `The results an admin marked incorrect, out of all its results. They keep their outcome too. ${MARKED_INCORRECT.note}`,
+	doesNotApply: `The observations where the practice did not apply to the work, out of all its observations. From ${minimumResults} observations, a practice where ${Math.round(neverAppliesShare * 100)}% or more do not apply is marked "${PRACTICE_MARKER_DEFS.NEVER_APPLIES.label}".`,
+	couldNotDetermine: `The observations where the review could not decide, out of all its observations. From ${minimumResults} observations, a practice where ${Math.round(oftenUndecidedShare * 100)}% or more could not be determined is marked "${PRACTICE_MARKER_DEFS.OFTEN_UNDECIDED.label}".`,
+	markedIncorrect: `The observations an admin marked incorrect, out of all its observations. They keep their outcome too. ${MARKED_INCORRECT.note}`,
 	feedbackDelivered:
 		"The feedback about this practice that reached the developer, out of all the feedback composed about it in the range: delivered, waiting, withheld, rejected or failed. A piece replaced by a newer one is not counted.",
 } as const;

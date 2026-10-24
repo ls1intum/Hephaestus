@@ -376,19 +376,20 @@ function resultVerdict(records: LineageRecords, result: LineageResult): TraceVer
 				};
 			}
 			return {
-				sentence: "The practice was not met, but no feedback was written.",
+				sentence:
+					"The practice was not met, but no feedback was written, so the developer was not told.",
 				end: end("lost", "no feedback was written from it"),
 			};
 		}
 		case "MET": {
 			return {
-				sentence: "The practice was met and led to no feedback.",
+				sentence: "The practice was met, so no feedback was written.",
 				end: end("none", "it was met, so nothing had to be sent"),
 			};
 		}
 		case "DOES_NOT_APPLY": {
 			return {
-				sentence: "This practice did not apply to the work, so the observation led to no feedback.",
+				sentence: "The practice did not apply to the work, so no feedback was written.",
 				end: end("none", "the practice did not apply"),
 			};
 		}

@@ -58,7 +58,7 @@ export function reviewReach(saw: ReviewSaw): string {
 	const decided = outcomes
 		.map(
 			(outcome, index) =>
-				`${index === 0 ? count(outcome.n, "observation", "observations", digits) : spell(outcome.n, digits)} ${outcome.verb}`,
+				`${index === 0 ? count(outcome.n, "practice", "practices", digits) : spell(outcome.n, digits)} ${outcome.verb}`,
 		)
 		.join(", ");
 	const reach =

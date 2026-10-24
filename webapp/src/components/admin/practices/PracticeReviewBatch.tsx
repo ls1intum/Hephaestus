@@ -431,7 +431,7 @@ function HistorySection({ batches, isLoading }: { batches: ReviewBatch[]; isLoad
 							<ItemDescription>
 								{batch.status === "CANCELLED"
 									? `Stopped after reviewing ${countOf(batch.submittedCount, batch.itemKind)}.`
-									: `Reviewed ${countOf(batch.submittedCount, batch.itemKind)}. ${batch.skippedCount} needed no new result.${
+									: `Reviewed ${countOf(batch.submittedCount, batch.itemKind)}. ${batch.skippedCount} needed no new observation.${
 											batch.failedCount > 0
 												? ` ${batch.failedCount} could not be read, so were not reviewed.`
 												: ""

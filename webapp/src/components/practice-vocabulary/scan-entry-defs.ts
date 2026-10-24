@@ -26,7 +26,7 @@ export const SCAN_ENTRY_DEFS: StatusDefs<ScanEntryStatus> = {
 		label: "Reviewed",
 		icon: FileCheck2Icon,
 		badgeVariant: "secondary",
-		description: "Reviewed in this scan. The outcome beside it is this scan’s observation.",
+		description: "Reviewed in this scan. The outcome beside it comes from this scan’s observation.",
 	},
 	REUSED: {
 		label: "Reused",

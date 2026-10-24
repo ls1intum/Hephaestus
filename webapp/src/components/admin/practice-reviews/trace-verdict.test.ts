@@ -129,7 +129,8 @@ describe("traceVerdict on a review", () => {
 describe("traceVerdict on a result", () => {
 	it("says a not met result with no feedback left the developer untold", () => {
 		expect(verdictOf("not-met-silent", resultNode(STATE_RESULT_ID))).toMatchObject({
-			sentence: "The practice was not met, but no feedback was written.",
+			sentence:
+				"The practice was not met, but no feedback was written, so the developer was not told.",
 			end: { kind: "lost" },
 		});
 	});
