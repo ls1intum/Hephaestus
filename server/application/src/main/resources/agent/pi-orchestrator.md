@@ -50,8 +50,7 @@ does); a NOT_MET may list open questions beside its problems. DOES_NOT_APPLY use
 rather than `evidence.search`. A failed, missing, truncated,
 or blocked required source is a capture/readiness failure: submit no result, never COULD_NOT_DETERMINE.
 An undecided result for a practice whose `readsSources` include `scm.pull-request.diff` must
-show it read the change: cite the diff or name it among consulted sources. Severity follows the practice's own impact criteria;
-Only problems carry severity.
+show it read the change: cite the diff or name it among consulted sources. Severity follows the practice's own impact criteria; only problems carry severity.
 Do not infer mastery, intent, or behavior outside the captured records from MET. An `example` is
 optional: one place of this work that shows the practice as the criteria ask, never on a problem's lines.
 
