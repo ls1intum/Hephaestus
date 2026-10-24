@@ -1818,11 +1818,13 @@ void describe("CI contract", () => {
 		const source = await readFile(".github/workflows/cicd.yml", "utf8");
 		const orchestrator = parseDocument(source);
 		const condition = String(orchestrator.getIn(["jobs", "Supported-host-smoke", "if"]));
-		// A fork publishes no images, so there is nothing for this job to pull.
-		assert.match(condition, /needs\.detect-changes\.outputs\.previews == 'true'/u);
+		// A fork publishes no images, so there is nothing for this job to pull. The smoke selects the
+		// image builds itself, so it does not wait for a preview label.
+		assert.match(condition, /github\.event_name == 'pull_request'/u);
+		assert.match(condition, /needs\.detect-changes\.outputs\.publishable == 'true'/u);
 		assert.match(
-			String(orchestrator.getIn(["jobs", "detect-changes", "outputs", "previews"])),
-			/github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository/u,
+			String(orchestrator.getIn(["jobs", "detect-changes", "outputs", "images"])),
+			/steps\.filter\.outputs\.supported-host-smoke == 'true'/u,
 		);
 		assert.match(condition, /needs\.detect-changes\.outputs\.supported-host-smoke == 'true'/u);
 

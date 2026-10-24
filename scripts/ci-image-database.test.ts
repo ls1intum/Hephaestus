@@ -58,10 +58,17 @@ void test("one advisory snapshot is selected for every image-policy consumer, no
 		"postgres-image",
 		"docker-config",
 	]) {
-		assert.ok(runs("vulnerability-database", { publishable: "true", [flag]: "true" }), flag);
 		assert.ok(
-			!runs("vulnerability-database", { publishable: "false", [flag]: "true" }),
+			runs("vulnerability-database", { publishable: "true", images: "true", [flag]: "true" }),
+			flag,
+		);
+		assert.ok(
+			!runs("vulnerability-database", { publishable: "false", images: "true", [flag]: "true" }),
 			`unpublished ${flag}`,
+		);
+		assert.ok(
+			!runs("vulnerability-database", { publishable: "true", images: "false", [flag]: "true" }),
+			`${flag} without images`,
 		);
 	}
 	for (const flag of ["release-preflight", "release-images"]) {
@@ -71,9 +78,10 @@ void test("one advisory snapshot is selected for every image-policy consumer, no
 			`duplicate ${flag}`,
 		);
 	}
-	assert.ok(!runs("vulnerability-database", { publishable: "true", previews: "true" }));
+	assert.ok(!runs("vulnerability-database", { publishable: "true", images: "true" }));
 	const fork = {
 		publishable: "false",
+		images: "true",
 		"all-images": "true",
 		"any-code": "true",
 		"release-images": "true",
@@ -94,7 +102,19 @@ void test("one advisory snapshot is selected for every image-policy consumer, no
 			assert.ok(!runs(job, fork, { "detect-changes": "failure" }), `${job}: no selection`);
 		}
 	}
-	assert.ok(runs("Docker", { previews: "true" }, { "vulnerability-database": "skipped" }));
+	assert.ok(
+		runs(
+			"Docker",
+			{ images: "true", "head-images": "true" },
+			{ "vulnerability-database": "skipped" },
+		),
+	);
+	for (const job of ["Docker", "application-server-image"]) {
+		assert.ok(
+			!runs(job, { "any-code": "true", "all-images": "true", images: "false" }),
+			`${job} without images`,
+		);
+	}
 	assert.ok(!runs("application-server-image", fork, { "server-package": "failure" }));
 	assert.ok(!runs("application-server-image", fork, { "server-package": "skipped" }));
 	assert.ok(runs("Release-preflight", { "release-preflight": "true" }));
@@ -203,4 +223,55 @@ void test("snapshot identity comes from the producer, not the consumer attempt, 
 	const needs = main.getIn(["jobs", "all-ci-passed", "needs"]);
 	assert.ok(isSeq(needs));
 	assert.ok(needs.items.some((item) => isScalar(item) && item.value === "vulnerability-database"));
+});
+
+// A pull request's image builds feed its preview, the host boot smoke and release evidence. Every
+// other image change is built by the merge group before it lands.
+void test("a pull request builds images only for its preview, the host boot smoke or a release", () => {
+	const outputs = main.getIn(["jobs", "detect-changes", "outputs"]);
+	assert.ok(isMap(outputs));
+	const repository = "hephaestus-build/Hephaestus";
+	const evaluate = (
+		name: string,
+		event: string,
+		{ head = repository, optedIn = "", smoke = "false", release = "false" } = {},
+	) => {
+		const template = String(outputs.get(name));
+		const expression = /^\$\{\{(?<body>[\s\S]+)\}\}$/u.exec(template)?.groups?.body;
+		assert.ok(expression !== undefined, name);
+		const context: unknown = JSON.parse(
+			JSON.stringify({
+				github: {
+					event_name: event,
+					repository,
+					event: { pull_request: { head: { repo: { full_name: head } } } },
+				},
+				steps: {
+					preview: { outputs: { "opted-in": optedIn } },
+					filter: { outputs: { "supported-host-smoke": smoke } },
+					release_candidate: { outputs: { "release-candidate": release } },
+				},
+			}),
+			data.reviver,
+		);
+		assert.ok(context instanceof data.Dictionary);
+		const parsed = new Parser(new Lexer(expression).lex().tokens, ["github", "steps"], []).parse();
+		return new Evaluator(parsed, context).evaluate().coerceString() === "true";
+	};
+	for (const [event, options, images, head] of [
+		["pull_request", { optedIn: "false" }, false, false],
+		["pull_request", { optedIn: "true" }, true, true],
+		// An unreadable label builds the images rather than withholding a requested preview.
+		["pull_request", { optedIn: "" }, true, true],
+		["pull_request", { optedIn: "false", smoke: "true" }, true, true],
+		["pull_request", { optedIn: "false", release: "true" }, true, false],
+		["pull_request", { head: "fork/Hephaestus", smoke: "true" }, false, false],
+		["merge_group", {}, true, false],
+		["push", {}, true, false],
+		["workflow_dispatch", {}, true, false],
+	] as const) {
+		const label = `${event} ${JSON.stringify(options)}`;
+		assert.equal(evaluate("images", event, options), images, `images: ${label}`);
+		assert.equal(evaluate("head-images", event, options), head, `head-images: ${label}`);
+	}
 });
