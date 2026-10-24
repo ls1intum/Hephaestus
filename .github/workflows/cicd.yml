@@ -39,6 +39,9 @@ jobs:
       webapp-image: ${{ steps.filter.outputs.webapp-image }}
       extension: ${{ steps.filter.outputs.extension }}
       application-server: ${{ steps.filter.outputs.application-server }}
+      # A pull request runs the integration shards whose packages it changed. Every other event runs
+      # all of them, so the merge group verifies the whole tier before main. ci-cd.mdx § Integration shards.
+      integration-shards: ${{ steps.shards.outputs.shards }}
       tooling: ${{ steps.filter.outputs.tooling }}
       application-server-image: ${{ steps.filter.outputs.application-server-image == 'true' || steps.filter.outputs.docker-config == 'true' || steps.filter.outputs.build-config == 'true' }}
       e2e: ${{ steps.filter.outputs.e2e }}
@@ -241,7 +244,7 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-            application-server:
+            application-server: &application-server
               - 'server/**'
               - 'scripts/e2e-identity-seed-database.ts'
               - 'scripts/e2e-setup.ts'
@@ -258,6 +261,28 @@ jobs:
               - 'docker/preview/compose.app.yaml'
               - '!server/**/AGENTS.md'
               - '!server/**/CLAUDE.md'
+            # Integration shards by the test packages build.gradle.kts assigns them. A server change
+            # outside a package directory, such as a resource, a build file or the root package,
+            # selects every shard.
+            integration-all:
+              - *application-server
+              - '!server/application/src/*/java/de/tum/cit/aet/hephaestus/*/**'
+            integration-providers:
+              - 'server/application/src/*/java/de/tum/cit/aet/hephaestus/integration/**'
+            integration-runtime-and-startup:
+              - 'server/application/src/*/java/de/tum/cit/aet/hephaestus/core/database/**'
+              - 'server/application/src/*/java/de/tum/cit/aet/hephaestus/core/privacy/**'
+              - 'server/application/src/*/java/de/tum/cit/aet/hephaestus/agent/job/**'
+            integration-practices-and-agent:
+              - 'server/application/src/*/java/de/tum/cit/aet/hephaestus/practices/**'
+              - 'server/application/src/*/java/de/tum/cit/aet/hephaestus/agent/**'
+            integration-application:
+              - 'server/application/src/*/java/de/tum/cit/aet/hephaestus/*/**'
+              - '!server/application/src/*/java/de/tum/cit/aet/hephaestus/integration/**'
+              - '!server/application/src/*/java/de/tum/cit/aet/hephaestus/core/database/**'
+              - '!server/application/src/*/java/de/tum/cit/aet/hephaestus/core/privacy/**'
+              - '!server/application/src/*/java/de/tum/cit/aet/hephaestus/practices/**'
+              - '!server/application/src/*/java/de/tum/cit/aet/hephaestus/agent/**'
             tooling:
               - '.vale/**'
               - '.vale.ini'
@@ -484,6 +509,26 @@ jobs:
               - 'scripts/run-gradlew.ts'
               - '.github/workflows/ci-quality-gates.yml'
               - '.github/workflows/ci-quality-leg.yml'
+
+      - name: Select the integration shards
+        id: shards
+        env:
+          ALL: ${{ github.event_name != 'pull_request' || steps.filter.outputs.integration-all == 'true' || steps.filter.outputs.test-config == 'true' }}
+          PROVIDERS: ${{ steps.filter.outputs.integration-providers }}
+          RUNTIME_AND_STARTUP: ${{ steps.filter.outputs.integration-runtime-and-startup }}
+          PRACTICES_AND_AGENT: ${{ steps.filter.outputs.integration-practices-and-agent }}
+          APPLICATION: ${{ steps.filter.outputs.integration-application }}
+        run: |
+          set -euo pipefail
+          shards='[]'
+          for entry in providers:PROVIDERS runtime-and-startup:RUNTIME_AND_STARTUP \
+            practices-and-agent:PRACTICES_AND_AGENT application:APPLICATION; do
+            selected=${entry#*:}
+            if [ "$ALL" = true ] || [ "${!selected}" = true ]; then
+              shards=$(jq -c --arg shard "${entry%%:*}" '. + [$shard]' <<< "$shards")
+            fi
+          done
+          echo "shards=$shards" >> "$GITHUB_OUTPUT"
 
   # `Actionlint` is a required context, and a required context that skips still satisfies the
   # ruleset — docs/contributor/ci-cd.mdx § Merge policy says why.
@@ -848,6 +893,7 @@ jobs:
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.test-config == 'true' || needs.detect-changes.outputs.unfiltered == 'true') && 'true' || 'false' }}
+      integration_shards: ${{ needs.detect-changes.outputs.integration-shards }}
 
   Changesets:
     if: github.event_name == 'pull_request'

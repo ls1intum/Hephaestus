@@ -36,7 +36,7 @@ function job(source: string, name: string): string {
 
 function pathFilter(source: string, name: string): string {
 	const match = new RegExp(
-		`^            ${name}:\\n(?:[\\s\\S]*?)(?=^            [\\w-]+:\\s*$)`,
+		`^            ${name}:(?: &[\\w-]+)?\\n(?:[\\s\\S]*?)(?=^            [\\w-]+:(?: &[\\w-]+)?\\s*$)`,
 		"mu",
 	).exec(source);
 	assert.ok(match, `Missing ${name} path filter`);
@@ -662,17 +662,123 @@ void describe("CI contract", () => {
 		assert.match(action, /gradle\/actions\/setup-gradle@/u);
 		assert.doesNotMatch(action, /cache-type|\.m2/u);
 		const workflow = parseDocument(await readFile(".github/workflows/ci-tests.yml", "utf8"));
-		const matrix = workflow.getIn(["jobs", "server-integration", "strategy", "matrix"]);
-		assert.ok(isMap(matrix));
-		assert.deepEqual(matrixValues(matrix, "shard"), [
-			"providers",
-			"runtime-and-startup",
-			"practices-and-agent",
-			"application",
-		]);
 		assert.equal(
 			runScript(workflow, ["jobs", "server-verification"], "Verify test tier and shard discovery"),
 			"vp run test:server:selection",
+		);
+	});
+
+	void test("a pull request runs the integration shards it affects, and every other event all of them", async () => {
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const workflow = parseDocument(source);
+		const filters = asRecord(
+			parseDocument(
+				asString(
+					step(workflow, ["jobs", "detect-changes"], "dorny/paths-filter").get("filters"),
+					"filters",
+				),
+			).toJS(),
+			"filters",
+		);
+		// dorny/paths-filter with some-with-excludes: an anchored list nests, a `!` pattern vetoes.
+		const selects = (filter: string, file: string): boolean => {
+			const patterns = asArray(filters[filter], filter).flat(Infinity).map(String);
+			const matches = (pattern: string) => minimatch(file, pattern, { dot: true });
+			return (
+				patterns.some((pattern) => !pattern.startsWith("!") && matches(pattern)) &&
+				!patterns.some((pattern) => pattern.startsWith("!") && matches(pattern.slice(1)))
+			);
+		};
+		const selection = namedStep(
+			workflow,
+			["jobs", "detect-changes"],
+			"Select the integration shards",
+		);
+		const environment = selection.get("env");
+		assert.ok(isMap(environment));
+		const shardsFor = async (event: string, files: string[]): Promise<string[]> => {
+			const outputs = Object.fromEntries(
+				Object.keys(filters).map((filter) => [
+					filter,
+					String(files.some((file) => selects(filter, file))),
+				]),
+			);
+			const context: unknown = JSON.parse(
+				JSON.stringify({ github: { event_name: event }, steps: { filter: { outputs } } }),
+				data.reviver,
+			);
+			assert.ok(context instanceof data.Dictionary);
+			const variables = Object.fromEntries(
+				environment.items.map((pair) => {
+					const expression = /^\$\{\{ (?<body>.+) \}\}$/u.exec(String(pair.value))?.groups?.body;
+					assert.ok(isSet(expression));
+					const parsed = new Parser(
+						new Lexer(expression).lex().tokens,
+						["github", "steps"],
+						[],
+					).parse();
+					return [String(pair.key), new Evaluator(parsed, context).evaluate().coerceString()];
+				}),
+			);
+			const run = await runStep(String(selection.get("run")), variables);
+			assert.equal(run.failed, false, run.diagnosis);
+			return asArray(JSON.parse(run.outputs.shards ?? ""), "shards").map(String);
+		};
+
+		const all = ["providers", "runtime-and-startup", "practices-and-agent", "application"];
+		const gradle = await readFile("server/application/build.gradle.kts", "utf8");
+		const inventories = /val integrationInventories =\s+mapOf\((?<body>[^)]*)\)/u.exec(gradle)
+			?.groups?.body;
+		assert.ok(isSet(inventories));
+		assert.deepEqual(
+			[...inventories.matchAll(/to "(?<shard>[\w-]+)"/gu)].map((match) => match.groups?.shard),
+			all,
+			"The selection names every shard build.gradle.kts defines",
+		);
+		const java = "server/application/src/main/java/de/tum/cit/aet/hephaestus";
+		const tests = "server/application/src/test/java/de/tum/cit/aet/hephaestus";
+		for (const [files, expected] of [
+			[[`${java}/integration/scm/github/Sync.java`], ["providers"]],
+			[[`${tests}/practices/review/ReviewIntegrationTest.java`], ["practices-and-agent"]],
+			[[`${java}/agent/job/JobRunner.java`], ["runtime-and-startup", "practices-and-agent"]],
+			[[`${java}/core/database/Migrations.java`], ["runtime-and-startup"]],
+			[[`${java}/workspace/WorkspaceService.java`], ["application"]],
+			[
+				[`${java}/workspace/A.java`, `${java}/integration/B.java`],
+				["providers", "application"],
+			],
+			// Outside a package directory: the root package, resources, build files.
+			[[`${java}/Application.java`], all],
+			[["server/application/src/main/resources/application.yml"], all],
+			[["server/application/build.gradle.kts"], all],
+			[["pnpm-lock.yaml"], all],
+			[[".github/workflows/ci-tests.yml"], all],
+			[["webapp/src/main.tsx"], []],
+			[["server/application/AGENTS.md"], []],
+		] as const) {
+			assert.deepEqual(await shardsFor("pull_request", [...files]), expected, files.join(", "));
+		}
+		for (const event of ["merge_group", "push", "workflow_dispatch"]) {
+			assert.deepEqual(await shardsFor(event, [`${java}/integration/B.java`]), all, event);
+		}
+
+		assert.equal(
+			workflow.getIn(["jobs", "detect-changes", "outputs", "integration-shards"]),
+			`\${{ steps.shards.outputs.shards }}`,
+		);
+		assert.equal(
+			workflow.getIn(["jobs", "Test", "with", "integration_shards"]),
+			`\${{ needs.detect-changes.outputs.integration-shards }}`,
+		);
+		const suites = parseDocument(await readFile(".github/workflows/ci-tests.yml", "utf8"));
+		assert.equal(
+			suites.getIn(["jobs", "server-integration", "strategy", "matrix", "shard"]),
+			`\${{ fromJSON(inputs.integration_shards) }}`,
+		);
+		// An empty matrix fails the job, so no selected shard skips it instead.
+		assert.match(
+			String(suites.getIn(["jobs", "server-integration", "if"])),
+			/inputs\.integration_shards != '\[\]'/u,
 		);
 	});
 

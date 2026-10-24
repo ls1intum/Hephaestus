@@ -754,6 +754,30 @@ previews need every image at the head SHA. No other event has a preview.
 `docker/agents/**` is in both the tooling and the agent-image filters: `test:agents` and
 `typecheck:agents` cover the practice script tree, and the same tree builds the agent image.
 
+### Integration shards
+
+A pull request runs only the integration shards whose test packages it changes.
+`build.gradle.kts` assigns each shard its packages:
+
+- `providers`: `integration`.
+- `runtime-and-startup`: `core.database`, `core.privacy` and `agent.job`.
+- `practices-and-agent`: `practices` and `agent`.
+- `application`: every other package.
+
+A change to `agent.job` selects both of its shards.
+A server change outside a package directory selects every shard. Examples are a resource, a build
+file, the root package or a root package file.
+A change to `ci-tests.yml` or to the setup actions it uses also selects every shard.
+Unit and architecture tests, and the shard partition check, always run.
+
+A merge group, a push and a dispatch run every shard. Main changes only through the merge
+queue, and the queue runs the same required checks on the merged result
+([GitHub: managing a merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue)).
+Thus, the whole integration tier still guards main.
+A pull request's shard verdict is early feedback for its author.
+A cross-package failure that the selection misses removes the entry from the queue.
+`ci-contract.test.ts` runs the selection step against sample paths.
+
 ## Docker layer caching
 
 Dockerfile builds import `<image>:cache-main-<platform>` from `ghcr.io` and write it, with every
