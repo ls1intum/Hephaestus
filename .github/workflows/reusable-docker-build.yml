@@ -303,26 +303,29 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+      # The artifact carries its platform directory, because a download extracts one matched
+      # artifact into its path but several into one subdirectory each.
       - name: Export digest
         if: inputs.publish
         env:
           DOCKERFILE_DIGEST: ${{ steps.build.outputs.digest }}
           BUILDPACKS_DIGEST: ${{ steps.build-buildpacks.outputs.digest }}
+          PLATFORM_PAIR: ${{ steps.prep.outputs.platform_pair }}
         run: |
-          mkdir -p ${{ runner.temp }}/digests
+          mkdir -p "$RUNNER_TEMP/digests/$PLATFORM_PAIR"
           digest="${BUILDPACKS_DIGEST:-$DOCKERFILE_DIGEST}"
           if [ -z "$digest" ]; then
             echo "::error::No digest produced by either build path"
             exit 1
           fi
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+          touch "$RUNNER_TEMP/digests/$PLATFORM_PAIR/${digest#sha256:}"
 
       - name: Upload digest
         if: inputs.publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: digests-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
-          path: ${{ runner.temp }}/digests/*
+          path: ${{ runner.temp }}/digests
           if-no-files-found: error
           retention-days: 1
 
@@ -354,6 +357,7 @@ jobs:
         with:
           path: ${{ runner.temp }}/digests
           pattern: digests-${{ steps.prep.outputs.image_name }}-*
+          merge-multiple: true
 
       # Caller-selected registry, not GHCR-only; see ci-cd.mdx § Shared setup actions.
       - name: Log in to Container Registry
@@ -386,11 +390,10 @@ jobs:
           (( ${#platforms[@]} > 0 && ${#entries[@]} == ${#platforms[@]} )) || exit 1
           args=(--tag "$STAGING_IMAGE" --metadata-file "$RUNNER_TEMP/merged-image.json")
           expected='[]'
-          image_pair="${INPUTS_IMAGE_NAME//\//-}"
           for platform in "${platforms[@]}"; do
             [[ "$platform" =~ ^linux/(amd64|arm64)$ ]] || exit 1
             arch="${platform#linux/}"
-            files=("digests-$image_pair-linux-$arch"/*)
+            files=("linux-$arch"/*)
             (( ${#files[@]} == 1 )) || exit 1
             [[ -f "${files[0]}" && ! -L "${files[0]}" ]] || exit 1
             digest="${files[0]##*/}"
@@ -545,7 +548,7 @@ jobs:
       - name: Resolve the platform subject
         id: subject
         env:
-          DIGEST_DIRECTORY: ${{ runner.temp }}/scan-digest
+          DIGEST_DIRECTORY: ${{ runner.temp }}/scan-digest/${{ steps.prep.outputs.platform_pair }}
           IMAGE_REPOSITORY: ${{ inputs.registry }}/${{ inputs.image-name }}
           INPUT_IMAGE_NAME: ${{ inputs.image-name }}
         run: node scripts/resolve-image-scan-subject.ts

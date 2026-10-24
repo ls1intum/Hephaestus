@@ -4,6 +4,7 @@ import {
 	chmodSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	symlinkSync,
@@ -353,33 +354,72 @@ void test("the image workflow shares the resolver and retains its immutable subj
 	assert.ok(isMap(subject));
 	assert.equal(subject.get("run"), "node scripts/resolve-image-scan-subject.ts");
 	assert.equal(subject.getIn(["env", "INPUT_IMAGE_NAME"]), `\${{ inputs.image-name }}`);
-	assert.equal(subject.getIn(["env", "DIGEST_DIRECTORY"]), `\${{ runner.temp }}/scan-digest`);
+	assert.equal(
+		subject.getIn(["env", "DIGEST_DIRECTORY"]),
+		`\${{ runner.temp }}/scan-digest/\${{ steps.prep.outputs.platform_pair }}`,
+	);
 	assert.equal(
 		subject.getIn(["env", "IMAGE_REPOSITORY"]),
 		`\${{ inputs.registry }}/\${{ inputs.image-name }}`,
 	);
 });
 
-void test("platform scans read their exact build artifact while merge retains platform directories", () => {
+void test("every digest artifact carries its platform directory, however many a download matches", () => {
 	const workflow = parseDocument(
 		readFileSync(".github/workflows/reusable-docker-build.yml", "utf8"),
 	);
-	assert.equal(workflow.getIn(["jobs", "scan", "needs"]), "build");
-	for (const job of ["scan", "merge"]) {
+	// A download extracts a single matched artifact straight into its path and several into one
+	// subdirectory each, so a layout that depended on the count broke the one-platform merge.
+	const step = (job: string, name: string) => {
 		const steps = workflow.getIn(["jobs", job, "steps"]);
 		assert.ok(isSeq(steps));
-		const download = steps.items.find(
-			(item) =>
-				isMap(item) &&
-				item.get("name") === (job === "scan" ? "Download platform digest" : "Download digests"),
+		const found: unknown = steps.items.find((item) => isMap(item) && item.get("name") === name);
+		assert.ok(isMap(found), `${job}: ${name}`);
+		return found;
+	};
+	const directory = mkdtempSync(path.join(tmpdir(), "digest-artifact-"));
+	try {
+		const exported = spawnSync(
+			"bash",
+			["-e", "-c", String(step("build", "Export digest").get("run"))],
+			{
+				encoding: "utf8",
+				env: {
+					...process.env,
+					RUNNER_TEMP: directory,
+					PLATFORM_PAIR: "linux-arm64",
+					DOCKERFILE_DIGEST: `sha256:${artifact}`,
+					BUILDPACKS_DIGEST: "",
+				},
+			},
 		);
-		assert.ok(isMap(download));
-		assert.notEqual(download.getIn(["with", "merge-multiple"]), true);
-		if (job === "scan") {
-			assert.equal(
-				download.getIn(["with", "name"]),
-				`digests-\${{ steps.prep.outputs.image_name }}-\${{ steps.prep.outputs.platform_pair }}`,
-			);
-		}
+		assert.equal(exported.status, 0, exported.stderr);
+		const entries = readdirSync(path.join(directory, "digests"), {
+			encoding: "utf8",
+			recursive: true,
+		});
+		assert.deepEqual(
+			entries.toSorted((left, right) => left.localeCompare(right)),
+			["linux-arm64", path.join("linux-arm64", artifact)],
+		);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
 	}
+	// The upload's root is the digests directory, so the artifact holds `<platform>/<digest>`.
+	assert.equal(
+		step("build", "Upload digest").getIn(["with", "path"]),
+		`\${{ runner.temp }}/digests`,
+	);
+	assert.equal(step("merge", "Download digests").getIn(["with", "merge-multiple"]), true);
+	assert.match(
+		String(step("merge", "Create manifest and push").get("run")),
+		/files=\("linux-\$arch"\/\*\)/u,
+	);
+	assert.equal(workflow.getIn(["jobs", "scan", "needs"]), "build");
+	const scan = step("scan", "Download platform digest");
+	assert.equal(
+		scan.getIn(["with", "name"]),
+		`digests-\${{ steps.prep.outputs.image_name }}-\${{ steps.prep.outputs.platform_pair }}`,
+	);
+	assert.equal(scan.getIn(["with", "path"]), `\${{ runner.temp }}/scan-digest`);
 });

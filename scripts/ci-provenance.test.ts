@@ -489,10 +489,7 @@ for (const scenario of [
 			await mkdir(artifactRoot);
 			for (const arch of architectures) {
 				const sourceDigest = arch === "arm64" ? armLeaf : buildIndex;
-				const artifactDirectory = path.join(
-					artifactRoot,
-					`digests-hephaestus-build-webapp-linux-${arch}`,
-				);
+				const artifactDirectory = path.join(artifactRoot, `linux-${arch}`);
 				await mkdir(artifactDirectory);
 				if ("artifact" in scenario && scenario.artifact === "missing" && arch === "amd64") {
 					continue;
