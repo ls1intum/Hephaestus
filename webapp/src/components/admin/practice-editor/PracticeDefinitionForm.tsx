@@ -698,7 +698,7 @@ function AboutField({ itemType, about, onChange, error }: AboutFieldProps) {
 				<FieldContent>
 					<FieldLabel htmlFor={FIELD_IDS.about}>About</FieldLabel>
 					<FieldDescription id="practice-about-description">
-						Whose work a result is about. The work means no developer.
+						Whose work an observation is about. The work means no developer.
 					</FieldDescription>
 				</FieldContent>
 				<Select

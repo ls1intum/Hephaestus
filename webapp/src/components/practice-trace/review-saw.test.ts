@@ -10,7 +10,7 @@ describe("recorded result totals", () => {
 				results: { met: 2, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
 				notMetPractices: [],
 			}),
-		).toBe("two results met");
+		).toBe("two observations met");
 	});
 });
 

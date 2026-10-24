@@ -924,7 +924,7 @@ export const LINEAGE_STATE_GROUP_TITLES: Record<LineageStateGroup, string> = {
 	review: "How the review ran",
 	origin: "What started it",
 	item: "The work reviewed",
-	results: "Results",
+	results: "Observations",
 	destination: "Where feedback went",
 	delivery: "What became of feedback",
 	volume: "Many records",
