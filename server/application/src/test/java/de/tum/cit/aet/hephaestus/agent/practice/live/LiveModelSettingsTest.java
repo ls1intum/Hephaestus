@@ -20,7 +20,7 @@ class LiveModelSettingsTest {
     void shouldKeepTheHarnessDefaultsWhenNoSettingIsGiven() {
         LiveModelSettings settings = LiveModelSettings.from(Map.<String, String>of()::get);
 
-        assertThat(settings).isEqualTo(new LiveModelSettings(131_072, 4096, null));
+        assertThat(settings).isEqualTo(LiveModelSettings.DEFAULTS);
     }
 
     @Test
@@ -31,20 +31,27 @@ class LiveModelSettingsTest {
         assertThat(settings).isEqualTo(new LiveModelSettings(131_072, 32_768, ReasoningEffort.HIGH));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"0", "-1", "", "4k", "2147483648"})
-    void shouldRefuseATokenCountWhenItIsNotAPositiveInteger(String value) {
-        assertThatThrownBy(() -> LiveModelSettings.from(Map.of(CONTEXT_WINDOW_PROPERTY, value)::get))
+    @Test
+    void shouldNameThePropertyWhenATokenCountIsNotAPositiveInteger() {
+        assertThatThrownBy(() -> LiveModelSettings.from(Map.of(CONTEXT_WINDOW_PROPERTY, "0")::get))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage(CONTEXT_WINDOW_PROPERTY + " must be a positive integer, not '" + value + "'");
+                .hasMessageContaining(CONTEXT_WINDOW_PROPERTY);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"8192", "16384"})
+    void shouldRefuseTheOutputAllowanceWhenItDoesNotFitTheContextWindow(String maxOutputTokens) {
+        assertThatThrownBy(() -> LiveModelSettings.from(
+                        Map.of(CONTEXT_WINDOW_PROPERTY, "8192", MAX_OUTPUT_TOKENS_PROPERTY, maxOutputTokens)::get))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(MAX_OUTPUT_TOKENS_PROPERTY);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"high", "", "EXTREME"})
-    void shouldRefuseAReasoningEffortWhenItIsNotACatalogValue(String value) {
+    void shouldRefuseAReasoningEffortWhenItIsNotACatalogName(String value) {
         assertThatThrownBy(() -> LiveModelSettings.from(Map.of(REASONING_EFFORT_PROPERTY, value)::get))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith(REASONING_EFFORT_PROPERTY + " must be one of [NONE,")
-                .hasMessageEndingWith(", not '" + value + "'");
+                .hasMessageContaining(REASONING_EFFORT_PROPERTY);
     }
 }

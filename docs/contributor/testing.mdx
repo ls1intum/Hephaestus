@@ -207,13 +207,15 @@ To measure the same cases with other model settings, add one or more of these op
 
 | Property | Value | Default |
 | --- | --- | --- |
-| `criteriaReasoningEffort` | A catalog reasoning effort: `NONE`, `MINIMAL`, `LOW`, `MEDIUM`, `HIGH`, `XHIGH` or `MAX` | none sent |
-| `criteriaMaxOutputTokens` | A positive integer | 4096 |
+| `criteriaReasoningEffort` | A reasoning effort: `NONE`, `MINIMAL`, `LOW`, `MEDIUM`, `HIGH`, `XHIGH` or `MAX`. The names are case-sensitive. | none sent |
+| `criteriaMaxOutputTokens` | A positive integer, less than the context window | 4096 |
 | `criteriaContextWindow` | A positive integer | 131072 |
 
 Each property needs `criteriaCases`.
-An invalid value fails the run before any model request.
-Each case prints the settings it sent.
+Gradle refuses a token count that is not a positive integer before any test starts.
+The live test refuses a lower-case or unknown reasoning effort, and an output allowance that does not fit the context window, before any model request.
+A live test that is skipped because no credentials are set checks none of these values.
+Each case prints the model settings it uses.
 
 First check the same selection without credentials or a model:
 

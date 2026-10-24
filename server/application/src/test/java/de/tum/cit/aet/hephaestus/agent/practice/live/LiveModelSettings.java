@@ -16,6 +16,10 @@ record LiveModelSettings(
     static final String MAX_OUTPUT_TOKENS_PROPERTY = "hephaestus.live.criteriaMaxOutputTokens";
     static final String REASONING_EFFORT_PROPERTY = "hephaestus.live.criteriaReasoningEffort";
 
+    /**
+     * The settings of a run that names none. The table in {@code docs/contributor/testing.mdx} § Live external-service
+     * tests states these values as the contract.
+     */
     static final LiveModelSettings DEFAULTS = new LiveModelSettings(131_072, 4096, null);
 
     static LiveModelSettings fromSystemProperties() {
@@ -24,27 +28,17 @@ record LiveModelSettings(
 
     /** The settings that {@code property} names; an invalid value fails before any model request. */
     static LiveModelSettings from(Function<String, @Nullable String> property) {
+        int contextWindow = LiveProperty.positiveInt(CONTEXT_WINDOW_PROPERTY, property.apply(CONTEXT_WINDOW_PROPERTY))
+                .orElse(DEFAULTS.contextWindow());
+        int maxOutputTokens = LiveProperty.positiveInt(
+                        MAX_OUTPUT_TOKENS_PROPERTY, property.apply(MAX_OUTPUT_TOKENS_PROPERTY))
+                .orElse(DEFAULTS.maxOutputTokens());
+        if (maxOutputTokens >= contextWindow) {
+            throw new IllegalArgumentException(MAX_OUTPUT_TOKENS_PROPERTY + " (" + maxOutputTokens
+                    + ") must be less than the context window (" + contextWindow + ")");
+        }
         return new LiveModelSettings(
-                positive(property, CONTEXT_WINDOW_PROPERTY, DEFAULTS.contextWindow()),
-                positive(property, MAX_OUTPUT_TOKENS_PROPERTY, DEFAULTS.maxOutputTokens()),
-                reasoningEffort(property.apply(REASONING_EFFORT_PROPERTY)));
-    }
-
-    private static int positive(Function<String, @Nullable String> property, String name, int fallback) {
-        String value = property.apply(name);
-        if (value == null) {
-            return fallback;
-        }
-        int parsed;
-        try {
-            parsed = Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(name + " must be a positive integer, not '" + value + "'", e);
-        }
-        if (parsed < 1) {
-            throw new IllegalArgumentException(name + " must be a positive integer, not '" + value + "'");
-        }
-        return parsed;
+                contextWindow, maxOutputTokens, reasoningEffort(property.apply(REASONING_EFFORT_PROPERTY)));
     }
 
     private static @Nullable ReasoningEffort reasoningEffort(@Nullable String value) {
