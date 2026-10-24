@@ -3,17 +3,18 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxAttemptRunner;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxWorkspaceManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.ByteArrayInputStream;
@@ -56,26 +57,27 @@ class DockerGatewayTransportTest extends BaseUnitTest {
     private final SandboxGatewaySessions sessions = new SandboxGatewaySessions();
     private final List<DockerOperations.ContainerSpec> created = new ArrayList<>();
     private final UUID jobId = UUID.randomUUID();
-    private DockerSandboxAdapter adapter;
+
+    @Mock
+    private SandboxCreator creator;
+
+    private SandboxAttemptRunner adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new DockerSandboxAdapter(
-                network,
+        var meters = new SimpleMeterRegistry();
+        adapter = new SandboxAttemptRunner(
+                new DockerSandboxBackend(network, containers, security, volumes, creator, "default", 8081, meters),
                 new SandboxWorkspaceManager(),
-                containers,
-                security,
-                8081,
-                new SimpleMeterRegistry(),
                 sessions,
-                volumes);
+                meters);
     }
 
     private void execution(int initializerExit) throws Exception {
         when(network.createJobNetwork(jobId, false, Map.of(SandboxLabels.JOB_ID, jobId.toString())))
                 .thenReturn("network");
         when(network.connectAppServer("network")).thenReturn("172.18.0.2");
-        when(security.buildHostConfig(any(), any(), any()))
+        when(security.buildHostConfig(any(), any(), anyBoolean()))
                 .thenReturn(new DockerOperations.HostConfigSpec(
                         1024,
                         1024,
@@ -127,15 +129,16 @@ class DockerGatewayTransportTest extends BaseUnitTest {
     private SandboxSpec spec(Map<String, Path> onDisk) {
         return new SandboxSpec(
                 jobId,
+                null,
                 "pi:locked",
                 List.of("sh", "-c", "run-review"),
                 Map.of(),
-                new NetworkPolicy(false, null, "token"),
+                "token",
                 ResourceLimits.DEFAULT,
-                SecurityProfile.DEFAULT,
+                null,
                 Map.of("task.json", "{}".getBytes(StandardCharsets.UTF_8)),
                 onDisk,
-                "/workspace/out");
+                List.of());
     }
 
     @Test

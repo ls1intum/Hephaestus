@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ExecSandboxes;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -171,7 +170,7 @@ public class DockerExecSandboxes implements ExecSandboxes, AutoCloseable {
         labels.put(SandboxLabels.HEPH_SANDBOX, sandboxId);
         labels.put(SandboxLabels.HEPH_WORKER, worker);
         HostConfig hostConfig = operations
-                .hostConfig(securityPolicy.buildHostConfig(PROFILE, limits, null))
+                .hostConfig(securityPolicy.buildHostConfig(PROFILE, limits, false))
                 .withNetworkMode("none")
                 .withInit(true);
         imageGuard.ensurePresent(image);

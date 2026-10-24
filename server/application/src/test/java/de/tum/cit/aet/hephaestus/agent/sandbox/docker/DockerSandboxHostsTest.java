@@ -14,9 +14,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxHosts;
+import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxWorkspaceManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.HostSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,7 +32,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 
-class DockerHostSandboxTest extends BaseUnitTest {
+/** {@code SandboxHosts} on the Docker backend: what a Heph host gets from Docker, and what its failure leaves. */
+class DockerSandboxHostsTest extends BaseUnitTest {
 
     private static final HostSandbox.HostSpec SPEC = new HostSandbox.HostSpec(
             Map.of(),
@@ -58,31 +62,42 @@ class DockerHostSandboxTest extends BaseUnitTest {
     @Mock
     private DockerVolumeOperations volumes;
 
-    private DockerHostSandbox sandbox;
+    @TempDir
+    Path temp;
+
+    private SandboxGatewaySessions.Session session;
+    private SandboxHosts sandbox;
 
     @BeforeEach
-    void setUp() {
-        sandbox = new DockerHostSandbox(
-                networks,
+    void setUp() throws IOException {
+        sandbox = new SandboxHosts(
+                new DockerSandboxBackend(
+                        networks,
+                        containers,
+                        securityPolicy,
+                        volumes,
+                        creator,
+                        "worker-1",
+                        8081,
+                        new SimpleMeterRegistry()),
                 workspaces,
-                containers,
-                securityPolicy,
-                creator,
                 gatewaySessions,
-                volumes,
-                "heph-host:test",
-                "worker-1",
-                8081);
+                "heph-host:test");
+        when(workspaces.createInputTar(any(), any())).thenReturn(Files.createFile(temp.resolve("input.tar")));
+        session = mock(SandboxGatewaySessions.Session.class);
+        when(session.id()).thenReturn(UUID.randomUUID());
+        when(gatewaySessions.registerHost(any(), any(), any(), any())).thenReturn(session);
     }
 
     @Test
-    void shouldStartNoHostWhenTheWorkerRunsInAContainerThatItCannotIdentify() {
+    void shouldStartNoHostWhenTheWorkerRunsInAContainerThatItCannotIdentify() throws IOException {
         when(creator.labels()).thenReturn(Map.of());
         when(creator.outsideContainer()).thenReturn(false);
 
         assertThatThrownBy(() -> sandbox.launch(SPEC)).isInstanceOf(IOException.class);
 
         verify(networks, never()).createJobNetwork(any(), anyBoolean(), any());
+        verify(session).close();
     }
 
     @Test
@@ -113,18 +128,13 @@ class DockerHostSandboxTest extends BaseUnitTest {
      * host ran on is still removed.
      */
     @Test
-    void shouldRemoveEverythingTheHostRanOnAndReadNoneOfItsOutputWhenItFailsToStart(@TempDir Path temp)
-            throws Exception {
+    void shouldRemoveEverythingTheHostRanOnAndReadNoneOfItsOutputWhenItFailsToStart() throws Exception {
         when(creator.labels())
                 .thenReturn(Map.of(
                         SandboxLabels.CREATOR_CONTAINER, "3f2a9c1b7d4e", SandboxLabels.CREATOR_STARTED_AT, "t1"));
         when(networks.createJobNetwork(any(), anyBoolean(), any())).thenReturn("net-1");
         when(networks.connectAppServer("net-1")).thenReturn("10.0.0.2");
-        when(workspaces.createInputTar(any(), any())).thenReturn(Files.createFile(temp.resolve("input.tar")));
-        SandboxGatewaySessions.Session session = mock(SandboxGatewaySessions.Session.class);
-        when(session.id()).thenReturn(UUID.randomUUID());
-        when(gatewaySessions.registerHost(any(), any(), any(), any())).thenReturn(session);
-        when(securityPolicy.buildHostConfig(any(), any(), any()))
+        when(securityPolicy.buildHostConfig(any(), any(), anyBoolean()))
                 .thenReturn(new DockerOperations.HostConfigSpec(
                         0, 0, 0, 0, true, false, List.of(), List.of(), Map.of(), List.of(), null, null, null, Map.of(),
                         List.of()));

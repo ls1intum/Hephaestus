@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
+package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import java.util.List;
 import java.util.Map;
