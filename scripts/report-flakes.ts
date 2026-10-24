@@ -35,13 +35,17 @@ export interface FlakyRun {
 	failedTests: string[] | null;
 }
 
-/** Jobs that failed in one attempt of a run and then passed in a later attempt of the same commit. */
+/**
+ * Jobs that failed in one attempt of a run and then passed in a later attempt of the same commit,
+ * once per job at its first failed attempt.
+ */
 export function flakyJobs(attempts: ReadonlyMap<number, readonly AttemptJob[]>): FlakyJob[] {
 	const flaky: FlakyJob[] = [];
+	const counted = new Set<string>();
 	const ordered = [...attempts.keys()].toSorted((a, b) => a - b);
 	for (const [index, attempt] of ordered.entries()) {
 		for (const job of attempts.get(attempt) ?? []) {
-			if (job.conclusion !== "failure" || AGGREGATE_JOBS.has(job.name)) {
+			if (job.conclusion !== "failure" || AGGREGATE_JOBS.has(job.name) || counted.has(job.name)) {
 				continue;
 			}
 			const passedLater = ordered
@@ -52,6 +56,7 @@ export function flakyJobs(attempts: ReadonlyMap<number, readonly AttemptJob[]>):
 					),
 				);
 			if (passedLater) {
+				counted.add(job.name);
 				flaky.push({ attempt, job });
 			}
 		}
@@ -100,6 +105,33 @@ export function failedTestCases(xml: string): string[] {
 				return `${asString(owner, "testcase classname")} > ${asString(testCase.name, "testcase name")}`;
 			});
 	});
+}
+
+/**
+ * The failed tests of the flaky attempts that did not fail again in the run's last attempt. A
+ * rerun repeats every failed job, so a test that fails there belongs to a job that never passed.
+ */
+export function flakyTests(
+	failedEarlier: readonly string[],
+	failedLast: readonly string[],
+): string[] {
+	const real = new Set(failedLast);
+	return [...new Set(failedEarlier)].filter((name) => !real.has(name));
+}
+
+/** Completed runs that needed another attempt, once each: adjacent day windows share their bound. */
+export function rerunsOf(pages: readonly unknown[]): Record<string, unknown>[] {
+	const seen = new Set<unknown>();
+	return pages
+		.flatMap((page) => asArray(asRecord(page, "runs page").workflow_runs, "workflow_runs"))
+		.map((run) => asRecord(run, "run"))
+		.filter((run) => {
+			if (typeof run.run_attempt !== "number" || run.run_attempt < 2 || seen.has(run.id)) {
+				return false;
+			}
+			seen.add(run.id);
+			return true;
+		});
 }
 
 /** Report artifacts of one attempt: CI names them `<suite>-reports-<attempt>`. */
@@ -179,42 +211,59 @@ async function api(route: string): Promise<readonly unknown[]> {
 	return asArray(parseJson(await output("gh", ["api", "--paginate", "--slurp", route])), "pages");
 }
 
+async function failedTestsIn(
+	repository: string,
+	runId: number,
+	names: readonly string[],
+	directory: string,
+): Promise<string[]> {
+	const failed: string[] = [];
+	for (const name of names) {
+		const target = path.join(directory, name);
+		await output("gh", [
+			"run",
+			"download",
+			String(runId),
+			"-R",
+			repository,
+			"-n",
+			name,
+			"-D",
+			target,
+		]);
+		for (const file of await readdir(target, { recursive: true })) {
+			if (file.endsWith(".xml")) {
+				failed.push(...failedTestCases(await readFile(path.join(target, file), "utf8")));
+			}
+		}
+	}
+	return failed;
+}
+
 async function failedTestsOf(
 	repository: string,
 	runId: number,
 	attempts: readonly number[],
+	lastAttempt: number,
 ): Promise<string[] | null> {
 	const pages = await api(`repos/${repository}/actions/runs/${runId}/artifacts?per_page=100`);
 	const artifacts = pages.flatMap((page) =>
 		asArray(asRecord(page, "artifact page").artifacts, "artifacts"),
 	);
-	const names = attempts.flatMap((attempt) => reportArtifacts(artifacts, attempt));
-	if (names.length === 0) {
+	const earlier = attempts.flatMap((attempt) => reportArtifacts(artifacts, attempt));
+	if (earlier.length === 0) {
 		return null;
 	}
 	const directory = await mkdtemp(path.join(tmpdir(), "report-flakes-"));
 	try {
-		const failed: string[] = [];
-		for (const name of names) {
-			const target = path.join(directory, name);
-			await output("gh", [
-				"run",
-				"download",
-				String(runId),
-				"-R",
-				repository,
-				"-n",
-				name,
-				"-D",
-				target,
-			]);
-			for (const file of await readdir(target, { recursive: true })) {
-				if (file.endsWith(".xml")) {
-					failed.push(...failedTestCases(await readFile(path.join(target, file), "utf8")));
-				}
-			}
-		}
-		return failed;
+		return flakyTests(
+			await failedTestsIn(repository, runId, earlier, directory),
+			await failedTestsIn(repository, runId, reportArtifacts(artifacts, lastAttempt), directory),
+		);
+	} catch (error) {
+		// An expired or deleted report leaves this run's tests unknown, not the whole report.
+		process.stderr.write(`Run ${runId}: test reports unreadable (${String(error)})\n`);
+		return null;
 	} finally {
 		await rm(directory, { recursive: true, force: true });
 	}
@@ -228,47 +277,49 @@ if (import.meta.main) {
 	const now = Date.now();
 	const flakyRuns: FlakyRun[] = [];
 	// A filtered run listing stops at 1,000 results, so each day is listed on its own.
+	const pages: unknown[] = [];
 	for (let day = WINDOW_DAYS; day > 0; day -= 1) {
 		const from = new Date(now - day * DAY_MS).toISOString();
 		const to = new Date(now - (day - 1) * DAY_MS).toISOString();
-		const pages = await api(
-			`repos/${repository}/actions/workflows/cicd.yml/runs?status=completed&per_page=100&created=${encodeURIComponent(`${from}..${to}`)}`,
+		pages.push(
+			...(await api(
+				`repos/${repository}/actions/workflows/cicd.yml/runs?status=completed&per_page=100&created=${encodeURIComponent(`${from}..${to}`)}`,
+			)),
 		);
-		const reruns = pages
-			.flatMap((page) => asArray(asRecord(page, "runs page").workflow_runs, "workflow_runs"))
-			.map((run) => asRecord(run, "run"))
-			.filter((run) => typeof run.run_attempt === "number" && run.run_attempt > 1);
-		for (const run of reruns) {
-			const runId = run.id;
-			const lastAttempt = run.run_attempt;
-			if (typeof runId !== "number" || typeof lastAttempt !== "number") {
-				throw new Error("Invalid run identifier");
-			}
-			const attempts = new Map<number, AttemptJob[]>();
-			for (let attempt = 1; attempt <= lastAttempt; attempt += 1) {
-				const jobPages = await api(
-					`repos/${repository}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`,
-				);
-				attempts.set(
-					attempt,
-					jobPages.flatMap((page) => attemptJobs(asRecord(page, "jobs page").jobs)),
-				);
-			}
-			const jobs = flakyJobs(attempts);
-			if (jobs.length === 0) {
-				continue;
-			}
-			flakyRuns.push({
-				runId,
-				sha: asString(run.head_sha, "head_sha"),
-				event: asString(run.event, "event"),
-				createdAt: asString(run.created_at, "created_at"),
-				jobs,
-				failedTests: await failedTestsOf(repository, runId, [
-					...new Set(jobs.map((job) => job.attempt)),
-				]),
-			});
+	}
+	for (const run of rerunsOf(pages)) {
+		const runId = run.id;
+		const lastAttempt = run.run_attempt;
+		if (typeof runId !== "number" || typeof lastAttempt !== "number") {
+			throw new Error("Invalid run identifier");
 		}
+		const attempts = new Map<number, AttemptJob[]>();
+		for (let attempt = 1; attempt <= lastAttempt; attempt += 1) {
+			const jobPages = await api(
+				`repos/${repository}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`,
+			);
+			attempts.set(
+				attempt,
+				jobPages.flatMap((page) => attemptJobs(asRecord(page, "jobs page").jobs)),
+			);
+		}
+		const jobs = flakyJobs(attempts);
+		if (jobs.length === 0) {
+			continue;
+		}
+		flakyRuns.push({
+			runId,
+			sha: asString(run.head_sha, "head_sha"),
+			event: asString(run.event, "event"),
+			createdAt: asString(run.created_at, "created_at"),
+			jobs,
+			failedTests: await failedTestsOf(
+				repository,
+				runId,
+				[...new Set(jobs.map((job) => job.attempt))],
+				lastAttempt,
+			),
+		});
 	}
 	await mkdir("tmp/ci-metrics", { recursive: true });
 	await writeFile(

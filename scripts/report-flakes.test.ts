@@ -5,8 +5,10 @@ import {
 	type AttemptJob,
 	failedTestCases,
 	flakyJobs,
+	flakyTests,
 	renderFlakes,
 	reportArtifacts,
+	rerunsOf,
 } from "./report-flakes.ts";
 
 const job = (name: string, conclusion: string | null, failedSteps: string[] = []): AttemptJob => ({
@@ -40,6 +42,38 @@ void test("a failure passes only when a later attempt passes, not an earlier one
 		[1, [job("Stories", "success")]],
 	]);
 	assert.deepEqual(flakyJobs(attempts), []);
+});
+
+void test("a job that fails twice and then passes counts once, at its first failure", () => {
+	const attempts = new Map([
+		[1, [job("Stories", "failure")]],
+		[2, [job("Stories", "failure")]],
+		[3, [job("Stories", "success")]],
+	]);
+	assert.deepEqual(
+		flakyJobs(attempts).map(({ attempt }) => attempt),
+		[1],
+	);
+});
+
+void test("a test that fails again in the last attempt is a real failure, not a flake", () => {
+	// Job A flaked: its test passed on the rerun. Job B failed in both attempts.
+	const firstAttempt = ["A > flaky", "B > broken"];
+	const lastAttempt = ["B > broken"];
+	assert.deepEqual(flakyTests(firstAttempt, lastAttempt), ["A > flaky"]);
+});
+
+const page = (...runs: object[]) => ({ workflow_runs: runs });
+
+void test("reruns are listed once, even where two day windows share a bound", () => {
+	const runs = rerunsOf([
+		page({ id: 1, run_attempt: 2 }, { id: 2, run_attempt: 1 }),
+		page({ id: 1, run_attempt: 2 }, { id: 3, run_attempt: 3 }),
+	]);
+	assert.deepEqual(
+		runs.map((run) => run.id),
+		[1, 3],
+	);
 });
 
 void test("failed and errored JUnit cases are named by class and test", () => {
