@@ -22,7 +22,10 @@ public record ResourceLimits(
         @Nullable Duration maxRuntime) {
     public static final long MAX_MEMORY_BYTES = 16L * 1024 * 1024 * 1024;
 
-    public static final double MAX_CPUS = 8.0;
+    /** {@link #MAX_CPUS} as configuration validation reads it. */
+    public static final String MAX_CPUS_TEXT = "8.0";
+
+    public static final double MAX_CPUS = Double.parseDouble(MAX_CPUS_TEXT);
 
     public static final int MAX_PIDS = 4096;
 

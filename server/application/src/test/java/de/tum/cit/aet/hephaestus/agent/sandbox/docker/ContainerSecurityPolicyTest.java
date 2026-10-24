@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxTestLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
@@ -371,5 +373,14 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             assertThat(core.soft()).isZero();
             assertThat(core.hard()).isZero();
         }
+    }
+
+    @Test
+    void shouldRefuseAReviewMemoryLimitThatFullTmpfsMountsWouldExhaust() {
+        assertThatThrownBy(() -> ContainerSecurityPolicy.requireRoomBesideTmpfs(2L * 1024 * 1024 * 1024))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SANDBOX_MEMORY_BYTES");
+        assertThatCode(() -> ContainerSecurityPolicy.requireRoomBesideTmpfs(3L * 1024 * 1024 * 1024))
+                .doesNotThrowAnyException();
     }
 }

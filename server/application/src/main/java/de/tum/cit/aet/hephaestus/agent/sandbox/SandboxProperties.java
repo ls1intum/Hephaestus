@@ -34,14 +34,14 @@ public record SandboxProperties(
      * they rest on are in docs/admin/install.mdx § Requirements.
      *
      * @param memoryBytes maximum memory in bytes, tmpfs pages included
-     * @param cpus CPU limit
+     * @param cpus CPU limit: a share of CPU time the sandbox may use, not a reservation
      * @param pidsLimit maximum process count
      */
     public record DefaultResourceLimits(
-            @DefaultValue("2147483648") @Min(1) @Max(ResourceLimits.MAX_MEMORY_BYTES)
+            @DefaultValue("3221225472") @Min(1) @Max(ResourceLimits.MAX_MEMORY_BYTES)
             long memoryBytes,
 
-            @DefaultValue("1.0") @DecimalMin("0.01") @DecimalMax("8.0")
+            @DefaultValue("1.0") @DecimalMin("0.01") @DecimalMax(ResourceLimits.MAX_CPUS_TEXT)
             double cpus,
 
             @DefaultValue("256") @Min(1) @Max(ResourceLimits.MAX_PIDS)

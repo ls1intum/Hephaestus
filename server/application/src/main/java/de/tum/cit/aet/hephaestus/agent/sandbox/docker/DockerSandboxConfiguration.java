@@ -212,9 +212,12 @@ public class DockerSandboxConfiguration {
             SandboxContainerManager containerManager,
             ContainerSecurityPolicy securityPolicy,
             SandboxGatewayProperties gatewayProperties,
+            SandboxProperties sandboxProperties,
             MeterRegistry meterRegistry,
             SandboxGatewaySessions gatewaySessions,
             DockerClientOperations volumeOperations) {
+        ContainerSecurityPolicy.requireRoomBesideTmpfs(
+                sandboxProperties.defaultResourceLimits().memoryBytes());
         return new DockerSandboxAdapter(
                 networkManager,
                 workspaceManager,
