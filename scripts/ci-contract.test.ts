@@ -2981,6 +2981,7 @@ void describe("CI contract", () => {
 				"--",
 				":(glob)**/package.json",
 				":(glob)**/pnpm-lock.yaml",
+				":(glob)**/pnpm-workspace.yaml",
 				":(glob)**/*.gradle.kts",
 				":(glob)**/*gradle.lockfile",
 				":(glob)server/gradle/**",
@@ -2999,6 +3000,7 @@ void describe("CI contract", () => {
 		);
 		for (const [file, expected] of [
 			["pnpm-workspace.yaml", true],
+			["docker/agents/pi/pnpm-workspace.yaml", true],
 			["server/gradle.properties", true],
 			[".github/dependency-review-config.yml", true],
 			[".changeset/review-progress.md", false],
@@ -3713,16 +3715,17 @@ void test("a pull-request workflow cancels its superseded runs and nothing else"
 					"true",
 			};
 		};
-		const pullRequest = (number: number, sha: string) =>
+		// Every fixture pushes the same branch name: a fork's branch can share a name with ours.
+		const pullRequest = (number: number, sha: string, head = repository) =>
 			lane({
 				event_name: event,
 				ref: event === "pull_request" ? `refs/pull/${number}/merge` : "refs/heads/main",
 				ref_name: event === "pull_request" ? `${number}/merge` : "main",
-				head_ref: `feature-${number}`,
+				head_ref: "feature",
 				sha,
 				event: {
 					number,
-					pull_request: { number, head: { sha, repo: { full_name: repository } } },
+					pull_request: { number, head: { sha, ref: "feature", repo: { full_name: head } } },
 					repository: { default_branch: "main" },
 				},
 			});
@@ -3732,6 +3735,9 @@ void test("a pull-request workflow cancels its superseded runs and nothing else"
 		}
 		if (pullRequest(2, "a".repeat(40)).group === first.group) {
 			offenders.push(`${file}: one pull request cancels another's run`);
+		}
+		if (pullRequest(3, "a".repeat(40), "fork/Hephaestus").group === first.group) {
+			offenders.push(`${file}: a fork's pull request cancels a run with the same branch name`);
 		}
 		const ref = `refs/heads/gh-readonly-queue/main/pr-1-${"c".repeat(40)}`;
 		for (const [trigger, github] of [
@@ -3766,6 +3772,18 @@ void test("a pull-request workflow cancels its superseded runs and nothing else"
 			workflow.hasIn(["on", "pull_request"]) || workflow.hasIn(["on", "pull_request_target"]),
 			`${file} no longer runs on pull requests, so it no longer needs an exception`,
 		);
+		const jobs = workflow.get("jobs");
+		assert.ok(isMap(jobs), file);
+		for (const lane of [
+			["concurrency"],
+			...jobs.items.map((entry) => ["jobs", String(entry.key), "concurrency"]),
+		]) {
+			const cancels = workflow.getIn([...lane, "cancel-in-progress"]);
+			assert.ok(
+				cancels === undefined || cancels === false,
+				`${file} is exempt because cancelling is unsafe, so ${lane.join(".")} must not cancel`,
+			);
+		}
 	}
 });
 

@@ -63,7 +63,7 @@ It can capture evidence only for images that its run published.
 | Build → Extension: E2E                                                  | Playwright with the extension's `e2e` build — not the production zip — against the packaged JAR                                                                                                           | `vp run test:extension:e2e`                                              |
 | Build → App Server image                                                | `pack build` from the packaged JAR, signed, attested and policy-scanned                                                                                                                                   | —                                                                        |
 | Test → App Server: Unit and architecture, App Server: Integration       | compiled from source                                                                                                                                                                                      | `vp run test:server:verification`, `test:server:integration`             |
-| Dependency review → New dependency risk                                          | informational dependency review. Pull requests only. Independent of CI Status Gate                                                                                                                                                                     | —                                                                        |
+| Dependency review → New dependency risk                                          | informational dependency review. Pull requests that change a dependency input. Independent of CI Status Gate                                                                                                                                                           | —                                                                        |
 | Security → Dependencies, secrets, and policy                            | Trivy filesystem scan, dependency vulnerability gate, TruffleHog, `security.txt` expiry, changelog immutability guard, legacy-reference guards                                                            | —                                                                        |
 | Changesets → Verify changesets                                          | policy tests, verified-revert detection, release-note presence, `MIGRATION.md` freeze                                                                                                                     | `vp run gate:changesets`                                                 |
 | Compose → Render compose stacks                                         | the self-hosted, preview and reference stacks render                                                                                                                                                      | `vp run gate:preview-stack`                                              |
@@ -202,10 +202,10 @@ changesets rather than adding one. [Release management](./release-management.mdx
 | Control                               | Timing                                                                       | Enforcement                                                                                                             | Destination                                 |
 | ------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | Dependency vulnerability gate         | Security workflow                                                            | owns the dependency verdict. Blocks fixable high or critical findings in every dependency the checkout resolves         | required Security workflow                  |
-| GitHub dependency review              | pull requests                                                                | reports the advisories a pull request introduces, with their patched versions. Holds no verdict                         | Independent dependency-review summary       |
+| GitHub dependency review              | pull requests that change a dependency input                                 | reports the advisories a pull request introduces, with their patched versions. Holds no verdict                         | Independent dependency-review summary       |
 | TruffleHog and GitHub push protection | pull requests and pushes                                                     | block verified secrets                                                                                                  | Security workflow and repository protection |
 | Trivy filesystem scan                 | Security workflow                                                            | a scanner error blocks. Findings of every severity are report-only                                                      | code scanning                               |
-| Semgrep TLS policy                    | pull requests, merge groups, and `main` pushes                               | fails on a rule violation or a scanner error                                                                            | code scanning and a run artifact            |
+| Semgrep TLS policy                    | pull requests and `main` pushes                                              | fails on a rule violation or a scanner error                                                                            | code scanning and a run artifact            |
 | Image vulnerability policy            | image build and release                                                      | blocks fixable high or critical findings                                                                                | build summary and release evidence          |
 | Weekly image rescans                  | `rescan-main-images.yml`, `rescan-release-images.yml`                        | the `main` rescan upserts one tracking issue. The release rescan fails and comments on the vulnerability response issue | issues and run artifacts                    |
 | OpenSSF Scorecard                     | `main` pushes, branch-protection changes, and weekly. Never on pull requests | reports                                                                                                                 | code scanning and a run artifact            |
@@ -882,7 +882,7 @@ If no such default-branch commit exists, the run builds every image itself. `det
   `fail-fast: true`.
 - A push to a pull request cancels the earlier runs of that pull request, and no other runs.
   A superseded run validates a commit that nobody merges, and it holds runners that other pull requests wait for.
-  Each workflow that runs on `pull_request` declares this at the top level:
+  Each workflow that runs on `pull_request` or `pull_request_target` declares this at the top level:
 
   ```yaml
   concurrency:
@@ -890,13 +890,15 @@ If no such default-branch commit exists, the run builds every image itself. `det
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
   ```
 
-  Equivalent groups are permitted. A `pull_request_target` run has the base branch as its ref, so its group must name the pull request number.
+  Equivalent groups are permitted. A `pull_request_target` run has the base branch as its ref, so its group must name the pull request number, as in `pull-request.yml`.
+  A group must not use the head branch name alone, because two forks can push branches with the same name.
   A reusable workflow declares no lane of its own.
   In a called workflow, `github.workflow` is the caller's name, so a group there would join the caller's lane.
   The caller's lane covers the jobs that it calls.
 
   A workflow that deploys, tears down, or writes to a pull request does not cancel, because a run cancelled halfway leaves partial state.
   `UNCANCELLED_PULL_REQUEST_RUNS` in `scripts/ci-contract.test.ts` lists those workflows with their reasons.
+  The test fails if a listed workflow cancels a run in progress at the workflow or job level.
   The test evaluates each group. It fails when a workflow lacks the rule or when one pull request cancels another.
   It also fails when a run can cancel a run on `main` or in the merge queue.
 - `release.yml` never cancels. The same-repository
