@@ -1094,6 +1094,17 @@ void describe("CI contract", () => {
 			/matrix\.shard/u,
 			"The shard's selector reaches the task as an environment value",
 		);
+		const steps = workflow.getIn([...jobPath, "steps"]);
+		assert.ok(isSeq(steps));
+		const postgres = steps.items.find(
+			(item) => isMap(item) && item.get("uses") === "./.github/actions/postgres-image",
+		);
+		assert.ok(isMap(postgres), "Integration shards resolve the published PostgreSQL image");
+		assert.equal(
+			environment.get("HEPHAESTUS_TEST_POSTGRES_IMAGE"),
+			stepInputs(postgres).get("tag"),
+			"Testcontainers starts the image that the job resolved",
+		);
 		assert.doesNotMatch(
 			runScript(workflow, jobPath, "Run integration tests"),
 			/\$\{\{/u,
